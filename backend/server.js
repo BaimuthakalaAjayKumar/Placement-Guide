@@ -17,8 +17,13 @@ app.use(express.json());
 
 // Enable CORS
 app.use(cors({
-  origin: '*', // For development, allow all origins. Can be restricted to React app domain later
-  credentials: true
+  origin: [
+    "http://localhost:5173",
+    "https://placement-guide-nu.vercel.app"
+  ],
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"]
 }));
 
 // Set static folder for uploaded files
