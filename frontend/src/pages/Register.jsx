@@ -27,14 +27,6 @@ const Register = () => {
       return;
     }
 
-    const normalizedRole = role || 'student';
-    const platformUsernames = [leetcodeUsername, codeforcesUsername, codechefUsername, hackerrankUsername].map(value => value?.trim() || '');
-
-    if (normalizedRole === 'student' && platformUsernames.some(username => username.length === 0)) {
-      setError('Students must fill all coding platform IDs: LeetCode, Codeforces, CodeChef, and HackerRank.');
-      return;
-    }
-
     if (password.length < 6) {
       setError('Password must be at least 6 characters long.');
       return;
@@ -116,7 +108,7 @@ const Register = () => {
           </div>
 
           <div className="form-group">
-            <label className="form-label" htmlFor="leetcodeUsername">LeetCode Username <span className="text-secondary">(Required for students)</span></label>
+            <label className="form-label" htmlFor="leetcodeUsername">LeetCode Username <span className="text-secondary">(Optional)</span></label>
             <input
               type="text"
               id="leetcodeUsername"
@@ -128,7 +120,7 @@ const Register = () => {
           </div>
 
           <div className="form-group">
-            <label className="form-label" htmlFor="codeforcesUsername">Codeforces Username <span className="text-secondary">(Required for students)</span></label>
+            <label className="form-label" htmlFor="codeforcesUsername">Codeforces Username <span className="text-secondary">(Optional)</span></label>
             <input
               type="text"
               id="codeforcesUsername"
@@ -140,7 +132,7 @@ const Register = () => {
           </div>
 
           <div className="form-group">
-            <label className="form-label" htmlFor="codechefUsername">CodeChef Username <span className="text-secondary">(Required for students)</span></label>
+            <label className="form-label" htmlFor="codechefUsername">CodeChef Username <span className="text-secondary">(Optional)</span></label>
             <input
               type="text"
               id="codechefUsername"
@@ -152,7 +144,7 @@ const Register = () => {
           </div>
 
           <div className="form-group">
-            <label className="form-label" htmlFor="hackerrankUsername">HackerRank Username <span className="text-secondary">(Required for students)</span></label>
+            <label className="form-label" htmlFor="hackerrankUsername">HackerRank Username <span className="text-secondary">(Optional)</span></label>
             <input
               type="text"
               id="hackerrankUsername"

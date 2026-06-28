@@ -31,13 +31,6 @@ exports.register = async (req, res, next) => {
     const trimmedCodeChef = (codechefUsername || '').trim();
     const trimmedHackerrank = (hackerrankUsername || '').trim();
 
-    if (normalizedRole === 'student' && (!trimmedLeetCode || !trimmedCodeforces || !trimmedCodeChef || !trimmedHackerrank)) {
-      return res.status(400).json({
-        success: false,
-        error: 'Students must provide all coding platform IDs: LeetCode, Codeforces, CodeChef, and HackerRank.'
-      });
-    }
-
     // Check if user already exists
     const userExists = await User.findOne({ email });
     if (userExists) {
