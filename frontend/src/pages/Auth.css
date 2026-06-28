@@ -148,6 +148,12 @@
   transition: color 0.2s ease;
 }
 
+.auth-form-extra {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 8px;
+}
+
 .auth-link:hover {
   color: var(--primary-hover);
   text-decoration: underline;

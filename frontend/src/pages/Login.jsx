@@ -85,6 +85,11 @@ const Login = () => {
               onChange={(e) => setPassword(e.target.value)}
               required
             />
+            <div className="auth-form-extra">
+              <a href="mailto:admin@prepportal.com?subject=Password%20Reset%20Request" className="auth-link">
+                Forgot password?
+              </a>
+            </div>
           </div>
 
           <button type="submit" className="btn btn-accent btn-block" disabled={localLoading}>
