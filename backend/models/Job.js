@@ -35,6 +35,10 @@ const JobSchema = new mongoose.Schema({
     type: String,
     default: ''
   },
+  targetBatch: {
+    type: String,
+    default: 'All'
+  },
   createdAt: {
     type: Date,
     default: Date.now

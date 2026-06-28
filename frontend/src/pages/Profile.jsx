@@ -5,7 +5,7 @@ import './Profile.css';
 
 const Profile = () => {
   const { user, updateProfile } = useAuth();
-  
+
   // Profile settings state
   const [targetRole, setTargetRole] = useState(user?.targetRole || 'Software Engineer');
   const [bio, setBio] = useState(user?.bio || '');
@@ -13,18 +13,28 @@ const Profile = () => {
   const [rollNumber, setRollNumber] = useState(user?.rollNumber || '');
   const [branch, setBranch] = useState(user?.branch || '');
   const [year, setYear] = useState(user?.year || '');
-  
+
+  // Academics details state
+  const [sgpaSem1, setSgpaSem1] = useState(user?.sgpaSem1 || 0);
+  const [sgpaSem2, setSgpaSem2] = useState(user?.sgpaSem2 || 0);
+  const [sgpaSem3, setSgpaSem3] = useState(user?.sgpaSem3 || 0);
+  const [sgpaSem4, setSgpaSem4] = useState(user?.sgpaSem4 || 0);
+  const [sgpaSem5, setSgpaSem5] = useState(user?.sgpaSem5 || 0);
+  const [sgpaSem6, setSgpaSem6] = useState(user?.sgpaSem6 || 0);
+  const [sgpaSem7, setSgpaSem7] = useState(user?.sgpaSem7 || 0);
+  const [sgpaSem8, setSgpaSem8] = useState(user?.sgpaSem8 || 0);
+
   // Platform usernames state
   const [leetcodeUsername, setLeetcodeUsername] = useState(user?.leetcodeUsername || '');
   const [codeforcesUsername, setCodeforcesUsername] = useState(user?.codeforcesUsername || '');
   const [codechefUsername, setCodechefUsername] = useState(user?.codechefUsername || '');
   const [hackerrankUsername, setHackerrankUsername] = useState(user?.hackerrankUsername || '');
-  
+
   // UI States
   const [saveLoading, setSaveLoading] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
- 
+
   // Sync state if user changes in context
   useEffect(() => {
     if (user) {
@@ -34,6 +44,14 @@ const Profile = () => {
       setRollNumber(user.rollNumber || '');
       setBranch(user.branch || '');
       setYear(user.year || '');
+      setSgpaSem1(user.sgpaSem1 || 0);
+      setSgpaSem2(user.sgpaSem2 || 0);
+      setSgpaSem3(user.sgpaSem3 || 0);
+      setSgpaSem4(user.sgpaSem4 || 0);
+      setSgpaSem5(user.sgpaSem5 || 0);
+      setSgpaSem6(user.sgpaSem6 || 0);
+      setSgpaSem7(user.sgpaSem7 || 0);
+      setSgpaSem8(user.sgpaSem8 || 0);
       setLeetcodeUsername(user.leetcodeUsername || '');
       setCodeforcesUsername(user.codeforcesUsername || '');
       setCodechefUsername(user.codechefUsername || '');
@@ -60,6 +78,14 @@ const Profile = () => {
         rollNumber: rollNumber.trim(),
         branch: branch.trim(),
         year: year.trim(),
+        sgpaSem1: sgpaSem1 || 0,
+        sgpaSem2: sgpaSem2 || 0,
+        sgpaSem3: sgpaSem3 || 0,
+        sgpaSem4: sgpaSem4 || 0,
+        sgpaSem5: sgpaSem5 || 0,
+        sgpaSem6: sgpaSem6 || 0,
+        sgpaSem7: sgpaSem7 || 0,
+        sgpaSem8: sgpaSem8 || 0,
         leetcodeUsername: leetcodeUsername.trim(),
         codeforcesUsername: codeforcesUsername.trim(),
         codechefUsername: codechefUsername.trim(),
@@ -77,6 +103,13 @@ const Profile = () => {
     } finally {
       setSaveLoading(false);
     }
+  };
+
+  const calculateCgpa = () => {
+    const sems = [sgpaSem1, sgpaSem2, sgpaSem3, sgpaSem4, sgpaSem5, sgpaSem6, sgpaSem7, sgpaSem8].map(Number);
+    const completed = sems.filter(v => v > 0);
+    if (completed.length === 0) return '0.00';
+    return (completed.reduce((a, b) => a + b, 0) / completed.length).toFixed(2);
   };
 
   const getInitials = (name) => {
@@ -114,7 +147,7 @@ const Profile = () => {
                 <p className="student-email">{user?.email}</p>
                 <div className="profile-role-pill">{user?.role === 'admin' ? 'Administrator' : targetRole}</div>
               </div>
-              
+
               <div className="student-meta-list">
                 <div className="meta-item">
                   <span className="meta-label">Account Type:</span>
@@ -136,6 +169,12 @@ const Profile = () => {
                   <div className="meta-item animate-fade">
                     <span className="meta-label">Grad Year:</span>
                     <span className="meta-value">{user.year}</span>
+                  </div>
+                )}
+                {user?.role === 'student' && (
+                  <div className="meta-item animate-fade">
+                    <span className="meta-label">CGPA:</span>
+                    <span className="meta-value text-glow" style={{ color: '#6366f1', fontWeight: 'bold' }}>{calculateCgpa()}</span>
                   </div>
                 )}
                 <div className="meta-item">
@@ -264,7 +303,7 @@ const Profile = () => {
                     placeholder="e.g. React, Node.js, C++, SQL, Python"
                   />
                   <p className="field-help">Enter your skills separated by commas.</p>
-                  
+
                   {/* Real-time skill badges */}
                   {skillsText.trim() && (
                     <div className="skills-preview-list">
@@ -275,6 +314,63 @@ const Profile = () => {
                   )}
                 </div>
               </div>
+
+              {/* Academic Performance Details Card */}
+              {user?.role === 'student' && (
+                <div className="glass-card form-section-card mt-24">
+                  <div className="section-header">
+                    <svg className="section-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 10v6M2 10l10-5 10 5-10 5z" /><path d="M6 12v5c0 2 2 3 6 3s6-1 6-3v-5" /></svg>
+                    <h3>Academic Performance (SGPAs)</h3>
+                  </div>
+                  <p className="section-desc">
+                    Enter your semester-wise SGPA scores. Your overall CGPA will be computed automatically.
+                  </p>
+
+                  <div className="academics-cgpa-banner" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(99, 102, 241, 0.1)', border: '1px solid rgba(99, 102, 241, 0.2)', padding: '12px 16px', borderRadius: '8px', marginBottom: '20px' }}>
+                    <span className="text-secondary" style={{ fontWeight: '500' }}>Computed CGPA:</span>
+                    <strong className="text-glow" style={{ fontSize: '18px', color: '#6366f1' }}>{calculateCgpa()}</strong>
+                  </div>
+
+                  <div className="academics-sgpas-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))', gap: '16px' }}>
+                    {[1, 2, 3, 4, 5, 6, 7, 8].map(sem => {
+                      const sgpaStates = [
+                        [sgpaSem1, setSgpaSem1],
+                        [sgpaSem2, setSgpaSem2],
+                        [sgpaSem3, setSgpaSem3],
+                        [sgpaSem4, setSgpaSem4],
+                        [sgpaSem5, setSgpaSem5],
+                        [sgpaSem6, setSgpaSem6],
+                        [sgpaSem7, setSgpaSem7],
+                        [sgpaSem8, setSgpaSem8]
+                      ];
+                      const [val, setVal] = sgpaStates[sem - 1];
+                      return (
+                        <div className="form-group" key={sem} style={{ marginBottom: 0 }}>
+                          <label className="form-label" style={{ fontSize: '12px', marginBottom: '4px' }}>Sem {sem} SGPA</label>
+                          <input
+                            type="number"
+                            className="form-control"
+                            min="0"
+                            max="10"
+                            step="0.01"
+                            placeholder="0.00"
+                            value={val || ''}
+                            onChange={(e) => {
+                              const inputVal = e.target.value;
+                              if (inputVal === '') {
+                                setVal(0);
+                              } else {
+                                const parsed = parseFloat(inputVal);
+                                setVal(isNaN(parsed) ? 0 : parsed);
+                              }
+                            }}
+                          />
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
 
               {/* Coding Platforms Card */}
               <div className="glass-card form-section-card mt-24">
@@ -288,7 +384,7 @@ const Profile = () => {
 
                 <div className="form-group">
                   <label className="form-label platform-label" htmlFor="leetcode">
-                    <svg className="platform-icon" viewBox="0 0 24 24" style={{ fill: '#FFA116' }}><path d="M13.483 0a1.374 1.374 0 0 0-.961.414l-9.177 9.178a1.35 1.35 0 0 0-.415.962c0 .356.141.696.393.948l8.344 8.344a1.35 1.35 0 0 0 .963.414c.356 0 .696-.142.948-.394l9.178-9.177a1.35 1.35 0 0 0 .415-.963 1.35 1.35 0 0 0-.393-.948l-8.344-8.344A1.374 1.374 0 0 0 13.483 0zM13.775 2.228c.1 0 .2.04.27.11l7.305 7.305c.148.148.148.39 0 .538l-8.158 8.158a.38.38 0 0 1-.27.11c-.1 0-.2-.04-.27-.11l-7.305-7.305a.38.38 0 0 1-.11-.27c0-.1.04-.2.11-.27l8.158-8.158c.07-.07.17-.11.27-.11z"/></svg>
+                    <svg className="platform-icon" viewBox="0 0 24 24" style={{ fill: '#FFA116' }}><path d="M13.483 0a1.374 1.374 0 0 0-.961.414l-9.177 9.178a1.35 1.35 0 0 0-.415.962c0 .356.141.696.393.948l8.344 8.344a1.35 1.35 0 0 0 .963.414c.356 0 .696-.142.948-.394l9.178-9.177a1.35 1.35 0 0 0 .415-.963 1.35 1.35 0 0 0-.393-.948l-8.344-8.344A1.374 1.374 0 0 0 13.483 0zM13.775 2.228c.1 0 .2.04.27.11l7.305 7.305c.148.148.148.39 0 .538l-8.158 8.158a.38.38 0 0 1-.27.11c-.1 0-.2-.04-.27-.11l-7.305-7.305a.38.38 0 0 1-.11-.27c0-.1.04-.2.11-.27l8.158-8.158c.07-.07.17-.11.27-.11z" /></svg>
                     LeetCode Username
                   </label>
                   <input
@@ -303,7 +399,7 @@ const Profile = () => {
 
                 <div className="form-group">
                   <label className="form-label platform-label" htmlFor="codeforces">
-                    <svg className="platform-icon" viewBox="0 0 24 24" style={{ fill: '#FF4B4B' }}><path d="M4.5 7.5h1.5v15H4.5zM0 12h1.5v10.5H0zM9 3h1.5v19.5H9z"/></svg>
+                    <svg className="platform-icon" viewBox="0 0 24 24" style={{ fill: '#FF4B4B' }}><path d="M4.5 7.5h1.5v15H4.5zM0 12h1.5v10.5H0zM9 3h1.5v19.5H9z" /></svg>
                     Codeforces Username
                   </label>
                   <input
@@ -333,7 +429,7 @@ const Profile = () => {
 
                 <div className="form-group">
                   <label className="form-label platform-label" htmlFor="hackerrank">
-                    <svg className="platform-icon" viewBox="0 0 24 24" style={{ fill: '#2EC866' }}><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
+                    <svg className="platform-icon" viewBox="0 0 24 24" style={{ fill: '#2EC866' }}><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z" /></svg>
                     HackerRank Username
                   </label>
                   <input

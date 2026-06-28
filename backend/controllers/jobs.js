@@ -154,16 +154,21 @@ exports.createJob = async (req, res, next) => {
   try {
     const job = await Job.create(req.body);
 
-    // Find all registered students to email notify them
-    const students = await User.find({ role: 'student' });
+    // Filter students by graduation/batch year if specified
+    const query = { role: 'student' };
+    if (job.targetBatch && job.targetBatch !== 'All') {
+      query.year = job.targetBatch.trim();
+    }
+    const students = await User.find(query);
 
     console.log("==================================");
-    console.log("Students Found:", students.length);
+    console.log(`Students Found for Batch (${job.targetBatch || 'All'}):`, students.length);
     console.log(
       students.map(student => ({
         name: student.name,
         email: student.email,
-        role: student.role
+        role: student.role,
+        year: student.year
       }))
     );
     console.log("==================================");

@@ -1079,59 +1079,10 @@ exports.getPlatformLeaderboards = async (req, res, next) => {
 // @route   PUT /api/users/students/:id/academics
 // @access  Private/Admin
 exports.updateStudentAcademics = async (req, res, next) => {
-  try {
-    const {
-      sgpaSem1,
-      sgpaSem2,
-      sgpaSem3,
-      sgpaSem4,
-      sgpaSem5,
-      sgpaSem6,
-      sgpaSem7,
-      sgpaSem8
-    } = req.body;
-
-    const student = await User.findById(req.params.id);
-
-    if (!student) {
-      return res.status(404).json({
-        success: false,
-        error: 'Student not found.'
-      });
-    }
-
-    if (student.role !== 'student') {
-      return res.status(400).json({
-        success: false,
-        error: 'Only user accounts with the role student can be modified.'
-      });
-    }
-
-    const updatedData = {
-      sgpaSem1: sgpaSem1 !== undefined ? Number(sgpaSem1) : student.sgpaSem1,
-      sgpaSem2: sgpaSem2 !== undefined ? Number(sgpaSem2) : student.sgpaSem2,
-      sgpaSem3: sgpaSem3 !== undefined ? Number(sgpaSem3) : student.sgpaSem3,
-      sgpaSem4: sgpaSem4 !== undefined ? Number(sgpaSem4) : student.sgpaSem4,
-      sgpaSem5: sgpaSem5 !== undefined ? Number(sgpaSem5) : student.sgpaSem5,
-      sgpaSem6: sgpaSem6 !== undefined ? Number(sgpaSem6) : student.sgpaSem6,
-      sgpaSem7: sgpaSem7 !== undefined ? Number(sgpaSem7) : student.sgpaSem7,
-      sgpaSem8: sgpaSem8 !== undefined ? Number(sgpaSem8) : student.sgpaSem8,
-    };
-
-    const updatedStudent = await User.findByIdAndUpdate(
-      req.params.id,
-      updatedData,
-      { new: true }
-    );
-
-    res.status(200).json({
-      success: true,
-      message: 'Student academics updated successfully.',
-      data: updatedStudent
-    });
-  } catch (err) {
-    next(err);
-  }
+  return res.status(403).json({
+    success: false,
+    error: 'Academic details must be filled by the student only from their Profile page.'
+  });
 };
 
 // @desc    Bulk delete students by year

@@ -28,6 +28,7 @@ const AdminPanel = () => {
   const [jobSalary, setJobSalary] = useState('');
   const [jobExp, setJobExp] = useState('');
   const [jobApply, setJobApply] = useState('');
+  const [jobTargetBatch, setJobTargetBatch] = useState('All');
   const [submittingJob, setSubmittingJob] = useState(false);
 
   // Admin creation form states
@@ -278,7 +279,8 @@ const AdminPanel = () => {
           location: jobLocation || 'Remote',
           salary: jobSalary || 'Not Specified',
           experienceLevel: jobExp || 'Entry Level',
-          applyLink: jobApply
+          applyLink: jobApply,
+          targetBatch: jobTargetBatch
         })
       });
 
@@ -293,6 +295,7 @@ const AdminPanel = () => {
         setJobSalary('');
         setJobExp('');
         setJobApply('');
+        setJobTargetBatch('All');
         fetchJobs();
       } else {
         setError(data.error || 'Failed to create job posting.');
@@ -1342,13 +1345,14 @@ const AdminPanel = () => {
                             <th>Company</th>
                             <th>Location</th>
                             <th>Salary</th>
+                            <th>Target Batch</th>
                             <th style={{ textAlign: 'center' }}>Action</th>
                           </tr>
                         </thead>
                         <tbody>
                           {fetchJobsLoading ? (
                             <tr>
-                              <td colSpan="5" className="table-empty-msg">
+                              <td colSpan="6" className="table-empty-msg">
                                 <span className="spinner-loader" style={{ margin: '10px auto' }}></span>
                               </td>
                             </tr>
@@ -1361,6 +1365,11 @@ const AdminPanel = () => {
                                 <td>{job.company}</td>
                                 <td>{job.location}</td>
                                 <td>{job.salary}</td>
+                                <td>
+                                  <span className="badge" style={{ backgroundColor: 'rgba(99, 102, 241, 0.1)', color: '#818cf8', border: '1px solid rgba(99, 102, 241, 0.2)', padding: '4px 8px', borderRadius: '4px', fontSize: '12px' }}>
+                                    {job.targetBatch || 'All'}
+                                  </span>
+                                </td>
                                 <td>
                                   <div style={{ display: 'flex', justifyContent: 'center' }}>
                                     <button
@@ -1376,7 +1385,7 @@ const AdminPanel = () => {
                             ))
                           ) : (
                             <tr>
-                              <td colSpan="5" className="table-empty-msg">No job postings found.</td>
+                              <td colSpan="6" className="table-empty-msg">No job postings found.</td>
                             </tr>
                           )}
                         </tbody>
@@ -1485,16 +1494,34 @@ const AdminPanel = () => {
                         </div>
                       </div>
 
-                      <div className="form-group">
-                        <label className="form-label" htmlFor="apply">External Apply URL</label>
-                        <input
-                          type="url"
-                          id="apply"
-                          className="form-control"
-                          placeholder="https://careers.company.com/apply"
-                          value={jobApply}
-                          onChange={(e) => setJobApply(e.target.value)}
-                        />
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                        <div className="form-group" style={{ marginBottom: 0 }}>
+                          <label className="form-label" htmlFor="apply">External Apply URL</label>
+                          <input
+                            type="url"
+                            id="apply"
+                            className="form-control"
+                            placeholder="https://careers.company.com/apply"
+                            value={jobApply}
+                            onChange={(e) => setJobApply(e.target.value)}
+                          />
+                        </div>
+                        <div className="form-group" style={{ marginBottom: 0 }}>
+                          <label className="form-label" htmlFor="targetBatch">Target Batch Year</label>
+                          <select
+                            id="targetBatch"
+                            className="form-control"
+                            value={jobTargetBatch}
+                            onChange={(e) => setJobTargetBatch(e.target.value)}
+                          >
+                            <option value="All">All Batches (Email All)</option>
+                            <option value="2024">2024 Batch</option>
+                            <option value="2025">2025 Batch</option>
+                            <option value="2026">2026 Batch</option>
+                            <option value="2027">2027 Batch</option>
+                            <option value="2028">2028 Batch</option>
+                          </select>
+                        </div>
                       </div>
 
                       <button type="submit" className="btn btn-primary btn-block" disabled={submittingJob}>
@@ -2064,50 +2091,37 @@ const AdminPanel = () => {
             <div className="modal-header">
               <div>
                 <h3>Academic Report Card — {selectedStudent.name}</h3>
-                <p className="modal-subtitle">Update semester-wise SGPA scores. CGPA is computed automatically.</p>
+                <p className="modal-subtitle">Academic details are view-only. SGPAs are filled by the student on their Profile settings tab.</p>
               </div>
               <button className="close-btn" onClick={() => setShowAcademicsModal(false)}>×</button>
             </div>
-            <form onSubmit={handleSaveAcademics}>
-              <div className="modal-body academics-modal-body">
-                <div className="academics-cgpa-banner" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(99, 102, 241, 0.1)', border: '1px solid rgba(99, 102, 241, 0.2)', padding: '12px 16px', borderRadius: '8px', marginBottom: '20px' }}>
-                  <span className="text-secondary" style={{ fontWeight: '500' }}>Roll Number: {selectedStudent.rollNumber || 'N/A'}</span>
-                  <span style={{ fontSize: '15px' }}>Computed CGPA: <strong className="text-glow" style={{ fontSize: '18px' }}>{calculateCgpa()}</strong></span>
-                </div>
+            <div className="modal-body academics-modal-body">
+              <div className="academics-cgpa-banner" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(99, 102, 241, 0.1)', border: '1px solid rgba(99, 102, 241, 0.2)', padding: '12px 16px', borderRadius: '8px', marginBottom: '20px' }}>
+                <span className="text-secondary" style={{ fontWeight: '500' }}>Roll Number: {selectedStudent.rollNumber || 'N/A'}</span>
+                <span style={{ fontSize: '15px' }}>Computed CGPA: <strong className="text-glow" style={{ fontSize: '18px' }}>{calculateCgpa()}</strong></span>
+              </div>
 
-                <div className="academics-sgpas-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                  {[1, 2, 3, 4, 5, 6, 7, 8].map(sem => (
-                    <div className="form-group" key={sem}>
-                      <label className="form-label">Semester {sem} SGPA</label>
-                      <input
-                        type="number"
-                        className="form-control"
-                        min="0"
-                        max="10"
-                        step="0.01"
-                        placeholder="0.00"
-                        value={sgpas[`sgpaSem${sem}`] || ''}
-                        onChange={(e) => {
-                          const val = e.target.value === '' ? 0 : parseFloat(e.target.value);
-                          setSgpas(prev => ({
-                            ...prev,
-                            [`sgpaSem${sem}`]: val
-                          }));
-                        }}
-                      />
-                    </div>
-                  ))}
-                </div>
+              <div className="academics-sgpas-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                {[1, 2, 3, 4, 5, 6, 7, 8].map(sem => (
+                  <div className="form-group" key={sem}>
+                    <label className="form-label">Semester {sem} SGPA</label>
+                    <input
+                      type="number"
+                      className="form-control"
+                      value={sgpas[`sgpaSem${sem}`] || '0'}
+                      readOnly
+                      disabled
+                      style={{ opacity: 0.8, cursor: 'not-allowed' }}
+                    />
+                  </div>
+                ))}
               </div>
-              <div className="modal-footer" style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', padding: '15px 24px', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
-                <button type="button" className="btn btn-secondary" onClick={() => setShowAcademicsModal(false)}>
-                  Cancel
-                </button>
-                <button type="submit" className="btn btn-primary" disabled={savingAcademics}>
-                  {savingAcademics ? 'Saving...' : 'Save Changes'}
-                </button>
-              </div>
-            </form>
+            </div>
+            <div className="modal-footer" style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', padding: '15px 24px', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+              <button type="button" className="btn btn-secondary" onClick={() => setShowAcademicsModal(false)}>
+                Close
+              </button>
+            </div>
           </div>
         </div>
       )}

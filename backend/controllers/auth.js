@@ -259,7 +259,15 @@ exports.updateProfile = async (req, res, next) => {
       leetcodeUsername: req.body.leetcodeUsername,
       codeforcesUsername: req.body.codeforcesUsername,
       codechefUsername: req.body.codechefUsername,
-      hackerrankUsername: req.body.hackerrankUsername
+      hackerrankUsername: req.body.hackerrankUsername,
+      sgpaSem1: req.body.sgpaSem1 !== undefined ? Number(req.body.sgpaSem1) : undefined,
+      sgpaSem2: req.body.sgpaSem2 !== undefined ? Number(req.body.sgpaSem2) : undefined,
+      sgpaSem3: req.body.sgpaSem3 !== undefined ? Number(req.body.sgpaSem3) : undefined,
+      sgpaSem4: req.body.sgpaSem4 !== undefined ? Number(req.body.sgpaSem4) : undefined,
+      sgpaSem5: req.body.sgpaSem5 !== undefined ? Number(req.body.sgpaSem5) : undefined,
+      sgpaSem6: req.body.sgpaSem6 !== undefined ? Number(req.body.sgpaSem6) : undefined,
+      sgpaSem7: req.body.sgpaSem7 !== undefined ? Number(req.body.sgpaSem7) : undefined,
+      sgpaSem8: req.body.sgpaSem8 !== undefined ? Number(req.body.sgpaSem8) : undefined
     };
 
     // Remove undefined fields
@@ -268,7 +276,7 @@ exports.updateProfile = async (req, res, next) => {
     );
 
     // If leetcodeUsername is changing, verify and sync stats!
-    if (req.body.leetcodeUsername !== undefined) {
+    if (req.body.leetcodeUsername !== undefined && req.body.leetcodeUsername !== req.user.leetcodeUsername) {
       const username = req.body.leetcodeUsername;
       if (username && username.trim() !== '') {
         try {
@@ -287,7 +295,7 @@ exports.updateProfile = async (req, res, next) => {
     }
 
     // If codeforcesUsername is changing, verify and sync stats!
-    if (req.body.codeforcesUsername !== undefined) {
+    if (req.body.codeforcesUsername !== undefined && req.body.codeforcesUsername !== req.user.codeforcesUsername) {
       const username = req.body.codeforcesUsername;
       if (username && username.trim() !== '') {
         try {
@@ -306,7 +314,7 @@ exports.updateProfile = async (req, res, next) => {
     }
 
     // If codechefUsername is changing, verify and sync stats!
-    if (req.body.codechefUsername !== undefined) {
+    if (req.body.codechefUsername !== undefined && req.body.codechefUsername !== req.user.codechefUsername) {
       const username = req.body.codechefUsername;
       if (username && username.trim() !== '') {
         try {
@@ -325,7 +333,7 @@ exports.updateProfile = async (req, res, next) => {
     }
 
     // If hackerrankUsername is changing, verify and sync stats!
-    if (req.body.hackerrankUsername !== undefined) {
+    if (req.body.hackerrankUsername !== undefined && req.body.hackerrankUsername !== req.user.hackerrankUsername) {
       const username = req.body.hackerrankUsername;
       if (username && username.trim() !== '') {
         try {
