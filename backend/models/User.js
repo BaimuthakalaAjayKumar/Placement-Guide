@@ -103,6 +103,8 @@ const UserSchema = new mongoose.Schema({
   sgpaSem6: { type: Number, default: 0 },
   sgpaSem7: { type: Number, default: 0 },
   sgpaSem8: { type: Number, default: 0 },
+  resetPasswordToken: String,
+  resetPasswordExpire: Date,
   createdAt: {
     type: Date,
     default: Date.now

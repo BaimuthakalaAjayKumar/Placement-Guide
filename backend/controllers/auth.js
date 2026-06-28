@@ -1,5 +1,7 @@
 const User = require('../models/User');
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
+const sendEmail = require('../utils/sendEmail');
 
 // Helper to generate and send token
 const sendTokenResponse = (user, statusCode, res) => {
@@ -167,7 +169,7 @@ exports.getMe = async (req, res, next) => {
         const syncPromise = fetchLeetcodeData(user.leetcodeUsername);
         const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 1500));
         const freshStats = await Promise.race([syncPromise, timeoutPromise]);
-        
+
         user = await User.findByIdAndUpdate(
           req.user.id,
           { leetcodeStats: freshStats },
@@ -185,7 +187,7 @@ exports.getMe = async (req, res, next) => {
         const syncPromise = fetchCodeforcesData(user.codeforcesUsername);
         const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 1500));
         const freshStats = await Promise.race([syncPromise, timeoutPromise]);
-        
+
         user = await User.findByIdAndUpdate(
           req.user.id,
           { codeforcesStats: freshStats },
@@ -203,7 +205,7 @@ exports.getMe = async (req, res, next) => {
         const syncPromise = fetchCodechefData(user.codechefUsername);
         const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 1500));
         const freshStats = await Promise.race([syncPromise, timeoutPromise]);
-        
+
         user = await User.findByIdAndUpdate(
           req.user.id,
           { codechefStats: freshStats },
@@ -221,7 +223,7 @@ exports.getMe = async (req, res, next) => {
         const syncPromise = fetchHackerrankData(user.hackerrankUsername);
         const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 1500));
         const freshStats = await Promise.race([syncPromise, timeoutPromise]);
-        
+
         user = await User.findByIdAndUpdate(
           req.user.id,
           { hackerrankStats: freshStats },
@@ -350,6 +352,113 @@ exports.updateProfile = async (req, res, next) => {
       success: true,
       data: user
     });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// @desc    Forgot password
+// @route   POST /api/auth/forgotpassword
+// @access  Public
+exports.forgotPassword = async (req, res, next) => {
+  try {
+    const { email } = req.body;
+    if (!email) {
+      return res.status(400).json({ success: false, error: 'Please provide an email' });
+    }
+
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res.status(404).json({ success: false, error: 'There is no user with that email' });
+    }
+
+    // Generate token
+    const resetToken = crypto.randomBytes(20).toString('hex');
+
+    // Hash token and set to resetPasswordToken field
+    user.resetPasswordToken = crypto
+      .createHash('sha256')
+      .update(resetToken)
+      .digest('hex');
+
+    // Set expire (10 minutes)
+    user.resetPasswordExpire = Date.now() + 10 * 60 * 1000;
+
+    await user.save({ validateBeforeSave: false });
+
+    // Create reset url
+    const resetUrl = `http://localhost:5173/reset-password/${resetToken}`;
+
+    const message = `You are receiving this email because you (or someone else) have requested the reset of a password. Please use the following link to reset your password within 10 minutes:\n\n${resetUrl}\n\nIf you did not request this, please ignore this email.`;
+
+    try {
+      await sendEmail({
+        to: user.email,
+        subject: 'PrepPortal - Password Reset Token',
+        text: message,
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px;">
+            <h2 style="color: #4f46e5; margin-bottom: 20px;">Password Reset Request</h2>
+            <p style="font-size: 16px; color: #333;">Hello <strong>${user.name}</strong>,</p>
+            <p style="font-size: 14px; color: #555;">You requested a password reset for your PrepPortal account. Please click the button below to choose a new password:</p>
+            
+            <div style="text-align: center; margin: 30px 0;">
+              <a href="${resetUrl}" style="background-color: #4f46e5; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 14px; display: inline-block;">Reset Password</a>
+            </div>
+            
+            <p style="font-size: 14px; color: #555;">Or copy and paste the following URL into your browser:</p>
+            <p style="font-size: 12px; background-color: #f3f4f6; padding: 10px; border-radius: 4px; word-break: break-all; color: #4b5563;">${resetUrl}</p>
+            
+            <p style="font-size: 12px; color: #9ca3af; margin-top: 25px;">Note: This link will expire in 10 minutes. If you did not make this request, you can safely ignore this email.</p>
+          </div>
+        `
+      });
+
+      res.status(200).json({ success: true, data: 'Email sent successfully' });
+    } catch (err) {
+      console.error(err);
+      user.resetPasswordToken = undefined;
+      user.resetPasswordExpire = undefined;
+      await user.save({ validateBeforeSave: false });
+      return res.status(500).json({ success: false, error: 'Email could not be sent' });
+    }
+  } catch (err) {
+    next(err);
+  }
+};
+
+// @desc    Reset password
+// @route   PUT /api/auth/resetpassword/:token
+// @access  Public
+exports.resetPassword = async (req, res, next) => {
+  try {
+    const { password } = req.body;
+    if (!password) {
+      return res.status(400).json({ success: false, error: 'Please provide a password' });
+    }
+
+    // Get hashed token
+    const resetPasswordToken = crypto
+      .createHash('sha256')
+      .update(req.params.token)
+      .digest('hex');
+
+    const user = await User.findOne({
+      resetPasswordToken,
+      resetPasswordExpire: { $gt: Date.now() }
+    });
+
+    if (!user) {
+      return res.status(400).json({ success: false, error: 'Invalid or expired reset token' });
+    }
+
+    // Set new password
+    user.password = password;
+    user.resetPasswordToken = undefined;
+    user.resetPasswordExpire = undefined;
+    await user.save();
+
+    sendTokenResponse(user, 200, res);
   } catch (err) {
     next(err);
   }

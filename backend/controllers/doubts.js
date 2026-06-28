@@ -64,7 +64,7 @@ exports.createDoubt = async (req, res, next) => {
 
             // Notify Admin by Email
             const adminEmail = process.env.SMTP_EMAIL || 'admin@prepportal.com';
-            await sendEmail({
+            sendEmail({
                 to: adminEmail,
                 subject: `📬 New Student Query: ${subject}`,
                 html: `
@@ -81,7 +81,7 @@ exports.createDoubt = async (req, res, next) => {
           </div>
         `,
                 text: `New Doubt from ${doubt.student.name} (${doubt.student.email})\n\nSubject: ${subject}\n\nDescription:\n${description}`
-            });
+            }).catch(err => console.error('Admin doubt notification email failed:', err.message));
 
             res.status(201).json({ success: true, data: doubt });
         } catch (error) {
@@ -138,7 +138,7 @@ exports.answerDoubt = async (req, res, next) => {
         await doubt.save();
 
         // Email notification to student
-        await sendEmail({
+        sendEmail({
             to: doubt.student.email,
             subject: `✅ Your Query Has Been Answered: ${doubt.subject}`,
             html: `
@@ -156,7 +156,7 @@ exports.answerDoubt = async (req, res, next) => {
         </div>
       `,
             text: `Hello ${doubt.student.name},\n\nYour query "${doubt.subject}" has been answered.\n\nYour Question:\n${doubt.description}\n\nAdmin Response:\n${answer}`
-        });
+        }).catch(err => console.error(`Error sending query resolved email to student ${doubt.student?.email}:`, err.message));
 
         res.status(200).json({ success: true, data: doubt });
     } catch (err) {
@@ -179,7 +179,7 @@ exports.submitContactUs = async (req, res, next) => {
 
         const adminEmail = process.env.SMTP_EMAIL || 'admin@prepportal.com';
 
-        await sendEmail({
+        sendEmail({
             to: adminEmail,
             subject: `💬 Contact Us Message from ${studentName}: ${subject}`,
             html: `
@@ -193,7 +193,7 @@ exports.submitContactUs = async (req, res, next) => {
         </div>
       `,
             text: `Contact Us message from ${studentName} (${studentEmail})\n\nSubject: ${subject}\n\nMessage:\n${message}`
-        });
+        }).catch(err => console.error('Admin contact us email failed:', err.message));
 
         res.status(200).json({ success: true, message: 'Message sent to the placement team. We will respond to your email shortly.' });
     } catch (err) {

@@ -33,6 +33,10 @@ exports.createContest = async (req, res, next) => {
     User.find({ role: 'student' })
       .select('email name')
       .then(students => {
+        console.log("==================================");
+        console.log("Contest Students Found:", students.length);
+        console.log(students);
+        console.log("==================================");
         students.forEach(student => {
           sendEmail({
             to: student.email,
@@ -207,7 +211,7 @@ exports.logViolation = async (req, res, next) => {
     // Check if it's a fullscreen violation
     if (type === 'violation' && message.toLowerCase().includes('fullscreen')) {
       attempt.fullscreenExits += 1;
-      
+
       // Auto-terminate on 3rd fullscreen exit
       if (attempt.fullscreenExits >= 3) {
         attempt.isFinished = true;
@@ -285,9 +289,9 @@ exports.submitQuestion = async (req, res, next) => {
     }).populate('user', 'name');
 
     for (const other of otherAttempts) {
-      const match = other.submissions.find(sub => 
-        sub.question.toString() === questionId && 
-        sub.status !== 'Plagiarized' && 
+      const match = other.submissions.find(sub =>
+        sub.question.toString() === questionId &&
+        sub.status !== 'Plagiarized' &&
         getNormalized(sub.code) === currentNormalized
       );
 
@@ -529,7 +533,7 @@ exports.getContestLeaderboard = async (req, res, next) => {
         if (l === 'c') return 'C';
         return s.language;
       }).filter(Boolean)));
-      
+
       const languagesUsed = uniqueLangs.join(', ') || 'N/A';
 
       return {
@@ -556,9 +560,9 @@ exports.getContestLeaderboard = async (req, res, next) => {
       if (a.status === 'Not Attempted' && b.status !== 'Not Attempted') return 1;
       if (a.status !== 'Not Attempted' && b.status === 'Not Attempted') return -1;
       if (a.status === 'Not Attempted' && b.status === 'Not Attempted') return 0;
-      
+
       if (b.score !== a.score) return b.score - a.score;
-      
+
       const parseTime = (timeStr) => {
         const parts = timeStr.split(' ');
         let totalSecs = 0;

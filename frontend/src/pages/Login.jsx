@@ -15,7 +15,7 @@ const Login = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
-    
+
     if (!email || !password) {
       setError('Please fill in all fields.');
       return;
@@ -40,7 +40,7 @@ const Login = () => {
     <div className="auth-container">
       <div className="auth-glow-circle-1"></div>
       <div className="auth-glow-circle-2"></div>
-      
+
       <div className="auth-card glass-card animate-fade">
         <div className="auth-header">
           <div className="auth-logo">
@@ -86,9 +86,9 @@ const Login = () => {
               required
             />
             <div className="auth-form-extra">
-              <a href="mailto:admin@prepportal.com?subject=Password%20Reset%20Request" className="auth-link">
+              <Link to="/forgot-password" className="auth-link">
                 Forgot password?
-              </a>
+              </Link>
             </div>
           </div>
 

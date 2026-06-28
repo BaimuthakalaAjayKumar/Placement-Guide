@@ -8,6 +8,8 @@ import Sidebar from './components/Sidebar';
 // Pages
 import Login from './pages/Login';
 import Register from './pages/Register';
+import ForgotPassword from './pages/ForgotPassword';
+import ResetPassword from './pages/ResetPassword';
 import Dashboard from './pages/Dashboard';
 import ResumeAnalyzer from './pages/ResumeAnalyzer';
 import AptitudeTests from './pages/AptitudeTests';
@@ -66,6 +68,14 @@ const AppRoutes = () => {
       <Route
         path="/register"
         element={token && user ? <Navigate to={user.role === 'admin' ? '/admin' : '/dashboard'} replace /> : <Register />}
+      />
+      <Route
+        path="/forgot-password"
+        element={token && user ? <Navigate to={user.role === 'admin' ? '/admin' : '/dashboard'} replace /> : <ForgotPassword />}
+      />
+      <Route
+        path="/reset-password/:token"
+        element={token && user ? <Navigate to={user.role === 'admin' ? '/admin' : '/dashboard'} replace /> : <ResetPassword />}
       />
 
       {/* Private Student Routes */}

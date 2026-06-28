@@ -99,13 +99,13 @@ exports.getJobRecommendations = async (req, res, next) => {
 
     const recommendedJobs = jobs.map(job => {
       const jobReqs = job.requirements.map(r => r.toLowerCase());
-      
+
       // Calculate matching skills
-      const matchedSkills = jobReqs.filter(reqSkill => 
+      const matchedSkills = jobReqs.filter(reqSkill =>
         userSkills.some(userSkill => userSkill.includes(reqSkill) || reqSkill.includes(userSkill))
       );
 
-      const matchPercent = jobReqs.length > 0 
+      const matchPercent = jobReqs.length > 0
         ? Math.round((matchedSkills.length / jobReqs.length) * 100)
         : 0;
 
@@ -156,7 +156,18 @@ exports.createJob = async (req, res, next) => {
 
     // Find all registered students to email notify them
     const students = await User.find({ role: 'student' });
-    
+
+    console.log("==================================");
+    console.log("Students Found:", students.length);
+    console.log(
+      students.map(student => ({
+        name: student.name,
+        email: student.email,
+        role: student.role
+      }))
+    );
+    console.log("==================================");
+
     students.forEach(student => {
       sendEmail({
         to: student.email,
@@ -196,6 +207,22 @@ exports.createJob = async (req, res, next) => {
       success: true,
       data: job
     });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// @desc    Delete a job listing (Admin only)
+// @route   DELETE /api/jobs/:id
+// @access  Private/Admin
+exports.deleteJob = async (req, res, next) => {
+  try {
+    const job = await Job.findById(req.params.id);
+    if (!job) {
+      return res.status(404).json({ success: false, error: 'Job not found' });
+    }
+    await Job.findByIdAndDelete(req.params.id);
+    res.status(200).json({ success: true, message: 'Job deleted successfully' });
   } catch (err) {
     next(err);
   }

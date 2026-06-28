@@ -15,6 +15,10 @@ const AdminPanel = () => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
+  // Job options list & deletion
+  const [jobs, setJobs] = useState([]);
+  const [fetchJobsLoading, setFetchJobsLoading] = useState(false);
+
   // Job form fields
   const [jobTitle, setJobTitle] = useState('');
   const [jobCompany, setJobCompany] = useState('');
@@ -181,10 +185,59 @@ const AdminPanel = () => {
     }
   };
 
+  const fetchJobs = async () => {
+    try {
+      setFetchJobsLoading(true);
+      const res = await fetch(`${API_URL}/jobs`, {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      const data = await res.json();
+      if (data.success) {
+        setJobs(data.data);
+      } else {
+        setError(data.error || 'Failed to fetch job listings.');
+      }
+    } catch (err) {
+      console.error(err);
+      setError('Could not connect to job service.');
+    } finally {
+      setFetchJobsLoading(false);
+    }
+  };
+
+  const handleDeleteJob = async (jobId, jobTitle) => {
+    if (!window.confirm(`Are you sure you want to permanently delete the job listing for "${jobTitle}"? This action cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      setError('');
+      setSuccess('');
+      const res = await fetch(`${API_URL}/jobs/${jobId}`, {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      const data = await res.json();
+      if (data.success) {
+        setSuccess(`Successfully deleted job listing for "${jobTitle}".`);
+        setJobs(prev => prev.filter(j => j._id !== jobId));
+      } else {
+        setError(data.error || 'Failed to delete job listing.');
+      }
+    } catch (err) {
+      setError('Could not connect to job deletion service.');
+    }
+  };
+
   useEffect(() => {
     if (token) {
       if (activeTab === 'analytics') {
         fetchStudents();
+        fetchJobs();
       } else if (activeTab === 'interviews') {
         fetchMockInterviewReports();
       } else if (activeTab === 'aptitude') {
@@ -240,6 +293,7 @@ const AdminPanel = () => {
         setJobSalary('');
         setJobExp('');
         setJobApply('');
+        fetchJobs();
       } else {
         setError(data.error || 'Failed to create job posting.');
       }
@@ -1205,71 +1259,131 @@ const AdminPanel = () => {
               </div>
 
               <div className="admin-split-layout">
-                {/* List of Students */}
-                <div className="glass-card student-roster-card">
-                  <h3>Student Preparedness Roster</h3>
-                  <p className="card-desc">Comprehensive log of students ranked by Placement Readiness Index (PRI).</p>
+                {/* Admin Panels Left Column */}
+                <div className="admin-left-column" style={{ display: 'flex', flexDirection: 'column', gap: '24px', minWidth: 0 }}>
 
-                  <div className="table-responsive-wrapper">
-                    <table className="student-roster-table">
-                      <thead>
-                        <tr>
-                          <th>Student Name</th>
-                          <th>Email Address</th>
-                          <th>Target Role</th>
-                          <th>PRI Score</th>
-                          <th>Status</th>
-                          <th style={{ textAlign: 'center' }}>Action</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {students.length > 0 ? (
-                          students.map((student) => (
-                            <tr key={student._id}>
-                              <td>
-                                <div className="table-student-name">
-                                  <span className="table-avatar">{student.name.charAt(0).toUpperCase()}</span>
-                                  <span>{student.name}</span>
-                                </div>
-                              </td>
-                              <td>{student.email}</td>
-                              <td className="text-secondary">{student.targetRole || 'Software Engineer'}</td>
-                              <td>
-                                <strong className="text-glow">{student.readinessScore}%</strong>
-                              </td>
-                              <td>
-                                <span className={`pri-level-badge scale-down`} data-level={student.readinessScore >= 80 ? 'high' : student.readinessScore >= 50 ? 'medium' : 'low'}>
-                                  {student.readinessScore >= 80 ? 'Job Ready' : student.readinessScore >= 50 ? 'Medium' : 'Low'}
-                                </span>
-                              </td>
-                              <td>
-                                <div style={{ display: 'flex', justifyContent: 'center', gap: '8px' }}>
-                                  <button
-                                    className="btn btn-secondary btn-sm"
-                                    onClick={() => openAcademicsModal(student)}
-                                    title="Edit Academics"
-                                  >
-                                    🎓 Academics
-                                  </button>
-                                  <button
-                                    className="btn btn-danger btn-sm"
-                                    onClick={() => handleDeleteStudent(student._id, student.name)}
-                                    title="Remove Student"
-                                  >
-                                    🗑 Remove
-                                  </button>
-                                </div>
+                  {/* List of Students */}
+                  <div className="glass-card student-roster-card">
+                    <h3>Student Preparedness Roster</h3>
+                    <p className="card-desc">Comprehensive log of students ranked by Placement Readiness Index (PRI).</p>
+
+                    <div className="table-responsive-wrapper">
+                      <table className="student-roster-table">
+                        <thead>
+                          <tr>
+                            <th>Student Name</th>
+                            <th>Email Address</th>
+                            <th>Target Role</th>
+                            <th>PRI Score</th>
+                            <th>Status</th>
+                            <th style={{ textAlign: 'center' }}>Action</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {students.length > 0 ? (
+                            students.map((student) => (
+                              <tr key={student._id}>
+                                <td>
+                                  <div className="table-student-name">
+                                    <span className="table-avatar">{student.name.charAt(0).toUpperCase()}</span>
+                                    <span>{student.name}</span>
+                                  </div>
+                                </td>
+                                <td>{student.email}</td>
+                                <td className="text-secondary">{student.targetRole || 'Software Engineer'}</td>
+                                <td>
+                                  <strong className="text-glow">{student.readinessScore}%</strong>
+                                </td>
+                                <td>
+                                  <span className={`pri-level-badge scale-down`} data-level={student.readinessScore >= 80 ? 'high' : student.readinessScore >= 50 ? 'medium' : 'low'}>
+                                    {student.readinessScore >= 80 ? 'Job Ready' : student.readinessScore >= 50 ? 'Medium' : 'Low'}
+                                  </span>
+                                </td>
+                                <td>
+                                  <div style={{ display: 'flex', justifyContent: 'center', gap: '8px' }}>
+                                    <button
+                                      className="btn btn-secondary btn-sm"
+                                      onClick={() => openAcademicsModal(student)}
+                                      title="Edit Academics"
+                                    >
+                                      🎓 Academics
+                                    </button>
+                                    <button
+                                      className="btn btn-danger btn-sm"
+                                      onClick={() => handleDeleteStudent(student._id, student.name)}
+                                      title="Remove Student"
+                                    >
+                                      🗑 Remove
+                                    </button>
+                                  </div>
+                                </td>
+                              </tr>
+                            ))
+                          ) : (
+                            <tr>
+                              <td colSpan="6" className="table-empty-msg">No students registered yet.</td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  {/* Posted Job Listings */}
+                  <div className="glass-card posted-jobs-card">
+                    <h3>Posted Job Listings</h3>
+                    <p className="card-desc">Review and manage job postings currently visible to students.</p>
+
+                    <div className="table-responsive-wrapper">
+                      <table className="student-roster-table">
+                        <thead>
+                          <tr>
+                            <th>Job Title</th>
+                            <th>Company</th>
+                            <th>Location</th>
+                            <th>Salary</th>
+                            <th style={{ textAlign: 'center' }}>Action</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {fetchJobsLoading ? (
+                            <tr>
+                              <td colSpan="5" className="table-empty-msg">
+                                <span className="spinner-loader" style={{ margin: '10px auto' }}></span>
                               </td>
                             </tr>
-                          ))
-                        ) : (
-                          <tr>
-                            <td colSpan="6" className="table-empty-msg">No students registered yet.</td>
-                          </tr>
-                        )}
-                      </tbody>
-                    </table>
+                          ) : jobs.length > 0 ? (
+                            jobs.map((job) => (
+                              <tr key={job._id}>
+                                <td>
+                                  <strong>{job.title}</strong>
+                                </td>
+                                <td>{job.company}</td>
+                                <td>{job.location}</td>
+                                <td>{job.salary}</td>
+                                <td>
+                                  <div style={{ display: 'flex', justifyContent: 'center' }}>
+                                    <button
+                                      className="btn btn-danger btn-sm"
+                                      onClick={() => handleDeleteJob(job._id, job.title)}
+                                      title="Delete Job"
+                                    >
+                                      🗑 Delete
+                                    </button>
+                                  </div>
+                                </td>
+                              </tr>
+                            ))
+                          ) : (
+                            <tr>
+                              <td colSpan="5" className="table-empty-msg">No job postings found.</td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
+
                 </div>
 
                 {/* Admin Panels Right Column */}

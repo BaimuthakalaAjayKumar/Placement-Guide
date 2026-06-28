@@ -132,6 +132,34 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  // Reset Password & Log In automatically
+  const resetPassword = async (resetToken, password) => {
+    setLoading(true);
+    try {
+      const res = await fetch(`${API_URL}/auth/resetpassword/${resetToken}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ password })
+      });
+      const data = await res.json();
+
+      if (data.success) {
+        localStorage.setItem('token', data.token);
+        setToken(data.token);
+        setUser(data.user);
+        return { success: true, user: data.user };
+      } else {
+        return { success: false, error: data.error };
+      }
+    } catch (err) {
+      return { success: false, error: 'Network error. Please try again later.' };
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -142,6 +170,7 @@ export const AuthProvider = ({ children }) => {
         login,
         logout,
         updateProfile,
+        resetPassword,
         loadUser: () => loadUser(token)
       }}
     >
