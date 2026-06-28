@@ -1,0 +1,20 @@
+What if the Student not attempt the Contest on the Individual platform
+
+   If a student has not attempted a specific contest on LeetCode, Codeforces, or CodeChef, here is how the leaderboard handles it:
+
+	1)Filtered Out from Specific Contests: Since actual coding platforms only include active participants in contest leaderboards, students who did not attempt the contest are filtered out and will not be displayed on the leaderboard table for that specific contest.
+	2)Friendly Empty State: If no students have attempted a particular contest, the table displays a fallback message: "No attempts found for this contest."
+	3)Standings Remain Intact: Switching the dropdown back to -- Overall Platform Standings -- will restore the complete list of overall rankings.
+
+
+
+That means for the Upcoming Contests, it will automatically display whether it is right
+
+
+	Yes, that is correct!
+	
+	1)Automatically Transitions: Once the contest's start date and time are reached, the system will automatically stop showing the "Upcoming Contest" placeholder.
+	2)Displays Rankings: It will instantly transition to ranking and displaying student results as soon as the contest starts and attempts/submissions are recorded. No manual administrator action or manual switches are required.
+
+
+

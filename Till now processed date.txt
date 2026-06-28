@@ -1,0 +1,23 @@
+Modifying backend models and router configuration to add Holidays and Student SGPAs
+
+2
+Creating backend controllers/holidays.js and routes/holidays.js files
+
+3
+Modifying getDashboardStats controller in users.js to retrieve and return contest attempts
+
+4
+Updating react-router-dom imports, fetching holidays/contestAttempts, and updating calendar layouts in Dashboard.jsx
+
+5
+Locating the Live Query banner container in Dashboard.jsx
+
+6
+Searching for search terms like 'Resolver' or 'Query' in Dashboard.jsx
+
+
+
+
+
+
+

@@ -1,0 +1,363 @@
+const User = require('../models/User');
+const jwt = require('jsonwebtoken');
+
+// Helper to generate and send token
+const sendTokenResponse = (user, statusCode, res) => {
+  // Create token
+  const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
+    expiresIn: process.env.JWT_EXPIRE
+  });
+
+  // Remove password from output if present
+  const userObj = user.toObject();
+  delete userObj.password;
+
+  res.status(statusCode).json({
+    success: true,
+    token,
+    user: userObj
+  });
+};
+
+// @desc    Register user
+// @route   POST /api/auth/register
+// @access  Public
+exports.register = async (req, res, next) => {
+  try {
+    const { name, email, password, role, leetcodeUsername, codeforcesUsername, codechefUsername, hackerrankUsername } = req.body;
+    const normalizedRole = role || 'student';
+    const trimmedLeetCode = (leetcodeUsername || '').trim();
+    const trimmedCodeforces = (codeforcesUsername || '').trim();
+    const trimmedCodeChef = (codechefUsername || '').trim();
+    const trimmedHackerrank = (hackerrankUsername || '').trim();
+
+    if (normalizedRole === 'student' && (!trimmedLeetCode || !trimmedCodeforces || !trimmedCodeChef || !trimmedHackerrank)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Students must provide all coding platform IDs: LeetCode, Codeforces, CodeChef, and HackerRank.'
+      });
+    }
+
+    // Check if user already exists
+    const userExists = await User.findOne({ email });
+    if (userExists) {
+      return res.status(400).json({
+        success: false,
+        error: 'Email already registered'
+      });
+    }
+
+    let leetcodeStats = { easySolved: 0, mediumSolved: 0, hardSolved: 0, totalSolved: 0, solvedSlugs: [] };
+    if (trimmedLeetCode) {
+      try {
+        const { fetchLeetcodeData } = require('./users');
+        leetcodeStats = await fetchLeetcodeData(trimmedLeetCode);
+      } catch (err) {
+        return res.status(400).json({
+          success: false,
+          error: `LeetCode user '${trimmedLeetCode}' not found. Please verify the handle.`
+        });
+      }
+    }
+
+    let codeforcesStats = { rating: 0, maxRating: 0, rank: 'Unrated', solvedCount: 0 };
+    if (trimmedCodeforces) {
+      try {
+        const { fetchCodeforcesData } = require('./users');
+        codeforcesStats = await fetchCodeforcesData(trimmedCodeforces);
+      } catch (err) {
+        return res.status(400).json({
+          success: false,
+          error: `Codeforces user '${trimmedCodeforces}' not found. Please verify the handle.`
+        });
+      }
+    }
+
+    let codechefStats = { rating: 0, stars: '1★', globalRank: 0, countryRank: 0 };
+    if (trimmedCodeChef) {
+      try {
+        const { fetchCodechefData } = require('./users');
+        codechefStats = await fetchCodechefData(trimmedCodeChef);
+      } catch (err) {
+        return res.status(400).json({
+          success: false,
+          error: `CodeChef user '${trimmedCodeChef}' not found. Please verify the handle.`
+        });
+      }
+    }
+
+    let hackerrankStats = { solvedCount: 0, score: 0, badgesCount: 0 };
+    if (trimmedHackerrank) {
+      try {
+        const { fetchHackerrankData } = require('./users');
+        hackerrankStats = await fetchHackerrankData(trimmedHackerrank);
+      } catch (err) {
+        return res.status(400).json({
+          success: false,
+          error: `HackerRank user '${trimmedHackerrank}' not found. Please verify the handle.`
+        });
+      }
+    }
+
+    // Create user
+    const user = await User.create({
+      name,
+      email,
+      password,
+      role: normalizedRole,
+      leetcodeUsername: trimmedLeetCode,
+      leetcodeStats,
+      codeforcesUsername: trimmedCodeforces,
+      codeforcesStats,
+      codechefUsername: trimmedCodeChef,
+      codechefStats,
+      hackerrankUsername: trimmedHackerrank,
+      hackerrankStats
+    });
+
+    sendTokenResponse(user, 201, res);
+  } catch (err) {
+    next(err);
+  }
+};
+
+// @desc    Login user
+// @route   POST /api/auth/login
+// @access  Public
+exports.login = async (req, res, next) => {
+  try {
+    const { email, password } = req.body;
+
+    // Validate email & password
+    if (!email || !password) {
+      return res.status(400).json({
+        success: false,
+        error: 'Please provide an email and password'
+      });
+    }
+
+    // Check for user
+    const user = await User.findOne({ email }).select('+password');
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        error: 'Invalid credentials'
+      });
+    }
+
+    // Check if password matches
+    const isMatch = await user.matchPassword(password);
+    if (!isMatch) {
+      return res.status(401).json({
+        success: false,
+        error: 'Invalid credentials'
+      });
+    }
+
+    sendTokenResponse(user, 200, res);
+  } catch (err) {
+    next(err);
+  }
+};
+
+// @desc    Get current logged in user
+// @route   GET /api/auth/me
+// @access  Private
+exports.getMe = async (req, res, next) => {
+  try {
+    let user = await User.findById(req.user.id);
+
+    // Auto-replicate LeetCode status on load
+    if (user && user.leetcodeUsername) {
+      try {
+        const { fetchLeetcodeData } = require('./users');
+        const syncPromise = fetchLeetcodeData(user.leetcodeUsername);
+        const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 1500));
+        const freshStats = await Promise.race([syncPromise, timeoutPromise]);
+        
+        user = await User.findByIdAndUpdate(
+          req.user.id,
+          { leetcodeStats: freshStats },
+          { new: true }
+        );
+      } catch (err) {
+        console.warn(`Auto-sync skipped during getMe: ${err.message}`);
+      }
+    }
+
+    // Auto-replicate Codeforces status on load
+    if (user && user.codeforcesUsername) {
+      try {
+        const { fetchCodeforcesData } = require('./users');
+        const syncPromise = fetchCodeforcesData(user.codeforcesUsername);
+        const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 1500));
+        const freshStats = await Promise.race([syncPromise, timeoutPromise]);
+        
+        user = await User.findByIdAndUpdate(
+          req.user.id,
+          { codeforcesStats: freshStats },
+          { new: true }
+        );
+      } catch (err) {
+        console.warn(`Codeforces auto-sync skipped during getMe: ${err.message}`);
+      }
+    }
+
+    // Auto-replicate CodeChef status on load
+    if (user && user.codechefUsername) {
+      try {
+        const { fetchCodechefData } = require('./users');
+        const syncPromise = fetchCodechefData(user.codechefUsername);
+        const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 1500));
+        const freshStats = await Promise.race([syncPromise, timeoutPromise]);
+        
+        user = await User.findByIdAndUpdate(
+          req.user.id,
+          { codechefStats: freshStats },
+          { new: true }
+        );
+      } catch (err) {
+        console.warn(`CodeChef auto-sync skipped during getMe: ${err.message}`);
+      }
+    }
+
+    // Auto-replicate HackerRank status on load
+    if (user && user.hackerrankUsername) {
+      try {
+        const { fetchHackerrankData } = require('./users');
+        const syncPromise = fetchHackerrankData(user.hackerrankUsername);
+        const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 1500));
+        const freshStats = await Promise.race([syncPromise, timeoutPromise]);
+        
+        user = await User.findByIdAndUpdate(
+          req.user.id,
+          { hackerrankStats: freshStats },
+          { new: true }
+        );
+      } catch (err) {
+        console.warn(`HackerRank auto-sync skipped during getMe: ${err.message}`);
+      }
+    }
+
+    res.status(200).json({
+      success: true,
+      data: user
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// @desc    Update user profile
+// @route   PUT /api/auth/profile
+// @access  Private
+exports.updateProfile = async (req, res, next) => {
+  try {
+    const fieldsToUpdate = {
+      name: req.body.name,
+      bio: req.body.bio,
+      skills: req.body.skills,
+      targetRole: req.body.targetRole,
+      rollNumber: req.body.rollNumber,
+      branch: req.body.branch,
+      year: req.body.year,
+      leetcodeUsername: req.body.leetcodeUsername,
+      codeforcesUsername: req.body.codeforcesUsername,
+      codechefUsername: req.body.codechefUsername,
+      hackerrankUsername: req.body.hackerrankUsername
+    };
+
+    // Remove undefined fields
+    Object.keys(fieldsToUpdate).forEach(
+      key => fieldsToUpdate[key] === undefined && delete fieldsToUpdate[key]
+    );
+
+    // If leetcodeUsername is changing, verify and sync stats!
+    if (req.body.leetcodeUsername !== undefined) {
+      const username = req.body.leetcodeUsername;
+      if (username && username.trim() !== '') {
+        try {
+          const { fetchLeetcodeData } = require('./users');
+          fieldsToUpdate.leetcodeStats = await fetchLeetcodeData(username);
+        } catch (err) {
+          return res.status(400).json({
+            success: false,
+            error: `LeetCode user '${username}' not found. Please verify the handle.`
+          });
+        }
+      } else {
+        // Reset stats if they clear their username
+        fieldsToUpdate.leetcodeStats = { easySolved: 0, mediumSolved: 0, hardSolved: 0, totalSolved: 0, solvedSlugs: [] };
+      }
+    }
+
+    // If codeforcesUsername is changing, verify and sync stats!
+    if (req.body.codeforcesUsername !== undefined) {
+      const username = req.body.codeforcesUsername;
+      if (username && username.trim() !== '') {
+        try {
+          const { fetchCodeforcesData } = require('./users');
+          fieldsToUpdate.codeforcesStats = await fetchCodeforcesData(username);
+        } catch (err) {
+          return res.status(400).json({
+            success: false,
+            error: `Codeforces user '${username}' not found. Please verify the handle.`
+          });
+        }
+      } else {
+        // Reset stats if they clear their username
+        fieldsToUpdate.codeforcesStats = { rating: 0, maxRating: 0, rank: 'Unrated', solvedCount: 0 };
+      }
+    }
+
+    // If codechefUsername is changing, verify and sync stats!
+    if (req.body.codechefUsername !== undefined) {
+      const username = req.body.codechefUsername;
+      if (username && username.trim() !== '') {
+        try {
+          const { fetchCodechefData } = require('./users');
+          fieldsToUpdate.codechefStats = await fetchCodechefData(username);
+        } catch (err) {
+          return res.status(400).json({
+            success: false,
+            error: `CodeChef user '${username}' not found. Please verify the handle.`
+          });
+        }
+      } else {
+        // Reset stats if they clear their username
+        fieldsToUpdate.codechefStats = { rating: 0, stars: '1★', globalRank: 0, countryRank: 0 };
+      }
+    }
+
+    // If hackerrankUsername is changing, verify and sync stats!
+    if (req.body.hackerrankUsername !== undefined) {
+      const username = req.body.hackerrankUsername;
+      if (username && username.trim() !== '') {
+        try {
+          const { fetchHackerrankData } = require('./users');
+          fieldsToUpdate.hackerrankStats = await fetchHackerrankData(username);
+        } catch (err) {
+          return res.status(400).json({
+            success: false,
+            error: `HackerRank user '${username}' not found. Please verify the handle.`
+          });
+        }
+      } else {
+        // Reset stats if they clear their username
+        fieldsToUpdate.hackerrankStats = { solvedCount: 0, score: 0, badgesCount: 0 };
+      }
+    }
+
+    const user = await User.findByIdAndUpdate(req.user.id, fieldsToUpdate, {
+      new: true,
+      runValidators: true
+    });
+
+    res.status(200).json({
+      success: true,
+      data: user
+    });
+  } catch (err) {
+    next(err);
+  }
+};

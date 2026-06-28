@@ -1,0 +1,294 @@
+/* DoubtSolver - Student Doubt Portal */
+
+.doubt-page-wrapper {
+    display: flex;
+    flex-direction: column;
+    gap: 28px;
+}
+
+/* Submit Card */
+.doubt-submit-card {
+    padding: 28px 32px;
+}
+
+.doubt-card-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 18px;
+    margin-bottom: 24px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.doubt-header-icon {
+    font-size: 36px;
+    line-height: 1;
+}
+
+.doubt-card-header h3 {
+    font-size: 20px;
+    color: white;
+    margin-bottom: 4px;
+}
+
+.doubt-header-sub {
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin: 0;
+    line-height: 1.5;
+}
+
+/* Alert banners */
+.alert {
+    padding: 12px 16px;
+    border-radius: var(--border-radius-sm);
+    font-size: 14px;
+    margin-bottom: 20px;
+    line-height: 1.5;
+}
+
+.alert-error {
+    background: rgba(239, 68, 68, 0.1);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    color: #fca5a5;
+}
+
+.alert-success {
+    background: rgba(16, 185, 129, 0.1);
+    border: 1px solid rgba(16, 185, 129, 0.3);
+    color: #a7f3d0;
+}
+
+/* Form */
+.doubt-form {
+    display: flex;
+    flex-direction: column;
+}
+
+.doubt-textarea {
+    resize: vertical;
+    min-height: 120px;
+    line-height: 1.6;
+}
+
+/* Image Upload Zone */
+.image-upload-zone {
+    border: 2px dashed var(--border-color);
+    border-radius: var(--border-radius-sm);
+    padding: 24px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    color: var(--text-secondary);
+    font-size: 14px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    background: rgba(255, 255, 255, 0.01);
+}
+
+.image-upload-zone:hover {
+    border-color: var(--primary);
+    background: rgba(99, 102, 241, 0.04);
+    color: white;
+}
+
+.upload-icon {
+    font-size: 28px;
+}
+
+/* Image Preview */
+.image-preview-block {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.image-preview-img {
+    max-width: 100%;
+    max-height: 260px;
+    object-fit: contain;
+    border-radius: var(--border-radius-sm);
+    border: 1px solid var(--border-color);
+    background: rgba(0, 0, 0, 0.2);
+}
+
+.remove-image-btn {
+    background: rgba(239, 68, 68, 0.1);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    color: #f87171;
+    padding: 8px 16px;
+    border-radius: var(--border-radius-sm);
+    cursor: pointer;
+    font-size: 13px;
+    transition: all 0.2s;
+    align-self: flex-start;
+}
+
+.remove-image-btn:hover {
+    background: rgba(239, 68, 68, 0.22);
+    color: white;
+}
+
+/* History Section */
+.doubt-history-section {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.breakdown-headline {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+
+.empty-doubts-card {
+    text-align: center;
+    padding: 40px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+}
+
+.empty-icon {
+    font-size: 36px;
+}
+
+.empty-doubts-card p {
+    color: var(--text-muted);
+    font-size: 14px;
+}
+
+/* Doubt Item Card */
+.doubt-list {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.doubt-item-card {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    padding: 22px 26px;
+    border-left: 4px solid transparent;
+    transition: border-color 0.2s;
+}
+
+.doubt-item-card.status-pending {
+    border-left-color: var(--warning);
+}
+
+.doubt-item-card.status-answered {
+    border-left-color: var(--success);
+}
+
+.doubt-item-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+}
+
+.doubt-item-subject {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.doubt-item-icon {
+    font-size: 20px;
+}
+
+.doubt-item-subject h4 {
+    font-size: 16px;
+    color: white;
+    margin: 0;
+}
+
+.doubt-status-badge {
+    font-size: 12px;
+    font-weight: 700;
+    padding: 5px 12px;
+    border-radius: 999px;
+}
+
+.doubt-status-badge.pending {
+    background: rgba(245, 158, 11, 0.1);
+    color: #fbbf24;
+}
+
+.doubt-status-badge.answered {
+    background: rgba(16, 185, 129, 0.1);
+    color: #34d399;
+}
+
+.doubt-description {
+    font-size: 14px;
+    color: var(--text-secondary);
+    line-height: 1.65;
+    white-space: pre-wrap;
+}
+
+.doubt-image-wrapper {
+    max-width: 500px;
+}
+
+.doubt-attached-img {
+    width: 100%;
+    max-height: 300px;
+    object-fit: contain;
+    border-radius: var(--border-radius-sm);
+    border: 1px solid var(--border-color);
+    background: rgba(0, 0, 0, 0.15);
+}
+
+.doubt-meta {
+    font-size: 12px;
+    color: var(--text-muted);
+}
+
+/* Admin Answer Block */
+.doubt-answer-block {
+    background: rgba(16, 185, 129, 0.04);
+    border: 1px solid rgba(16, 185, 129, 0.2);
+    border-radius: var(--border-radius-sm);
+    padding: 16px 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.answer-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.answer-icon {
+    font-size: 18px;
+}
+
+.answer-header strong {
+    font-size: 14px;
+    color: #34d399;
+}
+
+.answer-date {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-left: auto;
+}
+
+.answer-text {
+    font-size: 14px;
+    color: var(--text-primary);
+    line-height: 1.65;
+    white-space: pre-wrap;
+    margin: 0;
+}

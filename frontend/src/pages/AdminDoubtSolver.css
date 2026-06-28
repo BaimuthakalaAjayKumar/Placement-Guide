@@ -1,0 +1,255 @@
+/* AdminDoubtSolver - Admin Doubt Resolving Panel */
+
+.admin-doubt-wrapper {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+}
+
+/* Stats Bar */
+.admin-doubt-stats {
+    display: flex;
+    align-items: center;
+    gap: 32px;
+    padding: 20px 28px;
+}
+
+.doubt-stat-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+}
+
+.doubt-stat-num {
+    font-family: var(--font-display);
+    font-size: 28px;
+    font-weight: 800;
+    color: white;
+}
+
+.doubt-stat-num.text-warning {
+    color: #fbbf24;
+}
+
+.doubt-stat-num.text-success {
+    color: #34d399;
+}
+
+.doubt-stat-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    letter-spacing: 0.05em;
+}
+
+.doubt-stat-divider {
+    width: 1px;
+    height: 40px;
+    background: var(--border-color);
+}
+
+/* Alert banners */
+.alert-banner {
+    padding: 12px 18px;
+    border-radius: var(--border-radius-sm);
+    font-size: 14px;
+}
+
+.success-banner {
+    background: rgba(16, 185, 129, 0.1);
+    border: 1px solid rgba(16, 185, 129, 0.3);
+    color: #a7f3d0;
+}
+
+.error-banner-red {
+    background: rgba(239, 68, 68, 0.1);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    color: #fca5a5;
+}
+
+/* Pending badge */
+.pending-badge {
+    background: rgba(245, 158, 11, 0.8);
+    color: white;
+    font-size: 10px;
+    font-weight: 700;
+    border-radius: 999px;
+    padding: 1px 6px;
+    min-width: 20px;
+    text-align: center;
+}
+
+/* Doubt List */
+.admin-doubt-list {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+/* Doubt Card */
+.admin-doubt-card {
+    padding: 0;
+    overflow: hidden;
+    border-left: 4px solid transparent;
+    cursor: pointer;
+    transition: border-color 0.2s ease;
+}
+
+.admin-doubt-card.status-pending {
+    border-left-color: var(--warning);
+}
+
+.admin-doubt-card.status-answered {
+    border-left-color: var(--success);
+}
+
+.admin-doubt-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    padding: 18px 22px;
+}
+
+.admin-doubt-left {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+}
+
+.admin-doubt-status-dot {
+    font-size: 20px;
+    margin-top: 2px;
+    flex-shrink: 0;
+}
+
+.admin-doubt-subject {
+    font-size: 15px;
+    color: white;
+    margin: 0 0 4px 0;
+}
+
+.admin-doubt-student {
+    font-size: 12px;
+    color: var(--text-muted);
+}
+
+.admin-doubt-right {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-shrink: 0;
+}
+
+.expand-chevron {
+    font-size: 12px;
+    color: var(--text-muted);
+}
+
+/* Status Badges */
+.doubt-status-badge {
+    font-size: 12px;
+    font-weight: 700;
+    padding: 5px 12px;
+    border-radius: 999px;
+}
+
+.doubt-status-badge.pending {
+    background: rgba(245, 158, 11, 0.1);
+    color: #fbbf24;
+}
+
+.doubt-status-badge.answered {
+    background: rgba(16, 185, 129, 0.1);
+    color: #34d399;
+}
+
+/* Expanded Body */
+.admin-doubt-expanded-body {
+    padding: 0 22px 22px;
+    border-top: 1px solid var(--border-color);
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    padding-top: 18px;
+}
+
+.student-query-block {
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-sm);
+    padding: 14px 16px;
+}
+
+.query-block-title {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: var(--text-muted);
+    margin-bottom: 8px;
+    font-weight: 700;
+}
+
+.query-block-text {
+    font-size: 14px;
+    color: var(--text-secondary);
+    line-height: 1.65;
+    white-space: pre-wrap;
+    margin: 0;
+}
+
+/* Admin Doubt Image */
+.admin-doubt-img-block {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.admin-doubt-img {
+    max-width: 100%;
+    max-height: 360px;
+    object-fit: contain;
+    border-radius: var(--border-radius-sm);
+    border: 1px solid var(--border-color);
+    background: rgba(0, 0, 0, 0.15);
+}
+
+/* Existing Answer */
+.existing-answer-block {
+    background: rgba(16, 185, 129, 0.04);
+    border: 1px solid rgba(16, 185, 129, 0.2);
+    border-radius: var(--border-radius-sm);
+    padding: 14px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.existing-answer-text {
+    font-size: 14px;
+    color: var(--text-primary);
+    line-height: 1.65;
+    white-space: pre-wrap;
+    margin: 0;
+}
+
+.answered-meta {
+    font-size: 12px;
+    color: var(--text-muted);
+    font-style: italic;
+}
+
+/* Reply Form */
+.reply-form-block {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.reply-textarea {
+    resize: vertical;
+    min-height: 100px;
+    font-size: 14px;
+    line-height: 1.6;
+}
