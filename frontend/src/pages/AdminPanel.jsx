@@ -106,6 +106,14 @@ const AdminPanel = () => {
   const [deleteYear, setDeleteYear] = useState('');
   const [deletingBulk, setDeletingBulk] = useState(false);
 
+  // Bulk jobs states
+  const [jobPostMode, setJobPostMode] = useState('single'); // 'single' or 'bulk'
+  const [bulkInputText, setBulkInputText] = useState('');
+  const [bulkInputType, setBulkInputType] = useState('csv'); // 'csv' or 'json'
+  const [parsedPreviewJobs, setParsedPreviewJobs] = useState([]);
+  const [parsingError, setParsingError] = useState('');
+  const [isSubmittingBulk, setIsSubmittingBulk] = useState(false);
+
   // Student Academics Modal states
   const [showAcademicsModal, setShowAcademicsModal] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState(null);
@@ -1112,6 +1120,168 @@ const AdminPanel = () => {
     return (completed.reduce((a, b) => a + b, 0) / completed.length).toFixed(2);
   };
 
+  const handlePreviewBulkJobs = () => {
+    setParsingError('');
+    setParsedPreviewJobs([]);
+
+    if (!bulkInputText.trim()) {
+      setParsingError('Please paste CSV or JSON content first.');
+      return;
+    }
+
+    try {
+      let parsed = [];
+      if (bulkInputType === 'json') {
+        parsed = parseJSONText(bulkInputText);
+      } else {
+        parsed = parseCSVText(bulkInputText);
+      }
+
+      if (parsed.length === 0) {
+        setParsingError('No valid job listings found. Make sure headers "title" and "company" are present and filled.');
+      } else {
+        setParsedPreviewJobs(parsed);
+      }
+    } catch (err) {
+      setParsingError(err.message || 'Parsing failed. Check the structure.');
+    }
+  };
+
+  const handleCsvFileUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const text = event.target.result;
+      setBulkInputText(text);
+      setBulkInputType('csv');
+
+      // Auto-preview on upload for better UX
+      try {
+        setParsingError('');
+        const parsed = parseCSVText(text);
+        if (parsed.length === 0) {
+          setParsingError('CSV upload parsed to 0 jobs. Ensure headers "title" and "company" exist.');
+        } else {
+          setParsedPreviewJobs(parsed);
+        }
+      } catch (err) {
+        setParsingError('Failed to parse uploaded CSV: ' + err.message);
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  const parseCSVText = (text) => {
+    const lines = text.split(/\r?\n/).map(l => l.trim()).filter(l => l.length > 0);
+    if (lines.length < 2) return [];
+
+    const headers = lines[0].split(',').map(h => h.trim().replace(/^["']|["']$/g, '').toLowerCase());
+
+    return lines.slice(1).map(line => {
+      const values = [];
+      let current = '';
+      let inQuotes = false;
+      for (let i = 0; i < line.length; i++) {
+        const char = line[i];
+        if (char === '"') {
+          inQuotes = !inQuotes;
+        } else if (char === ',' && !inQuotes) {
+          values.push(current.trim());
+          current = '';
+        } else {
+          current += char;
+        }
+      }
+      values.push(current.trim());
+
+      const item = {};
+      headers.forEach((header, index) => {
+        let val = values[index] || '';
+        val = val.replace(/^["']|["']$/g, '').trim();
+
+        if (header === 'title') item.title = val;
+        else if (header === 'company') item.company = val;
+        else if (header === 'description') item.description = val;
+        else if (header === 'requirements' || header === 'skills') {
+          item.requirements = val ? val.split(/;\s*|,\s*/).map(s => s.trim()).filter(s => s.length > 0) : [];
+        }
+        else if (header === 'location') item.location = val;
+        else if (header === 'salary') item.salary = val;
+        else if (header === 'experiencelevel' || header === 'experience') item.experienceLevel = val;
+        else if (header === 'targetbatch' || header === 'batch') item.targetBatch = val;
+        else if (header === 'applylink' || header === 'link') item.applyLink = val;
+      });
+      return item;
+    }).filter(job => job.title && job.company);
+  };
+
+  const parseJSONText = (text) => {
+    try {
+      const data = JSON.parse(text);
+      const jobsList = Array.isArray(data) ? data : (data.jobs || []);
+      return jobsList.map(j => ({
+        title: j.title || '',
+        company: j.company || '',
+        description: j.description || '',
+        requirements: Array.isArray(j.requirements) ? j.requirements : (j.requirements || '').split(',').map(s => s.trim()).filter(Boolean),
+        location: j.location || 'Remote',
+        salary: j.salary || 'Not Specified',
+        experienceLevel: j.experienceLevel || 'Entry Level',
+        targetBatch: String(j.targetBatch || 'All'),
+        applyLink: j.applyLink || ''
+      })).filter(job => job.title && job.company);
+    } catch (err) {
+      throw new Error('Invalid JSON structure. Expecting standard array [ {...}, {...} ]');
+    }
+  };
+
+  const handlePostBulkJobs = async () => {
+    if (parsedPreviewJobs.length === 0) return;
+    setError('');
+    setSuccess('');
+    setIsSubmittingBulk(true);
+
+    try {
+      const res = await fetch(`${API_URL}/jobs/bulk`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ jobs: parsedPreviewJobs })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setSuccess(`Successfully posted ${data.count} jobs in bulk! Batch email notifications triggered.`);
+        setBulkInputText('');
+        setParsedPreviewJobs([]);
+        fetchJobs();
+      } else {
+        setError(data.error || 'Failed to bulk post job listings.');
+      }
+    } catch (err) {
+      setError('Could not connect to bulk jobs endpoint.');
+    } finally {
+      setIsSubmittingBulk(false);
+    }
+  };
+
+  const downloadCsvTemplate = () => {
+    const csvContent = "title,company,description,requirements,location,salary,experienceLevel,targetBatch,applyLink\n" +
+      "\"Software Engineer Intern\",\"Google\",\"Exciting summer internship for CS students\",\"Java, Python, Algorithms\",\"Bangalore, India\",\"₹50,000 / month\",\"Internship\",\"2026\",\"https://careers.google.com\"\n" +
+      "\"Frontend Developer\",\"InnovateTech\",\"Build beautiful React screens\",\"React, TypeScript, CSS\",\"Remote\",\"₹10,00,000 LPA\",\"Entry Level\",\"All\",\"https://careers.innovatetech.com\"";
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", "bulk_jobs_template.csv");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   return (
     <>
       <Header title="Admin Command Console" />
@@ -1399,135 +1569,266 @@ const AdminPanel = () => {
                 <div className="admin-right-column" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
                   {/* Add Job form */}
                   <div className="glass-card create-job-form-card">
-                    <h3>Post a New Job Opportunity</h3>
-                    <p className="card-desc">Publish jobs that will be recommended to students matching the technical skill checklist.</p>
-
-                    <form onSubmit={handlePostJob} className="admin-job-form">
-                      <div className="form-grid-2-col">
-                        <div className="form-group">
-                          <label className="form-label" htmlFor="title">Job Title</label>
-                          <input
-                            type="text"
-                            id="title"
-                            className="form-control"
-                            placeholder="e.g. Associate Software Engineer"
-                            value={jobTitle}
-                            onChange={(e) => setJobTitle(e.target.value)}
-                            required
-                          />
-                        </div>
-                        <div className="form-group">
-                          <label className="form-label" htmlFor="company">Company Name</label>
-                          <input
-                            type="text"
-                            id="company"
-                            className="form-control"
-                            placeholder="e.g. Google"
-                            value={jobCompany}
-                            onChange={(e) => setJobCompany(e.target.value)}
-                            required
-                          />
-                        </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap', gap: '8px' }}>
+                      <h3 style={{ margin: 0 }}>Post Job Opportunities</h3>
+                      <div className="job-mode-toggle" style={{ display: 'flex', gap: '4px', background: 'rgba(255,255,255,0.05)', padding: '3px', borderRadius: '6px' }}>
+                        <button
+                          className={`btn btn-sm ${jobPostMode === 'single' ? 'btn-primary' : ''}`}
+                          style={{ background: jobPostMode === 'single' ? 'var(--primary)' : 'transparent', border: 'none', padding: '4px 10px', fontSize: '12px' }}
+                          onClick={() => setJobPostMode('single')}
+                        >
+                          Single Job
+                        </button>
+                        <button
+                          className={`btn btn-sm ${jobPostMode === 'bulk' ? 'btn-primary' : ''}`}
+                          style={{ background: jobPostMode === 'bulk' ? 'var(--primary)' : 'transparent', border: 'none', padding: '4px 10px', fontSize: '12px' }}
+                          onClick={() => setJobPostMode('bulk')}
+                        >
+                          Bulk Jobs
+                        </button>
                       </div>
+                    </div>
+                    {jobPostMode === 'single' ? (
+                      <>
+                        <p className="card-desc">Publish a single job opportunity that notifies matching students on the platform.</p>
+                        <form onSubmit={handlePostJob} className="admin-job-form" style={{ marginTop: '8px' }}>
+                          <div className="form-grid-2-col">
+                            <div className="form-group">
+                              <label className="form-label" htmlFor="title">Job Title</label>
+                              <input
+                                type="text"
+                                id="title"
+                                className="form-control"
+                                placeholder="e.g. Associate Software Engineer"
+                                value={jobTitle}
+                                onChange={(e) => setJobTitle(e.target.value)}
+                                required
+                              />
+                            </div>
+                            <div className="form-group">
+                              <label className="form-label" htmlFor="company">Company Name</label>
+                              <input
+                                type="text"
+                                id="company"
+                                className="form-control"
+                                placeholder="e.g. Google"
+                                value={jobCompany}
+                                onChange={(e) => setJobCompany(e.target.value)}
+                                required
+                              />
+                            </div>
+                          </div>
 
-                      <div className="form-group">
-                        <label className="form-label" htmlFor="description">Job Description</label>
-                        <textarea
-                          id="description"
-                          className="form-control"
-                          rows="4"
-                          placeholder="Outline key responsibilities and expectations..."
-                          value={jobDesc}
-                          onChange={(e) => setJobDesc(e.target.value)}
-                          required
-                        />
-                      </div>
+                          <div className="form-group">
+                            <label className="form-label" htmlFor="description">Job Description</label>
+                            <textarea
+                              id="description"
+                              className="form-control"
+                              rows="4"
+                              placeholder="Outline key responsibilities and expectations..."
+                              value={jobDesc}
+                              onChange={(e) => setJobDesc(e.target.value)}
+                              required
+                            />
+                          </div>
 
-                      <div className="form-group">
-                        <label className="form-label" htmlFor="requirements">Skill Requirements (comma-separated)</label>
-                        <input
-                          type="text"
-                          id="requirements"
-                          className="form-control"
-                          placeholder="React, Node.js, Git, SQL"
-                          value={jobReqsText}
-                          onChange={(e) => setJobReqsText(e.target.value)}
-                        />
-                      </div>
+                          <div className="form-group">
+                            <label className="form-label" htmlFor="requirements">Skill Requirements (comma-separated)</label>
+                            <input
+                              type="text"
+                              id="requirements"
+                              className="form-control"
+                              placeholder="React, Node.js, Git, SQL"
+                              value={jobReqsText}
+                              onChange={(e) => setJobReqsText(e.target.value)}
+                            />
+                          </div>
 
-                      <div className="form-grid-3-col">
-                        <div className="form-group">
-                          <label className="form-label" htmlFor="location">Location</label>
-                          <input
-                            type="text"
-                            id="location"
+                          <div className="form-grid-3-col">
+                            <div className="form-group">
+                              <label className="form-label" htmlFor="location">Location</label>
+                              <input
+                                type="text"
+                                id="location"
+                                className="form-control"
+                                placeholder="Remote / Bangalore"
+                                value={jobLocation}
+                                onChange={(e) => setJobLocation(e.target.value)}
+                              />
+                            </div>
+                            <div className="form-group">
+                              <label className="form-label" htmlFor="salary">Salary Estimate</label>
+                              <input
+                                type="text"
+                                id="salary"
+                                className="form-control"
+                                placeholder="₹8,0,000 LPA"
+                                value={jobSalary}
+                                onChange={(e) => setJobSalary(e.target.value)}
+                              />
+                            </div>
+                            <div className="form-group">
+                              <label className="form-label" htmlFor="experience">Experience Level</label>
+                              <select
+                                id="experience"
+                                className="form-control"
+                                value={jobExp}
+                                onChange={(e) => setJobExp(e.target.value)}
+                              >
+                                <option value="Entry Level">Entry Level</option>
+                                <option value="Internship">Internship</option>
+                                <option value="Associate">Associate</option>
+                                <option value="Mid-Senior">Mid-Senior</option>
+                              </select>
+                            </div>
+                          </div>
+
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                            <div className="form-group" style={{ marginBottom: 0 }}>
+                              <label className="form-label" htmlFor="apply">External Apply URL</label>
+                              <input
+                                type="url"
+                                id="apply"
+                                className="form-control"
+                                placeholder="https://careers.company.com/apply"
+                                value={jobApply}
+                                onChange={(e) => setJobApply(e.target.value)}
+                              />
+                            </div>
+                            <div className="form-group" style={{ marginBottom: 0 }}>
+                              <label className="form-label" htmlFor="targetBatch">Target Batch Year</label>
+                              <select
+                                id="targetBatch"
+                                className="form-control"
+                                value={jobTargetBatch}
+                                onChange={(e) => setJobTargetBatch(e.target.value)}
+                              >
+                                <option value="All">All Batches (Email All)</option>
+                                <option value="2024">2024 Batch</option>
+                                <option value="2025">2025 Batch</option>
+                                <option value="2026">2026 Batch</option>
+                                <option value="2027">2027 Batch</option>
+                                <option value="2028">2028 Batch</option>
+                              </select>
+                            </div>
+                          </div>
+
+                          <button type="submit" className="btn btn-primary btn-block" disabled={submittingJob} style={{ marginTop: '16px' }}>
+                            {submittingJob ? 'Publishing...' : 'Publish Job Listing'}
+                          </button>
+                        </form>
+                      </>
+                    ) : (
+                      <>
+                        <p className="card-desc">Parse structured CSV/JSON data or upload a direct spreadsheet template of target job openings.</p>
+
+                        <div style={{ display: 'flex', gap: '8px', marginBottom: '12px', alignItems: 'center' }}>
+                          <button className="btn btn-secondary btn-sm" onClick={downloadCsvTemplate} type="button">
+                            ⬇️ CSV Template
+                          </button>
+                          <label className="btn btn-accent btn-sm" style={{ cursor: 'pointer', margin: 0 }}>
+                            📁 Upload File
+                            <input
+                              type="file"
+                              accept=".csv"
+                              onChange={handleCsvFileUpload}
+                              style={{ display: 'none' }}
+                            />
+                          </label>
+                        </div>
+
+                        <div className="form-group" style={{ marginBottom: '12px' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
+                            <label className="form-label">Data Paste Console</label>
+                            <div style={{ display: 'flex', gap: '10px' }}>
+                              <label style={{ fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer', color: 'var(--text-secondary)' }}>
+                                <input
+                                  type="radio"
+                                  name="bulkType"
+                                  checked={bulkInputType === 'csv'}
+                                  onChange={() => setBulkInputType('csv')}
+                                /> CSV
+                              </label>
+                              <label style={{ fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer', color: 'var(--text-secondary)' }}>
+                                <input
+                                  type="radio"
+                                  name="bulkType"
+                                  checked={bulkInputType === 'json'}
+                                  onChange={() => setBulkInputType('json')}
+                                /> JSON
+                              </label>
+                            </div>
+                          </div>
+                          <textarea
                             className="form-control"
-                            placeholder="Remote / Bangalore"
-                            value={jobLocation}
-                            onChange={(e) => setJobLocation(e.target.value)}
+                            rows="6"
+                            placeholder={bulkInputType === 'csv'
+                              ? 'title,company,description,requirements,location,salary,experienceLevel,targetBatch,applyLink\n"Software Tester","Google","Run tests","Python, Selenium","Remote","₹6,00,000","Entry Level","2026","https://..."'
+                              : '[\n  {\n    "title": "Software Tester",\n    "company": "Google",\n    "description": "Run tests",\n    "requirements": ["Python", "Selenium"],\n    "location": "Remote"\n  }\n]'
+                            }
+                            value={bulkInputText}
+                            onChange={(e) => setBulkInputText(e.target.value)}
+                            style={{ fontFamily: 'Courier New, Courier, monospace', fontSize: '12px', background: 'rgba(0,0,0,0.25)', border: '1px solid rgba(255,255,255,0.08)' }}
                           />
                         </div>
-                        <div className="form-group">
-                          <label className="form-label" htmlFor="salary">Salary Estimate</label>
-                          <input
-                            type="text"
-                            id="salary"
-                            className="form-control"
-                            placeholder="₹8,0,000 LPA"
-                            value={jobSalary}
-                            onChange={(e) => setJobSalary(e.target.value)}
-                          />
-                        </div>
-                        <div className="form-group">
-                          <label className="form-label" htmlFor="experience">Experience Level</label>
-                          <select
-                            id="experience"
-                            className="form-control"
-                            value={jobExp}
-                            onChange={(e) => setJobExp(e.target.value)}
+
+                        {parsingError && (
+                          <div style={{ color: '#f87171', fontSize: '12px', margin: '8px 0', padding: '8px 12px', background: 'rgba(239, 68, 68, 0.1)', borderRadius: '6px', border: '1px solid rgba(239, 68, 68, 0.18)' }}>
+                            ⚠️ {parsingError}
+                          </div>
+                        )}
+
+                        <div style={{ display: 'flex', gap: '10px', marginTop: '12px' }}>
+                          <button
+                            className="btn btn-secondary btn-block"
+                            onClick={handlePreviewBulkJobs}
+                            type="button"
                           >
-                            <option value="Entry Level">Entry Level</option>
-                            <option value="Internship">Internship</option>
-                            <option value="Associate">Associate</option>
-                            <option value="Mid-Senior">Mid-Senior</option>
-                          </select>
+                            🔎 Preview Parsed Listings
+                          </button>
                         </div>
-                      </div>
 
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                        <div className="form-group" style={{ marginBottom: 0 }}>
-                          <label className="form-label" htmlFor="apply">External Apply URL</label>
-                          <input
-                            type="url"
-                            id="apply"
-                            className="form-control"
-                            placeholder="https://careers.company.com/apply"
-                            value={jobApply}
-                            onChange={(e) => setJobApply(e.target.value)}
-                          />
-                        </div>
-                        <div className="form-group" style={{ marginBottom: 0 }}>
-                          <label className="form-label" htmlFor="targetBatch">Target Batch Year</label>
-                          <select
-                            id="targetBatch"
-                            className="form-control"
-                            value={jobTargetBatch}
-                            onChange={(e) => setJobTargetBatch(e.target.value)}
-                          >
-                            <option value="All">All Batches (Email All)</option>
-                            <option value="2024">2024 Batch</option>
-                            <option value="2025">2025 Batch</option>
-                            <option value="2026">2026 Batch</option>
-                            <option value="2027">2027 Batch</option>
-                            <option value="2028">2028 Batch</option>
-                          </select>
-                        </div>
-                      </div>
-
-                      <button type="submit" className="btn btn-primary btn-block" disabled={submittingJob}>
-                        {submittingJob ? 'Publishing...' : 'Publish Job Listing'}
-                      </button>
-                    </form>
+                        {parsedPreviewJobs.length > 0 && (
+                          <div style={{ marginTop: '16px', borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '16px' }}>
+                            <h4 style={{ fontSize: '14px', marginBottom: '8px', color: 'white', display: 'flex', justifyContent: 'space-between' }}>
+                              <span>Parsed Listings Preview</span>
+                              <span style={{ color: '#818cf8' }}>{parsedPreviewJobs.length} Jobs Found</span>
+                            </h4>
+                            <div style={{ maxHeight: '160px', overflowY: 'auto', background: 'rgba(0,0,0,0.3)', padding: '10px', borderRadius: '6px', fontSize: '12px', border: '1px solid rgba(255, 255, 255, 0.05)' }}>
+                              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+                                <thead>
+                                  <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.1)', color: 'var(--text-secondary)', fontSize: '11px', textTransform: 'uppercase' }}>
+                                    <th style={{ paddingBottom: '4px' }}>Title</th>
+                                    <th style={{ paddingBottom: '4px' }}>Company</th>
+                                    <th style={{ paddingBottom: '4px' }}>Location</th>
+                                    <th style={{ paddingBottom: '4px' }}>Batch</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {parsedPreviewJobs.map((pJob, idx) => (
+                                    <tr key={idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)', color: '#f1f5f9' }}>
+                                      <td style={{ padding: '6px 0', fontWeight: 'bold' }}>{pJob.title}</td>
+                                      <td>{pJob.company}</td>
+                                      <td>{pJob.location || 'Remote'}</td>
+                                      <td>{pJob.targetBatch || 'All'}</td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                            <button
+                              className="btn btn-primary btn-block"
+                              onClick={handlePostBulkJobs}
+                              disabled={isSubmittingBulk}
+                              style={{ marginTop: '12px' }}
+                              type="button"
+                            >
+                              {isSubmittingBulk ? 'Uploading & Notifying...' : `🚀 Confirm & Upload ${parsedPreviewJobs.length} Jobs`}
+                            </button>
+                          </div>
+                        )}
+                      </>
+                    )}
                   </div>
 
                   {/* Add Admin form */}

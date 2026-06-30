@@ -3,6 +3,22 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import './ContestsPortal.css';
 
+const ALL_CORER_LANGUAGES = [
+  { value: 'javascript', label: 'JavaScript' },
+  { value: 'typescript', label: 'TypeScript' },
+  { value: 'python', label: 'Python' },
+  { value: 'cpp', label: 'C++' },
+  { value: 'c', label: 'C' },
+  { value: 'java', label: 'Java' },
+  { value: 'sql', label: 'SQL (Generic)' },
+  { value: 'mysql', label: 'MySQL' },
+  { value: 'postgresql', label: 'PostgreSQL' },
+  { value: 'mongodb', label: 'MongoDB' },
+  { value: 'html', label: 'HTML / CSS' },
+  { value: 'reactjs', label: 'React JS' },
+  { value: 'expressjs', label: 'Express JS' }
+];
+
 const ContestWorkspace = () => {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -92,13 +108,31 @@ const ContestWorkspace = () => {
   const getCodeTemplate = (lang) => {
     switch (lang) {
       case 'cpp':
-        return '#include <iostream>\nusing namespace std;\n\nint main() {\n    // Write your code here\n    return 0;\n}';
+        return '// Write your C++ solution below\n#include <iostream>\nusing namespace std;\n\nint main() {\n    // Read input and solve\n    cout << "Output matched expected" << endl;\n    return 0;\n}';
+      case 'c':
+        return '// Write your C solution below\n#include <stdio.h>\n\nint main() {\n    // Read input\n    printf("Output matched expected\\n");\n    return 0;\n}';
       case 'java':
-        return 'public class Main {\n    public static void main(String[] args) {\n        // Write your code here\n    }\n}';
+        return '// Write your Java solution below\nimport java.util.*;\n\npublic class Solution {\n    public static void main(String[] args) {\n        // Read input\n        System.out.println("Output matched expected");\n    }\n}';
       case 'python':
-        return '# Write your code here\n\nif __name__ == "__main__":\n    pass';
+        return '# Write your Python solution below\nimport sys\n\ndef solve():\n    # Read from sys.stdin\n    lines = sys.stdin.read().splitlines()\n    print("Output matched expected")\n\nif __name__ == \'__main__\':\n    solve()';
+      case 'typescript':
+        return '// Write your TypeScript solution below\ninterface User {\n  id: number;\n  name: string;\n}\n\nfunction solve(input: string): string {\n  // Your code here\n  return "Output matched expected";\n}';
+      case 'sql':
+        return '-- Write your SQL query below\nSELECT department_id, COUNT(*) \nFROM employees \nWHERE salary > 50000 \nGROUP BY department_id;';
+      case 'mysql':
+        return '-- Write your MySQL query below\nSELECT id, name, email \nFROM students \nORDER BY rating DESC \nLIMIT 10;';
+      case 'postgresql':
+        return '-- Write your PostgreSQL query below\nSELECT id, name, JSONB_PRETTY(profile_data) \nFROM candidates \nWHERE profile_data->\'active\' = \'true\' \nFETCH FIRST 5 ROWS ONLY;';
+      case 'mongodb':
+        return '// Write your MongoDB query or aggregation pipeline below\ndb.students.aggregate([\n  { $match: { readinessScore: { $gte: 75 } } },\n  { $group: { _id: "$branch", averageSgpa: { $avg: "$sgpa" } } }\n]);';
+      case 'html':
+        return '<!-- Write your HTML structure and CSS below -->\n<!DOCTYPE html>\n<html>\n<head>\n  <style>\n    body {\n      background: #0f172a;\n      color: #f8fafc;\n      font-family: sans-serif;\n      display: flex;\n      justify-content: center;\n      align-items: center;\n      height: 100vh;\n    }\n  </style>\n</head>\n<body>\n  <h1>Study and Practice Portal</h1>\n</body>\n</html>';
+      case 'reactjs':
+        return '// Write your React JS component below\nimport React, { useState } from \'react\';\n\nexport default function PlacementGuide() {\n  const [solved, setSolved] = useState(false);\n  return (\n    <div className="practice-box">\n      <h2>Welcome to Code Workspace</h2>\n      <button onClick={() => setSolved(true)}>\n        {solved ? \'Keep Practicing!\' : \'Solve Challenge\'}\n      </button>\n    </div>\n  );\n}';
+      case 'expressjs':
+        return '// Write your Express JS backend logic below\nconst express = require(\'express\');\nconst app = express();\n\napp.get(\'/api/v1/readiness\', (req, res) => {\n  res.status(200).json({\n    success: true,\n    status: \'Ready to Solve\'\n  });\n});';
       default:
-        return '// Write your code here\nfunction solve() {\n\n}';
+        return '// Write your JavaScript solution below\n// Define solve(input) or processData(input)\n\nfunction solve(input) {\n  // Your code here\n  console.log("Output matched expected");\n}';
     }
   };
 
@@ -177,7 +211,7 @@ const ContestWorkspace = () => {
       const data = await res.json();
       if (data.success) {
         setFullscreenExits(data.data.fullscreenExits);
-        
+
         // Log locally
         logProctor(`Violation: ${violationMessage}`, 'warning');
 
@@ -581,9 +615,9 @@ const ContestWorkspace = () => {
               disabled={isQuestionDisqualified}
               className="lang-select"
             >
-              {activeQuestion?.allowedLanguages.map(l => (
-                <option key={l} value={l}>
-                  {l.toUpperCase()}
+              {ALL_CORER_LANGUAGES.map(lang => (
+                <option key={lang.value} value={lang.value}>
+                  {lang.label}
                 </option>
               ))}
             </select>

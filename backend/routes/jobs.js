@@ -3,7 +3,8 @@ const {
   getJobs,
   getJobRecommendations,
   createJob,
-  deleteJob
+  deleteJob,
+  bulkCreateJobs
 } = require('../controllers/jobs');
 
 const router = express.Router();
@@ -17,6 +18,7 @@ router.get('/recommendations', getJobRecommendations);
 
 // Admin only routes
 router.post('/', authorize('admin'), createJob);
+router.post('/bulk', authorize('admin'), bulkCreateJobs);
 router.delete('/:id', authorize('admin'), deleteJob);
 
 module.exports = router;

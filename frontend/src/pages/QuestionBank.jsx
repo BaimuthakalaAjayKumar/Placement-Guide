@@ -3,6 +3,22 @@ import { useAuth } from '../context/AuthContext';
 import Header from '../components/Header';
 import './QuestionBank.css';
 
+const ALL_CORER_LANGUAGES = [
+  { value: 'javascript', label: 'JavaScript' },
+  { value: 'typescript', label: 'TypeScript' },
+  { value: 'python', label: 'Python' },
+  { value: 'cpp', label: 'C++' },
+  { value: 'c', label: 'C' },
+  { value: 'java', label: 'Java' },
+  { value: 'sql', label: 'SQL (Generic)' },
+  { value: 'mysql', label: 'MySQL' },
+  { value: 'postgresql', label: 'PostgreSQL' },
+  { value: 'mongodb', label: 'MongoDB' },
+  { value: 'html', label: 'HTML / CSS' },
+  { value: 'reactjs', label: 'React JS' },
+  { value: 'expressjs', label: 'Express JS' }
+];
+
 const QuestionBank = () => {
   const { user, token } = useAuth();
   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
@@ -11,23 +27,23 @@ const QuestionBank = () => {
   const [questions, setQuestions] = useState([]);
   const [selectedQuestion, setSelectedQuestion] = useState(null);
   const [loadingQuestions, setLoadingQuestions] = useState(true);
-  
+
   // Filtering & Search
   const [searchQuery, setSearchQuery] = useState('');
   const [difficultyFilter, setDifficultyFilter] = useState('');
   const [topicFilter, setTopicFilter] = useState('');
   const [languageFilter, setLanguageFilter] = useState('');
-  
+
   // Coding Playground
   const [selectedLanguage, setSelectedLanguage] = useState('javascript');
   const [solutionCode, setSolutionCode] = useState('');
   const [runningCode, setRunningCode] = useState(false);
   const [submittingCode, setSubmittingCode] = useState(false);
   const [executionOutput, setExecutionOutput] = useState(null);
-  
+
   // Right Pane Tabs
   const [rightActiveTab, setRightActiveTab] = useState('submissions'); // submissions, plagiarism, discussions, history
-  
+
   // Student workflow state & resizing split-pane widths
   const [studentViewState, setStudentViewState] = useState('browse'); // 'browse', 'coding', 'submissions'
   const [splitWidth, setSplitWidth] = useState(30); // percentage for left column
@@ -35,12 +51,12 @@ const QuestionBank = () => {
   const [lastSubmittedCode, setLastSubmittedCode] = useState('');
   const [lastSubmittedLanguage, setLastSubmittedLanguage] = useState('');
   const containerRef = useRef(null);
-  
+
   // Submissions & Plagiarism reports (Admin view / Student self view)
   const [submissionsList, setSubmissionsList] = useState([]);
   const [detailedReport, setDetailedReport] = useState(null);
   const [adminReportFilter, setAdminReportFilter] = useState('Latest Submission'); // sort options
-  
+
   // Modals & Notifications
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingQuestion, setEditingQuestion] = useState(null);
@@ -124,6 +140,8 @@ const QuestionBank = () => {
     setSelectedLanguage(lang);
     if (lang === 'javascript') {
       setSolutionCode(`// Write your JavaScript solution below\n// Define solve(input) or processData(input)\n\nfunction solve(input) {\n  // Your code here\n  console.log("Output matched expected");\n}`);
+    } else if (lang === 'typescript') {
+      setSolutionCode(`// Write your TypeScript solution below\ninterface User {\n  id: number;\n  name: string;\n}\n\nfunction solve(input: string): string {\n  // Your code here\n  return "Output matched expected";\n}`);
     } else if (lang === 'python') {
       setSolutionCode(`# Write your Python solution below\nimport sys\n\ndef solve():\n    # Read from sys.stdin\n    lines = sys.stdin.read().splitlines()\n    print("Output matched expected")\n\nif __name__ == '__main__':\n    solve()`);
     } else if (lang === 'cpp') {
@@ -132,6 +150,20 @@ const QuestionBank = () => {
       setSolutionCode(`// Write your C solution below\n#include <stdio.h>\n\nint main() {\n    // Read input\n    printf("Output matched expected\\n");\n    return 0;\n}`);
     } else if (lang === 'java') {
       setSolutionCode(`// Write your Java solution below\nimport java.util.*;\n\npublic class Solution {\n    public static void main(String[] args) {\n        // Read input\n        System.out.println("Output matched expected");\n    }\n}`);
+    } else if (lang === 'sql') {
+      setSolutionCode(`-- Write your SQL query below\nSELECT department_id, COUNT(*) \nFROM employees \nWHERE salary > 50000 \nGROUP BY department_id;`);
+    } else if (lang === 'mysql') {
+      setSolutionCode(`-- Write your MySQL query below\nSELECT id, name, email \nFROM students \nORDER BY rating DESC \nLIMIT 10;`);
+    } else if (lang === 'postgresql') {
+      setSolutionCode(`-- Write your PostgreSQL query below\nSELECT id, name, JSONB_PRETTY(profile_data) \nFROM candidates \nWHERE profile_data->>'active' = 'true' \nFETCH FIRST 5 ROWS ONLY;`);
+    } else if (lang === 'mongodb') {
+      setSolutionCode(`// Write your MongoDB query or aggregation pipeline below\ndb.students.aggregate([\n  { $match: { readinessScore: { $gte: 75 } } },\n  { $group: { _id: "$branch", averageSgpa: { $avg: "$sgpa" } } }\n]);`);
+    } else if (lang === 'html') {
+      setSolutionCode(`<!-- Write your HTML structure and CSS below -->\n<!DOCTYPE html>\n<html>\n<head>\n  <style>\n    body {\n      background: #0f172a;\n      color: #f8fafc;\n      font-family: sans-serif;\n      display: flex;\n      justify-content: center;\n      align-items: center;\n      height: 100vh;\n    }\n  </style>\n</head>\n<body>\n  <h1>Study and Practice Portal</h1>\n</body>\n</html>`);
+    } else if (lang === 'reactjs') {
+      setSolutionCode(`// Write your React JS component below\nimport React, { useState } from 'react';\n\nexport default function PlacementGuide() {\n  const [solved, setSolved] = useState(false);\n  return (\n    <div className="practice-box">\n      <h2>Welcome to Code Workspace</h2>\n      <button onClick={() => setSolved(true)}>\n        {solved ? 'Keep Practicing!' : 'Solve Challenge'}\n      </button>\n    </div>\n  );\n}`);
+    } else if (lang === 'expressjs') {
+      setSolutionCode(`// Write your Express JS backend logic below\nconst express = require('express');\nconst app = express();\n\napp.get('/api/v1/readiness', (req, res) => {\n  res.status(200).json({\n    success: true,\n    status: 'Ready to Solve'\n  });\n});`);
     }
   };
 
@@ -171,7 +203,7 @@ const QuestionBank = () => {
         const plagAlerts = data.data.filter(sub => sub.plagiarismPercentage > 40);
         setAdminNotifications(plagAlerts);
       }
-    } catch (e) {}
+    } catch (e) { }
   };
 
   const handleSelectQuestion = async (question) => {
@@ -250,7 +282,7 @@ const QuestionBank = () => {
         setExecutionOutput(data.evaluation);
         setSuccessMsg('Solution submitted successfully!');
         fetchSubmissions(selectedQuestion._id);
-        
+
         // Save code for student review
         setLastSubmittedCode(solutionCode);
         setLastSubmittedLanguage(selectedLanguage);
@@ -285,7 +317,7 @@ const QuestionBank = () => {
           setLastSubmittedLanguage(data.data.submission.language);
         }
       }
-    } catch (e) {}
+    } catch (e) { }
   };
 
   const handleSaveQuestion = async (e) => {
@@ -326,7 +358,7 @@ const QuestionBank = () => {
     try {
       const method = editingQuestion ? 'PUT' : 'POST';
       const endpoint = editingQuestion ? `${API_URL}/questions/${editingQuestion._id}` : `${API_URL}/questions`;
-      
+
       const res = await fetch(endpoint, {
         method,
         headers: {
@@ -362,7 +394,7 @@ const QuestionBank = () => {
         setSelectedQuestion(null);
         fetchQuestions();
       }
-    } catch (e) {}
+    } catch (e) { }
   };
 
   const handleEditClick = (q) => {
@@ -443,8 +475,8 @@ const QuestionBank = () => {
             </ul>
           </div>
         )}
-        <div 
-          className="question-bank-container" 
+        <div
+          className="question-bank-container"
           ref={containerRef}
           style={{ display: 'flex', gap: '0' }}
         >
@@ -566,7 +598,7 @@ const QuestionBank = () => {
                     <div className="qb-tab-content">
                       <div className="problem-description-text">
                         <p style={{ whiteSpace: 'pre-wrap' }}>{selectedQuestion.description}</p>
-                        
+
                         {selectedQuestion.inputFormat && (
                           <>
                             <div className="problem-section-title">Input Format</div>
@@ -613,9 +645,9 @@ const QuestionBank = () => {
                             value={selectedLanguage}
                             onChange={(e) => changeLanguageTemplate(e.target.value)}
                           >
-                            {(selectedQuestion.allowedLanguages || []).map((lang) => (
-                              <option key={lang} value={lang}>
-                                {lang.toUpperCase()}
+                            {ALL_CORER_LANGUAGES.map((lang) => (
+                              <option key={lang.value} value={lang.value}>
+                                {lang.label}
                               </option>
                             ))}
                           </select>
@@ -662,11 +694,71 @@ const QuestionBank = () => {
                         </div>
                       </div>
 
+                      {/* Web Development Live Preview System */}
+                      {['html', 'css', 'reactjs', 'expressjs', 'javascript', 'typescript'].includes(selectedLanguage) && (
+                        <div className="glass-card mb-20" style={{ padding: '20px', marginTop: '20px', border: '1px solid rgba(99, 102, 241, 0.2)', background: 'rgba(15, 23, 42, 0.4)' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                            <h4 style={{ color: '#fff', fontSize: '1rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <span>🌐</span> Live Web Development Preview Runtime
+                            </h4>
+                            <span style={{ fontSize: '0.75rem', padding: '3px 8px', background: 'rgba(99, 102, 241, 0.2)', color: '#a5b4fc', borderRadius: '12px', fontWeight: 'bold' }}>
+                              Interactive Sandbox: On
+                            </span>
+                          </div>
+
+                          <p style={{ fontSize: '0.8rem', color: '#a0aec0', marginBottom: '15px' }}>
+                            This workspace compiles and runs your code in a real-time web rendering frame. Use HTML/inline styles/scripts to see instant outputs.
+                          </p>
+
+                          <div style={{ background: '#fff', borderRadius: '8px', overflow: 'hidden', height: '280px', border: '2px solid #2d3748', boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.06)' }}>
+                            <iframe
+                              srcDoc={selectedLanguage === 'html' ? solutionCode : `
+                                <html>
+                                  <head>
+                                    <style>
+                                      body { background: #0f172a; color: #f8fafc; font-family: sans-serif; display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100vh; margin: 0; text-align: center; }
+                                      ${selectedLanguage === 'css' ? solutionCode : ''}
+                                    </style>
+                                  </head>
+                                  <body>
+                                    <div id="root">
+                                      <h3>Web Development Output</h3>
+                                      <p>Code type: <strong>${selectedLanguage.toUpperCase()}</strong></p>
+                                      ${selectedLanguage === 'html' ? '' : '<div id="output" style="font-family: monospace; background: #1e293b; padding: 10px; border-radius: 4px; color: #38bdf8; min-width: 250px;">Evaluating environment...</div>'}
+                                    </div>
+                                    <script>
+                                      try {
+                                        const originalLog = console.log;
+                                        console.log = (...args) => {
+                                          const out = document.getElementById("output");
+                                          if (out) out.innerText = args.join(" ");
+                                          originalLog(...args);
+                                        };
+                                        ${selectedLanguage === 'javascript' ? solutionCode : ''}
+                                      } catch (err) {
+                                        const out = document.getElementById("output");
+                                        if (out) {
+                                          out.style.color = "#ef4444";
+                                          out.innerText = "Error: " + err.message;
+                                        }
+                                      }
+                                    </script>
+                                  </body>
+                                </html>
+                              `}
+                              title="Web Dev Live Simulation"
+                              sandbox="allow-scripts"
+                              style={{ width: '100%', height: '100%', border: 'none', background: selectedLanguage === 'html' ? '#fff' : '#0f172a' }}
+                            />
+                          </div>
+                        </div>
+                      )}
+
                       {/* Output Panel */}
                       {executionOutput && (
                         <div className="glass-card" style={{ padding: '15px', border: '1px solid rgba(255,255,255,0.08)' }}>
                           <h4 style={{ marginBottom: '10px', color: '#fff', fontSize: '0.95rem' }}>Execution Console</h4>
-                          
+
                           {executionOutput.error ? (
                             <div style={{ color: '#e53e3e', fontSize: '0.85rem', fontFamily: 'monospace' }}>
                               ❌ Error: {executionOutput.error}
@@ -808,7 +900,7 @@ const QuestionBank = () => {
                   </div>
 
                   {/* Drag adjustment bar */}
-                  <div 
+                  <div
                     className={`qb-divider ${isDragging ? 'dragging' : ''}`}
                     onMouseDown={handleDividerMouseDown}
                   />
@@ -842,7 +934,7 @@ const QuestionBank = () => {
                         <div className="qb-tab-content">
                           <div className="problem-description-text">
                             <p style={{ whiteSpace: 'pre-wrap' }}>{selectedQuestion.description}</p>
-                            
+
                             {selectedQuestion.inputFormat && (
                               <>
                                 <div className="problem-section-title">Input Format</div>
@@ -879,17 +971,17 @@ const QuestionBank = () => {
                             )}
                           </div>
 
-                          <button 
-                            className="btn btn-primary solve-btn-cta" 
+                          <button
+                            className="btn btn-primary solve-btn-cta"
                             onClick={() => {
                               setStudentViewState('coding');
                               setSplitWidth(45);
                             }}
-                            style={{ 
-                              marginTop: '25px', 
-                              padding: '14px', 
-                              fontSize: '1.05rem', 
-                              fontWeight: 'bold', 
+                            style={{
+                              marginTop: '25px',
+                              padding: '14px',
+                              fontSize: '1.05rem',
+                              fontWeight: 'bold',
                               background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
                               borderRadius: '8px',
                               boxShadow: '0 4px 15px rgba(99, 102, 241, 0.4)',
@@ -917,8 +1009,8 @@ const QuestionBank = () => {
                     {selectedQuestion && (
                       <>
                         <div style={{ marginBottom: '15px' }}>
-                          <button 
-                            className="btn btn-secondary btn-sm" 
+                          <button
+                            className="btn btn-secondary btn-sm"
                             onClick={() => {
                               setStudentViewState('browse');
                               setSplitWidth(30);
@@ -945,7 +1037,7 @@ const QuestionBank = () => {
                         <div className="qb-tab-content">
                           <div className="problem-description-text" style={{ maxHeight: 'calc(100vh - 250px)', overflowY: 'auto', paddingRight: '10px' }}>
                             <p style={{ whiteSpace: 'pre-wrap' }}>{selectedQuestion.description}</p>
-                            
+
                             {selectedQuestion.inputFormat && (
                               <>
                                 <div className="problem-section-title">Input Format</div>
@@ -987,7 +1079,7 @@ const QuestionBank = () => {
                   </div>
 
                   {/* Drag adjustment bar */}
-                  <div 
+                  <div
                     className={`qb-divider ${isDragging ? 'dragging' : ''}`}
                     onMouseDown={handleDividerMouseDown}
                   />
@@ -997,7 +1089,7 @@ const QuestionBank = () => {
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
                       <span className="editor-header-title" style={{ fontSize: '1rem', color: '#fff', fontWeight: 'bold' }}>Editor Workspace</span>
                       {submissionsList.length > 0 && (
-                        <button 
+                        <button
                           className="btn btn-secondary btn-sm"
                           onClick={() => {
                             setStudentViewState('submissions');
@@ -1019,9 +1111,9 @@ const QuestionBank = () => {
                           value={selectedLanguage}
                           onChange={(e) => changeLanguageTemplate(e.target.value)}
                         >
-                          {(selectedQuestion?.allowedLanguages || []).map((lang) => (
-                            <option key={lang} value={lang}>
-                              {lang.toUpperCase()}
+                          {ALL_CORER_LANGUAGES.map((lang) => (
+                            <option key={lang.value} value={lang.value}>
+                              {lang.label}
                             </option>
                           ))}
                         </select>
@@ -1068,11 +1160,71 @@ const QuestionBank = () => {
                       </div>
                     </div>
 
+                    {/* Web Development Live Preview System */}
+                    {['html', 'css', 'reactjs', 'expressjs', 'javascript', 'typescript'].includes(selectedLanguage) && (
+                      <div className="glass-card mb-20" style={{ padding: '20px', marginTop: '20px', border: '1px solid rgba(99, 102, 241, 0.2)', background: 'rgba(15, 23, 42, 0.4)' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                          <h4 style={{ color: '#fff', fontSize: '1rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span>🌐</span> Live Web Development Preview Runtime
+                          </h4>
+                          <span style={{ fontSize: '0.75rem', padding: '3px 8px', background: 'rgba(99, 102, 241, 0.2)', color: '#a5b4fc', borderRadius: '12px', fontWeight: 'bold' }}>
+                            Interactive Sandbox: On
+                          </span>
+                        </div>
+
+                        <p style={{ fontSize: '0.8rem', color: '#a0aec0', marginBottom: '15px' }}>
+                          This workspace compiles and runs your code in a real-time web rendering frame. Use HTML/inline styles/scripts to see instant outputs.
+                        </p>
+
+                        <div style={{ background: '#fff', borderRadius: '8px', overflow: 'hidden', height: '280px', border: '2px solid #2d3748', boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.06)' }}>
+                          <iframe
+                            srcDoc={selectedLanguage === 'html' ? solutionCode : `
+                              <html>
+                                <head>
+                                  <style>
+                                    body { background: #0f172a; color: #f8fafc; font-family: sans-serif; display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100vh; margin: 0; text-align: center; }
+                                    ${selectedLanguage === 'css' ? solutionCode : ''}
+                                  </style>
+                                </head>
+                                <body>
+                                  <div id="root">
+                                    <h3>Web Development Output</h3>
+                                    <p>Code type: <strong>${selectedLanguage.toUpperCase()}</strong></p>
+                                    ${selectedLanguage === 'html' ? '' : '<div id="output" style="font-family: monospace; background: #1e293b; padding: 10px; border-radius: 4px; color: #38bdf8; min-width: 250px;">Evaluating environment...</div>'}
+                                  </div>
+                                  <script>
+                                    try {
+                                      const originalLog = console.log;
+                                      console.log = (...args) => {
+                                        const out = document.getElementById("output");
+                                        if (out) out.innerText = args.join(" ");
+                                        originalLog(...args);
+                                      };
+                                      ${selectedLanguage === 'javascript' ? solutionCode : ''}
+                                    } catch (err) {
+                                      const out = document.getElementById("output");
+                                      if (out) {
+                                        out.style.color = "#ef4444";
+                                        out.innerText = "Error: " + err.message;
+                                      }
+                                    }
+                                  </script>
+                                </body>
+                              </html>
+                            `}
+                            title="Web Dev Live Simulation"
+                            sandbox="allow-scripts"
+                            style={{ width: '100%', height: '100%', border: 'none', background: selectedLanguage === 'html' ? '#fff' : '#0f172a' }}
+                          />
+                        </div>
+                      </div>
+                    )}
+
                     {/* Output Panel */}
                     {executionOutput && (
                       <div className="glass-card" style={{ padding: '15px', border: '1px solid rgba(255,255,255,0.08)', marginTop: '15px' }}>
                         <h4 style={{ marginBottom: '10px', color: '#fff', fontSize: '0.95rem' }}>Execution Console</h4>
-                        
+
                         {executionOutput.error ? (
                           <div style={{ color: '#e53e3e', fontSize: '0.85rem', fontFamily: 'monospace' }}>
                             ❌ Error: {executionOutput.error}
@@ -1138,8 +1290,8 @@ const QuestionBank = () => {
                   {/* LEFT PANE: Submitted Code Snippet */}
                   <div className="qb-center-pane" style={{ width: `${splitWidth}%`, flexShrink: 0, flexGrow: 0, paddingRight: '15px' }}>
                     <div style={{ marginBottom: '15px' }}>
-                      <button 
-                        className="btn btn-secondary btn-sm" 
+                      <button
+                        className="btn btn-secondary btn-sm"
                         onClick={() => {
                           setStudentViewState('coding');
                           setSplitWidth(45);
@@ -1160,13 +1312,13 @@ const QuestionBank = () => {
                     </div>
 
                     <div className="coding-editor-container" style={{ padding: '12px', background: '#11111b' }}>
-                      <pre style={{ 
-                        margin: 0, 
-                        padding: '15px', 
-                        background: '#1e1e2e', 
-                        borderRadius: '6px', 
-                        color: '#cdd6f4', 
-                        fontFamily: 'Consolas, Monaco, monospace', 
+                      <pre style={{
+                        margin: 0,
+                        padding: '15px',
+                        background: '#1e1e2e',
+                        borderRadius: '6px',
+                        color: '#cdd6f4',
+                        fontFamily: 'Consolas, Monaco, monospace',
                         fontSize: '0.85rem',
                         lineHeight: '1.5',
                         maxHeight: 'calc(100vh - 280px)',
@@ -1179,7 +1331,7 @@ const QuestionBank = () => {
                   </div>
 
                   {/* Drag adjustment bar */}
-                  <div 
+                  <div
                     className={`qb-divider ${isDragging ? 'dragging' : ''}`}
                     onMouseDown={handleDividerMouseDown}
                   />
@@ -1219,10 +1371,10 @@ const QuestionBank = () => {
                                         sub.plagiarismPercentage > 60
                                           ? 'High'
                                           : sub.plagiarismPercentage > 30
-                                          ? 'Moderate'
-                                          : sub.plagiarismPercentage > 10
-                                          ? 'Low'
-                                          : 'Original'
+                                            ? 'Moderate'
+                                            : sub.plagiarismPercentage > 10
+                                              ? 'Low'
+                                              : 'Original'
                                       }
                                     >
                                       {sub.plagiarismPercentage}%
@@ -1271,8 +1423,8 @@ const QuestionBank = () => {
                                 detailedReport.report?.plagiarismPercentage > 60
                                   ? 'High'
                                   : detailedReport.report?.plagiarismPercentage > 30
-                                  ? 'Moderate'
-                                  : 'Original'
+                                    ? 'Moderate'
+                                    : 'Original'
                               }
                             >
                               {detailedReport.report?.status || 'Original'}
@@ -1306,7 +1458,7 @@ const QuestionBank = () => {
             <h3 style={{ color: '#fff', marginBottom: '15px' }}>
               {editingQuestion ? 'Modify Coding Challenge' : 'Publish New Coding Challenge'}
             </h3>
-            
+
             {errorMsg && (
               <div className="error-banner" style={{ marginBottom: '15px' }}>
                 <span>{errorMsg}</span>

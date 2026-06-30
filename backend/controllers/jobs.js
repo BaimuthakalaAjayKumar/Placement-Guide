@@ -232,3 +232,101 @@ exports.deleteJob = async (req, res, next) => {
     next(err);
   }
 };
+
+// @desc    Bulk create job postings (Admin only)
+// @route   POST /api/jobs/bulk
+// @access  Private/Admin
+exports.bulkCreateJobs = async (req, res, next) => {
+  try {
+    const { jobs } = req.body;
+    if (!jobs || !Array.isArray(jobs) || jobs.length === 0) {
+      return res.status(400).json({ success: false, error: 'Please provide an array of jobs' });
+    }
+
+    // Prepare jobs: trim requirements if passed as comma separated strings or arrays
+    const formattedJobs = jobs.map(job => {
+      let requirements = [];
+      if (Array.isArray(job.requirements)) {
+        requirements = job.requirements.map(r => r.trim()).filter(r => r.length > 0);
+      } else if (typeof job.requirements === 'string') {
+        requirements = job.requirements.split(',').map(r => r.trim()).filter(r => r.length > 0);
+      }
+
+      return {
+        title: job.title,
+        company: job.company,
+        description: job.description || 'No description provided.',
+        requirements: requirements,
+        location: job.location || 'Remote',
+        salary: job.salary || 'Not Specified',
+        experienceLevel: job.experienceLevel || 'Entry Level',
+        applyLink: job.applyLink || '',
+        targetBatch: job.targetBatch || 'All'
+      };
+    });
+
+    const createdJobs = await Job.insertMany(formattedJobs);
+
+    // Dynamic notifications: group jobs by target batch and notify students with a single digest email!
+    const students = await User.find({ role: 'student' });
+
+    students.forEach(student => {
+      // Find jobs relevant to this student
+      const studentJobs = createdJobs.filter(job => {
+        return !job.targetBatch || job.targetBatch === 'All' || job.targetBatch.trim() === student.year;
+      });
+
+      if (studentJobs.length > 0) {
+        // Send a single digest email containing all relevant jobs
+        const jobListText = studentJobs.map(job =>
+          `- ${job.title} at ${job.company} (${job.location}) - Req: ${job.requirements.join(', ')}`
+        ).join('\n');
+
+        const jobListHtml = studentJobs.map(job => `
+          <div style="background-color: #f9fafb; padding: 15px; border-radius: 6px; margin: 15px 0; border-left: 4px solid #4f46e5;">
+            <h3 style="margin: 0 0 10px 0; color: #111827;">${job.title} (Bulk Alert)</h3>
+            <p style="margin: 5px 0; font-size: 14px; color: #4b5563;"><strong>Company:</strong> ${job.company}</p>
+            <p style="margin: 5px 0; font-size: 14px; color: #4b5563;"><strong>Location:</strong> ${job.location}</p>
+            <p style="margin: 5px 0; font-size: 14px; color: #4b5563;"><strong>Salary:</strong> ${job.salary}</p>
+            <p style="margin: 10px 0 0 0; font-size: 14px; color: #4b5563;"><strong>Requirements:</strong></p>
+            <p style="margin: 5px 0 0 0;">
+              ${job.requirements.map(req => `<span style="display: inline-block; background-color: #e0e7ff; color: #4338ca; padding: 2px 8px; border-radius: 4px; font-size: 12px; margin-right: 5px; margin-bottom: 5px;">${req}</span>`).join('')}
+            </p>
+          </div>
+        `).join('');
+
+        sendEmail({
+          to: student.email,
+          subject: `${studentJobs.length} New Job Opportunities on PrepPortal!`,
+          text: `Hello ${student.name},\n\nMultiple new job opportunities have been posted on PrepPortal that match your profile:\n\n${jobListText}\n\nLog in to your PrepPortal dashboard (http://localhost:5173/jobs) to view and apply!\n\nBest regards,\nPrepPortal Team`,
+          html: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px;">
+              <h2 style="color: #4f46e5; margin-bottom: 5px;">New Job Openings!</h2>
+              <p style="font-size: 16px; color: #333;">Hello <strong>${student.name}</strong>,</p>
+              <p style="font-size: 14px; color: #555;">New job opportunities matching your graduation batch have been published on PrepPortal:</p>
+              
+              ${jobListHtml}
+
+              <p style="font-size: 14px; color: #555;">Log in to your dashboard to analyze your resume against these jobs, check match ratings, and apply directly!</p>
+              
+              <div style="text-align: center; margin-top: 25px;">
+                <a href="http://localhost:5173/jobs" style="background-color: #4f46e5; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 14px; display: inline-block;">View Job Board</a>
+              </div>
+              
+              <hr style="border: 0; border-top: 1px solid #eaeaea; margin: 30px 0 15px 0;" />
+              <p style="font-size: 12px; color: #9ca3af; text-align: center;">You are receiving this because you are registered as a student on PrepPortal.</p>
+            </div>
+          `
+        }).catch(err => console.error(`Error sending digest email to ${student.email}:`, err.message));
+      }
+    });
+
+    res.status(201).json({
+      success: true,
+      count: createdJobs.length,
+      data: createdJobs
+    });
+  } catch (err) {
+    next(err);
+  }
+};

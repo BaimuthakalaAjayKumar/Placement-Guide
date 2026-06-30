@@ -30,14 +30,14 @@ const seedPracticeQuestions = async () => {
         let content = fs.readFileSync(filePath, 'utf8');
         // Replace ES module export with module.exports
         content = content.replace(/export\s+const\s+\w+\s*=\s*/, 'module.exports = ');
-        
+
         // Write to a temporary file
         const tempFilePath = path.join(__dirname, `temp_${plat.file}`);
         fs.writeFileSync(tempFilePath, content, 'utf8');
-        
+
         // Dynamically load it
         const data = require(tempFilePath);
-        
+
         // Clean up temporary file
         fs.unlinkSync(tempFilePath);
 
@@ -70,19 +70,22 @@ const seedDefaultTests = async () => {
     await AptitudeTest.updateMany({}, { duration: 20 });
 
     const count = await AptitudeTest.countDocuments();
-    if (count !== 4) {
-      console.log('Clearing old tests to seed 4 new comprehensive tests...');
+    if (count < 8) {
+      console.log('Clearing old tests to seed comprehensive aptitude and core subject tests...');
       await AptitudeTest.deleteMany({});
       await TestAttempt.deleteMany({});
-      
+
       const defaultTests = require('../config/testSeeds');
-      defaultTests.forEach(t => {
+      const coreTests = require('../config/coreSubjectSeeds');
+
+      const allTests = [...defaultTests, ...coreTests];
+      allTests.forEach(t => {
         t.duration = 20;
       });
-      await AptitudeTest.create(defaultTests);
-      console.log('Default aptitude tests seeded successfully!');
+      await AptitudeTest.create(allTests);
+      console.log('All 8 comprehensive aptitude and core subject tests seeded successfully!');
     }
-    
+
     // Also seed practice questions
     await seedPracticeQuestions();
   } catch (err) {
@@ -100,7 +103,7 @@ exports.getTests = async (req, res, next) => {
   try {
     // Return tests without questions list to prevent client-side answer viewing
     const tests = await AptitudeTest.find().select('-questions');
-    
+
     // Enrich with question count and completion status
     const enrichedTests = await Promise.all(
       tests.map(async test => {
@@ -323,10 +326,10 @@ exports.addQuestion = async (req, res, next) => {
     if (!test) {
       return res.status(404).json({ success: false, error: 'Test not found' });
     }
-    
+
     test.questions.push(req.body);
     await test.save();
-    
+
     res.status(201).json({ success: true, data: test.questions[test.questions.length - 1] });
   } catch (err) {
     next(err);
@@ -342,12 +345,12 @@ exports.editQuestion = async (req, res, next) => {
     if (!test) {
       return res.status(404).json({ success: false, error: 'Test not found' });
     }
-    
+
     const question = test.questions.id(req.params.qId);
     if (!question) {
       return res.status(404).json({ success: false, error: 'Question not found' });
     }
-    
+
     const { questionText, questionImage, options, correctOptionIndex, difficulty, explanation, explanationImage } = req.body;
     if (questionText !== undefined) question.questionText = questionText;
     if (questionImage !== undefined) question.questionImage = questionImage;
@@ -356,9 +359,9 @@ exports.editQuestion = async (req, res, next) => {
     if (difficulty !== undefined) question.difficulty = difficulty;
     if (explanation !== undefined) question.explanation = explanation;
     if (explanationImage !== undefined) question.explanationImage = explanationImage;
-    
+
     await test.save();
-    
+
     res.status(200).json({ success: true, data: question });
   } catch (err) {
     next(err);
@@ -374,10 +377,10 @@ exports.deleteQuestion = async (req, res, next) => {
     if (!test) {
       return res.status(404).json({ success: false, error: 'Test not found' });
     }
-    
+
     test.questions.pull(req.params.qId);
     await test.save();
-    
+
     res.status(200).json({ success: true, data: {} });
   } catch (err) {
     next(err);
@@ -393,7 +396,7 @@ exports.getAdminAttempts = async (req, res, next) => {
       .populate('user', 'name email rollNumber branch')
       .populate('test', 'title category')
       .sort({ completedAt: -1 });
-      
+
     res.status(200).json({ success: true, data: attempts });
   } catch (err) {
     next(err);
@@ -584,7 +587,7 @@ exports.deletePracticeQuestion = async (req, res, next) => {
 exports.getPracticeReport = async (req, res, next) => {
   try {
     const { platform } = req.params;
-    
+
     // Get all practice questions for this platform from database
     const questions = await PracticeQuestion.find({ platform, isActive: true }).sort({ id: 1 });
     const questionCount = questions.length;
@@ -693,7 +696,7 @@ exports.getPracticeReport = async (req, res, next) => {
           else if (starsCount === 3) solvedCount = 7;
           else if (starsCount === 4) solvedCount = 9;
           else solvedCount = 11;
-          
+
           platformTotalSolved = solvedCount;
 
           const listWithHash = questions.map(item => {
