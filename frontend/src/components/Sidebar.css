@@ -23,6 +23,14 @@
   color: white;
 }
 
+.sidebar-logo-img {
+  width: 34px;
+  height: 34px;
+  object-fit: contain;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.05);
+}
+
 .logo-icon {
   width: 28px;
   height: 28px;

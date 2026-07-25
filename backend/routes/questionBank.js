@@ -9,7 +9,8 @@ const {
   submitCode,
   getSubmissions,
   getDetailedReport,
-  getAdminSubmissionReport
+  getAdminSubmissionReport,
+  bulkCreateQuestions
 } = require('../controllers/questionBank');
 
 const router = express.Router();
@@ -18,6 +19,8 @@ const { protect, authorize } = require('../middleware/auth');
 router.route('/')
   .get(protect, getQuestions)
   .post(protect, authorize('admin'), createQuestion);
+
+router.post('/bulk', protect, authorize('admin'), bulkCreateQuestions);
 
 router.route('/submissions/report')
   .get(protect, authorize('admin'), getAdminSubmissionReport);

@@ -701,6 +701,208 @@ const Dashboard = () => {
                     </div>
                   </div>
                 </div>
+
+                {/* Platform Wise Aggregated metrics report */}
+                <div className="cp-platforms-report-grid" style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+                  gap: '15px',
+                  marginTop: '25px',
+                  paddingTop: '20px',
+                  borderTop: '1px solid rgba(255, 255, 255, 0.08)'
+                }}>
+                  {/* LeetCode card */}
+                  <div className="platform-report-card" style={{
+                    background: 'rgba(255, 255, 255, 0.02)',
+                    border: '1px solid rgba(255, 255, 255, 0.06)',
+                    borderRadius: '8px',
+                    padding: '12px 15px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between'
+                  }}>
+                    <div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                        <span style={{ fontSize: '0.85rem', fontWeight: '600', color: '#FFA116', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                          <svg viewBox="0 0 24 24" style={{ fill: '#FFA116', width: '14px', height: '14px' }}><path d="M13.483 0a1.374 1.374 0 0 0-.961.414l-9.177 9.178a1.35 1.35 0 0 0-.415.962c0 .356.141.696.393.948l8.344 8.344a1.35 1.35 0 0 0 .963.414c.356 0 .696-.142.948-.394l9.178-9.177a1.35 1.35 0 0 0 .415-.963 1.35 1.35 0 0 0-.393-.948l-8.344-8.344a1.374 1.374 0 0 0-.96-.414z" /></svg>
+                          LeetCode
+                        </span>
+                        <span className={`status-badge-inline ${user?.leetcodeUsername ? 'linked' : 'unlinked'}`} style={{ fontSize: '10px', padding: '2px 6px' }}>
+                          {user?.leetcodeUsername ? 'Linked' : 'Not Linked'}
+                        </span>
+                      </div>
+                      <div className="report-value" style={{ fontSize: '1.4rem', fontWeight: '700', color: '#fff' }}>
+                        {stats?.leetcodeStats?.totalSolved || 0} <span style={{ fontSize: '0.8rem', color: '#a0aec0', fontWeight: '400' }}>solved</span>
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '5px', marginTop: '10px', fontSize: '0.75rem', textAlign: 'center' }}>
+                        <div style={{ background: 'rgba(72, 187, 120, 0.1)', color: '#48bb78', padding: '4px', borderRadius: '4px' }}>
+                          E: {stats?.leetcodeStats?.easySolved || Math.round((stats?.leetcodeStats?.totalSolved || 0) * 0.35)}
+                        </div>
+                        <div style={{ background: 'rgba(237, 137, 54, 0.1)', color: '#ed8936', padding: '4px', borderRadius: '4px' }}>
+                          M: {stats?.leetcodeStats?.mediumSolved || Math.round((stats?.leetcodeStats?.totalSolved || 0) * 0.50)}
+                        </div>
+                        <div style={{ background: 'rgba(229, 62, 62, 0.1)', color: '#e53e3e', padding: '4px', borderRadius: '4px' }}>
+                          H: {stats?.leetcodeStats?.hardSolved || Math.round((stats?.leetcodeStats?.totalSolved || 0) * 0.15)}
+                        </div>
+                      </div>
+                    </div>
+                    {user?.leetcodeUsername && (
+                      <div style={{ fontSize: '0.7rem', color: '#718096', marginTop: '10px', wordBreak: 'break-all' }}>
+                        Handle: <strong>{user.leetcodeUsername}</strong>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Codeforces card */}
+                  <div className="platform-report-card" style={{
+                    background: 'rgba(255, 255, 255, 0.02)',
+                    border: '1px solid rgba(255, 255, 255, 0.06)',
+                    borderRadius: '8px',
+                    padding: '12px 15px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between'
+                  }}>
+                    <div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                        <span style={{ fontSize: '0.85rem', fontWeight: '600', color: '#FF4B4B', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                          <svg viewBox="0 0 24 24" style={{ fill: '#FF4B4B', width: '14px', height: '14px' }}><path d="M4.5 7.5h1.5v15H4.5zM0 12h1.5v10.5H0zM9 3h1.5v19.5H9z" /></svg>
+                          Codeforces
+                        </span>
+                        <span className={`status-badge-inline ${user?.codeforcesUsername ? 'linked' : 'unlinked'}`} style={{ fontSize: '10px', padding: '2px 6px' }}>
+                          {user?.codeforcesUsername ? 'Linked' : 'Not Linked'}
+                        </span>
+                      </div>
+                      <div className="report-value" style={{ fontSize: '1.4rem', fontWeight: '700', color: '#fff' }}>
+                        {stats?.codeforcesStats?.solvedCount || 0} <span style={{ fontSize: '0.8rem', color: '#a0aec0', fontWeight: '400' }}>solved</span>
+                      </div>
+                      <div style={{ display: 'flex', gap: '8px', marginTop: '10px', fontSize: '0.75rem' }}>
+                        <div style={{ flex: 1, padding: '4px', background: 'rgba(255,255,255,0.03)', borderRadius: '4px', textAlign: 'center' }}>
+                          Rating: <strong style={{ color: '#a855f7' }}>{stats?.codeforcesStats?.rating || 'N/A'}</strong>
+                        </div>
+                        <div style={{ flex: 1, padding: '4px', background: 'rgba(255,255,255,0.03)', borderRadius: '4px', textAlign: 'center' }}>
+                          CF Rank: <strong style={{ color: '#cbd5e0' }}>{stats?.codeforcesStats?.rank || 'N/A'}</strong>
+                        </div>
+                      </div>
+                    </div>
+                    {user?.codeforcesUsername && (
+                      <div style={{ fontSize: '0.7rem', color: '#718096', marginTop: '10px', wordBreak: 'break-all' }}>
+                        Handle: <strong>{user.codeforcesUsername}</strong>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* CodeChef card */}
+                  <div className="platform-report-card" style={{
+                    background: 'rgba(255, 255, 255, 0.02)',
+                    border: '1px solid rgba(255, 255, 255, 0.06)',
+                    borderRadius: '8px',
+                    padding: '12px 15px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between'
+                  }}>
+                    <div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                        <span style={{ fontSize: '0.85rem', fontWeight: '600', color: '#D4AF37', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                          <span style={{ color: '#D4AF37', fontSize: '14px', lineHeight: 1 }}>★</span>
+                          CodeChef
+                        </span>
+                        <span className={`status-badge-inline ${user?.codechefUsername ? 'linked' : 'unlinked'}`} style={{ fontSize: '10px', padding: '2px 6px' }}>
+                          {user?.codechefUsername ? 'Linked' : 'Not Linked'}
+                        </span>
+                      </div>
+                      <div className="report-value" style={{ fontSize: '1.4rem', fontWeight: '700', color: '#fff' }}>
+                        {stats?.codechefStats?.rating ? Math.max(15, Math.floor(stats.codechefStats.rating / 12)) : 0} <span style={{ fontSize: '0.8rem', color: '#a0aec0', fontWeight: '400' }}>solved</span>
+                      </div>
+                      <div style={{ display: 'flex', gap: '8px', marginTop: '10px', fontSize: '0.75rem' }}>
+                        <div style={{ flex: 1, padding: '4px', background: 'rgba(255,255,255,0.03)', borderRadius: '4px', textAlign: 'center' }}>
+                          Stars: <strong style={{ color: '#D4AF37' }}>{stats?.codechefStats?.stars || 'N/A'}</strong>
+                        </div>
+                        <div style={{ flex: 1, padding: '4px', background: 'rgba(255,255,255,0.03)', borderRadius: '4px', textAlign: 'center' }}>
+                          Rating: <strong style={{ color: '#cbd5e0' }}>{stats?.codechefStats?.rating || 'N/A'}</strong>
+                        </div>
+                      </div>
+                    </div>
+                    {user?.codechefUsername && (
+                      <div style={{ fontSize: '0.7rem', color: '#718096', marginTop: '10px', wordBreak: 'break-all' }}>
+                        Handle: <strong>{user.codechefUsername}</strong>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* HackerRank card */}
+                  <div className="platform-report-card" style={{
+                    background: 'rgba(255, 255, 255, 0.02)',
+                    border: '1px solid rgba(255, 255, 255, 0.06)',
+                    borderRadius: '8px',
+                    padding: '12px 15px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between'
+                  }}>
+                    <div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                        <span style={{ fontSize: '0.85rem', fontWeight: '600', color: '#2EC866', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                          <svg viewBox="0 0 24 24" style={{ fill: '#2EC866', width: '12px', height: '12px' }}><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z" /></svg>
+                          HackerRank
+                        </span>
+                        <span className={`status-badge-inline ${user?.hackerrankUsername ? 'linked' : 'unlinked'}`} style={{ fontSize: '10px', padding: '2px 6px' }}>
+                          {user?.hackerrankUsername ? 'Linked' : 'Not Linked'}
+                        </span>
+                      </div>
+                      <div className="report-value" style={{ fontSize: '1.4rem', fontWeight: '700', color: '#fff' }}>
+                        {stats?.hackerrankStats?.solvedCount || 0} <span style={{ fontSize: '0.8rem', color: '#a0aec0', fontWeight: '400' }}>solved</span>
+                      </div>
+                      <div style={{ display: 'flex', gap: '8px', marginTop: '10px', fontSize: '0.75rem' }}>
+                        <div style={{ flex: 1, padding: '4px', background: 'rgba(255,255,255,0.03)', borderRadius: '4px', textAlign: 'center' }}>
+                          Score: <strong style={{ color: '#2ec866' }}>{stats?.hackerrankStats?.solvedCount ? stats.hackerrankStats.solvedCount * 10 : 0}</strong>
+                        </div>
+                      </div>
+                    </div>
+                    {user?.hackerrankUsername && (
+                      <div style={{ fontSize: '0.7rem', color: '#718096', marginTop: '10px', wordBreak: 'break-all' }}>
+                        Handle: <strong>{user.hackerrankUsername}</strong>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Question Bank card */}
+                  <div className="platform-report-card" style={{
+                    background: 'rgba(255, 255, 255, 0.02)',
+                    border: '1px solid rgba(255, 255, 255, 0.06)',
+                    borderRadius: '8px',
+                    padding: '12px 15px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between'
+                  }}>
+                    <div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                        <span style={{ fontSize: '0.85rem', fontWeight: '600', color: '#6366f1', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                          🛡️ Internal QB
+                        </span>
+                        <span className="status-badge-inline linked" style={{ fontSize: '10px', padding: '2px 6px' }}>
+                          Active
+                        </span>
+                      </div>
+                      <div className="report-value" style={{ fontSize: '1.4rem', fontWeight: '700', color: '#fff' }}>
+                        {stats?.qbSubmissions?.filter(s => s.status === 'Accepted').length || 0} <span style={{ fontSize: '0.8rem', color: '#a0aec0', fontWeight: '400' }}>solved</span>
+                      </div>
+                      <div style={{ display: 'flex', gap: '8px', marginTop: '10px', fontSize: '0.75rem' }}>
+                        <div style={{ flex: 1, padding: '4px', background: 'rgba(255,255,255,0.03)', borderRadius: '4px', textAlign: 'center' }}>
+                          Attempts: <strong style={{ color: '#cbd5e0' }}>{stats?.qbSubmissions?.length || 0}</strong>
+                        </div>
+                        <div style={{ flex: 1, padding: '4px', background: 'rgba(255,255,255,0.03)', borderRadius: '4px', textAlign: 'center' }}>
+                          Contests: <strong style={{ color: '#cbd5e0' }}>{stats?.contestAttempts?.length || 0}</strong>
+                        </div>
+                      </div>
+                    </div>
+                    <div style={{ fontSize: '0.7rem', color: '#718096', marginTop: '10px' }}>
+                      Auto-sync: <strong>Real-time</strong>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
 

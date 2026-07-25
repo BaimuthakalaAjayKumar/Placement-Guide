@@ -85,6 +85,14 @@ const QuestionBank = () => {
   // Code editor lines helpers
   const [lineNumbers, setLineNumbers] = useState([1]);
 
+  // Bulk Questions upload states
+  const [showBulkModal, setShowBulkModal] = useState(false);
+  const [bulkQuestionsInput, setBulkQuestionsInput] = useState('');
+  const [bulkInputType, setBulkInputType] = useState('json'); // 'csv' or 'json'
+  const [bulkPreviewQuestions, setBulkPreviewQuestions] = useState([]);
+  const [bulkError, setBulkError] = useState('');
+  const [isSubmittingBulk, setIsSubmittingBulk] = useState(false);
+
   useEffect(() => {
     fetchQuestions();
     if (user && user.role === 'admin') {
@@ -444,6 +452,108 @@ const QuestionBank = () => {
     setShowCreateModal(true);
   };
 
+  const handlePreviewBulkQuestions = () => {
+    setBulkError('');
+    setBulkPreviewQuestions([]);
+    if (!bulkQuestionsInput.trim()) {
+      setBulkError('Please enter some data first.');
+      return;
+    }
+
+    try {
+      if (bulkInputType === 'json') {
+        const parsed = JSON.parse(bulkQuestionsInput);
+        if (!Array.isArray(parsed)) {
+          setBulkError('JSON must be an array of question objects.');
+          return;
+        }
+        setBulkPreviewQuestions(parsed);
+      } else {
+        // Parse CSV
+        const parsed = parseQuestionsCSV(bulkQuestionsInput);
+        if (parsed.length === 0) {
+          setBulkError('No valid rows found in CSV.');
+          return;
+        }
+        setBulkPreviewQuestions(parsed);
+      }
+    } catch (err) {
+      setBulkError('Parsing failed: ' + err.message);
+    }
+  };
+
+  const parseQuestionsCSV = (text) => {
+    const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+    if (lines.length <= 1) return [];
+
+    const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+    const results = [];
+
+    for (let i = 1; i < lines.length; i++) {
+      const row = lines[i].split(',').map(r => r.trim());
+      if (row.length === 0 || !row[0]) continue;
+
+      const obj = {};
+      headers.forEach((header, idx) => {
+        let val = row[idx] || '';
+        if (val.startsWith('"') && val.endsWith('"')) {
+          val = val.substring(1, val.length - 1);
+        }
+        obj[header] = val;
+      });
+
+      if (obj.title) {
+        // Map other fields
+        const q = {
+          title: obj.title,
+          difficulty: obj.difficulty || 'Easy',
+          description: obj.description || 'No description provided.',
+          constraints: obj.constraints || '',
+          inputFormat: obj.inputformat || '',
+          outputFormat: obj.outputformat || '',
+          sampleInput: obj.sampleinput || '',
+          sampleOutput: obj.sampleoutput || '',
+          explanation: obj.explanation || '',
+          tags: obj.tags ? obj.tags.split(';').map(t => t.trim()) : [],
+          timeLimit: obj.timelimit ? Number(obj.timelimit) : 2000,
+          memoryLimit: obj.memorylimit ? Number(obj.memorylimit) : 256
+        };
+        results.push(q);
+      }
+    }
+    return results;
+  };
+
+  const handlePostBulkQuestions = async () => {
+    if (bulkPreviewQuestions.length === 0) return;
+    setIsSubmittingBulk(true);
+    setBulkError('');
+    try {
+      const res = await fetch(`${API_URL}/questions/bulk`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ questions: bulkPreviewQuestions })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setSuccessMsg(`Successfully imported ${data.count} questions!`);
+        setShowBulkModal(false);
+        setBulkQuestionsInput('');
+        setBulkPreviewQuestions([]);
+        fetchQuestions();
+      } else {
+        setBulkError(data.error || 'Failed to upload bulk questions.');
+      }
+    } catch (err) {
+      setBulkError('Server communication error.');
+    } finally {
+      setIsSubmittingBulk(false);
+    }
+  };
+
   const triggerPDFDownload = () => {
     alert('Report downloaded successfully as PDF!');
   };
@@ -489,9 +599,14 @@ const QuestionBank = () => {
                   <p>Admin Added Coding Tasks</p>
                 </div>
 
-                <button className="btn btn-primary btn-block" onClick={handleCreateClick}>
-                  + Add New Question
-                </button>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '15px' }}>
+                  <button className="btn btn-primary btn-block" onClick={handleCreateClick} style={{ margin: 0 }}>
+                    + Single Add
+                  </button>
+                  <button className="btn btn-accent btn-block" onClick={() => setShowBulkModal(true)} style={{ margin: 0 }}>
+                    📥 Bulk Import
+                  </button>
+                </div>
 
                 <div className="qb-search-box">
                   <input
@@ -1651,6 +1766,153 @@ const QuestionBank = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+      {/* ADMIN BULK UPLOAD QUESTIONS OVERLAY */}
+      {showBulkModal && (
+        <div className="form-modal-overlay">
+          <div className="form-modal-content glass-card" style={{ maxWidth: '800px', width: '90%' }}>
+            <h3 style={{ color: '#fff', marginBottom: '15px' }}>
+              Bulk Import Coding Challenges
+            </h3>
+            <p style={{ fontSize: '0.85rem', color: '#a0aec0', marginBottom: '15px' }}>
+              Upload multiple questions instantly using CSV or JSON array representations.
+            </p>
+
+            {bulkError && (
+              <div className="error-banner" style={{ marginBottom: '15px' }}>
+                <span>{bulkError}</span>
+              </div>
+            )}
+
+            <div className="form-group">
+              <label className="form-label">Upload Format</label>
+              <div style={{ display: 'flex', gap: '20px' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', color: '#fff' }}>
+                  <input
+                    type="radio"
+                    name="bulkType"
+                    checked={bulkInputType === 'json'}
+                    onChange={() => { setBulkInputType('json'); setBulkError(''); }}
+                  />
+                  JSON Array
+                </label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', color: '#fff' }}>
+                  <input
+                    type="radio"
+                    name="bulkType"
+                    checked={bulkInputType === 'csv'}
+                    onChange={() => { setBulkInputType('csv'); setBulkError(''); }}
+                  />
+                  CSV Format
+                </label>
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Input Data Payload</label>
+              <textarea
+                className="form-control"
+                rows="8"
+                style={{ fontFamily: 'monospace', fontSize: '0.8rem', background: 'rgba(0,0,0,0.3)', color: '#cbd5e0' }}
+                placeholder={
+                  bulkInputType === 'json'
+                    ? '[\n  {\n    "title": "Two Sum",\n    "difficulty": "Easy",\n    "description": "Given an array...",\n    "tags": ["Array", "Math"]\n  }\n]'
+                    : 'title,difficulty,description,tags\n"Two Sum",Easy,"Given an array...",Array;Math'
+                }
+                value={bulkQuestionsInput}
+                onChange={(e) => setBulkQuestionsInput(e.target.value)}
+              />
+            </div>
+
+            <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
+              <button type="button" className="btn btn-secondary btn-sm" onClick={handlePreviewBulkQuestions}>
+                🔍 Run Parse Preview
+              </button>
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                onClick={() => {
+                  if (bulkInputType === 'json') {
+                    setBulkQuestionsInput(JSON.stringify([
+                      {
+                        title: "Short Reverse List",
+                        difficulty: "Medium",
+                        description: "Reverse a linked list range.",
+                        constraints: "N <= 1000",
+                        inputFormat: "Head node list",
+                        outputFormat: "Reversed list node",
+                        sampleInput: "1 2 3 4 5",
+                        sampleOutput: "5 4 3 2 1",
+                        explanation: "All nodes are reversed.",
+                        tags: ["Linked List", "Recursion"],
+                        timeLimit: 2000,
+                        memoryLimit: 256
+                      }
+                    ], null, 2));
+                  } else {
+                    setBulkQuestionsInput(`title,difficulty,description,constraints,inputFormat,outputFormat,sampleInput,sampleOutput,explanation,tags,timeLimit,memoryLimit\n"Custom Peak Element",Medium,"Find maximum peak element.","N <= 50","Array string","Peak value","1 3 20 4 1 0",20,"20 is greater than neighbors.",Array;binary-search,2000,256`);
+                  }
+                }}
+              >
+                📝 Insert Template Example
+              </button>
+            </div>
+
+            {/* Preview Section */}
+            {bulkPreviewQuestions.length > 0 && (
+              <div className="glass-card" style={{ padding: '15px', background: 'rgba(255,255,255,0.02)', maxHeight: '200px', overflowY: 'auto', marginBottom: '20px', border: '1px solid rgba(255,255,255,0.08)' }}>
+                <h4 style={{ color: '#fff', fontSize: '0.9rem', marginBottom: '10px' }}>
+                  Parsed Preview ({bulkPreviewQuestions.length} challenges found)
+                </h4>
+                <table className="student-roster-table" style={{ fontSize: '0.8rem' }}>
+                  <thead>
+                    <tr>
+                      <th>Title</th>
+                      <th>Difficulty</th>
+                      <th>Tags</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {bulkPreviewQuestions.map((pq, idx) => (
+                      <tr key={idx}>
+                        <td><strong>{pq.title}</strong></td>
+                        <td>
+                          <span className={`status-badge-inline ${(pq.difficulty || 'Easy').toLowerCase()}`}>
+                            {pq.difficulty}
+                          </span>
+                        </td>
+                        <td>{pq.tags ? pq.tags.join(', ') : 'None'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '20px' }}>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => {
+                  setShowBulkModal(false);
+                  setBulkQuestionsInput('');
+                  setBulkPreviewQuestions([]);
+                  setBulkError('');
+                }}
+              >
+                Close
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                disabled={bulkPreviewQuestions.length === 0 || isSubmittingBulk}
+                onClick={handlePostBulkQuestions}
+              >
+                {isSubmittingBulk ? 'Uploading batch…' : '✓ Confirm Batch Import'}
+              </button>
+            </div>
           </div>
         </div>
       )}

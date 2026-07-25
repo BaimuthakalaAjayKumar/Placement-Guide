@@ -1,0 +1,34 @@
+﻿<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240">
+  <defs>
+    <linearGradient id="ringGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#c12d2d"/>
+      <stop offset="100%" stop-color="#ff7f7f"/>
+    </linearGradient>
+    <linearGradient id="innerGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#f4e0c2"/>
+      <stop offset="100%" stop-color="#fff5e6"/>
+    </linearGradient>
+  </defs>
+  <circle cx="120" cy="120" r="118" fill="#fff8ed" stroke="#c12d2d" stroke-width="8" />
+  <path d="M40 120 a80 80 0 1 1 160 0 a80 80 0 1 1 -160 0" fill="url(#innerGrad)" stroke="#c12d2d" stroke-width="6"/>
+  <circle cx="120" cy="120" r="56" fill="#f7d9c2" stroke="#c12d2d" stroke-width="5"/>
+  <circle cx="120" cy="120" r="44" fill="#ffffff"/>
+  <text x="120" y="134" text-anchor="middle" font-family="Arial, sans-serif" font-size="44" font-weight="800" fill="#c12d2d">GRIET</text>
+  <text x="120" y="160" text-anchor="middle" font-family="Arial, sans-serif" font-size="18" fill="#8f1f1f">1997</text>
+  <path id="outerRing" d="M120,20 A100,100 0 1,1 119.99,20" fill="none"/>
+  <text font-family="Arial, sans-serif" font-size="13" fill="#b53b3b">
+    <textPath href="#outerRing" startOffset="50%" text-anchor="middle">
+      Gokaraju Rangaraju Institute of Engineering & Technology
+    </textPath>
+  </text>
+  <g stroke="#c12d2d" stroke-width="6" fill="none">
+    <path d="M52 104 C60 60 180 60 188 104" />
+    <path d="M52 136 C60 180 180 180 188 136" />
+  </g>
+  <g fill="none" stroke="#c12d2d" stroke-width="5">
+    <path d="M120 30 L120 14" />
+    <path d="M120 226 L120 210" />
+    <path d="M30 120 L14 120" />
+    <path d="M226 120 L210 120" />
+  </g>
+</svg>

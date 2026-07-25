@@ -44,10 +44,8 @@ const Login = () => {
       <div className="auth-card glass-card animate-fade">
         <div className="auth-header">
           <div className="auth-logo">
-            <svg viewBox="0 0 24 24" className="logo-icon-auth">
-              <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
-            </svg>
-            <span>PrepPortal</span>
+            <img src="/griet-logo.svg" alt="GRIET Placement" className="auth-logo-img" />
+            <span>GRIET Placement</span>
           </div>
           <h2>Welcome Back</h2>
           <p>Accelerate your placement preparation with AI tools</p>
@@ -102,7 +100,7 @@ const Login = () => {
         </form>
 
         <div className="auth-footer">
-          <span>New to PrepPortal? </span>
+          <span>New to GRIET Placement? </span>
           <Link to="/register" className="auth-link">Create an Account</Link>
         </div>
       </div>

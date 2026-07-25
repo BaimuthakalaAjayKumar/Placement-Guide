@@ -15,7 +15,9 @@ const {
   getPracticeQuestions,
   addPracticeQuestion,
   deletePracticeQuestion,
-  getPracticeReport
+  getPracticeReport,
+  editPracticeQuestion,
+  bulkCreatePracticeQuestions
 } = require('../controllers/tests');
 
 const router = express.Router();
@@ -46,6 +48,8 @@ router.post('/upload-image', authorize('admin'), uploadQuestionImage, uploadImag
 // Practice Platform Coordinator
 router.post('/practice-questions/:platform', authorize('admin'), addPracticeQuestion);
 router.delete('/practice-questions/:platform/:id', authorize('admin'), deletePracticeQuestion);
+router.put('/practice-questions/:platform/:id', authorize('admin'), editPracticeQuestion);
+router.post('/practice-questions/:platform/bulk', authorize('admin'), bulkCreatePracticeQuestions);
 router.get('/practice-reports/:platform', authorize('admin'), getPracticeReport);
 
 module.exports = router;

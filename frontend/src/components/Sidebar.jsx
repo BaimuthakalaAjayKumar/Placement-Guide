@@ -60,10 +60,8 @@ const Sidebar = () => {
   return (
     <aside className="sidebar">
       <div className="sidebar-logo">
-        <svg viewBox="0 0 24 24" className="logo-icon">
-          <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
-        </svg>
-        <span>PrepPortal</span>
+        <img src="/griet-logo.svg" alt="GRIET Placement" className="sidebar-logo-img" />
+        <span>GRIET Placement</span>
       </div>
 
       {user.role !== 'student' && (

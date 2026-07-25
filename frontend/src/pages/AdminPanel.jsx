@@ -114,6 +114,25 @@ const AdminPanel = () => {
   const [parsingError, setParsingError] = useState('');
   const [isSubmittingBulk, setIsSubmittingBulk] = useState(false);
 
+  // Bulk Practice questions uploads
+  const [showPracticeBulkForm, setShowPracticeBulkForm] = useState(false);
+  const [practiceBulkInput, setPracticeBulkInput] = useState('');
+  const [practiceBulkInputType, setPracticeBulkInputType] = useState('csv'); // csv or json
+  const [practiceBulkPreview, setPracticeBulkPreview] = useState([]);
+  const [practiceBulkError, setPracticeBulkError] = useState('');
+  const [isSubmittingPracticeBulk, setIsSubmittingPracticeBulk] = useState(false);
+
+  // Edit Practice questions options
+  const [showPracticeEditForm, setShowPracticeEditForm] = useState(false);
+  const [editingPracticeQuestion, setEditingPracticeQuestion] = useState(null);
+  const [editPqTitle, setEditPqTitle] = useState('');
+  const [editPqDifficulty, setEditPqDifficulty] = useState('Medium');
+  const [editPqAcceptance, setEditPqAcceptance] = useState('50%');
+  const [editPqSlug, setEditPqSlug] = useState('');
+  const [editPqSolution, setEditPqSolution] = useState('');
+  const [editPqTagsText, setEditPqTagsText] = useState('');
+  const [submittingPracticeEdit, setSubmittingPracticeEdit] = useState(false);
+
   // Student Academics Modal states
   const [showAcademicsModal, setShowAcademicsModal] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState(null);
@@ -717,6 +736,156 @@ const AdminPanel = () => {
       }
     } catch (err) {
       alert('Error deleting question.');
+    }
+  };
+
+  const handleOpenPracticeEdit = (q) => {
+    setEditingPracticeQuestion(q);
+    setEditPqTitle(q.title);
+    setEditPqDifficulty(q.difficulty);
+    setEditPqAcceptance(q.acceptance || '50%');
+    setEditPqSlug(q.slug);
+    setEditPqSolution(q.solution || '');
+    setEditPqTagsText(q.tags ? q.tags.join(', ') : '');
+    setShowPracticeEditForm(true);
+  };
+
+  const handleSavePracticeEdit = async (e) => {
+    e.preventDefault();
+    if (!editingPracticeQuestion) return;
+    setSubmittingPracticeEdit(true);
+
+    const tagsArray = editPqTagsText
+      .split(',')
+      .map(t => t.trim())
+      .filter(Boolean);
+
+    try {
+      const res = await fetch(`${API_URL}/tests/practice-questions/${practicePlatform}/${editingPracticeQuestion.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          title: editPqTitle,
+          difficulty: editPqDifficulty,
+          acceptance: editPqAcceptance,
+          slug: editPqSlug,
+          solution: editPqSolution,
+          tags: tagsArray
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setSuccess('Practice question updated successfully!');
+        setShowPracticeEditForm(false);
+        fetchPracticeQuestions(practicePlatform);
+      } else {
+        alert(data.error || 'Failed to update question.');
+      }
+    } catch (err) {
+      alert('Error updating question.');
+    } finally {
+      setSubmittingPracticeEdit(false);
+    }
+  };
+
+  const handlePreviewPracticeBulk = () => {
+    setPracticeBulkError('');
+    setPracticeBulkPreview([]);
+    if (!practiceBulkInput.trim()) {
+      setPracticeBulkError('Please enter some data payload first.');
+      return;
+    }
+
+    try {
+      if (practiceBulkInputType === 'json') {
+        const parsed = JSON.parse(practiceBulkInput);
+        if (!Array.isArray(parsed)) {
+          setPracticeBulkError('JSON must be a valid array of objects.');
+          return;
+        }
+        setPracticeBulkPreview(parsed);
+      } else {
+        // Parse CSV
+        const parsed = parsePracticeCSV(practiceBulkInput);
+        if (parsed.length === 0) {
+          setPracticeBulkError('No valid rows parsed in CSV.');
+          return;
+        }
+        setPracticeBulkPreview(parsed);
+      }
+    } catch (err) {
+      setPracticeBulkError('Parsing failed: ' + err.message);
+    }
+  };
+
+  const parsePracticeCSV = (text) => {
+    const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+    if (lines.length <= 1) return [];
+
+    const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+    const results = [];
+
+    for (let i = 1; i < lines.length; i++) {
+      const row = lines[i].split(',').map(r => r.trim());
+      if (row.length === 0 || !row[0]) continue;
+
+      const obj = {};
+      headers.forEach((header, idx) => {
+        let val = row[idx] || '';
+        if (val.startsWith('"') && val.endsWith('"')) {
+          val = val.substring(1, val.length - 1);
+        }
+        obj[header] = val;
+      });
+
+      const urlStr = obj.officialurl || obj.url || obj.questionurl || '';
+      const finalSlug = obj.slug || '';
+      if (urlStr || finalSlug) {
+        results.push({
+          officialUrl: urlStr,
+          slug: finalSlug,
+          title: obj.title || '',
+          difficulty: obj.difficulty || 'Medium',
+          acceptance: obj.acceptance || '50%',
+          solution: obj.solution || '',
+          tags: obj.tags ? obj.tags.split(';').map(t => t.trim()) : []
+        });
+      }
+    }
+    return results;
+  };
+
+  const handlePostPracticeBulk = async () => {
+    if (practiceBulkPreview.length === 0) return;
+    setIsSubmittingPracticeBulk(true);
+    setPracticeBulkError('');
+
+    try {
+      const res = await fetch(`${API_URL}/tests/practice-questions/${practicePlatform}/bulk`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ questions: practiceBulkPreview })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setSuccess(`Successfully imported ${data.count} practice questions!`);
+        setShowPracticeBulkForm(false);
+        setPracticeBulkInput('');
+        setPracticeBulkPreview([]);
+        fetchPracticeQuestions(practicePlatform);
+      } else {
+        setPracticeBulkError(data.error || 'Failed to submit bulk practice questions');
+      }
+    } catch (err) {
+      setPracticeBulkError('Server communication error.');
+    } finally {
+      setIsSubmittingPracticeBulk(false);
     }
   };
 
@@ -2011,6 +2180,9 @@ const AdminPanel = () => {
                   <button className="btn btn-accent" onClick={() => setShowPracticeForm(true)}>
                     ➕ Add Practice Question
                   </button>
+                  <button className="btn btn-secondary" onClick={() => setShowPracticeBulkForm(true)}>
+                    📥 Bulk Import Practice
+                  </button>
                   <button className="btn btn-primary" onClick={handleDownloadPracticeReport}>
                     📥 Export Candidates Report
                   </button>
@@ -2118,6 +2290,12 @@ const AdminPanel = () => {
                                 >
                                   🔗 Open
                                 </a>
+                                <button
+                                  className="btn btn-secondary btn-sm"
+                                  onClick={() => handleOpenPracticeEdit(q)}
+                                >
+                                  📝 Edit
+                                </button>
                                 <button
                                   className="btn btn-danger btn-sm"
                                   onClick={() => handleDeletePracticeQuestion(q.id)}
@@ -2775,6 +2953,234 @@ const AdminPanel = () => {
           </div>
         )
       }
+      {/* PRACTICE QUESTION EDIT MODAL */}
+      {showPracticeEditForm && editingPracticeQuestion && (
+        <div className="modal-overlay">
+          <div className="modal-content glass-card medium-modal">
+            <div className="modal-header">
+              <h3>Edit Practice Question — #{editingPracticeQuestion.id}</h3>
+              <button className="close-btn" onClick={() => setShowPracticeEditForm(false)}>×</button>
+            </div>
+            <form onSubmit={handleSavePracticeEdit}>
+              <div className="modal-body">
+                <div className="form-group">
+                  <label className="form-label">Question Title</label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    required
+                    value={editPqTitle}
+                    onChange={(e) => setEditPqTitle(e.target.value)}
+                  />
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
+                  <div className="form-group">
+                    <label className="form-label">Difficulty</label>
+                    <select
+                      className="form-control"
+                      value={editPqDifficulty}
+                      onChange={(e) => setEditPqDifficulty(e.target.value)}
+                    >
+                      <option value="Easy">Easy</option>
+                      <option value="Medium">Medium</option>
+                      <option value="Hard">Hard</option>
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Acceptance Rate</label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      value={editPqAcceptance}
+                      onChange={(e) => setEditPqAcceptance(e.target.value)}
+                      placeholder="e.g. 54.8%"
+                    />
+                  </div>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Slug / Key Identifier</label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    required
+                    value={editPqSlug}
+                    onChange={(e) => setEditPqSlug(e.target.value)}
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Tags (comma-separated)</label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    value={editPqTagsText}
+                    onChange={(e) => setEditPqTagsText(e.target.value)}
+                    placeholder="Array, Hash Table"
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Solution Reference / Explanation</label>
+                  <textarea
+                    className="form-control"
+                    rows="3"
+                    value={editPqSolution}
+                    onChange={(e) => setEditPqSolution(e.target.value)}
+                    placeholder="Write a summary or instructions for the student..."
+                  />
+                </div>
+              </div>
+              <div className="modal-footer" style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', padding: '15px 20px', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+                <button type="button" className="btn btn-secondary" onClick={() => setShowPracticeEditForm(false)}>
+                  Cancel
+                </button>
+                <button type="submit" className="btn btn-primary" disabled={submittingPracticeEdit}>
+                  {submittingPracticeEdit ? 'Saving...' : 'Save Changes'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* PRACTICE QUESTION BULK UPLOAD MODAL */}
+      {showPracticeBulkForm && (
+        <div className="modal-overlay">
+          <div className="modal-content glass-card medium-modal" style={{ maxWidth: '750px', width: '90%' }}>
+            <div className="modal-header">
+              <h3>Bulk Import Questions to {practicePlatform.toUpperCase()}</h3>
+              <button className="close-btn" onClick={() => {
+                setShowPracticeBulkForm(false);
+                setPracticeBulkInput('');
+                setPracticeBulkPreview([]);
+                setPracticeBulkError('');
+              }}>×</button>
+            </div>
+            <div className="modal-body">
+              {practiceBulkError && (
+                <div className="error-banner" style={{ marginBottom: '15px' }}>
+                  <span>{practiceBulkError}</span>
+                </div>
+              )}
+              <div className="form-group">
+                <label className="form-label">Upload Format</label>
+                <div style={{ display: 'flex', gap: '20px' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', color: '#fff' }}>
+                    <input
+                      type="radio"
+                      name="pqBulkType"
+                      checked={practiceBulkInputType === 'json'}
+                      onChange={() => { setPracticeBulkInputType('json'); setPracticeBulkError(''); }}
+                    />
+                    JSON Array
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', color: '#fff' }}>
+                    <input
+                      type="radio"
+                      name="pqBulkType"
+                      checked={practiceBulkInputType === 'csv'}
+                      onChange={() => { setPracticeBulkInputType('csv'); setPracticeBulkError(''); }}
+                    />
+                    CSV Format
+                  </label>
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Input Data Payload</label>
+                <textarea
+                  className="form-control"
+                  rows="7"
+                  style={{ fontFamily: 'monospace', fontSize: '0.8rem', background: 'rgba(0,0,0,0.3)', color: '#cbd5e0' }}
+                  placeholder={
+                    practiceBulkInputType === 'json'
+                      ? '[\n  {\n    "officialUrl": "https://leetcode.com/problems/two-sum/",\n    "title": "Two Sum",\n    "difficulty": "Easy"\n  }\n]'
+                      : 'officialUrl,slug,title,difficulty,acceptance,tags\n"https://leetcode.com/problems/two-sum/",two-sum,"Two Sum",Easy,"49.2%",Array;Hash-Table'
+                  }
+                  value={practiceBulkInput}
+                  onChange={(e) => setPracticeBulkInput(e.target.value)}
+                />
+              </div>
+
+              <div style={{ display: 'flex', gap: '10px', marginBottom: '15px' }}>
+                <button type="button" className="btn btn-secondary btn-sm" onClick={handlePreviewPracticeBulk}>
+                  🔍 Run Parse Preview
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm"
+                  onClick={() => {
+                    if (practiceBulkInputType === 'json') {
+                      setPracticeBulkInput(JSON.stringify([
+                        {
+                          officialUrl: practicePlatform === 'leetcode' ? "https://leetcode.com/problems/reverse-string/" : `https://codeforces.com/problemset/problem/1/A`,
+                          slug: practicePlatform === 'leetcode' ? "reverse-string" : "1A",
+                          title: practicePlatform === 'leetcode' ? "Reverse String" : "Theatre Square",
+                          difficulty: "Easy",
+                          acceptance: "75%",
+                          tags: ["String", "Two-Pointers"]
+                        }
+                      ], null, 2));
+                    } else {
+                      setPracticeBulkInput(`officialUrl,slug,title,difficulty,acceptance,tags\n"${practicePlatform === 'leetcode' ? 'https://leetcode.com/problems/merge-sorted-array/' : 'https://codeforces.com/problemset/problem/4/A'}",${practicePlatform === 'leetcode' ? 'merge-sorted-array,"Merge Sorted Array"' : '4A,"Watermelon"'},Easy,"45%",Array;Sorting`);
+                    }
+                  }}
+                >
+                  📝 Insert Example Template
+                </button>
+              </div>
+
+              {/* Preview table */}
+              {practiceBulkPreview.length > 0 && (
+                <div className="glass-card" style={{ padding: '10px', maxHeight: '160px', overflowY: 'auto', border: '1px solid rgba(255,255,255,0.08)' }}>
+                  <h4 style={{ color: '#fff', fontSize: '0.85rem', marginBottom: '8px' }}>Parsed Preview ({practiceBulkPreview.length} questions)</h4>
+                  <table className="student-roster-table mini-table" style={{ fontSize: '0.75rem' }}>
+                    <thead>
+                      <tr>
+                        <th>Title / Slug</th>
+                        <th>URL</th>
+                        <th>Diff</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {practiceBulkPreview.map((pq, idx) => (
+                        <tr key={idx}>
+                          <td>
+                            <strong>{pq.title || 'Untitled'}</strong>
+                            <div className="text-secondary small">{pq.slug || 'No Slug'}</div>
+                          </td>
+                          <td style={{ maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{pq.officialUrl || 'N/A'}</td>
+                          <td>{pq.difficulty}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+            <div className="modal-footer" style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', padding: '15px 20px', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => {
+                  setShowPracticeBulkForm(false);
+                  setPracticeBulkInput('');
+                  setPracticeBulkPreview([]);
+                  setPracticeBulkError('');
+                }}
+              >
+                Close
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                disabled={practiceBulkPreview.length === 0 || isSubmittingPracticeBulk}
+                onClick={handlePostPracticeBulk}
+              >
+                {isSubmittingPracticeBulk ? 'Submitting Batch...' : '✓ Confirm Batch Import'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 };

@@ -18,7 +18,7 @@ exports.getQuestions = async (req, res, next) => {
     if (difficulty) query.difficulty = difficulty;
     if (tag) query.tags = { $in: [tag] };
     if (language) query.allowedLanguages = { $in: [language] };
-    
+
     // Non-admin can only see active questions
     if (req.user.role !== 'admin') {
       query.isActive = true;
@@ -274,7 +274,7 @@ exports.submitCode = async (req, res, next) => {
 exports.getSubmissions = async (req, res, next) => {
   try {
     const query = { question: req.params.id };
-    
+
     if (req.user.role !== 'admin') {
       query.user = req.user.id;
     }
@@ -343,10 +343,10 @@ exports.getAdminSubmissionReport = async (req, res, next) => {
     }
 
     const { sort, difficulty, plagiarismStatus } = req.query;
-    
+
     // Find all submissions
     let query = {};
-    
+
     // Fetch submissions populated
     let submissions = await Submission.find(query)
       .populate('user', 'name email rollNumber branch year')
@@ -389,6 +389,51 @@ exports.getAdminSubmissionReport = async (req, res, next) => {
       success: true,
       count: submissions.length,
       data: submissions
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// @desc    Bulk create internal questions
+// @route   POST /api/questions/bulk
+// @access  Private/Admin
+exports.bulkCreateQuestions = async (req, res, next) => {
+  try {
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ success: false, error: 'Only admins can perform this action' });
+    }
+
+    const { questions } = req.body;
+    if (!Array.isArray(questions)) {
+      return res.status(400).json({ success: false, error: 'Please provide an array of questions' });
+    }
+
+    const formattedQuestions = questions.map(q => ({
+      title: q.title,
+      difficulty: q.difficulty || 'Easy',
+      description: q.description || 'No description provided.',
+      constraints: q.constraints || '',
+      inputFormat: q.inputFormat || '',
+      outputFormat: q.outputFormat || '',
+      sampleInput: q.sampleInput || '',
+      sampleOutput: q.sampleOutput || '',
+      explanation: q.explanation || '',
+      visibleTestCases: q.visibleTestCases || [],
+      hiddenTestCases: q.hiddenTestCases || [],
+      timeLimit: q.timeLimit || 2000,
+      memoryLimit: q.memoryLimit || 256,
+      tags: q.tags || [],
+      allowedLanguages: q.allowedLanguages || ['c', 'cpp', 'java', 'python', 'javascript', 'typescript', 'sql', 'mysql', 'postgresql', 'mongodb', 'html', 'css', 'reactjs', 'expressjs'],
+      createdBy: req.user.id
+    }));
+
+    const created = await Question.insertMany(formattedQuestions);
+
+    res.status(201).json({
+      success: true,
+      count: created.length,
+      data: created
     });
   } catch (err) {
     next(err);

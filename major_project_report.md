@@ -141,6 +141,11 @@ The portal implements a secure gateway to bifurcate student access, faculty moni
 *   **Dynamic Generation**: Employs AI endpoints to generate 10 unique, context-matched interview questions based on the candidate's target job role and selected technology tags.
 *   **Evaluation Cycle**: Students answer questions, and responses are compared against standard technical benchmarks. Feedback reports include sub-grades and overall score percentages.
 
+### 5.5 Administrative Bulk Practice Question Importing & Individual Editing
+To streamline the process of managing practice questions across multiple external competitive coding platforms, the system introduces a specialized administration channel:
+*   **Bulk Import Portal**: Administrators can upload question lists in CSV or JSON formats. An intelligent parser processes URLs from LeetCode, Codeforces, CodeChef, and HackerRank, extracts problem identifiers/metadata, maps fields, and displays a interactive parse preview table for approval before batch inserting records.
+*   **Granular Question Editor**: Admins can modify live properties (slug, title, difficulty, acceptance, solution links) directly from the admin panel with live dashboard synchronization.
+
 ---
 
 ## Chapter 6: Implementation Details and Code Walkthrough
@@ -196,6 +201,10 @@ exports.bulkCreateJobs = async (req, res, next) => {
 2.  **Roster CSV Downloads**: Allows placement cells to extract comprehensive reports.
 3.  **Bulk Delete Controller**: Removes outdated configurations using confirmation targets.
 4.  **Bulk Job Posting Options**: Supports raw CSV file updates or JSON pasting, generating live pre-upload data previews.
+
+### 7.3 Unified Competitive Programming Dashboard & Platform Reports
+1.  **Linked Handles & Sync Status**: Dynamic widgets display connection indicators (Linked / Not Linked / Active) for student handles across LeetCode, Codeforces, CodeChef, and HackerRank.
+2.  **Platform Solved Breakdown Panels**: Includes solved counts, average score metrics, platform-specific ranks, star achievements (e.g., CodeChef 3★), and difficulty tier classifications (Easy, Medium, Hard breakdown) aligned under the matching heatmap tracker panel.
 
 ---
 

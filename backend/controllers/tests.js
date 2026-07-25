@@ -755,3 +755,146 @@ exports.getPracticeReport = async (req, res, next) => {
     next(err);
   }
 };
+
+// @desc    Edit a practice question (Admin only)
+// @route   PUT /api/tests/practice-questions/:platform/:id
+// @access  Private/Admin
+exports.editPracticeQuestion = async (req, res, next) => {
+  try {
+    const { platform, id } = req.params;
+    const { title, difficulty, acceptance, slug, solution, tags } = req.body;
+
+    const question = await PracticeQuestion.findOneAndUpdate(
+      { platform, id: Number(id) },
+      { title, difficulty, acceptance, slug, solution, tags },
+      { new: true, runValidators: true }
+    );
+
+    if (!question) {
+      return res.status(404).json({ success: false, error: 'Practice question not found.' });
+    }
+
+    res.status(200).json({ success: true, data: question });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// Simple utility to capitalize slug terms
+const cleanTitleFromSlug = (slug) => {
+  if (!slug) return '';
+  return slug
+    .split('-')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+};
+
+// @desc    Bulk create practice questions (Admin only)
+// @route   POST /api/tests/practice-questions/:platform/bulk
+// @access  Private/Admin
+exports.bulkCreatePracticeQuestions = async (req, res, next) => {
+  try {
+    const { platform } = req.params;
+    const { questions } = req.body;
+
+    if (!Array.isArray(questions)) {
+      return res.status(400).json({ success: false, error: 'Please provide an array of questions.' });
+    }
+
+    const createdQuestions = [];
+    const duplicateErrors = [];
+
+    for (const q of questions) {
+      const urlStr = q.officialUrl || q.url || q.questionUrl || '';
+
+      // Parse details
+      let parsedId = null;
+      let parsedSlug = '';
+      let parsedTitle = '';
+
+      if (platform === 'leetcode') {
+        const match = urlStr.match(/problems\/([a-zA-Z0-9-]+)/);
+        if (match?.[1]) {
+          parsedSlug = match[1];
+          parsedTitle = cleanTitleFromSlug(parsedSlug);
+        }
+      } else if (platform === 'codeforces') {
+        const match = urlStr.match(/problemset\/problem\/(\d+)\/([A-Z]\d*)/i) || urlStr.match(/contest\/(\d+)\/problem\/([A-Z]\d*)/i);
+        if (match?.[1] && match?.[2]) {
+          parsedId = Number(match[1]);
+          parsedSlug = String(match[1]) + match[2].toUpperCase();
+          parsedTitle = 'Problem ' + parsedSlug;
+        }
+      } else if (platform === 'codechef') {
+        const match = urlStr.match(/problems\/([a-zA-Z0-9_-]+)/i);
+        if (match?.[1]) {
+          parsedSlug = match[1].toUpperCase();
+          parsedTitle = parsedSlug;
+        }
+      } else if (platform === 'hackerrank') {
+        const match = urlStr.match(/challenges\/([a-zA-Z0-9-]+)/i);
+        if (match?.[1]) {
+          parsedSlug = match[1];
+          parsedTitle = cleanTitleFromSlug(parsedSlug);
+        }
+      }
+
+      if (!parsedSlug && urlStr) {
+        const cleanUrl = urlStr.replace(/[?#].*$/, '').replace(/\/$/, '');
+        const lastSegment = cleanUrl.substring(cleanUrl.lastIndexOf('/') + 1);
+        if (/^[a-zA-Z0-9_-]+$/.test(lastSegment)) {
+          parsedSlug = lastSegment;
+          parsedTitle = cleanTitleFromSlug(lastSegment);
+        }
+      }
+
+      let idCount = q.id || parsedId;
+      if (!idCount) {
+        const maxQ = await PracticeQuestion.findOne({ platform }).sort({ id: -1 }).select('id');
+        idCount = (maxQ?.id || 0) + 1;
+      }
+
+      const finalId = Number(idCount);
+      const finalSlug = String(q.slug || parsedSlug || '').trim();
+      const finalTitle = String(q.title || parsedTitle || cleanTitleFromSlug(finalSlug) || `Question ${finalId}`).trim();
+      const finalDifficulty = q.difficulty || 'Medium';
+
+      if (!finalSlug) {
+        duplicateErrors.push(`Skipped: Missing URL or slug payload details`);
+        continue;
+      }
+
+      const existing = await PracticeQuestion.findOne({
+        platform,
+        $or: [{ id: finalId }, { slug: finalSlug }]
+      });
+
+      if (existing) {
+        duplicateErrors.push(`Skipped: "${finalTitle}" already exists on ${platform}`);
+        continue;
+      }
+
+      const newQ = await PracticeQuestion.create({
+        platform,
+        id: finalId,
+        title: finalTitle,
+        difficulty: finalDifficulty,
+        acceptance: q.acceptance || '50%',
+        slug: finalSlug,
+        solution: q.solution || '',
+        tags: q.tags || []
+      });
+
+      createdQuestions.push(newQ);
+    }
+
+    res.status(200).json({
+      success: true,
+      count: createdQuestions.length,
+      data: createdQuestions,
+      errors: duplicateErrors
+    });
+  } catch (err) {
+    next(err);
+  }
+};
