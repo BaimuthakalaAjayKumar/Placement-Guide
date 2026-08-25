@@ -18,7 +18,7 @@
   <path id="outerRing" d="M120,20 A100,100 0 1,1 119.99,20" fill="none"/>
   <text font-family="Arial, sans-serif" font-size="13" fill="#b53b3b">
     <textPath href="#outerRing" startOffset="50%" text-anchor="middle">
-      Gokaraju Rangaraju Institute of Engineering & Technology
+      Gokaraju Rangaraju Institute of Engineering &amp; Technology
     </textPath>
   </text>
   <g stroke="#c12d2d" stroke-width="6" fill="none">

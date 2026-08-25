@@ -1,16 +1,28 @@
-# React + Vite
+# Frontend Client: AI-Powered Placement Portal
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+This directory contains the robust React.js client interface for the **AI-Powered Placement Preparation Portal**. 
 
-Currently, two official plugins are available:
+The frontend implements a unified, rich, and highly responsive user experience ensuring that students can access learning tracking, assessment, and placement management tools without fragmented contexts. Administrators and faculty access a granular centralized dashboard enabling advanced analytics and tracking of institutional cohorts.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Core Implementations
 
-## React Compiler
+- **Web Development & Components Base**: Modern, scalable component structures governed by React and styled securely with advanced visual aesthetics.
+- **Monaco Code Sandbox**: Embedded React component integrating Microsoft's Monaco IDE directly onto the coding workspace page, providing syntax highlighting, snippet tracking, and live test-case interactions.
+- **AI-Powered Interfaces**: Forms and dialogs that stream AI generated questions dynamically from backend APIs, directly tracking behavioral and technical metrics.
+- **Data Presentation Visualizations**: Custom, responsive chart graphs computing readiness ratios based on code logic metrics, aptitude completion rates, and learning progression parameters, seamlessly rendering for dashboards.
+- **Socket IO Connections**: Instant real-time UI synchronizations rendering notifications for external contests, mock drives, or doubt forums.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Running the Frontend Locally
 
-## Expanding the Oxlint configuration
+This client template relies on the optimized Vite bundler.
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and Oxlint's TypeScript related rules in your project.
+### Installation & Execution
+```bash
+# Ensure you are within the frontend directory
+npm install
+
+# Start the Vite development hot-reload server
+npm run dev
+```
+
+Remember to sync this frontend with the active backend express server on the proper configured HTTP port.

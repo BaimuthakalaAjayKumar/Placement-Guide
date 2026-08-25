@@ -1,0 +1,232 @@
+.resume-builder-layout {
+    display: flex;
+    min-height: 100vh;
+    background-color: #0f172a;
+    color: #f1f5f9;
+}
+
+.resume-builder-main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.builder-container {
+    display: flex;
+    padding: 2rem;
+    gap: 2rem;
+    height: calc(100vh - 80px);
+    /* rough header offset */
+    overflow: hidden;
+}
+
+.editor-panel {
+    flex: 1;
+    background-color: #1e293b;
+    padding: 1.5rem;
+    border-radius: 0.5rem;
+    border: 1px solid #334155;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.editor-panel h2 {
+    margin-top: 0;
+    border-bottom: 1px solid #334155;
+    padding-bottom: 0.75rem;
+}
+
+.form-section {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    background: rgba(15, 23, 42, 0.4);
+    padding: 1rem;
+    border-radius: 0.5rem;
+    border: 1px dashed #475569;
+}
+
+.form-section h3 {
+    margin-top: 0;
+    margin-bottom: 0.5rem;
+    color: #94a3b8;
+    font-size: 0.875rem;
+    text-transform: uppercase;
+}
+
+.form-section input,
+.form-section textarea {
+    width: 100%;
+    padding: 0.75rem;
+    background-color: #0f172a;
+    border: 1px solid #334155;
+    border-radius: 0.375rem;
+    color: white;
+    margin-bottom: 0.5rem;
+}
+
+.form-section input:focus,
+.form-section textarea:focus {
+    outline: none;
+    border-color: #3b82f6;
+}
+
+.dynamic-field {
+    padding-bottom: 1rem;
+    margin-bottom: 0.5rem;
+    border-bottom: 1px solid #334155;
+}
+
+.btn-add {
+    background-color: transparent;
+    color: #60a5fa;
+    border: 1px dashed #60a5fa;
+    padding: 0.5rem;
+    border-radius: 0.375rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-weight: 500;
+    align-self: flex-start;
+}
+
+.btn-add:hover {
+    background-color: rgba(96, 165, 250, 0.1);
+}
+
+.form-actions {
+    margin-top: auto;
+    padding-top: 1rem;
+}
+
+.btn-download {
+    width: 100%;
+    padding: 1rem;
+    background-color: #10b981;
+    color: white;
+    border: none;
+    border-radius: 0.5rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.btn-download:hover {
+    background-color: #059669;
+}
+
+.preview-panel {
+    flex: 1.2;
+    background-color: #cbd5e1;
+    padding: 1rem;
+    border-radius: 0.5rem;
+    overflow-y: auto;
+    display: flex;
+    justify-content: center;
+}
+
+/* Resume PDF styles wrapper */
+.a4-resume-preview {
+    background-color: white;
+    color: black;
+    width: 210mm;
+    min-height: 297mm;
+    padding: 20mm;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    font-family: 'Times New Roman', Times, serif;
+}
+
+.resume-header {
+    text-align: center;
+    margin-bottom: 1.5rem;
+}
+
+.resume-header h1 {
+    margin: 0 0 0.25rem 0;
+    font-size: 2rem;
+    color: #111827;
+}
+
+.contact-links {
+    font-size: 0.9rem;
+    color: #374151;
+}
+
+.resume-section {
+    margin-bottom: 1rem;
+}
+
+.resume-section h2 {
+    font-size: 1.1rem;
+    color: #1e293b;
+    margin-bottom: 0.25rem;
+    margin-top: 0.5rem;
+    text-transform: uppercase;
+}
+
+.resume-section hr {
+    border: 0;
+    border-top: 2px solid #1e293b;
+    margin-bottom: 0.75rem;
+}
+
+.resume-item {
+    margin-bottom: 0.75rem;
+}
+
+.item-header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 0.1rem;
+}
+
+.item-header strong {
+    font-size: 1rem;
+}
+
+.item-subheader {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.95rem;
+    font-style: italic;
+    margin-bottom: 0.25rem;
+}
+
+.item-desc {
+    font-size: 0.95rem;
+    margin: 0;
+    line-height: 1.4;
+}
+
+.skills-text {
+    font-size: 0.95rem;
+    line-height: 1.5;
+    margin: 0;
+}
+
+.mt-1 {
+    margin-top: 0.25rem;
+}
+
+/* Print CSS override */
+@media print {
+    body * {
+        visibility: hidden;
+    }
+
+    .print-area,
+    .print-area * {
+        visibility: visible;
+    }
+
+    .print-area {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        margin: 0;
+        padding: 10mm;
+        box-shadow: none;
+    }
+}

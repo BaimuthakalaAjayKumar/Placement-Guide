@@ -26,8 +26,8 @@ const sendTokenResponse = (user, statusCode, res) => {
 // @access  Public
 exports.register = async (req, res, next) => {
   try {
-    const { name, email, password, role, leetcodeUsername, codeforcesUsername, codechefUsername, hackerrankUsername } = req.body;
-    const normalizedRole = role || 'student';
+    const { name, email, password, leetcodeUsername, codeforcesUsername, codechefUsername, hackerrankUsername } = req.body;
+    const normalizedRole = 'student'; // Force public registration to default role
     const trimmedLeetCode = (leetcodeUsername || '').trim();
     const trimmedCodeforces = (codeforcesUsername || '').trim();
     const trimmedCodeChef = (codechefUsername || '').trim();

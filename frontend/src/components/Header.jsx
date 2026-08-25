@@ -30,7 +30,7 @@ const Header = ({ title }) => {
         <div className="header-divider"></div>
 
         <div className="header-profile">
-          <span className="profile-role-badge">{user.role === 'admin' ? 'Admin' : 'Student'}</span>
+          <span className="profile-role-badge">{user.role === 'admin' ? 'Admin' : user.role === 'faculty' ? 'Faculty' : 'Student'}</span>
         </div>
       </div>
     </header>

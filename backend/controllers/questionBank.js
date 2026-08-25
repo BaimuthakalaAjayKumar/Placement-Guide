@@ -245,16 +245,26 @@ exports.submitCode = async (req, res, next) => {
 
     // Create Notification if plagiarism > 40%
     if (plagResult.plagiarismPercentage > 40) {
-      await Notification.create({
-        type: 'plagiarism_alert',
-        message: `High Plagiarism Detected! Student "${req.user.name}" submitted solution with ${plagResult.plagiarismPercentage}% similarity for question "${question.title}".`,
-        metadata: {
-          submissionId: submission._id,
-          questionId: question._id,
-          plagiarismPercentage: plagResult.plagiarismPercentage,
-          studentName: req.user.name
+      const recipients = await User.find({ role: { $in: ['admin', 'faculty'] } });
+      const io = req.app.get('socketio');
+      
+      for (const recipient of recipients) {
+        const notification = await Notification.create({
+          user: recipient._id,
+          type: 'plagiarism_alert',
+          message: `High Plagiarism Detected! Student "${req.user.name}" submitted solution with ${plagResult.plagiarismPercentage}% similarity for question "${question.title}".`,
+          metadata: {
+            submissionId: submission._id,
+            questionId: question._id,
+            plagiarismPercentage: plagResult.plagiarismPercentage,
+            studentName: req.user.name
+          }
+        });
+        
+        if (io) {
+          io.to(`user_${recipient._id}`).emit('new_notification', notification);
         }
-      });
+      }
     }
 
     res.status(200).json({

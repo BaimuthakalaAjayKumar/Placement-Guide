@@ -53,7 +53,7 @@ const ForgotPassword = () => {
             <div className="auth-card glass-card animate-fade">
                 <div className="auth-header">
                     <div className="auth-logo">
-                        <img src="/griet-logo.svg" alt="GRIET Placement" className="auth-logo-img" />
+                        <img src="/college-logo.jpg" alt="GRIET Placement" className="auth-logo-img" />
                         <span>GRIET Placement</span>
                     </div>
                     <h2>Reset Password</h2>

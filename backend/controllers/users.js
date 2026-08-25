@@ -543,6 +543,48 @@ exports.createAdmin = async (req, res, next) => {
   }
 };
 
+// @desc    Create a new faculty member (Admin only)
+// @route   POST /api/users/faculty
+// @access  Private/Admin
+exports.createFaculty = async (req, res, next) => {
+  try {
+    const { name, email, password } = req.body;
+
+    if (!name || !email || !password) {
+      return res.status(400).json({
+        success: false,
+        error: 'Please fill in name, email, and password.'
+      });
+    }
+
+    const userExists = await User.findOne({ email });
+    if (userExists) {
+      return res.status(400).json({
+        success: false,
+        error: 'Email already registered.'
+      });
+    }
+
+    const faculty = await User.create({
+      name,
+      email,
+      password,
+      role: 'faculty'
+    });
+
+    const facultyObj = faculty.toObject();
+    delete facultyObj.password;
+
+    res.status(201).json({
+      success: true,
+      message: 'New faculty account created successfully.',
+      data: facultyObj
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
 // @desc    Update/Sync LeetCode profile credentials and solved stats
 // @route   PUT /api/users/leetcode
 // @access  Private
