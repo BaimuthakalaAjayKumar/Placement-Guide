@@ -156,6 +156,17 @@ exports.createJob = async (req, res, next) => {
 
     // Find all registered students to email notify them
     const students = await User.find({ role: 'student' });
+
+    console.log("==================================");
+    console.log("Students Found:", students.length);
+    console.log(
+      students.map(student => ({
+        name: student.name,
+        email: student.email,
+        role: student.role
+    }))
+);
+    console.log("==================================");
     
     students.forEach(student => {
       sendEmail({

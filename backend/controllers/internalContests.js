@@ -30,9 +30,12 @@ exports.createContest = async (req, res, next) => {
     });
 
     // Notify all students via email (asynchronous background operation)
-    User.find({ role: 'student' })
-      .select('email name')
-      .then(students => {
+    console.log("==================================");
+    console.log("Contest Students Found:", students.length);
+    console.log(students);
+    console.log("==================================");
+      select('email name')
+      then(students => {
         students.forEach(student => {
           sendEmail({
             to: student.email,

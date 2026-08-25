@@ -32,10 +32,31 @@ const sendEmail = async (options) => {
     html: options.html
   };
 
+  try {
+  console.log("======================================");
+  console.log("SMTP HOST:", process.env.SMTP_HOST);
+  console.log("SMTP PORT:", process.env.SMTP_PORT);
+  console.log("SMTP EMAIL:", process.env.SMTP_EMAIL);
+  console.log("Sending Mail To:", options.to);
+
+  await transporter.verify();
+  console.log("SMTP Connected Successfully");
+
   const info = await transporter.sendMail(message);
 
-  console.log(`Real email sent to ${options.to}: Message ID %s`, info.messageId);
-  return { success: true, messageId: info.messageId };
+  console.log("Email Sent Successfully");
+  console.log("Message ID:", info.messageId);
+
+  return {
+    success: true,
+    messageId: info.messageId
+  };
+} catch (err) {
+  console.error("EMAIL ERROR");
+  console.error(err);
+
+  throw err;
+}
 };
 
 module.exports = sendEmail;
