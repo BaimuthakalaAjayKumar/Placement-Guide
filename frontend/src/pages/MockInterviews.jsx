@@ -428,6 +428,55 @@ const MockInterviews = () => {
               </button>
             </div>
 
+            {/* Strengths & Weaknesses Analysis */}
+            <div className="glass-card analysis-grid-card" style={{ marginTop: '20px', padding: '20px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+                <h3 style={{ margin: 0 }}>Performance Analysis</h3>
+                <span className="q-score-badge" data-score={interviewResult.overallScore >= 80 ? 'high' : interviewResult.overallScore >= 60 ? 'medium' : 'low'}>
+                  Readiness: {interviewResult.interviewReadiness || (interviewResult.overallScore >= 80 ? 'Highly Placement Ready' : interviewResult.overallScore >= 60 ? 'Needs Practice' : 'Requires Significant Work')}
+                </span>
+              </div>
+              
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px' }}>
+                <div>
+                  <h4 style={{ color: '#4ade80', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                    <span>✓</span> Strengths
+                  </h4>
+                  <ul style={{ paddingLeft: '20px', listStyleType: 'disc', color: '#94a3b8' }}>
+                    {(interviewResult.strengths && interviewResult.strengths.length > 0) ? (
+                      interviewResult.strengths.map((str, idx) => <li key={idx}>{str}</li>)
+                    ) : (
+                      <li>Strong foundational performance</li>
+                    )}
+                  </ul>
+                </div>
+                
+                <div>
+                  <h4 style={{ color: '#f87171', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                    <span>✗</span> Weaknesses
+                  </h4>
+                  <ul style={{ paddingLeft: '20px', listStyleType: 'disc', color: '#94a3b8' }}>
+                    {(interviewResult.weaknesses && interviewResult.weaknesses.length > 0) ? (
+                      interviewResult.weaknesses.map((wk, idx) => <li key={idx}>{wk}</li>)
+                    ) : (
+                      <li>Opportunity to elaborate further</li>
+                    )}
+                  </ul>
+                </div>
+              </div>
+
+              <div style={{ marginTop: '20px', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '15px' }}>
+                <h4 style={{ color: '#6366f1', marginBottom: '8px' }}>💡 Suggestions for Improvement</h4>
+                <ul style={{ paddingLeft: '20px', listStyleType: 'disc', color: '#94a3b8' }}>
+                  {(interviewResult.improvementSuggestions && interviewResult.improvementSuggestions.length > 0) ? (
+                    interviewResult.improvementSuggestions.map((sug, idx) => <li key={idx}>{sug}</li>)
+                  ) : (
+                    <li>Incorporate more technical jargon and detail when expanding answers.</li>
+                  )}
+                </ul>
+              </div>
+            </div>
+
             <h3 className="breakdown-headline">Question-by-Question AI Analysis</h3>
 
             <div className="evaluation-questions-list">

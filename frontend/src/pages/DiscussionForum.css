@@ -1,0 +1,17 @@
+.forum-layout {
+  display: flex;
+  min-height: 100vh;
+  background-color: #0f172a;
+  color: #f1f5f9;
+}
+
+.forum-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.forum-content {
+  padding: 2rem;
+  overflow-y: auto;
+}

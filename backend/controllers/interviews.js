@@ -1,6 +1,7 @@
 const MockInterview = require('../models/MockInterview');
 const User = require('../models/User');
 const { InterviewRole, InterviewTechnology } = require('../models/InterviewMetadata');
+const aiService = require('../services/aiService');
 
 const questionBank = {
   'Software Engineer': {
@@ -481,32 +482,66 @@ exports.submitInterview = async (req, res, next) => {
     let totalScore = 0;
     const questionsCount = interview.questions.length;
 
-    interview.questions.forEach((q, idx) => {
+    for (let idx = 0; idx < questionsCount; idx++) {
+      const q = interview.questions[idx];
       const userRes = responses.find(r => r.questionId === q._id.toString()) || responses[idx];
       const answerText = userRes ? userRes.answer : '';
 
-      const evaluation = gradeInterviewAnswer(q.questionText, answerText, q.questionType || 'technical');
+      let evaluation = await aiService.gradeInterviewAnswerWithAI(q.questionText, answerText, q.questionType || 'technical');
+      if (!evaluation) {
+        evaluation = gradeInterviewAnswer(q.questionText, answerText, q.questionType || 'technical');
+      }
 
       q.userResponse = answerText;
       q.score = evaluation.score;
       q.feedback = evaluation.feedback;
 
       totalScore += evaluation.score;
-    });
+    }
 
     const overallScore = Math.round(totalScore / questionsCount);
 
     let generalFeedback = '';
-    if (overallScore >= 80) {
-      generalFeedback = 'Excellent performance! You expressed technical terms clearly, structured your answers with strong story flow, and included specific examples. You are interview-ready.';
-    } else if (overallScore >= 60) {
-      generalFeedback = 'Good effort. Your technical insights are solid, but you should practice explaining your project outcomes and approach with more specificity. Try applying the STAR method throughout.';
+    let strengths = [];
+    let weaknesses = [];
+    let improvementSuggestions = [];
+    let interviewReadiness = 'Needs Practice';
+
+    const aiReport = await aiService.generateInterviewOverallReportWithAI(interview.jobRole, interview.technology, interview.questions);
+    if (aiReport) {
+      generalFeedback = aiReport.generalFeedback;
+      strengths = aiReport.strengths || [];
+      weaknesses = aiReport.weaknesses || [];
+      improvementSuggestions = aiReport.improvementSuggestions || [];
+      interviewReadiness = aiReport.interviewReadiness || 'Needs Practice';
     } else {
-      generalFeedback = 'Requires improvement. Focus on providing longer, more explanatory answers. Use precise technical terminology and structure your responses around a problem-action-resolution framework.';
+      if (overallScore >= 80) {
+        generalFeedback = 'Excellent performance! You expressed technical terms clearly, structured your answers with strong story flow, and included specific examples. You are interview-ready.';
+        strengths = ['Clear technical vocabulary', 'Structured answers', 'Provided relevant details'];
+        weaknesses = ['Could add more time-complexity context for coding sections'];
+        improvementSuggestions = ['Practice deep-diving into system design concepts to elevate responses further.'];
+        interviewReadiness = 'Highly Placement Ready';
+      } else if (overallScore >= 60) {
+        generalFeedback = 'Good effort. Your technical insights are solid, but you should practice explaining your project outcomes and approach with more specificity. Try applying the STAR method throughout.';
+        strengths = ['Demonstrates foundational domain knowledge', 'Adequate length of responses'];
+        weaknesses = ['Needs more project metrics or concrete examples', 'Missed opportunities to apply STAR structure'];
+        improvementSuggestions = ['Structure behavioral answers with Situation, Task, Action, and Result explicitly.'];
+        interviewReadiness = 'Needs Practice';
+      } else {
+        generalFeedback = 'Requires improvement. Focus on providing longer, more explanatory answers. Use precise technical terminology and structure your responses around a problem-action-resolution framework.';
+        strengths = ['Basic comprehension of interview topics'];
+        weaknesses = ['Answers are too short', 'Lack of technical terminology and depth'];
+        improvementSuggestions = ['Expand responses to at least 3-4 full sentences and explicitly describe past projects.'];
+        interviewReadiness = 'Requires Significant Work';
+      }
     }
 
     interview.overallScore = overallScore;
     interview.generalFeedback = generalFeedback;
+    interview.strengths = strengths;
+    interview.weaknesses = weaknesses;
+    interview.improvementSuggestions = improvementSuggestions;
+    interview.interviewReadiness = interviewReadiness;
     interview.status = 'completed';
     interview.completedAt = new Date();
     await interview.save();

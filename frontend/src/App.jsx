@@ -29,6 +29,8 @@ import FacultyDashboard from './pages/FacultyDashboard';
 import CoreCSEPrep from './pages/CoreCSEPrep';
 import ResumeBuilder from './pages/ResumeBuilder';
 import CompanyPrep from './pages/CompanyPrep';
+import PersonalizedRoadmap from './pages/PersonalizedRoadmap';
+import DiscussionForum from './pages/DiscussionForum';
 
 // Private Route Wrapper
 const PrivateRoute = ({ children, allowedRoles }) => {
@@ -104,6 +106,22 @@ const AppRoutes = () => {
         element={
           <PrivateRoute allowedRoles={['student']}>
             <ResumeBuilder />
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/learning-roadmap"
+        element={
+          <PrivateRoute allowedRoles={['student']}>
+            <PersonalizedRoadmap />
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/discussion-forum"
+        element={
+          <PrivateRoute allowedRoles={['student', 'faculty', 'admin']}>
+            <DiscussionForum />
           </PrivateRoute>
         }
       />

@@ -41,6 +41,8 @@ const contestRoutes = require('./routes/contests');
 const doubtRoutes = require('./routes/doubts');
 const holidayRoutes = require('./routes/holidays');
 const notificationRoutes = require('./routes/notifications');
+const roadmapRoutes = require('./routes/roadmaps');
+const discussionRoutes = require('./routes/discussions');
 
 // Mount routers
 app.use('/api/auth', authRoutes);
@@ -54,6 +56,8 @@ app.use('/api/contests', contestRoutes);
 app.use('/api/doubts', doubtRoutes);
 app.use('/api/holidays', holidayRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/roadmaps', roadmapRoutes);
+app.use('/api/discussions', discussionRoutes);
 
 // Base route
 app.get('/', (req, res) => {

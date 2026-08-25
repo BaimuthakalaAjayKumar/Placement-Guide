@@ -330,3 +330,126 @@ exports.bulkCreateJobs = async (req, res, next) => {
     next(err);
   }
 };
+
+// @desc    Toggle saving a job listing
+// @route   POST /api/jobs/:id/save
+// @access  Private
+exports.toggleSaveJob = async (req, res, next) => {
+  try {
+    const job = await Job.findById(req.params.id);
+    if (!job) {
+      return res.status(404).json({ success: false, error: 'Job not found' });
+    }
+
+    const user = await User.findById(req.user.id);
+    const index = user.savedJobs.indexOf(job._id);
+
+    if (index >= 0) {
+      // Unsave
+      user.savedJobs.splice(index, 1);
+      await user.save();
+      return res.status(200).json({ success: true, message: 'Job removed from saved list', isSaved: false });
+    } else {
+      // Save
+      user.savedJobs.push(job._id);
+      await user.save();
+      return res.status(200).json({ success: true, message: 'Job added to saved list', isSaved: true });
+    }
+  } catch (err) {
+    next(err);
+  }
+};
+
+// @desc    Get all saved jobs for user
+// @route   GET /api/jobs/saved
+// @access  Private
+exports.getSavedJobs = async (req, res, next) => {
+  try {
+    const user = await User.findById(req.user.id).populate('savedJobs');
+    res.status(200).json({
+      success: true,
+      count: user.savedJobs.length,
+      data: user.savedJobs
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// @desc    Apply for a job listing
+// @route   POST /api/jobs/:id/apply
+// @access  Private
+exports.applyJob = async (req, res, next) => {
+  try {
+    const job = await Job.findById(req.params.id);
+    if (!job) {
+      return res.status(404).json({ success: false, error: 'Job not found' });
+    }
+
+    const user = await User.findById(req.user.id);
+    const alreadyApplied = user.appliedJobs.some(app => app.job.toString() === job._id.toString());
+    if (alreadyApplied) {
+      return res.status(400).json({ success: false, error: 'Already applied for this job' });
+    }
+
+    user.appliedJobs.push({ job: job._id, status: 'applied', appliedAt: new Date() });
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Successfully applied for job',
+      data: user.appliedJobs
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// @desc    Get all applied jobs for user
+// @route   GET /api/jobs/applied
+// @access  Private
+exports.getAppliedJobs = async (req, res, next) => {
+  try {
+    const user = await User.findById(req.user.id).populate('appliedJobs.job');
+    res.status(200).json({
+      success: true,
+      count: user.appliedJobs.length,
+      data: user.appliedJobs
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// @desc    Update application status (Admin only)
+// @route   PUT /api/jobs/:id/status
+// @access  Private/Admin
+exports.updateApplicationStatus = async (req, res, next) => {
+  try {
+    const { studentId, status } = req.body;
+    if (!studentId || !status) {
+      return res.status(400).json({ success: false, error: 'Please provide studentId and status' });
+    }
+
+    const student = await User.findById(studentId);
+    if (!student) {
+      return res.status(404).json({ success: false, error: 'Student not found' });
+    }
+
+    const application = student.appliedJobs.find(app => app.job.toString() === req.params.id);
+    if (!application) {
+      return res.status(404).json({ success: false, error: 'Application not found' });
+    }
+
+    application.status = status;
+    await student.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Application status updated successfully',
+      data: student.appliedJobs
+    });
+  } catch (err) {
+    next(err);
+  }
+};
