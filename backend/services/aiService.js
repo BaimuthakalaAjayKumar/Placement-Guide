@@ -256,7 +256,7 @@ exports.generateRoadmapWithAI = async (user, stats) => {
       }
     `;
 
-    const response = await fetch(\`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=\${apiKey}\`, {
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
@@ -270,7 +270,7 @@ exports.generateRoadmapWithAI = async (user, stats) => {
     });
 
     if (!response.ok) {
-      throw new Error(\`Gemini API returned status \${response.status}\`);
+      throw new Error(`Gemini API returned status ${response.status}`);
     }
 
     const data = await response.json();
