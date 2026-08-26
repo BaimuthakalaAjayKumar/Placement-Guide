@@ -449,3 +449,31 @@ exports.bulkCreateQuestions = async (req, res, next) => {
     next(err);
   }
 };
+
+// @desc    Run arbitrary code in sandbox playground
+// @route   POST /api/questions/run-sandbox
+// @access  Private
+exports.runSandboxCode = async (req, res, next) => {
+  try {
+    const { code, language, input } = req.body;
+    if (!code || !language) {
+      return res.status(400).json({ success: false, error: 'Please provide code and language' });
+    }
+
+    const testCases = [{ input: input || '', output: '' }];
+    const evalResult = await evaluateCode(code, language, testCases, 4000, 128, 'Sandbox Play');
+
+    const result = evalResult.results[0];
+
+    res.status(200).json({
+      success: true,
+      stdout: result.actualOutput,
+      status: result.status,
+      timeMs: result.timeMs,
+      memoryKb: result.memoryKb,
+      error: result.status === 'Runtime Error' || result.status === 'Time Limit Exceeded' ? result.status : null
+    });
+  } catch (err) {
+    next(err);
+  }
+};

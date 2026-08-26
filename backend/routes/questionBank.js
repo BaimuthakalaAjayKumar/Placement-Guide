@@ -10,7 +10,8 @@ const {
   getSubmissions,
   getDetailedReport,
   getAdminSubmissionReport,
-  bulkCreateQuestions
+  bulkCreateQuestions,
+  runSandboxCode
 } = require('../controllers/questionBank');
 
 const router = express.Router();
@@ -27,6 +28,9 @@ router.route('/submissions/report')
 
 router.route('/submissions/:submissionId/report')
   .get(protect, getDetailedReport);
+
+router.route('/run-sandbox')
+  .post(protect, runSandboxCode);
 
 router.route('/:id')
   .get(protect, getQuestion)

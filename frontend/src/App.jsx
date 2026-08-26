@@ -31,6 +31,7 @@ import ResumeBuilder from './pages/ResumeBuilder';
 import CompanyPrep from './pages/CompanyPrep';
 import PersonalizedRoadmap from './pages/PersonalizedRoadmap';
 import DiscussionForum from './pages/DiscussionForum';
+import CodingPlayground from './pages/CodingPlayground';
 
 // Private Route Wrapper
 const PrivateRoute = ({ children, allowedRoles }) => {
@@ -122,6 +123,14 @@ const AppRoutes = () => {
         element={
           <PrivateRoute allowedRoles={['student', 'faculty', 'admin']}>
             <DiscussionForum />
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/coding-playground"
+        element={
+          <PrivateRoute allowedRoles={['student', 'faculty', 'admin']}>
+            <CodingPlayground />
           </PrivateRoute>
         }
       />
