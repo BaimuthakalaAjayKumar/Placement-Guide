@@ -394,8 +394,9 @@ exports.forgotPassword = async (req, res, next) => {
 
     await user.save({ validateBeforeSave: false });
 
-    // Create reset url
-    const resetUrl = `http://localhost:5173/reset-password/${resetToken}`;
+    // Create reset url dynamically based on request origin
+    const clientOrigin = req.headers.origin || 'http://localhost:5173';
+    const resetUrl = `${clientOrigin}/reset-password/${resetToken}`;
 
     const message = `You are receiving this email because you (or someone else) have requested the reset of a password. Please use the following link to reset your password within 10 minutes:\n\n${resetUrl}\n\nIf you did not request this, please ignore this email.`;
 
@@ -424,7 +425,21 @@ exports.forgotPassword = async (req, res, next) => {
 
       res.status(200).json({ success: true, data: 'Email sent successfully' });
     } catch (err) {
-      console.error(err);
+      console.error('Email error:', err);
+
+      // In development mode, fallback to logging the link to console and returning success
+      if (process.env.NODE_ENV === 'development') {
+        console.log('\n======================================');
+        console.log('PASSWORD RESET LINK (DEVELOPMENT FALLBACK):');
+        console.log(resetUrl);
+        console.log('======================================\n');
+
+        return res.status(200).json({
+          success: true,
+          data: 'Email failed to send, but reset link was logged to the server console for local development.'
+        });
+      }
+
       user.resetPasswordToken = undefined;
       user.resetPasswordExpire = undefined;
       await user.save({ validateBeforeSave: false });
