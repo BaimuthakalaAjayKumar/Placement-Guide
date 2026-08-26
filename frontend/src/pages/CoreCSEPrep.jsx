@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import Header from '../components/Header';
-import Sidebar from '../components/Sidebar';
 import './CoreCSEPrep.css';
 
 const CS_DOMAINS = [
@@ -38,74 +37,69 @@ const CoreCSEPrep = () => {
     };
 
     return (
-        <div className="core-cse-layout">
-            <Sidebar />
-            <div className="core-cse-main">
-                <Header title="Core CSE Preparation" />
+        <div className="content-wrapper core-cse-content animate-fade">
+            <Header title="Core CSE Preparation" />
 
-                <div className="core-cse-content">
-                    <div className="header-section">
-                        <h1>Computer Science Fundamentals</h1>
-                        <p>Master the core subjective theoretical tests and programming syntax required for top-tier corporate interviews.</p>
-                    </div>
-
-                    <div className="tabs-container">
-                        <button
-                            className={`tab-btn ${activeTab === 'domains' ? 'active' : ''}`}
-                            onClick={() => setActiveTab('domains')}
-                        >
-                            Core Subjects
-                        </button>
-                        <button
-                            className={`tab-btn ${activeTab === 'languages' ? 'active' : ''}`}
-                            onClick={() => setActiveTab('languages')}
-                        >
-                            Programming Languages
-                        </button>
-                    </div>
-
-                    {activeTab === 'domains' && (
-                        <div className="grid-container">
-                            {CS_DOMAINS.map(domain => (
-                                <div key={domain.id} className={`subject-card ${domain.color}`}>
-                                    <div className="subject-icon">{domain.icon}</div>
-                                    <div className="subject-details">
-                                        <h3>{domain.name}</h3>
-                                        <p>Topics, Practice MCQs, Tests</p>
-                                    </div>
-                                    <div className="subject-actions">
-                                        <button className="btn-take-test" onClick={() => handleStartPractice(domain.id)}>
-                                            Take Test
-                                        </button>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    )}
-
-                    {activeTab === 'languages' && (
-                        <div className="grid-container">
-                            {PROGRAMMING_LANGUAGES.map(lang => (
-                                <div key={lang.id} className="subject-card bg-slate-800 border-slate-600">
-                                    <div className="subject-icon language-icon">{lang.icon}</div>
-                                    <div className="subject-details">
-                                        <h3>{lang.name}</h3>
-                                        <p>Syntax MCQs & Algorithms</p>
-                                    </div>
-                                    <div className="subject-actions">
-                                        <button className="btn-take-test mx-1" onClick={() => handleStartPractice(lang.id)}>
-                                            MCQ Test
-                                        </button>
-                                        <button className="btn-code mx-1" onClick={() => handleCodingPractice(lang.id)}>
-                                            Code Mode
-                                        </button>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    )}
-                </div>
+            <div className="header-section">
+                <h1>Computer Science Fundamentals</h1>
+                <p>Master the core subjective theoretical tests and programming syntax required for top-tier corporate interviews.</p>
             </div>
+
+            <div className="tabs-container">
+                <button
+                    className={`tab-btn ${activeTab === 'domains' ? 'active' : ''}`}
+                    onClick={() => setActiveTab('domains')}
+                >
+                    Core Subjects
+                </button>
+                <button
+                    className={`tab-btn ${activeTab === 'languages' ? 'active' : ''}`}
+                    onClick={() => setActiveTab('languages')}
+                >
+                    Programming Languages
+                </button>
+            </div>
+
+            {activeTab === 'domains' && (
+                <div className="grid-container">
+                    {CS_DOMAINS.map(domain => (
+                        <div key={domain.id} className={`subject-card ${domain.color}`}>
+                            <div className="subject-icon">{domain.icon}</div>
+                            <div className="subject-details">
+                                <h3>{domain.name}</h3>
+                                <p>Topics, Practice MCQs, Tests</p>
+                            </div>
+                            <div className="subject-actions">
+                                <button className="btn-take-test" onClick={() => handleStartPractice(domain.id)}>
+                                    Take Test
+                                </button>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            )}
+
+            {activeTab === 'languages' && (
+                <div className="grid-container">
+                    {PROGRAMMING_LANGUAGES.map(lang => (
+                        <div key={lang.id} className="subject-card bg-slate-800 border-slate-600">
+                            <div className="subject-icon language-icon">{lang.icon}</div>
+                            <div className="subject-details">
+                                <h3>{lang.name}</h3>
+                                <p>Syntax MCQs & Algorithms</p>
+                            </div>
+                            <div className="subject-actions">
+                                <button className="btn-take-test mx-1" onClick={() => handleStartPractice(lang.id)}>
+                                    MCQ Test
+                                </button>
+                                <button className="btn-code mx-1" onClick={() => handleCodingPractice(lang.id)}>
+                                    Code Mode
+                                </button>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            )}
         </div>
     );
 };

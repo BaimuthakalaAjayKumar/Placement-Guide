@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import Header from '../components/Header';
-import Sidebar from '../components/Sidebar';
 import './DiscussionForum.css';
 
 const DiscussionForum = () => {
@@ -180,12 +179,8 @@ const DiscussionForum = () => {
   };
 
   return (
-    <div className="forum-layout" style={{ display: 'flex', minHeight: '100vh', backgroundColor: '#0f172a' }}>
-      <Sidebar />
-      <div className="forum-main" style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-        <Header title="Placement Discussion Forum" />
-
-        <div className="content-wrapper forum-content animate-fade" style={{ padding: '2rem', overflowY: 'auto' }}>
+    <div className="content-wrapper forum-content animate-fade" style={{ padding: '2rem', overflowY: 'auto' }}>
+      <Header title="Placement Discussion Forum" />
           {error && (
             <div className="error-banner">
               <span>{error}</span>
@@ -429,8 +424,6 @@ const DiscussionForum = () => {
             )}
           </div>
         </div>
-      </div>
-    </div>
   );
 };
 

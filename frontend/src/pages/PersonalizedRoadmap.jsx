@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import Header from '../components/Header';
-import Sidebar from '../components/Sidebar';
 import './PersonalizedRoadmap.css';
 
 const PersonalizedRoadmap = () => {
@@ -101,139 +100,129 @@ const PersonalizedRoadmap = () => {
   }
 
   return (
-    <div className="roadmap-layout" style={{ display: 'flex', minHeight: '100vh', backgroundColor: '#0f172a' }}>
-      <Sidebar />
-      <div className="roadmap-main" style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-        <Header title="Personalized Learning Roadmap" />
+    <div className="content-wrapper roadmap-content animate-fade" style={{ padding: '2rem', overflowY: 'auto' }}>
+      <Header title="Personalized Learning Roadmap" />
 
-        <div className="content-wrapper roadmap-content animate-fade" style={{ padding: '2rem', overflowY: 'auto' }}>
-          {error && (
-            <div className="error-banner">
-              <span>{error}</span>
-            </div>
-          )}
-
-          {!roadmap ? (
-            <div className="empty-roadmap-state glass-card" style={{ padding: '3rem', textAlign: 'center', margin: '2rem auto', maxWidth: '600px' }}>
-              <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🗺️</div>
-              <h2>Map Your Placement Pathway</h2>
-              <p style={{ color: '#94a3b8', marginBottom: '2rem' }}>Analyze your mock performance, aptitude statistics, coding velocity, and resume scores to compile a step-by-step custom preparation roadmap.</p>
-              <button className="btn btn-primary" onClick={() => handleGenerate(false)} disabled={generating}>
-                {generating ? 'Constructing Pathway...' : 'Generate Roadmap'}
-              </button>
-            </div>
-          ) : (
-            <div className="roadmap-container">
-              
-              {/* Header profile cards */}
-              <div className="roadmap-header-cards" style={{ display: 'flex', gap: '20px', marginBottom: '30px', flexWrap: 'wrap' }}>
-                <div className="glass-card header-profile-summary" style={{ flex: 2, padding: '20px', minWidth: '300px' }}>
-                  <span className="profile-role-badge">Target Role</span>
-                  <h2 style={{ marginTop: '5px', color: 'white' }}>{roadmap.careerInterest}</h2>
-                  <p style={{ color: '#94a3b8', fontSize: '0.9rem', marginTop: '10px' }}>This roadmap adapts dynamically based on your latest mock exam scores, resume analysis, and solved coding milestones.</p>
-                  
-                  <button className="btn btn-secondary" style={{ marginTop: '15px' }} onClick={() => handleGenerate(true)} disabled={generating}>
-                    {generating ? 'Re-analyzing...' : '⚡ Re-Calculate Roadmap'}
-                  </button>
-                </div>
-
-                <div className="glass-card strengths-weaknesses-summary" style={{ flex: 3, padding: '20px', minWidth: '300px' }}>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
-                    <div>
-                      <h4 style={{ color: '#4ade80', marginBottom: '8px' }}>✓ Observed Strengths</h4>
-                      <ul style={{ paddingLeft: '15px', color: '#cbd5e1', fontSize: '0.85rem', listStyleType: 'disc' }}>
-                        {roadmap.strengths.map((str, i) => <li key={i}>{str}</li>)}
-                        {roadmap.strengths.length === 0 && <li style={{ color: '#94a3b8' }}>Establishing benchmarks...</li>}
-                      </ul>
-                    </div>
-                    <div>
-                      <h4 style={{ color: '#f87171', marginBottom: '8px' }}>✗ Development Areas</h4>
-                      <ul style={{ paddingLeft: '15px', color: '#cbd5e1', fontSize: '0.85rem', listStyleType: 'disc' }}>
-                        {roadmap.weaknesses.map((wk, i) => <li key={i}>{wk}</li>)}
-                        {roadmap.weaknesses.length === 0 && <li style={{ color: '#94a3b8' }}>No major weaknesses observed! Keep practicing.</li>}
-                      </ul>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Vertical preparation steps list */}
-              <h3 style={{ color: 'white', marginBottom: '20px' }}>Your Customized Preparation Pipeline</h3>
-              
-              <div className="roadmap-steps-list" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                {roadmap.steps.map((step, idx) => (
-                  <div
-                    className={`glass-card step-card status-${step.status}`}
-                    key={step._id}
-                    style={{
-                      padding: '20px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '20px',
-                      borderLeft: `4px solid ${step.status === 'completed' ? '#10b981' : step.status === 'in-progress' ? '#3b82f6' : '#64748b'}`
-                    }}
-                  >
-                    {/* Status checkbox indicator */}
-                    <div
-                      className="step-checkbox"
-                      onClick={() => handleStepStatusChange(step._id, step.status)}
-                      style={{
-                        width: '24px',
-                        height: '24px',
-                        borderRadius: '50%',
-                        border: '2px solid #334155',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        cursor: 'pointer',
-                        background: step.status === 'completed' ? '#10b981' : step.status === 'in-progress' ? '#3b82f6' : 'transparent',
-                        color: 'white',
-                        fontWeight: 'bold',
-                        fontSize: '12px'
-                      }}
-                    >
-                      {step.status === 'completed' ? '✓' : step.status === 'in-progress' ? '➜' : ''}
-                    </div>
-
-                    {/* Step details */}
-                    <div style={{ flex: 1 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <h4 style={{ margin: 0, color: 'white' }}>{step.title}</h4>
-                        <span
-                          className={`type-badge ${step.type}`}
-                          style={{
-                            fontSize: '0.75rem',
-                            padding: '2px 8px',
-                            borderRadius: '12px',
-                            textTransform: 'uppercase',
-                            fontWeight: 'bold',
-                            background: step.type === 'coding' ? '#f59e0b' : step.type === 'aptitude' ? '#a855f7' : step.type === 'interview' ? '#10b981' : '#4f46e5',
-                            color: 'white'
-                          }}
-                        >
-                          {step.type}
-                        </span>
-                      </div>
-                      <p style={{ margin: '8px 0 0 0', color: '#94a3b8', fontSize: '0.9rem' }}>{step.description}</p>
-                    </div>
-
-                    {/* Quick navigation links */}
-                    {step.resourceLink && (
-                      <button
-                        className="btn btn-secondary btn-sm"
-                        onClick={() => navigate(step.resourceLink)}
-                      >
-                        Navigate
-                      </button>
-                    )}
-                  </div>
-                ))}
-              </div>
-
-            </div>
-          )}
+      {error && (
+        <div className="error-banner">
+          <span>{error}</span>
         </div>
-      </div>
+      )}
+
+      {!roadmap ? (
+        <div className="glass-card empty-roadmap-state animate-fade">
+          <div style={{ fontSize: '3rem', marginBottom: '15px' }}>🗺️</div>
+          <h3 style={{ color: 'white', marginBottom: '10px' }}>No Learning Roadmap Found</h3>
+          <p style={{ color: '#94a3b8', marginBottom: '25px', fontSize: '0.95rem' }}>
+            Get a tailored, AI-generated preparation path mapping study materials, mock questions, and syntax trackers to your placement profile goal.
+          </p>
+          <button
+            className="btn btn-primary"
+            onClick={() => handleGenerate(false)}
+            disabled={generating}
+          >
+            {generating ? 'Running AI Profile Analysis...' : '🚀 Generate My Learning Roadmap'}
+          </button>
+        </div>
+      ) : (
+        <div className="roadmap-container">
+          
+          {/* Dashboard Summary Card */}
+          <div className="glass-card" style={{ padding: '25px', marginBottom: '30px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '1px solid #334155', paddingBottom: '15px', marginBottom: '20px' }}>
+              <div>
+                <span className="profile-role-badge">{roadmap.targetRole} Preparation Path</span>
+                <h2 style={{ color: 'white', marginTop: '8px', fontSize: '1.75rem' }}>AI Learning Roadmap</h2>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>Overall Completion:</span>
+                <h3 style={{ color: '#10b981', margin: '4px 0 0 0' }}>{roadmap.completionPercentage}%</h3>
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+              <div>
+                <h4 style={{ color: '#3b82f6', marginBottom: '8px' }}>✓ Identified Strengths</h4>
+                <ul style={{ paddingLeft: '15px', color: '#cbd5e1', fontSize: '0.85rem', listStyleType: 'disc' }}>
+                  {roadmap.strengths.map((str, i) => <li key={i}>{str}</li>)}
+                  {roadmap.strengths.length === 0 && <li style={{ color: '#94a3b8' }}>Establishing benchmarks...</li>}
+                </ul>
+              </div>
+              <div>
+                <h4 style={{ color: '#f87171', marginBottom: '8px' }}>✗ Development Areas</h4>
+                <ul style={{ paddingLeft: '15px', color: '#cbd5e1', fontSize: '0.85rem', listStyleType: 'disc' }}>
+                  {roadmap.weaknesses.map((wk, i) => <li key={i}>{wk}</li>)}
+                  {roadmap.weaknesses.length === 0 && <li style={{ color: '#94a3b8' }}>No major weaknesses observed! Keep practicing.</li>}
+                </ul>
+              </div>
+            </div>
+          </div>
+
+          {/* Vertical preparation steps list */}
+          <h3 style={{ color: 'white', marginBottom: '20px' }}>Your Customized Preparation Pipeline</h3>
+          
+          <div className="roadmap-steps-list" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            {roadmap.steps.map((step, idx) => (
+              <div
+                className={`glass-card step-card status-${step.status}`}
+                key={step._id}
+                style={{
+                  padding: '20px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '20px',
+                  borderLeft: `4px solid ${step.status === 'completed' ? '#10b981' : step.status === 'in-progress' ? '#3b82f6' : '#64748b'}`
+                }}
+              >
+                {/* Checkbox selector */}
+                <div
+                  className="step-checkbox"
+                  onClick={() => handleStepStatusChange(step._id, step.status)}
+                  style={{
+                    width: '24px',
+                    height: '24px',
+                    borderRadius: '6px',
+                    border: `2px solid ${step.status === 'completed' ? '#10b981' : '#475569'}`,
+                    background: step.status === 'completed' ? '#10b981' : 'transparent',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                    color: 'white',
+                    fontWeight: 'bold',
+                    fontSize: '0.8rem',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  {step.status === 'completed' && '✓'}
+                </div>
+
+                {/* Step Details */}
+                <div style={{ flex: 1 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <span style={{ fontSize: '0.75rem', fontWeight: 'bold', textTransform: 'uppercase', color: step.status === 'completed' ? '#10b981' : step.status === 'in-progress' ? '#3b82f6' : '#94a3b8' }}>
+                      Step {idx + 1}: {step.status.replace('-', ' ')}
+                    </span>
+                  </div>
+                  <h4 style={{ color: 'white', margin: '4px 0' }}>{step.topic}</h4>
+                  <p style={{ color: '#cbd5e1', margin: 0, fontSize: '0.85rem' }}>{step.resources}</p>
+                </div>
+
+                {/* Quick navigation links */}
+                {step.resourceLink && (
+                  <button
+                    className="btn btn-secondary btn-sm"
+                    onClick={() => navigate(step.resourceLink)}
+                  >
+                    Navigate
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+
+        </div>
+      )}
     </div>
   );
 };

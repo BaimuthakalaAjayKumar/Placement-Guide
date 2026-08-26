@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import Header from '../components/Header';
-import Sidebar from '../components/Sidebar';
 import './JobBoard.css';
 
 const JobBoard = () => {
@@ -160,12 +159,8 @@ const JobBoard = () => {
   }
 
   return (
-    <div className="job-board-layout" style={{ display: 'flex', minHeight: '100vh', backgroundColor: '#0f172a' }}>
-      <Sidebar />
-      <div className="job-board-main" style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-        <Header title="Personalized Job Board" />
-
-        <div className="content-wrapper job-content animate-fade" style={{ padding: '2rem', overflowY: 'auto' }}>
+    <div className="content-wrapper job-content animate-fade" style={{ padding: '2rem', overflowY: 'auto' }}>
+      <Header title="Personalized Job Board" />
           {error && (
             <div className="error-banner">
               <span>{error}</span>
@@ -402,8 +397,6 @@ const JobBoard = () => {
             </div>
           )}
         </div>
-      </div>
-    </div>
   );
 };
 

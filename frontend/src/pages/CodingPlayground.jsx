@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import Header from '../components/Header';
-import Sidebar from '../components/Sidebar';
 import Editor from '@monaco-editor/react';
 import './CodingPlayground.css';
 
@@ -105,12 +104,8 @@ const CodingPlayground = () => {
   };
 
   return (
-    <div className="playground-layout" style={{ display: 'flex', minHeight: '100vh', backgroundColor: '#0f172a' }}>
-      <Sidebar />
-      <div className="playground-main" style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-        <Header title="Interactive Coding Sandbox Playground" />
-
-        <div className="content-wrapper playground-content animate-fade" style={{ padding: '2rem', display: 'flex', flexDirection: 'column', gap: '20px', flex: 1 }}>
+    <div className="content-wrapper playground-content animate-fade" style={{ padding: '2rem', display: 'flex', flexDirection: 'column', gap: '20px', flex: 1 }}>
+      <Header title="Interactive Coding Sandbox Playground" />
           <p style={{ color: '#94a3b8', margin: 0 }}>Select your preferred language, customize standard input arguments, run code securely in our containerized playground, and see real-time compile/execution outputs.</p>
 
           <div className="playground-workspace" style={{ display: 'flex', gap: '20px', flex: 1, minHeight: '550px' }}>
@@ -215,8 +210,6 @@ const CodingPlayground = () => {
 
           </div>
         </div>
-      </div>
-    </div>
   );
 };
 
