@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Header from '../components/Header';
-import Sidebar from '../components/Sidebar';
 import './CompanyPrep.css';
 
 const CORPORATE_TRACKS = [
@@ -23,12 +22,9 @@ const CompanyPrep = () => {
     };
 
     return (
-        <div className="company-prep-layout">
-            <Sidebar />
-            <div className="company-prep-main">
-                <Header title="Company Specific Preparation" />
-
-                <div className="company-prep-content">
+        <>
+            <Header title="Company Specific Preparation" />
+            <div className="content-wrapper company-prep-content animate-fade">
                     <div className="company-header-section">
                         <h1>Corporate Hiring Pathways</h1>
                         <p>Target your preparation according to the exact assessment templates utilized by top recruiters.</p>
@@ -84,8 +80,7 @@ const CompanyPrep = () => {
                         </div>
                     )}
                 </div>
-            </div>
-        </div>
+            </>
     );
 };
 

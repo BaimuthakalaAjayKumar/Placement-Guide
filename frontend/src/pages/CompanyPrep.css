@@ -1,21 +1,4 @@
-.company-prep-layout {
-    display: flex;
-    min-height: 100vh;
-    background-color: #0f172a;
-    color: #f1f5f9;
-}
-
-.company-prep-main {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-}
-
-.company-prep-content {
-    padding: 2rem;
-    flex: 1;
-    overflow-y: auto;
-}
+/* Removed obsolete layout classes */
 
 .company-header-section {
     margin-bottom: 2rem;
