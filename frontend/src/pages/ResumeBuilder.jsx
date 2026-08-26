@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import Header from '../components/Header';
-import Sidebar from '../components/Sidebar';
 import './ResumeBuilder.css';
 
 const ResumeBuilder = () => {
@@ -43,10 +42,9 @@ const ResumeBuilder = () => {
     };
 
     return (
-        <div className="resume-builder-layout">
-            <Sidebar />
-            <div className="resume-builder-main">
-                <Header title="AI Resume Builder" />
+        <>
+            <Header title="AI Resume Builder" />
+            <div className="content-wrapper resume-builder-content animate-fade">
 
                 <div className="builder-container no-print">
                     <div className="editor-panel">
@@ -204,7 +202,7 @@ const ResumeBuilder = () => {
                     </div>
                 </div>
             </div>
-        </div>
+        </>
     );
 };
 
