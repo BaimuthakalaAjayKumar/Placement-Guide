@@ -37,8 +37,9 @@ const CoreCSEPrep = () => {
     };
 
     return (
-        <div className="content-wrapper core-cse-content animate-fade">
+        <>
             <Header title="Core CSE Preparation" />
+            <div className="content-wrapper core-cse-content animate-fade">
 
             <div className="header-section">
                 <h1>Computer Science Fundamentals</h1>
@@ -101,6 +102,7 @@ const CoreCSEPrep = () => {
                 </div>
             )}
         </div>
+      </>
     );
 };
 

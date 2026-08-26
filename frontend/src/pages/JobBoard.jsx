@@ -159,8 +159,9 @@ const JobBoard = () => {
   }
 
   return (
-    <div className="content-wrapper job-content animate-fade" style={{ padding: '2rem', overflowY: 'auto' }}>
+    <>
       <Header title="Personalized Job Board" />
+      <div className="content-wrapper job-content animate-fade" style={{ padding: '2rem', overflowY: 'auto' }}>
           {error && (
             <div className="error-banner">
               <span>{error}</span>
@@ -397,6 +398,7 @@ const JobBoard = () => {
             </div>
           )}
         </div>
+      </>
   );
 };
 

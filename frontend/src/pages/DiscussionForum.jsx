@@ -179,8 +179,9 @@ const DiscussionForum = () => {
   };
 
   return (
-    <div className="content-wrapper forum-content animate-fade" style={{ padding: '2rem', overflowY: 'auto' }}>
+    <>
       <Header title="Placement Discussion Forum" />
+      <div className="content-wrapper forum-content animate-fade" style={{ padding: '2rem', overflowY: 'auto' }}>
           {error && (
             <div className="error-banner">
               <span>{error}</span>
@@ -424,6 +425,7 @@ const DiscussionForum = () => {
             )}
           </div>
         </div>
+      </>
   );
 };
 

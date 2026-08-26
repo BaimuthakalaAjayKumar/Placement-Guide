@@ -100,8 +100,9 @@ const PersonalizedRoadmap = () => {
   }
 
   return (
-    <div className="content-wrapper roadmap-content animate-fade" style={{ padding: '2rem', overflowY: 'auto' }}>
+    <>
       <Header title="Personalized Learning Roadmap" />
+      <div className="content-wrapper roadmap-content animate-fade" style={{ padding: '2rem', overflowY: 'auto' }}>
 
       {error && (
         <div className="error-banner">
@@ -224,6 +225,7 @@ const PersonalizedRoadmap = () => {
         </div>
       )}
     </div>
+  </>
   );
 };
 
