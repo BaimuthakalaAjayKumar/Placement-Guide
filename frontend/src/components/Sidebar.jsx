@@ -229,47 +229,46 @@ const Sidebar = () => {
         )}
       </nav>
 
-      <div className="sidebar-footer">
+      <div className="sidebar-footer" style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
         {user.role === 'student' ? (
-          <div className="user-badge-container">
-            <div className="user-profile-badge-btn" onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}>
-              <div className="user-avatar">
-                {user.name.charAt(0).toUpperCase()}
+          <>
+            <div className="user-badge-container">
+              <div className="user-profile-badge-btn" onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}>
+                <div className="user-avatar">
+                  {user.name.charAt(0).toUpperCase()}
+                </div>
+                <div className="user-info">
+                  <span className="user-name">{user.name}</span>
+                  <span className="user-role">{user.targetRole || 'Student'}</span>
+                </div>
+                <span className="chevron-icon">›</span>
               </div>
-              <div className="user-info">
-                <span className="user-name">{user.name}</span>
-                <span className="user-role">{user.targetRole || 'Student'}</span>
-              </div>
-              <span className="chevron-icon">›</span>
+
+              {isUserMenuOpen && (
+                <div className="user-popover-menu animate-fade">
+                  <button
+                    onClick={() => { navigate('/profile'); setIsUserMenuOpen(false); }}
+                    className="popover-item"
+                  >
+                    <svg className="popover-icon" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>
+                    <span>Profile</span>
+                  </button>
+
+                  <button
+                    onClick={() => { setShowContactModal(true); setIsUserMenuOpen(false); }}
+                    className="popover-item"
+                  >
+                    <svg className="popover-icon" viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" /><polyline points="22,6 12,13 2,6" /></svg>
+                    <span>Contact Us</span>
+                  </button>
+                </div>
+              )}
             </div>
-
-            {isUserMenuOpen && (
-              <div className="user-popover-menu animate-fade">
-                <button
-                  onClick={() => { navigate('/profile'); setIsUserMenuOpen(false); }}
-                  className="popover-item"
-                >
-                  <svg className="popover-icon" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>
-                  <span>Profile</span>
-                </button>
-
-                <button
-                  onClick={() => { setShowContactModal(true); setIsUserMenuOpen(false); }}
-                  className="popover-item"
-                >
-                  <svg className="popover-icon" viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" /><polyline points="22,6 12,13 2,6" /></svg>
-                  <span>Contact Us</span>
-                </button>
-
-                <div className="popover-divider"></div>
-
-                <button onClick={handleLogout} className="popover-item logout">
-                  <svg className="popover-icon" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" /></svg>
-                  <span>Log Out</span>
-                </button>
-              </div>
-            )}
-          </div>
+            <button onClick={handleLogout} className="logout-btn" style={{ width: '100%' }}>
+              <svg viewBox="0 0 24 24" className="logout-icon"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" /></svg>
+              <span>Sign Out</span>
+            </button>
+          </>
         ) : (
           <button onClick={handleLogout} className="logout-btn">
             <svg viewBox="0 0 24 24" className="logout-icon"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" /></svg>
