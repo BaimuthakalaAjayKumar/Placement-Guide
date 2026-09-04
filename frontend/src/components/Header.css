@@ -45,6 +45,29 @@
   border: 1px solid var(--border-color);
 }
 
+.header-theme-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.03);
+  padding: 6px 12px;
+  border-radius: var(--border-radius-sm);
+  border: 1px solid var(--border-color);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.header-theme-btn:hover,
+.header-theme-btn:focus-visible {
+  color: var(--text-primary);
+  border-color: var(--border-hover);
+  background: rgba(99, 102, 241, 0.08);
+  outline: none;
+}
+
 .header-icon {
   width: 14px;
   height: 14px;
@@ -82,4 +105,22 @@
     width: 100%;
     padding: 0 20px;
   }
+}
+
+[data-theme="light"] .main-header {
+  background: rgba(255, 255, 255, 0.92);
+  border-color: #e2e8f0;
+}
+
+[data-theme="light"] .header-title h1 { color: #0f172a; }
+[data-theme="light"] .header-date,
+[data-theme="light"] .header-theme-btn {
+  background: #f8fafc;
+  border-color: #e2e8f0;
+  color: #475569;
+}
+[data-theme="light"] .profile-role-badge {
+  color: #4338ca;
+  background: #eef2ff;
+  border-color: #c7d2fe;
 }
