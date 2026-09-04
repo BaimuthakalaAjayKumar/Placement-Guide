@@ -6,6 +6,7 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import Sidebar from './components/Sidebar';
 
 // Pages
+import HomePage from './pages/HomePage';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import ForgotPassword from './pages/ForgotPassword';
@@ -68,6 +69,10 @@ const AppRoutes = () => {
   return (
     <Routes>
       {/* Public Routes */}
+      <Route
+        path="/"
+        element={<HomePage />}
+      />
       <Route
         path="/login"
         element={token && user ? <Navigate to={user.role === 'admin' ? '/admin' : user.role === 'faculty' ? '/faculty' : '/dashboard'} replace /> : <Login />}
@@ -272,7 +277,7 @@ const AppRoutes = () => {
       {/* Fallback routing */}
       <Route
         path="*"
-        element={<Navigate to={token && user ? (user.role === 'admin' ? '/admin' : user.role === 'faculty' ? '/faculty' : '/dashboard') : "/login"} replace />}
+        element={<Navigate to={token && user ? (user.role === 'admin' ? '/admin' : user.role === 'faculty' ? '/faculty' : '/dashboard') : "/"} replace />}
       />
     </Routes>
   );
