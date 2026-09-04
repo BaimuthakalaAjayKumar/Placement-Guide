@@ -19,6 +19,8 @@ app.use(express.json());
 app.use(cors({
   origin: [
     "http://localhost:5173",
+    "http://localhost:5174",
+    "http://localhost:5175",
     "https://placement-guide-nu.vercel.app"
   ],
   credentials: true,
@@ -40,6 +42,9 @@ const questionBankRoutes = require('./routes/questionBank');
 const contestRoutes = require('./routes/contests');
 const doubtRoutes = require('./routes/doubts');
 const holidayRoutes = require('./routes/holidays');
+const notificationRoutes = require('./routes/notifications');
+const roadmapRoutes = require('./routes/roadmaps');
+const discussionRoutes = require('./routes/discussions');
 
 // Mount routers
 app.use('/api/auth', authRoutes);
@@ -52,6 +57,9 @@ app.use('/api/questions', questionBankRoutes);
 app.use('/api/contests', contestRoutes);
 app.use('/api/doubts', doubtRoutes);
 app.use('/api/holidays', holidayRoutes);
+app.use('/api/notifications', notificationRoutes);
+app.use('/api/roadmaps', roadmapRoutes);
+app.use('/api/discussions', discussionRoutes);
 
 // Base route
 app.get('/', (req, res) => {
@@ -69,7 +77,34 @@ app.use((err, req, res, next) => {
 
 const PORT = process.env.PORT || 5000;
 
-const server = app.listen(PORT, () => {
+const http = require('http');
+const server = http.createServer(app);
+const { Server } = require("socket.io");
+const io = new Server(server, {
+  cors: {
+    origin: ["http://localhost:5173", "https://placement-guide-nu.vercel.app"],
+    methods: ["GET", "POST"]
+  }
+});
+
+// Configure Socket App
+app.set('socketio', io);
+
+io.on('connection', (socket) => {
+  console.log(`Socket connected: ${socket.id}`);
+
+  // User connects to their private room
+  socket.on('join_user_room', (userId) => {
+    socket.join(`user_${userId}`);
+    console.log(`User ${userId} joined their notification room`);
+  });
+
+  socket.on('disconnect', () => {
+    console.log(`Socket disconnected: ${socket.id}`);
+  });
+});
+
+server.listen(PORT, () => {
   console.log(`Server running in ${process.env.NODE_ENV} mode on port ${PORT}`);
 });
 

@@ -3,6 +3,7 @@ const path = require('path');
 const pdfParse = require('pdf-parse');
 const Resume = require('../models/Resume');
 const User = require('../models/User');
+const aiService = require('../services/aiService');
 
 // Configure Multer storage
 const multer = require('multer');
@@ -194,7 +195,10 @@ exports.analyzeResume = async (req, res, next) => {
       const targetRole = user.targetRole || 'Software Engineer';
 
       // 3. Analyze Text
-      const analysis = analyzeResumeText(extractedText, targetRole);
+      let analysis = await aiService.analyzeResumeWithAI(extractedText, targetRole);
+      if (!analysis) {
+        analysis = analyzeResumeText(extractedText, targetRole);
+      }
 
       // 4. Save to Database
       const resume = await Resume.create({

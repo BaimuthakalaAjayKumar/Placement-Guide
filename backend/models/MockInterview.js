@@ -54,6 +54,22 @@ const MockInterviewSchema = new mongoose.Schema({
     type: String,
     default: ''
   },
+  strengths: {
+    type: [String],
+    default: []
+  },
+  weaknesses: {
+    type: [String],
+    default: []
+  },
+  improvementSuggestions: {
+    type: [String],
+    default: []
+  },
+  interviewReadiness: {
+    type: String,
+    default: 'Needs Practice'
+  },
   status: {
     type: String,
     default: 'in-progress'

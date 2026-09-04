@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import Editor from '@monaco-editor/react';
 import './ContestsPortal.css';
 
 const ALL_CORER_LANGUAGES = [
@@ -623,23 +624,44 @@ const ContestWorkspace = () => {
             </select>
           </div>
 
-          <div className="editor-textarea-container" style={{ position: 'relative' }}>
-            <textarea
-              className="editor-textarea"
+          <div className="editor-textarea-container" style={{ position: 'relative', height: '550px', border: '1px solid #334155', borderRadius: '6px', overflow: 'hidden' }}>
+            <Editor
+              height="100%"
+              theme="vs-dark"
+              language={
+                language === 'cpp' ? 'cpp' :
+                language === 'python' ? 'python' :
+                language === 'java' ? 'java' :
+                language === 'c' ? 'c' :
+                language === 'typescript' ? 'typescript' :
+                language === 'sql' ? 'sql' :
+                language === 'mysql' ? 'mysql' :
+                language === 'postgresql' ? 'sql' :
+                language === 'html' ? 'html' :
+                language === 'javascript' ? 'javascript' : 'javascript'
+              }
               value={codeMap[activeQuestion?._id] || ''}
-              onChange={(e) => {
-                const code = e.target.value;
+              onChange={(value) => {
                 setCodeMap(prev => ({
                   ...prev,
-                  [activeQuestion._id]: code
+                  [activeQuestion._id]: value || ''
                 }));
               }}
-              disabled={isQuestionDisqualified}
+              options={{
+                readOnly: isQuestionDisqualified,
+                minimap: { enabled: false },
+                fontSize: 14,
+                automaticLayout: true,
+                scrollBeyondLastLine: false,
+                lineNumbers: 'on',
+                tabSize: 4,
+                padding: { top: 10, bottom: 10 }
+              }}
             />
 
             {/* Lockout overlay for Plagiarized/Disqualified */}
             {isQuestionDisqualified && (
-              <div className="editor-lockout-overlay">
+              <div className="editor-lockout-overlay" style={{ zIndex: 10 }}>
                 <span className="lock-icon">🔒</span>
                 <h3>Question Disqualified</h3>
                 <p>Plagiarism matched. The editor is locked for this task.</p>

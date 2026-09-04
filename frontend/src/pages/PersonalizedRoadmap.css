@@ -1,0 +1,46 @@
+.roadmap-content {
+  overflow-y: auto;
+}
+
+.empty-roadmap-state {
+  margin: 3rem auto;
+  max-width: 600px;
+  text-align: center;
+  padding: 3rem;
+  border-radius: 12px;
+}
+
+.roadmap-container {
+  max-width: 1000px;
+  margin: 0 auto;
+}
+
+.step-card {
+  transition: all 0.3s ease;
+}
+
+.step-card:hover {
+  transform: translateY(-2px);
+  background-color: rgba(255, 255, 255, 0.03);
+}
+
+.step-card.status-completed {
+  opacity: 0.75;
+}
+
+.step-checkbox {
+  user-select: none;
+}
+
+.step-checkbox:hover {
+  transform: scale(1.1);
+}
+
+.profile-role-badge {
+  background: rgba(99, 102, 241, 0.15);
+  color: #818cf8;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: bold;
+}

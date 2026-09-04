@@ -349,24 +349,47 @@ exports.getDashboardStats = async (req, res, next) => {
       interviewAvg = Math.round(totalInterviewScore / interviews.length);
     }
 
+    // Calculate Coding Score out of 100
+    // Based on internal accepted submissions and external platform solved counts
+    const internalSolved = await Submission.distinct('question', { user: userId, status: 'Accepted' });
+    const internalSolvedCount = internalSolved.length;
+    const externalSolvedCount = (leetcodeStats.totalSolved || 0) + 
+                                (codeforcesStats.solvedCount || 0) + 
+                                (hackerrankStats.solvedCount || 0);
+    const totalSolved = internalSolvedCount + externalSolvedCount;
+    // Set 20 problems solved as the milestone for 100% coding score
+    const codingScore = Math.min(100, totalSolved > 0 ? Math.round((totalSolved / 20) * 100) : 0);
+
+    // Calculate Skills Score out of 100
+    // Based on user skills count
+    const skillsCount = user.skills ? user.skills.length : 0;
+    // Set 8 skills as the milestone for 100% skills score
+    const skillsScore = Math.min(100, skillsCount > 0 ? Math.round((skillsCount / 8) * 100) : 0);
+
     // 4. Calculate Placement Readiness Index (PRI)
-    // Resume (40%), Aptitude (30%), Mock Interview (30%)
+    // Resume (20%), Aptitude (25%), Coding (25%), Mock Interview (20%), Skills (10%)
     let pri = 0;
     let activeComponents = 0;
 
-    // If components are not yet attempted, we calculate based on active components
-    // If none are attempted, PRI is 0.
     if (latestResume) {
-      pri += resumeScore * 0.4;
-      activeComponents += 0.4;
+      pri += resumeScore * 0.20;
+      activeComponents += 0.20;
     }
     if (attempts.length > 0) {
-      pri += aptitudeAvg * 0.3;
-      activeComponents += 0.3;
+      pri += aptitudeAvg * 0.25;
+      activeComponents += 0.25;
+    }
+    if (totalSolved > 0) {
+      pri += codingScore * 0.25;
+      activeComponents += 0.25;
     }
     if (interviews.length > 0) {
-      pri += interviewAvg * 0.3;
-      activeComponents += 0.3;
+      pri += interviewAvg * 0.20;
+      activeComponents += 0.20;
+    }
+    if (skillsCount > 0) {
+      pri += skillsScore * 0.10;
+      activeComponents += 0.10;
     }
 
     const placementReadinessIndex = activeComponents > 0 ? Math.round(pri / activeComponents) : 0;
@@ -421,6 +444,9 @@ exports.getDashboardStats = async (req, res, next) => {
         aptitudeAvg,
         categoryAverages,
         interviewAvg,
+        codingScore,
+        skillsScore,
+        totalSolved,
         totalTestsAttempted: attempts.length,
         totalInterviewsCompleted: interviews.length,
         recentActivities,
@@ -537,6 +563,48 @@ exports.createAdmin = async (req, res, next) => {
       success: true,
       message: 'New administrator created successfully.',
       data: adminObj
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// @desc    Create a new faculty member (Admin only)
+// @route   POST /api/users/faculty
+// @access  Private/Admin
+exports.createFaculty = async (req, res, next) => {
+  try {
+    const { name, email, password } = req.body;
+
+    if (!name || !email || !password) {
+      return res.status(400).json({
+        success: false,
+        error: 'Please fill in name, email, and password.'
+      });
+    }
+
+    const userExists = await User.findOne({ email });
+    if (userExists) {
+      return res.status(400).json({
+        success: false,
+        error: 'Email already registered.'
+      });
+    }
+
+    const faculty = await User.create({
+      name,
+      email,
+      password,
+      role: 'faculty'
+    });
+
+    const facultyObj = faculty.toObject();
+    delete facultyObj.password;
+
+    res.status(201).json({
+      success: true,
+      message: 'New faculty account created successfully.',
+      data: facultyObj
     });
   } catch (err) {
     next(err);

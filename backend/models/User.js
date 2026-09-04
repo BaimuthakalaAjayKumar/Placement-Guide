@@ -24,7 +24,7 @@ const UserSchema = new mongoose.Schema({
   },
   role: {
     type: String,
-    enum: ['student', 'admin'],
+    enum: ['student', 'faculty', 'admin'],
     default: 'student'
   },
   bio: {
@@ -103,6 +103,25 @@ const UserSchema = new mongoose.Schema({
   sgpaSem6: { type: Number, default: 0 },
   sgpaSem7: { type: Number, default: 0 },
   sgpaSem8: { type: Number, default: 0 },
+  savedJobs: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Job'
+  }],
+  appliedJobs: [{
+    job: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Job'
+    },
+    status: {
+      type: String,
+      enum: ['applied', 'interviewing', 'offered', 'rejected', 'withdrawn'],
+      default: 'applied'
+    },
+    appliedAt: {
+      type: Date,
+      default: Date.now
+    }
+  }],
   resetPasswordToken: String,
   resetPasswordExpire: Date,
   createdAt: {

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
+import Editor from '@monaco-editor/react';
 import Header from '../components/Header';
 import './QuestionBank.css';
 
@@ -768,17 +769,33 @@ const QuestionBank = () => {
                           </select>
                         </div>
 
-                        <div className="editor-textarea-wrapper">
-                          <div className="editor-line-numbers">
-                            {lineNumbers.map((n) => (
-                              <div key={n}>{n}</div>
-                            ))}
-                          </div>
-                          <textarea
-                            className="editor-textarea"
+                        <div className="editor-textarea-wrapper" style={{ height: '400px', border: '1px solid #334155', borderRadius: '6px', overflow: 'hidden' }}>
+                          <Editor
+                            height="100%"
+                            theme="vs-dark"
+                            language={
+                              selectedLanguage === 'cpp' ? 'cpp' :
+                              selectedLanguage === 'python' ? 'python' :
+                              selectedLanguage === 'java' ? 'java' :
+                              selectedLanguage === 'c' ? 'c' :
+                              selectedLanguage === 'typescript' ? 'typescript' :
+                              selectedLanguage === 'sql' ? 'sql' :
+                              selectedLanguage === 'mysql' ? 'mysql' :
+                              selectedLanguage === 'postgresql' ? 'sql' :
+                              selectedLanguage === 'html' ? 'html' :
+                              selectedLanguage === 'javascript' ? 'javascript' : 'javascript'
+                            }
                             value={solutionCode}
-                            onChange={(e) => setSolutionCode(e.target.value)}
-                            placeholder="Write your code here..."
+                            onChange={(value) => setSolutionCode(value || '')}
+                            options={{
+                              minimap: { enabled: false },
+                              fontSize: 14,
+                              automaticLayout: true,
+                              scrollBeyondLastLine: false,
+                              lineNumbers: 'on',
+                              tabSize: 4,
+                              padding: { top: 10, bottom: 10 }
+                            }}
                           />
                         </div>
 
@@ -1234,17 +1251,33 @@ const QuestionBank = () => {
                         </select>
                       </div>
 
-                      <div className="editor-textarea-wrapper">
-                        <div className="editor-line-numbers">
-                          {lineNumbers.map((n) => (
-                            <div key={n}>{n}</div>
-                          ))}
-                        </div>
-                        <textarea
-                          className="editor-textarea"
+                      <div className="editor-textarea-wrapper" style={{ height: '400px', border: '1px solid #334155', borderRadius: '6px', overflow: 'hidden' }}>
+                        <Editor
+                          height="100%"
+                          theme="vs-dark"
+                          language={
+                            selectedLanguage === 'cpp' ? 'cpp' :
+                            selectedLanguage === 'python' ? 'python' :
+                            selectedLanguage === 'java' ? 'java' :
+                            selectedLanguage === 'c' ? 'c' :
+                            selectedLanguage === 'typescript' ? 'typescript' :
+                            selectedLanguage === 'sql' ? 'sql' :
+                            selectedLanguage === 'mysql' ? 'mysql' :
+                            selectedLanguage === 'postgresql' ? 'sql' :
+                            selectedLanguage === 'html' ? 'html' :
+                            selectedLanguage === 'javascript' ? 'javascript' : 'javascript'
+                          }
                           value={solutionCode}
-                          onChange={(e) => setSolutionCode(e.target.value)}
-                          placeholder="Write your code here..."
+                          onChange={(value) => setSolutionCode(value || '')}
+                          options={{
+                            minimap: { enabled: false },
+                            fontSize: 14,
+                            automaticLayout: true,
+                            scrollBeyondLastLine: false,
+                            lineNumbers: 'on',
+                            tabSize: 4,
+                            padding: { top: 10, bottom: 10 }
+                          }}
                         />
                       </div>
 

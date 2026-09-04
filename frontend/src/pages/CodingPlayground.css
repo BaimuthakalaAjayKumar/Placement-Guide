@@ -1,0 +1,14 @@
+.playground-content {
+  overflow-y: auto;
+}
+
+.playground-workspace {
+  display: flex;
+  gap: 20px;
+  flex: 1;
+}
+
+.editor-section {
+  display: flex;
+  flex-direction: column;
+}

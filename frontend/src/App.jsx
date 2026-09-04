@@ -25,6 +25,13 @@ import ContestLeaderboard from './pages/ContestLeaderboard';
 import Profile from './pages/Profile';
 import DoubtSolver from './pages/DoubtSolver';
 import AdminDoubtSolver from './pages/AdminDoubtSolver';
+import FacultyDashboard from './pages/FacultyDashboard';
+import CoreCSEPrep from './pages/CoreCSEPrep';
+import ResumeBuilder from './pages/ResumeBuilder';
+import CompanyPrep from './pages/CompanyPrep';
+import PersonalizedRoadmap from './pages/PersonalizedRoadmap';
+import DiscussionForum from './pages/DiscussionForum';
+import CodingPlayground from './pages/CodingPlayground';
 
 // Private Route Wrapper
 const PrivateRoute = ({ children, allowedRoles }) => {
@@ -44,7 +51,7 @@ const PrivateRoute = ({ children, allowedRoles }) => {
   }
 
   if (allowedRoles && !allowedRoles.includes(user.role)) {
-    return <Navigate to={user.role === 'admin' ? '/admin' : '/dashboard'} replace />;
+    return <Navigate to={user.role === 'admin' ? '/admin' : user.role === 'faculty' ? '/faculty' : '/dashboard'} replace />;
   }
 
   return (
@@ -63,19 +70,19 @@ const AppRoutes = () => {
       {/* Public Routes */}
       <Route
         path="/login"
-        element={token && user ? <Navigate to={user.role === 'admin' ? '/admin' : '/dashboard'} replace /> : <Login />}
+        element={token && user ? <Navigate to={user.role === 'admin' ? '/admin' : user.role === 'faculty' ? '/faculty' : '/dashboard'} replace /> : <Login />}
       />
       <Route
         path="/register"
-        element={token && user ? <Navigate to={user.role === 'admin' ? '/admin' : '/dashboard'} replace /> : <Register />}
+        element={token && user ? <Navigate to={user.role === 'admin' ? '/admin' : user.role === 'faculty' ? '/faculty' : '/dashboard'} replace /> : <Register />}
       />
       <Route
         path="/forgot-password"
-        element={token && user ? <Navigate to={user.role === 'admin' ? '/admin' : '/dashboard'} replace /> : <ForgotPassword />}
+        element={token && user ? <Navigate to={user.role === 'admin' ? '/admin' : user.role === 'faculty' ? '/faculty' : '/dashboard'} replace /> : <ForgotPassword />}
       />
       <Route
         path="/reset-password/:token"
-        element={token && user ? <Navigate to={user.role === 'admin' ? '/admin' : '/dashboard'} replace /> : <ResetPassword />}
+        element={token && user ? <Navigate to={user.role === 'admin' ? '/admin' : user.role === 'faculty' ? '/faculty' : '/dashboard'} replace /> : <ResetPassword />}
       />
 
       {/* Private Student Routes */}
@@ -96,6 +103,38 @@ const AppRoutes = () => {
         }
       />
       <Route
+        path="/resume-builder"
+        element={
+          <PrivateRoute allowedRoles={['student']}>
+            <ResumeBuilder />
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/learning-roadmap"
+        element={
+          <PrivateRoute allowedRoles={['student']}>
+            <PersonalizedRoadmap />
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/discussion-forum"
+        element={
+          <PrivateRoute allowedRoles={['student', 'faculty', 'admin']}>
+            <DiscussionForum />
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/coding-playground"
+        element={
+          <PrivateRoute allowedRoles={['student', 'faculty', 'admin']}>
+            <CodingPlayground />
+          </PrivateRoute>
+        }
+      />
+      <Route
         path="/aptitude-tests"
         element={
           <PrivateRoute allowedRoles={['student']}>
@@ -108,6 +147,22 @@ const AppRoutes = () => {
         element={
           <PrivateRoute allowedRoles={['student']}>
             <MockInterviews />
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/core-cse"
+        element={
+          <PrivateRoute allowedRoles={['student']}>
+            <CoreCSEPrep />
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/company-prep"
+        element={
+          <PrivateRoute allowedRoles={['student']}>
+            <CompanyPrep />
           </PrivateRoute>
         }
       />
@@ -147,9 +202,17 @@ const AppRoutes = () => {
         }
       />
       <Route
+        path="/faculty"
+        element={
+          <PrivateRoute allowedRoles={['faculty']}>
+            <FacultyDashboard />
+          </PrivateRoute>
+        }
+      />
+      <Route
         path="/plagiarism-audit"
         element={
-          <PrivateRoute allowedRoles={['admin']}>
+          <PrivateRoute allowedRoles={['admin', 'faculty']}>
             <PlagiarismAudit />
           </PrivateRoute>
         }
@@ -168,7 +231,7 @@ const AppRoutes = () => {
       <Route
         path="/question-bank"
         element={
-          <PrivateRoute allowedRoles={['student', 'admin']}>
+          <PrivateRoute allowedRoles={['student', 'faculty', 'admin']}>
             <QuestionBank />
           </PrivateRoute>
         }
@@ -176,7 +239,7 @@ const AppRoutes = () => {
       <Route
         path="/contests"
         element={
-          <PrivateRoute allowedRoles={['student', 'admin']}>
+          <PrivateRoute allowedRoles={['student', 'faculty', 'admin']}>
             <Contests />
           </PrivateRoute>
         }
@@ -209,7 +272,7 @@ const AppRoutes = () => {
       {/* Fallback routing */}
       <Route
         path="*"
-        element={<Navigate to={token && user ? (user.role === 'admin' ? '/admin' : '/dashboard') : "/login"} replace />}
+        element={<Navigate to={token && user ? (user.role === 'admin' ? '/admin' : user.role === 'faculty' ? '/faculty' : '/dashboard') : "/login"} replace />}
       />
     </Routes>
   );

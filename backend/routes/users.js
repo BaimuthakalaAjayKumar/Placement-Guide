@@ -3,6 +3,7 @@ const {
   getDashboardStats,
   getAllStudents,
   createAdmin,
+  createFaculty,
   updateLeetcodeProfile,
   updateCodeforcesProfile,
   updateCodechefProfile,
@@ -30,11 +31,12 @@ router.put('/codechef', protect, updateCodechefProfile);
 router.put('/hackerrank', protect, updateHackerrankProfile);
 router.get('/solutions/:platform/:problemId', protect, getUserSolution);
 router.post('/solutions', protect, saveUserSolution);
-router.get('/students', protect, authorize('admin'), getAllStudents);
+router.get('/students', protect, authorize('admin', 'faculty'), getAllStudents);
 router.get('/students/export', protect, authorize('admin'), exportStudentReport);
 router.post('/students/bulk-delete', protect, authorize('admin'), bulkDeleteStudents);
 router.put('/students/:id/academics', protect, authorize('admin'), updateStudentAcademics);
 router.delete('/students/:id', protect, authorize('admin'), deleteStudent);
 router.post('/admins', protect, authorize('admin'), createAdmin);
+router.post('/faculty', protect, authorize('admin', 'faculty'), createFaculty);
 
 module.exports = router;

@@ -525,7 +525,7 @@ const Dashboard = () => {
                 </div>
               </div>
 
-              {/* 2. Three Pillars Overview */}
+              {/* 2. Pillars Overview */}
               <div className="pillars-container">
                 {/* Pillar 1: Resume */}
                 <div className="glass-card pillar-card">
@@ -553,7 +553,7 @@ const Dashboard = () => {
                       <svg viewBox="0 0 24 24" className="p-icon"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" /></svg>
                     </div>
                     <div>
-                      <h4>Progress Score</h4>
+                      <h4>Aptitude Score</h4>
                       <span className="pillar-value">{stats?.aptitudeAvg || 0}%</span>
                     </div>
                   </div>
@@ -565,7 +565,26 @@ const Dashboard = () => {
                   </p>
                 </div>
 
-                {/* Pillar 3: Mock Interview */}
+                {/* Pillar 3: Coding */}
+                <div className="glass-card pillar-card" style={{ cursor: 'pointer' }} onClick={() => navigate('/question-bank')}>
+                  <div className="pillar-header">
+                    <div className="pillar-icon-box coding">
+                      <svg viewBox="0 0 24 24" className="p-icon" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" /></svg>
+                    </div>
+                    <div>
+                      <h4>Coding Score</h4>
+                      <span className="pillar-value">{stats?.codingScore || 0}%</span>
+                    </div>
+                  </div>
+                  <div className="progress-bar-bg">
+                    <div className="progress-bar-fill coding" style={{ width: `${stats?.codingScore || 0}%` }}></div>
+                  </div>
+                  <p className="pillar-footer-text">
+                    {stats?.totalSolved || 0} Problem{stats?.totalSolved === 1 ? '' : 's'} Solved
+                  </p>
+                </div>
+
+                {/* Pillar 4: Mock Interview */}
                 <div className="glass-card pillar-card">
                   <div className="pillar-header">
                     <div className="pillar-icon-box interview">

@@ -211,6 +211,11 @@
   color: var(--success);
 }
 
+.pillar-icon-box.coding {
+  background: rgba(245, 158, 11, 0.1);
+  color: #f59e0b;
+}
+
 .pillar-card h4 {
   font-size: 13px;
   color: var(--text-secondary);
@@ -250,6 +255,10 @@
 
 .progress-bar-fill.interview {
   background: var(--success);
+}
+
+.progress-bar-fill.coding {
+  background: #f59e0b;
 }
 
 .pillar-footer-text {
