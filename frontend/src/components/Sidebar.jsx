@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { API_URL } from '../config/api';
 import './Sidebar.css';
 
 const Sidebar = () => {
@@ -8,8 +9,6 @@ const Sidebar = () => {
   const navigate = useNavigate();
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [showContactModal, setShowContactModal] = useState(false);
-
-  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
   // Contact Form state
   const [contactSubject, setContactSubject] = useState('');

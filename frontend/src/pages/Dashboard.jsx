@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import Header from '../components/Header';
+import { API_URL } from '../config/api';
 import './Dashboard.css';
 
 const Dashboard = () => {
@@ -293,8 +294,6 @@ const Dashboard = () => {
       monthLabels: labels
     };
   }, [stats, activePlatform, activeTimeframe, user, holidays]);
-
-  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
   const fetchDashboardStats = async () => {
     try {

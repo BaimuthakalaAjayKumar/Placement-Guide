@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { API_URL } from '../config/api';
 import Editor from '@monaco-editor/react';
 import Header from '../components/Header';
 import './QuestionBank.css';
@@ -22,7 +23,9 @@ const ALL_CORER_LANGUAGES = [
 
 const QuestionBank = () => {
   const { user, token } = useAuth();
-  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+  
+  const queryParams = new URLSearchParams(window.location.search);
+  const companyFilter = queryParams.get('company') || '';
 
   // Questions state
   const [questions, setQuestions] = useState([]);
@@ -183,6 +186,7 @@ const QuestionBank = () => {
       if (difficultyFilter) query += `&difficulty=${difficultyFilter}`;
       if (topicFilter) query += `&tag=${topicFilter}`;
       if (languageFilter) query += `&language=${languageFilter}`;
+      if (companyFilter) query += `&company=${companyFilter}`;
 
       const res = await fetch(`${API_URL}/questions${query}`, {
         headers: { Authorization: `Bearer ${token}` }

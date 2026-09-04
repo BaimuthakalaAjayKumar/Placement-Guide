@@ -26,14 +26,21 @@ const CoreCSEPrep = () => {
     const [loading, setLoading] = useState(false);
     const navigate = useNavigate();
 
+    const queryParams = new URLSearchParams(window.location.search);
+    const companyFilter = queryParams.get('company') || '';
+
     const handleStartPractice = (subjectId) => {
         // Navigate to aptitude test page filtered by core subject category
-        navigate(`/aptitude-tests?category=${subjectId}`);
+        let url = `/aptitude-tests?category=${subjectId}`;
+        if (companyFilter) url += `&company=${companyFilter}`;
+        navigate(url);
     };
 
     const handleCodingPractice = (langId) => {
         // Navigate to coding question bank filtered by language or generic
-        navigate(`/question-bank?topic=${langId}`);
+        let url = `/question-bank?topic=${langId}`;
+        if (companyFilter) url += `&company=${companyFilter}`;
+        navigate(url);
     };
 
     return (

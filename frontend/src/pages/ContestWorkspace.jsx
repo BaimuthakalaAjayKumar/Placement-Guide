@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { API_URL } from '../config/api';
 import Editor from '@monaco-editor/react';
 import './ContestsPortal.css';
 
@@ -24,7 +25,6 @@ const ContestWorkspace = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { token, user } = useAuth();
-  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
   // Screen states: 'disclaimer', 'exam', 'terminated', 'finished'
   const [examState, setExamState] = useState('disclaimer');

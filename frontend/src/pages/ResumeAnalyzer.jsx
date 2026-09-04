@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import Header from '../components/Header';
+import { API_URL } from '../config/api';
 import './ResumeAnalyzer.css';
 
 const ResumeAnalyzer = () => {
@@ -13,7 +14,6 @@ const ResumeAnalyzer = () => {
   const [uploadStep, setUploadStep] = useState(0);
 
   const fileInputRef = useRef(null);
-  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
   const fetchLatestAnalysis = async () => {
     try {

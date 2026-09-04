@@ -101,8 +101,11 @@ seedDefaultTests();
 // @access  Private
 exports.getTests = async (req, res, next) => {
   try {
-    // Return tests without questions list to prevent client-side answer viewing
-    const tests = await AptitudeTest.find().select('-questions');
+    const query = {};
+    if (req.query.company) {
+      query.company = req.query.company;
+    }
+    const tests = await AptitudeTest.find(query).select('-questions');
 
     // Enrich with question count and completion status
     const enrichedTests = await Promise.all(
@@ -513,7 +516,11 @@ const parsePracticeQuestionUrl = (platform, rawUrl = '') => {
 exports.getPracticeQuestions = async (req, res, next) => {
   try {
     const { platform } = req.params;
-    const questions = await PracticeQuestion.find({ platform, isActive: true }).sort({ id: 1 });
+    const query = { platform, isActive: true };
+    if (req.query.company) {
+      query.company = req.query.company;
+    }
+    const questions = await PracticeQuestion.find(query).sort({ id: 1 });
     res.status(200).json({ success: true, data: questions });
   } catch (err) {
     next(err);
@@ -542,10 +549,11 @@ exports.addPracticeQuestion = async (req, res, next) => {
 
     const existing = await PracticeQuestion.findOne({
       platform,
+      company: req.body.company || '',
       $or: [{ id: finalId }, { slug: finalSlug }]
     });
     if (existing) {
-      return res.status(400).json({ success: false, error: 'This practice question already exists on this platform.' });
+      return res.status(400).json({ success: false, error: 'This practice question already exists on this platform for this company.' });
     }
 
     const question = await PracticeQuestion.create({
@@ -556,7 +564,9 @@ exports.addPracticeQuestion = async (req, res, next) => {
       acceptance: req.body.acceptance || '50%',
       slug: finalSlug,
       solution: solution || '',
-      tags: tags || []
+      tags: tags || [],
+      company: req.body.company || '',
+      year: req.body.year || new Date().getFullYear()
     });
 
     res.status(201).json({ success: true, data: question });
@@ -762,11 +772,11 @@ exports.getPracticeReport = async (req, res, next) => {
 exports.editPracticeQuestion = async (req, res, next) => {
   try {
     const { platform, id } = req.params;
-    const { title, difficulty, acceptance, slug, solution, tags } = req.body;
+    const { title, difficulty, acceptance, slug, solution, tags, company, year } = req.body;
 
     const question = await PracticeQuestion.findOneAndUpdate(
       { platform, id: Number(id) },
-      { title, difficulty, acceptance, slug, solution, tags },
+      { title, difficulty, acceptance, slug, solution, tags, company, year },
       { new: true, runValidators: true }
     );
 

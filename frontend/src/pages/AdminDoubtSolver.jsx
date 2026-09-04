@@ -1,12 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import Header from '../components/Header';
+import { API_URL, BASE_URL as UPLOADS_URL } from '../config/api';
 import './AdminDoubtSolver.css';
 
 const AdminDoubtSolver = () => {
     const { token } = useAuth();
-    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
-    const UPLOADS_URL = (import.meta.env.VITE_API_URL || 'http://localhost:5000/api').replace('/api', '');
 
     const [doubts, setDoubts] = useState([]);
     const [loading, setLoading] = useState(true);

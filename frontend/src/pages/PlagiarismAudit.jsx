@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import Header from '../components/Header';
+import { API_URL } from '../config/api';
 import './QuestionBank.css'; // Re-use Question Bank styling rules for cards, layout, badges
 
 const PlagiarismAudit = () => {
   const { token } = useAuth();
-  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
   // State Variables
   const [reports, setReports] = useState([]);

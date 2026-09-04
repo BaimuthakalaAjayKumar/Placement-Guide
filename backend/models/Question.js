@@ -72,6 +72,14 @@ const QuestionSchema = new mongoose.Schema({
     type: Boolean,
     default: true
   },
+  company: {
+    type: String,
+    default: ''
+  },
+  year: {
+    type: Number,
+    default: () => new Date().getFullYear()
+  },
   createdBy: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',

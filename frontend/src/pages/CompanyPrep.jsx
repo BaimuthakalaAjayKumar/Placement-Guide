@@ -67,7 +67,7 @@ const CompanyPrep = () => {
                                     <div className="stage-number">3</div>
                                     <h4>Technical & Core</h4>
                                     <p>CS fundamentals including OS, DBMS, networking.</p>
-                                    <button className="btn-stage" onClick={() => navigate(`/core-cse`)}>Start Core CSE</button>
+                                    <button className="btn-stage" onClick={() => navigate(`/core-cse?company=${selectedCompany}`)}>Start Core CSE</button>
                                 </div>
 
                                 <div className="stage-card">

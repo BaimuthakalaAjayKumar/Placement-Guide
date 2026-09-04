@@ -56,6 +56,14 @@ const AptitudeTestSchema = new mongoose.Schema({
     type: String,
     default: 'general'
   },
+  company: {
+    type: String,
+    default: ''
+  },
+  year: {
+    type: Number,
+    default: () => new Date().getFullYear()
+  },
   questions: [QuestionSchema],
   createdAt: {
     type: Date,

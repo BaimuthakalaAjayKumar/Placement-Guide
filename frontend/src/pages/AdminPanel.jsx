@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import Header from '../components/Header';
+import { API_URL } from '../config/api';
 import './AdminPanel.css';
 
 const AdminPanel = () => {
@@ -81,6 +82,8 @@ const AdminPanel = () => {
   // Practice Question URL form state
   const [submittingPracticeQuestion, setSubmittingPracticeQuestion] = useState(false);
   const [pqUrlInput, setPqUrlInput] = useState('');
+  const [pqCompanyInput, setPqCompanyInput] = useState('');
+  const [pqYearInput, setPqYearInput] = useState(new Date().getFullYear());
 
   // Mock Interview reports state
   const [mockInterviewReports, setMockInterviewReports] = useState([]);
@@ -131,6 +134,8 @@ const AdminPanel = () => {
   const [editPqSlug, setEditPqSlug] = useState('');
   const [editPqSolution, setEditPqSolution] = useState('');
   const [editPqTagsText, setEditPqTagsText] = useState('');
+  const [editPqCompany, setEditPqCompany] = useState('');
+  const [editPqYear, setEditPqYear] = useState(new Date().getFullYear());
   const [submittingPracticeEdit, setSubmittingPracticeEdit] = useState(false);
 
   // Student Academics Modal states
@@ -147,8 +152,6 @@ const AdminPanel = () => {
     sgpaSem8: 0
   });
   const [savingAcademics, setSavingAcademics] = useState(false);
-
-  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
   const fetchStudents = async () => {
     try {
@@ -700,7 +703,11 @@ const AdminPanel = () => {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`
         },
-        body: JSON.stringify({ officialUrl })
+        body: JSON.stringify({
+          officialUrl,
+          company: pqCompanyInput,
+          year: pqYearInput
+        })
       });
       const data = await res.json();
       if (data.success) {

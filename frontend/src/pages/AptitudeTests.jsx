@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import Header from '../components/Header';
+import { API_URL, getImageUrl } from '../config/api';
 import { leetcodeProblems as defaultLeetcodeProblems } from '../data/leetcodeProblems';
 import { codeforcesProblems as defaultCodeforcesProblems } from '../data/codeforcesProblems';
 import { codechefProblems as defaultCodechefProblems } from '../data/codechefProblems';
@@ -158,18 +159,12 @@ const getHackerrankSolvedIds = (username, hackerrankStats, problems) => {
   return new Set(selectedIds);
 };
 
-const getImageUrl = (url) => {
-  if (!url) return '';
-  if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:')) {
-    return url;
-  }
-  const cleanUrl = url.startsWith('/') ? url.slice(1) : url;
-  return `http://localhost:5000/${cleanUrl}`;
-};
-
 const AptitudeTests = () => {
   const { token, user, loadUser } = useAuth();
   
+  const queryParams = new URLSearchParams(window.location.search);
+  const companyFilter = queryParams.get('company') || '';
+
   // States
   const [tests, setTests] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -231,8 +226,6 @@ const AptitudeTests = () => {
   // Exam result states
   const [examResult, setExamResult] = useState(null);
 
-  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
-
   useEffect(() => {
     if (user) {
       if (user.leetcodeUsername) setLeetcodeUsernameInput(user.leetcodeUsername);
@@ -247,7 +240,9 @@ const AptitudeTests = () => {
     const fetchPracticeQuestions = async () => {
       if (activeTab === 'aptitude' || activeTab === 'leaderboard') return;
       try {
-        const res = await fetch(`${API_URL}/tests/practice-questions/${activeTab}`, {
+        let endpoint = `${API_URL}/tests/practice-questions/${activeTab}`;
+        if (companyFilter) endpoint += `?company=${companyFilter}`;
+        const res = await fetch(endpoint, {
           headers: {
             Authorization: `Bearer ${token}`
           }
@@ -481,7 +476,18 @@ const AptitudeTests = () => {
   const fetchTests = async () => {
     try {
       setLoading(true);
-      const res = await fetch(`${API_URL}/tests`, {
+      let endpoint = `${API_URL}/tests`;
+      const queryParamsList = [];
+      
+      const categoryFilter = queryParams.get('category');
+      if (categoryFilter) queryParamsList.push(`category=${categoryFilter}`);
+      if (companyFilter) queryParamsList.push(`company=${companyFilter}`);
+      
+      if (queryParamsList.length > 0) {
+        endpoint += `?${queryParamsList.join('&')}`;
+      }
+
+      const res = await fetch(endpoint, {
         headers: {
           Authorization: `Bearer ${token}`
         }

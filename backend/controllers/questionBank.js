@@ -11,13 +11,14 @@ const { checkPlagiarism } = require('../services/plagiarismService');
 // @access  Private
 exports.getQuestions = async (req, res, next) => {
   try {
-    const { difficulty, tag, language, search } = req.query;
+    const { difficulty, tag, language, search, company } = req.query;
     const query = {};
 
     // Standard filter
     if (difficulty) query.difficulty = difficulty;
     if (tag) query.tags = { $in: [tag] };
     if (language) query.allowedLanguages = { $in: [language] };
+    if (company) query.company = company;
 
     // Non-admin can only see active questions
     if (req.user.role !== 'admin') {

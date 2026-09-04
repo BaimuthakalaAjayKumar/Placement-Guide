@@ -15,18 +15,54 @@ const app = express();
 // Body parser
 app.use(express.json());
 
-// Enable CORS
-app.use(cors({
-  origin: [
-    "http://localhost:5173",
-    "http://localhost:5174",
-    "http://localhost:5175",
-    "https://placement-guide-nu.vercel.app"
-  ],
+// Base allowed origins
+const defaultAllowedOrigins = [
+  'http://localhost:5173',
+  'http://localhost:5174',
+  'http://localhost:5175',
+  'http://localhost:3000',
+  'http://127.0.0.1:5173',
+  'http://127.0.0.1:5174',
+  'http://127.0.0.1:5175',
+  'https://placement-guide-nu.vercel.app'
+];
+
+const envOrigins = [
+  process.env.CLIENT_URL,
+  process.env.FRONTEND_URL,
+  ...(process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',') : [])
+]
+  .filter(Boolean)
+  .map(o => o.trim().replace(/\/+$/, ''));
+
+const allowedOrigins = [...new Set([...defaultAllowedOrigins, ...envOrigins])];
+
+const corsOriginChecker = (origin, callback) => {
+  // Allow requests with no origin (e.g. mobile apps, curl, Postman, health-checkers)
+  if (!origin) return callback(null, true);
+
+  const cleanOrigin = origin.replace(/\/+$/, '');
+  if (allowedOrigins.includes(cleanOrigin) || /\.vercel\.app$/.test(cleanOrigin)) {
+    return callback(null, true);
+  }
+
+  // Allow any localhost in non-production
+  if (process.env.NODE_ENV !== 'production' && /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(cleanOrigin)) {
+    return callback(null, true);
+  }
+
+  return callback(new Error(`Origin ${origin} not allowed by CORS`));
+};
+
+const corsOptions = {
+  origin: corsOriginChecker,
   credentials: true,
-  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization"]
-}));
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+};
+
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));
 
 // Set static folder for uploaded files
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
@@ -81,10 +117,7 @@ const http = require('http');
 const server = http.createServer(app);
 const { Server } = require("socket.io");
 const io = new Server(server, {
-  cors: {
-    origin: ["http://localhost:5173", "https://placement-guide-nu.vercel.app"],
-    methods: ["GET", "POST"]
-  }
+  cors: corsOptions
 });
 
 // Configure Socket App
@@ -104,7 +137,7 @@ io.on('connection', (socket) => {
   });
 });
 
-server.listen(PORT, () => {
+server.listen(PORT, '0.0.0.0', () => {
   console.log(`Server running in ${process.env.NODE_ENV} mode on port ${PORT}`);
 });
 

@@ -1,8 +1,7 @@
 import React, { createContext, useState, useEffect, useContext } from 'react';
+import { API_URL } from '../config/api';
 
 const AuthContext = createContext();
-
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
@@ -84,7 +83,16 @@ export const AuthProvider = ({ children }) => {
         },
         body: JSON.stringify({ email, password })
       });
-      const data = await res.json();
+      
+      let data;
+      try {
+        data = await res.json();
+      } catch (parseErr) {
+        return {
+          success: false,
+          error: `Server returned HTTP ${res.status} (${res.statusText || 'Error'}). Check backend deployment.`
+        };
+      }
 
       if (data.success) {
         localStorage.setItem('token', data.token);
@@ -92,10 +100,16 @@ export const AuthProvider = ({ children }) => {
         setUser(data.user);
         return { success: true, user: data.user };
       } else {
-        return { success: false, error: data.error };
+        return { success: false, error: data.error || 'Invalid credentials. Please try again.' };
       }
     } catch (err) {
-      return { success: false, error: 'Network error. Please try again later.' };
+      const isConnectionError = err.message?.includes('Failed to fetch') || err.name === 'TypeError';
+      return {
+        success: false,
+        error: isConnectionError
+          ? 'Network error. Could not connect to backend server. Please try again later.'
+          : (err.message || 'Network error. Please try again later.')
+      };
     } finally {
       setLoading(false);
     }

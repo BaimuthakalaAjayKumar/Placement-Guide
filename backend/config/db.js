@@ -61,6 +61,49 @@ const connectDB = async () => {
       console.log(`Seeded ${DEFAULT_TECHNOLOGIES.length} interview technologies.`);
     }
 
+    // Start automated annual rollover check
+    const rollForwardQuestionYears = async () => {
+      try {
+        const Question = require('../models/Question');
+        const PracticeQuestion = require('../models/PracticeQuestion');
+        const AptitudeTest = require('../models/AptitudeTest');
+
+        const currentYear = new Date().getFullYear();
+
+        // Find the maximum year currently present across collections
+        const maxQ = await Question.findOne().sort({ year: -1 }).select('year');
+        const maxPractice = await PracticeQuestion.findOne().sort({ year: -1 }).select('year');
+        const maxTest = await AptitudeTest.findOne().sort({ year: -1 }).select('year');
+
+        const maxYear = Math.max(
+          maxQ?.year || 2025,
+          maxPractice?.year || 2025,
+          maxTest?.year || 2025
+        );
+
+        if (currentYear > maxYear) {
+          const diff = currentYear - maxYear;
+          console.log(`[Auto-Rollover] New year detected (${currentYear} > ${maxYear}). Rolling forward question years by +${diff}...`);
+          
+          await Question.updateMany({ year: { $exists: true } }, { $inc: { year: diff } });
+          await PracticeQuestion.updateMany({ year: { $exists: true } }, { $inc: { year: diff } });
+          await AptitudeTest.updateMany({ year: { $exists: true } }, { $inc: { year: diff } });
+          
+          console.log('[Auto-Rollover] Roll forward completed successfully!');
+        } else {
+          console.log(`[Auto-Rollover] Question years are up to date (Max year: ${maxYear}, Current year: ${currentYear}).`);
+        }
+      } catch (rollErr) {
+        console.error(`[Auto-Rollover Error] Failed to execute rollover: ${rollErr.message}`);
+      }
+    };
+
+    // Run rollover immediately on DB connection
+    await rollForwardQuestionYears();
+
+    // Setup periodic check every 24 hours
+    setInterval(rollForwardQuestionYears, 24 * 60 * 60 * 1000);
+
   } catch (err) {
     console.error(`MongoDB Connection Error: ${err.message}`);
     process.exit(1);

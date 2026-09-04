@@ -2,13 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import Header from '../components/Header';
+import { API_URL } from '../config/api';
 import './ContestsPortal.css';
 
 const ContestReport = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { token } = useAuth();
-  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
   const [contest, setContest] = useState(null);
   const [attempts, setAttempts] = useState([]);

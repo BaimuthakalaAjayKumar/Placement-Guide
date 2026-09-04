@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { API_URL } from '../config/api';
 import './Auth.css';
 
 const ForgotPassword = () => {
@@ -7,8 +8,6 @@ const ForgotPassword = () => {
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');
     const [loading, setLoading] = useState(false);
-
-    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
     const handleSubmit = async (e) => {
         e.preventDefault();

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import Header from '../components/Header';
+import { API_URL } from '../config/api';
 import './MockInterviews.css';
 
 const MockInterviews = () => {
@@ -27,8 +28,6 @@ const MockInterviews = () => {
     jobRole: user?.targetRole || 'Software Engineer',
     technology: 'General',
   });
-
-  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
   const fetchHistory = async () => {
     try {

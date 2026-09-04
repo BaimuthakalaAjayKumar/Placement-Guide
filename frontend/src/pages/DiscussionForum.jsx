@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import Header from '../components/Header';
+import { API_URL } from '../config/api';
 import './DiscussionForum.css';
 
 const DiscussionForum = () => {
@@ -25,8 +26,6 @@ const DiscussionForum = () => {
   // Reply state
   const [activeReplyCommentId, setActiveReplyCommentId] = useState(null);
   const [newReplyText, setNewReplyText] = useState('');
-
-  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
   const fetchPosts = async () => {
     try {
