@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
 import Header from '../components/Header';
 import { API_URL } from '../config/api';
 import Editor from '@monaco-editor/react';
@@ -48,6 +49,7 @@ const LANGUAGES = [
 
 const CodingPlayground = () => {
   const { token } = useAuth();
+  const { theme } = useTheme();
 
   const [language, setLanguage] = useState('cpp');
   const [code, setCode] = useState(TEMPLATES.cpp);
@@ -106,7 +108,7 @@ const CodingPlayground = () => {
     <>
       <Header title="Interactive Coding Sandbox Playground" />
       <div className="content-wrapper playground-content animate-fade" style={{ padding: '2rem', display: 'flex', flexDirection: 'column', gap: '20px', flex: 1 }}>
-          <p style={{ color: '#94a3b8', margin: 0 }}>Select your preferred language, customize standard input arguments, run code securely in our containerized playground, and see real-time compile/execution outputs.</p>
+          <p style={{ margin: 0, color: 'var(--text-secondary)' }}>Select your preferred language, customize standard input arguments, run code securely in our containerized playground, and see real-time compile/execution outputs.</p>
 
           <div className="playground-workspace" style={{ display: 'flex', gap: '20px', flex: 1, minHeight: '550px' }}>
             
@@ -114,11 +116,11 @@ const CodingPlayground = () => {
             <div className="glass-card editor-section" style={{ flex: 3, display: 'flex', flexDirection: 'column', padding: '20px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-                  <label style={{ color: '#94a3b8', fontWeight: 'bold' }}>Programming Language:</label>
+                  <label className="playground-label">Programming Language:</label>
                   <select
+                    className="playground-select"
                     value={language}
                     onChange={(e) => handleLanguageChange(e.target.value)}
-                    style={{ background: '#1e293b', border: '1px solid #334155', color: 'white', padding: '8px 15px', borderRadius: '6px', outline: 'none', cursor: 'pointer' }}
                   >
                     {LANGUAGES.map(lang => (
                       <option key={lang.value} value={lang.value}>{lang.label}</option>
@@ -133,10 +135,10 @@ const CodingPlayground = () => {
                 </button>
               </div>
 
-              <div style={{ flex: 1, border: '1px solid #334155', borderRadius: '6px', overflow: 'hidden' }}>
+              <div className="playground-editor-wrap">
                 <Editor
                   height="100%"
-                  theme="vs-dark"
+                  theme={theme === 'light' ? 'light' : 'vs-dark'}
                   language={language}
                   value={code}
                   onChange={(val) => setCode(val || '')}
@@ -158,19 +160,19 @@ const CodingPlayground = () => {
               
               {/* Input Area */}
               <div className="glass-card" style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: '20px' }}>
-                <h4 style={{ color: 'white', margin: '0 0 10px 0' }}>📥 Standard Input (stdin)</h4>
+                <h4 className="playground-heading">📥 Standard Input (stdin)</h4>
                 <textarea
                   placeholder="Provide parameters to stdin line by line..."
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
-                  style={{ flex: 1, background: '#0f172a', border: '1px solid #334155', borderRadius: '6px', color: 'white', padding: '12px', fontFamily: 'monospace', resize: 'none', outline: 'none' }}
+                  className="playground-textarea"
                 />
               </div>
 
               {/* Output Area */}
               <div className="glass-card" style={{ flex: 2, display: 'flex', flexDirection: 'column', padding: '20px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                  <h4 style={{ color: 'white', margin: 0 }}>💻 Console Output (stdout)</h4>
+                  <h4 className="playground-heading">💻 Console Output (stdout)</h4>
                   {stats && (
                     <span style={{ fontSize: '0.8rem', color: '#10b981' }}>
                       ⚡ {stats.timeMs}ms | 💾 {stats.memoryKb}KB
@@ -178,12 +180,13 @@ const CodingPlayground = () => {
                   )}
                 </div>
                 <pre
+                  className="playground-pre"
                   style={{
                     flex: 1,
-                    background: '#010409',
-                    border: '1px solid #334155',
+                    background: theme === 'light' ? '#f8fafc' : '#010409',
+                    border: '1px solid var(--border-color)',
                     borderRadius: '6px',
-                    color: output.startsWith('Error:') || output.startsWith('Server error:') ? '#f87171' : '#a7f3d0',
+                    color: output.startsWith('Error:') || output.startsWith('Server error:') ? '#ef4444' : (theme === 'light' ? '#0f172a' : '#a7f3d0'),
                     padding: '15px',
                     margin: 0,
                     overflowY: 'auto',

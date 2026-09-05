@@ -12,3 +12,75 @@
   display: flex;
   flex-direction: column;
 }
+
+.playground-label {
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+.playground-select {
+  background: #1e293b;
+  border: 1px solid #334155;
+  color: white;
+  padding: 8px 15px;
+  border-radius: 6px;
+  outline: none;
+  cursor: pointer;
+}
+
+.playground-heading {
+  color: white;
+  margin: 0 0 10px 0;
+}
+
+.playground-textarea {
+  flex: 1;
+  background: #0f172a;
+  border: 1px solid #334155;
+  border-radius: 6px;
+  color: white;
+  padding: 12px;
+  font-family: monospace;
+  resize: none;
+  outline: none;
+}
+
+.playground-editor-wrap {
+  flex: 1;
+  border: 1px solid #334155;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+/* ============================================================
+   LIGHT THEME OVERRIDES (Dark theme remains 100% as usual)
+   ============================================================ */
+[data-theme="light"] .playground-label {
+  color: #1e293b !important;
+}
+
+[data-theme="light"] .playground-select {
+  background: #ffffff !important;
+  border-color: #cbd5e1 !important;
+  color: #0f172a !important;
+}
+
+[data-theme="light"] .playground-heading {
+  color: #0f172a !important;
+}
+
+[data-theme="light"] .playground-textarea {
+  background: #ffffff !important;
+  border-color: #cbd5e1 !important;
+  color: #0f172a !important;
+}
+
+[data-theme="light"] .playground-editor-wrap {
+  border-color: #e2e8f0 !important;
+}
+
+[data-theme="light"] .playground-pre {
+  background: #f8fafc !important;
+  border-color: #e2e8f0 !important;
+  color: #0f172a !important;
+}

@@ -45,14 +45,17 @@ const defaultAllowedOrigins = [
   'http://localhost:5175',
   'http://localhost:3000',
 
-  // Local development using 127.0.0.1
+  // Local development using 127.0.0.1 / private-network access
   'http://127.0.0.1:5173',
   'http://127.0.0.1:5174',
   'http://127.0.0.1:5175',
+  'http://0.0.0.0:5173',
 
   // Production frontend
   'https://placement-guide-nu.vercel.app'
 ];
+
+const privateNetworkOriginPattern = /^https?:\/\/(?:localhost|127\.0\.0\.1|0\.0\.0\.0|10(?:\.\d{1,3}){3}|192\.168\.\d{1,3}\.\d{1,3}|172\.(?:1[6-9]|2\d|3[0-1])\.\d{1,3}\.\d{1,3})(?::\d+)?$/i;
 
 // Additional origins from environment variables
 const envOrigins = [
@@ -100,10 +103,13 @@ const corsOriginChecker = (origin, callback) => {
     return callback(null, true);
   }
 
-  // Allow localhost during development
+  // Allow localhost and LAN/private-network origins during development
   if (
     process.env.NODE_ENV !== 'production' &&
-    /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(cleanOrigin)
+    (
+      /^https?:\/\/(localhost|127\.0\.0\.1|0\.0\.0\.0)(:\d+)?$/.test(cleanOrigin) ||
+      privateNetworkOriginPattern.test(cleanOrigin)
+    )
   ) {
     return callback(null, true);
   }

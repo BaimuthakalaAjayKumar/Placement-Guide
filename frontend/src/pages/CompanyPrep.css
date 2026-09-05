@@ -186,3 +186,95 @@
         transform: translateY(0);
     }
 }
+
+/* ============================================================
+   LIGHT THEME OVERRIDES (Dark theme remains 100% as usual)
+   ============================================================ */
+[data-theme="light"] .company-header-section h1 {
+    background: linear-gradient(90deg, #b45309, #d97706) !important;
+    -webkit-background-clip: text !important;
+    -webkit-text-fill-color: transparent !important;
+}
+
+[data-theme="light"] .company-header-section p {
+    color: #475569 !important;
+    font-weight: 500;
+}
+
+[data-theme="light"] .company-card {
+    background-color: #ffffff !important;
+    border: 1px solid #e2e8f0 !important;
+    border-top: 4px solid #94a3b8 !important;
+    box-shadow: 0 2px 8px rgba(15, 23, 42, 0.05) !important;
+}
+
+[data-theme="light"] .company-card:hover {
+    background-color: #f8fafc !important;
+    border-color: #cbd5e1 !important;
+    box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08) !important;
+}
+
+[data-theme="light"] .company-card.selected {
+    background-color: #eef2ff !important;
+    box-shadow: 0 0 0 2px #6366f1 !important;
+}
+
+[data-theme="light"] .company-card.border-red-500 { border-top-color: #ef4444 !important; }
+[data-theme="light"] .company-card.border-orange-400 { border-top-color: #fb923c !important; }
+[data-theme="light"] .company-card.border-blue-500 { border-top-color: #3b82f6 !important; }
+[data-theme="light"] .company-card.border-indigo-400 { border-top-color: #818cf8 !important; }
+[data-theme="light"] .company-card.border-blue-400 { border-top-color: #60a5fa !important; }
+[data-theme="light"] .company-card.border-green-400 { border-top-color: #22c55e !important; }
+
+[data-theme="light"] .company-card h3 {
+    color: #0f172a !important;
+    font-weight: 700;
+}
+
+[data-theme="light"] .company-badge {
+    background-color: #f1f5f9 !important;
+    color: #334155 !important;
+    border: 1px solid #e2e8f0 !important;
+    font-weight: 600;
+}
+
+[data-theme="light"] .company-logo-stub {
+    background-color: #f1f5f9 !important;
+    color: #0f172a !important;
+    border: 1px solid #e2e8f0 !important;
+}
+
+[data-theme="light"] .company-details-panel {
+    background-color: #ffffff !important;
+    border-color: #e2e8f0 !important;
+    box-shadow: 0 4px 20px rgba(15, 23, 42, 0.06) !important;
+}
+
+[data-theme="light"] .company-details-panel h2 {
+    color: #0f172a !important;
+    border-bottom-color: #e2e8f0 !important;
+}
+
+[data-theme="light"] .stage-card {
+    background: #f8fafc !important;
+    border: 1px dashed #cbd5e1 !important;
+}
+
+[data-theme="light"] .stage-card h4 {
+    color: #0f172a !important;
+    font-weight: 700;
+}
+
+[data-theme="light"] .stage-card p {
+    color: #475569 !important;
+}
+
+[data-theme="light"] .btn-stage {
+    background-color: #4f46e5 !important;
+    color: #ffffff !important;
+    font-weight: 600;
+}
+
+[data-theme="light"] .btn-stage:hover {
+    background-color: #4338ca !important;
+}

@@ -25,7 +25,11 @@ const DEFAULT_TECHNOLOGIES = [
 
 const connectDB = async () => {
   try {
-    const conn = await mongoose.connect(process.env.MONGODB_URI);
+    let mongoUri = process.env.MONGODB_URI || '';
+    if (mongoUri.includes('<') && mongoUri.includes('>')) {
+      mongoUri = mongoUri.replace(/<([^>]+)>/g, '$1');
+    }
+    const conn = await mongoose.connect(mongoUri);
     console.log(`MongoDB Connected: ${conn.connection.host}`);
 
     // Seed Administrator Account

@@ -181,3 +181,33 @@
 @keyframes spin {
   to { transform: rotate(360deg); }
 }
+
+/* Light Theme overrides for Auth pages */
+[data-theme="light"] .auth-logo {
+  color: #0f172a;
+}
+[data-theme="light"] .auth-header h2 {
+  color: #0f172a;
+}
+[data-theme="light"] .auth-header p {
+  color: #475569;
+}
+[data-theme="light"] .auth-footer {
+  color: #475569;
+}
+[data-theme="light"] .auth-error-alert {
+  background: #fef2f2;
+  border-color: #fecaca;
+  color: #991b1b;
+}
+[data-theme="light"] .role-option {
+  color: #334155;
+  background: #f8fafc;
+  border-color: #e2e8f0;
+}
+[data-theme="light"] .role-option.active {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #ffffff !important;
+}
+

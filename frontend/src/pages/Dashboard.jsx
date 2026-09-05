@@ -730,15 +730,7 @@ const Dashboard = () => {
                   borderTop: '1px solid rgba(255, 255, 255, 0.08)'
                 }}>
                   {/* LeetCode card */}
-                  <div className="platform-report-card" style={{
-                    background: 'rgba(255, 255, 255, 0.02)',
-                    border: '1px solid rgba(255, 255, 255, 0.06)',
-                    borderRadius: '8px',
-                    padding: '12px 15px',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    justifyContent: 'space-between'
-                  }}>
+                  <div className="platform-report-card">
                     <div>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                         <span style={{ fontSize: '0.85rem', fontWeight: '600', color: '#FFA116', display: 'flex', alignItems: 'center', gap: '5px' }}>
@@ -749,38 +741,30 @@ const Dashboard = () => {
                           {user?.leetcodeUsername ? 'Linked' : 'Not Linked'}
                         </span>
                       </div>
-                      <div className="report-value" style={{ fontSize: '1.4rem', fontWeight: '700', color: '#fff' }}>
-                        {stats?.leetcodeStats?.totalSolved || 0} <span style={{ fontSize: '0.8rem', color: '#a0aec0', fontWeight: '400' }}>solved</span>
+                      <div className="report-value" style={{ fontSize: '1.4rem', fontWeight: '700', color: 'var(--text-primary)' }}>
+                        {stats?.leetcodeStats?.totalSolved || 0} <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: '400' }}>solved</span>
                       </div>
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '5px', marginTop: '10px', fontSize: '0.75rem', textAlign: 'center' }}>
-                        <div style={{ background: 'rgba(72, 187, 120, 0.1)', color: '#48bb78', padding: '4px', borderRadius: '4px' }}>
+                        <div style={{ background: 'rgba(72, 187, 120, 0.1)', color: '#15803d', padding: '4px', borderRadius: '4px', fontWeight: '600' }}>
                           E: {stats?.leetcodeStats?.easySolved || Math.round((stats?.leetcodeStats?.totalSolved || 0) * 0.35)}
                         </div>
-                        <div style={{ background: 'rgba(237, 137, 54, 0.1)', color: '#ed8936', padding: '4px', borderRadius: '4px' }}>
+                        <div style={{ background: 'rgba(237, 137, 54, 0.1)', color: '#c2410c', padding: '4px', borderRadius: '4px', fontWeight: '600' }}>
                           M: {stats?.leetcodeStats?.mediumSolved || Math.round((stats?.leetcodeStats?.totalSolved || 0) * 0.50)}
                         </div>
-                        <div style={{ background: 'rgba(229, 62, 62, 0.1)', color: '#e53e3e', padding: '4px', borderRadius: '4px' }}>
+                        <div style={{ background: 'rgba(229, 62, 62, 0.1)', color: '#b91c1c', padding: '4px', borderRadius: '4px', fontWeight: '600' }}>
                           H: {stats?.leetcodeStats?.hardSolved || Math.round((stats?.leetcodeStats?.totalSolved || 0) * 0.15)}
                         </div>
                       </div>
                     </div>
                     {user?.leetcodeUsername && (
-                      <div style={{ fontSize: '0.7rem', color: '#718096', marginTop: '10px', wordBreak: 'break-all' }}>
+                      <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginTop: '10px', wordBreak: 'break-all' }}>
                         Handle: <strong>{user.leetcodeUsername}</strong>
                       </div>
                     )}
                   </div>
 
                   {/* Codeforces card */}
-                  <div className="platform-report-card" style={{
-                    background: 'rgba(255, 255, 255, 0.02)',
-                    border: '1px solid rgba(255, 255, 255, 0.06)',
-                    borderRadius: '8px',
-                    padding: '12px 15px',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    justifyContent: 'space-between'
-                  }}>
+                  <div className="platform-report-card">
                     <div>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                         <span style={{ fontSize: '0.85rem', fontWeight: '600', color: '#FF4B4B', display: 'flex', alignItems: 'center', gap: '5px' }}>
@@ -791,35 +775,27 @@ const Dashboard = () => {
                           {user?.codeforcesUsername ? 'Linked' : 'Not Linked'}
                         </span>
                       </div>
-                      <div className="report-value" style={{ fontSize: '1.4rem', fontWeight: '700', color: '#fff' }}>
-                        {stats?.codeforcesStats?.solvedCount || 0} <span style={{ fontSize: '0.8rem', color: '#a0aec0', fontWeight: '400' }}>solved</span>
+                      <div className="report-value" style={{ fontSize: '1.4rem', fontWeight: '700', color: 'var(--text-primary)' }}>
+                        {stats?.codeforcesStats?.solvedCount || 0} <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: '400' }}>solved</span>
                       </div>
                       <div style={{ display: 'flex', gap: '8px', marginTop: '10px', fontSize: '0.75rem' }}>
-                        <div style={{ flex: 1, padding: '4px', background: 'rgba(255,255,255,0.03)', borderRadius: '4px', textAlign: 'center' }}>
+                        <div className="platform-stat-badge">
                           Rating: <strong style={{ color: '#a855f7' }}>{stats?.codeforcesStats?.rating || 'N/A'}</strong>
                         </div>
-                        <div style={{ flex: 1, padding: '4px', background: 'rgba(255,255,255,0.03)', borderRadius: '4px', textAlign: 'center' }}>
-                          CF Rank: <strong style={{ color: '#cbd5e0' }}>{stats?.codeforcesStats?.rank || 'N/A'}</strong>
+                        <div className="platform-stat-badge">
+                          CF Rank: <strong style={{ color: 'var(--text-primary)' }}>{stats?.codeforcesStats?.rank || 'N/A'}</strong>
                         </div>
                       </div>
                     </div>
                     {user?.codeforcesUsername && (
-                      <div style={{ fontSize: '0.7rem', color: '#718096', marginTop: '10px', wordBreak: 'break-all' }}>
+                      <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginTop: '10px', wordBreak: 'break-all' }}>
                         Handle: <strong>{user.codeforcesUsername}</strong>
                       </div>
                     )}
                   </div>
 
                   {/* CodeChef card */}
-                  <div className="platform-report-card" style={{
-                    background: 'rgba(255, 255, 255, 0.02)',
-                    border: '1px solid rgba(255, 255, 255, 0.06)',
-                    borderRadius: '8px',
-                    padding: '12px 15px',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    justifyContent: 'space-between'
-                  }}>
+                  <div className="platform-report-card">
                     <div>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                         <span style={{ fontSize: '0.85rem', fontWeight: '600', color: '#D4AF37', display: 'flex', alignItems: 'center', gap: '5px' }}>
@@ -830,35 +806,27 @@ const Dashboard = () => {
                           {user?.codechefUsername ? 'Linked' : 'Not Linked'}
                         </span>
                       </div>
-                      <div className="report-value" style={{ fontSize: '1.4rem', fontWeight: '700', color: '#fff' }}>
-                        {stats?.codechefStats?.rating ? Math.max(15, Math.floor(stats.codechefStats.rating / 12)) : 0} <span style={{ fontSize: '0.8rem', color: '#a0aec0', fontWeight: '400' }}>solved</span>
+                      <div className="report-value" style={{ fontSize: '1.4rem', fontWeight: '700', color: 'var(--text-primary)' }}>
+                        {stats?.codechefStats?.rating ? Math.max(15, Math.floor(stats.codechefStats.rating / 12)) : 0} <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: '400' }}>solved</span>
                       </div>
                       <div style={{ display: 'flex', gap: '8px', marginTop: '10px', fontSize: '0.75rem' }}>
-                        <div style={{ flex: 1, padding: '4px', background: 'rgba(255,255,255,0.03)', borderRadius: '4px', textAlign: 'center' }}>
+                        <div className="platform-stat-badge">
                           Stars: <strong style={{ color: '#D4AF37' }}>{stats?.codechefStats?.stars || 'N/A'}</strong>
                         </div>
-                        <div style={{ flex: 1, padding: '4px', background: 'rgba(255,255,255,0.03)', borderRadius: '4px', textAlign: 'center' }}>
-                          Rating: <strong style={{ color: '#cbd5e0' }}>{stats?.codechefStats?.rating || 'N/A'}</strong>
+                        <div className="platform-stat-badge">
+                          Rating: <strong style={{ color: 'var(--text-primary)' }}>{stats?.codechefStats?.rating || 'N/A'}</strong>
                         </div>
                       </div>
                     </div>
                     {user?.codechefUsername && (
-                      <div style={{ fontSize: '0.7rem', color: '#718096', marginTop: '10px', wordBreak: 'break-all' }}>
+                      <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginTop: '10px', wordBreak: 'break-all' }}>
                         Handle: <strong>{user.codechefUsername}</strong>
                       </div>
                     )}
                   </div>
 
                   {/* HackerRank card */}
-                  <div className="platform-report-card" style={{
-                    background: 'rgba(255, 255, 255, 0.02)',
-                    border: '1px solid rgba(255, 255, 255, 0.06)',
-                    borderRadius: '8px',
-                    padding: '12px 15px',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    justifyContent: 'space-between'
-                  }}>
+                  <div className="platform-report-card">
                     <div>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                         <span style={{ fontSize: '0.85rem', fontWeight: '600', color: '#2EC866', display: 'flex', alignItems: 'center', gap: '5px' }}>
@@ -869,32 +837,24 @@ const Dashboard = () => {
                           {user?.hackerrankUsername ? 'Linked' : 'Not Linked'}
                         </span>
                       </div>
-                      <div className="report-value" style={{ fontSize: '1.4rem', fontWeight: '700', color: '#fff' }}>
-                        {stats?.hackerrankStats?.solvedCount || 0} <span style={{ fontSize: '0.8rem', color: '#a0aec0', fontWeight: '400' }}>solved</span>
+                      <div className="report-value" style={{ fontSize: '1.4rem', fontWeight: '700', color: 'var(--text-primary)' }}>
+                        {stats?.hackerrankStats?.solvedCount || 0} <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: '400' }}>solved</span>
                       </div>
                       <div style={{ display: 'flex', gap: '8px', marginTop: '10px', fontSize: '0.75rem' }}>
-                        <div style={{ flex: 1, padding: '4px', background: 'rgba(255,255,255,0.03)', borderRadius: '4px', textAlign: 'center' }}>
+                        <div className="platform-stat-badge">
                           Score: <strong style={{ color: '#2ec866' }}>{stats?.hackerrankStats?.solvedCount ? stats.hackerrankStats.solvedCount * 10 : 0}</strong>
                         </div>
                       </div>
                     </div>
                     {user?.hackerrankUsername && (
-                      <div style={{ fontSize: '0.7rem', color: '#718096', marginTop: '10px', wordBreak: 'break-all' }}>
+                      <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginTop: '10px', wordBreak: 'break-all' }}>
                         Handle: <strong>{user.hackerrankUsername}</strong>
                       </div>
                     )}
                   </div>
 
                   {/* Question Bank card */}
-                  <div className="platform-report-card" style={{
-                    background: 'rgba(255, 255, 255, 0.02)',
-                    border: '1px solid rgba(255, 255, 255, 0.06)',
-                    borderRadius: '8px',
-                    padding: '12px 15px',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    justifyContent: 'space-between'
-                  }}>
+                  <div className="platform-report-card">
                     <div>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                         <span style={{ fontSize: '0.85rem', fontWeight: '600', color: '#6366f1', display: 'flex', alignItems: 'center', gap: '5px' }}>
@@ -904,19 +864,19 @@ const Dashboard = () => {
                           Active
                         </span>
                       </div>
-                      <div className="report-value" style={{ fontSize: '1.4rem', fontWeight: '700', color: '#fff' }}>
-                        {stats?.qbSubmissions?.filter(s => s.status === 'Accepted').length || 0} <span style={{ fontSize: '0.8rem', color: '#a0aec0', fontWeight: '400' }}>solved</span>
+                      <div className="report-value" style={{ fontSize: '1.4rem', fontWeight: '700', color: 'var(--text-primary)' }}>
+                        {stats?.qbSubmissions?.filter(s => s.status === 'Accepted').length || 0} <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: '400' }}>solved</span>
                       </div>
                       <div style={{ display: 'flex', gap: '8px', marginTop: '10px', fontSize: '0.75rem' }}>
-                        <div style={{ flex: 1, padding: '4px', background: 'rgba(255,255,255,0.03)', borderRadius: '4px', textAlign: 'center' }}>
-                          Attempts: <strong style={{ color: '#cbd5e0' }}>{stats?.qbSubmissions?.length || 0}</strong>
+                        <div className="platform-stat-badge">
+                          Attempts: <strong style={{ color: 'var(--text-primary)' }}>{stats?.qbSubmissions?.length || 0}</strong>
                         </div>
-                        <div style={{ flex: 1, padding: '4px', background: 'rgba(255,255,255,0.03)', borderRadius: '4px', textAlign: 'center' }}>
-                          Contests: <strong style={{ color: '#cbd5e0' }}>{stats?.contestAttempts?.length || 0}</strong>
+                        <div className="platform-stat-badge">
+                          Contests: <strong style={{ color: 'var(--text-primary)' }}>{stats?.contestAttempts?.length || 0}</strong>
                         </div>
                       </div>
                     </div>
-                    <div style={{ fontSize: '0.7rem', color: '#718096', marginTop: '10px' }}>
+                    <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginTop: '10px' }}>
                       Auto-sync: <strong>Real-time</strong>
                     </div>
                   </div>
@@ -1340,7 +1300,7 @@ const Dashboard = () => {
               <div className="query-pulse-avatar" style={{ margin: '0 auto 20px', width: '60px', height: '60px', borderRadius: '50%', background: 'rgba(168, 85, 247, 0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid var(--secondary)' }}>
                 <svg viewBox="0 0 24 24" style={{ width: '28px', height: '28px', fill: 'none', stroke: 'var(--secondary)', strokeWidth: 2 }}><polygon points="5 3 19 12 5 21 5 3" /></svg>
               </div>
-              <h4 style={{ color: 'white', marginBottom: '8px' }}>Initializing Audio/Video Stream</h4>
+              <h4 style={{ color: 'var(--text-primary)', marginBottom: '8px' }}>Initializing Audio/Video Stream</h4>
               <p style={{ fontSize: '13.5px', lineHeight: 1.5 }}>Our expert mentors are ready to assist you. Creating secure peer connection...</p>
               <div className="connecting-bars" style={{ display: 'flex', gap: '4px', justifyContent: 'center', marginTop: '16px' }}>
                 <div className="bar-pulse"></div>

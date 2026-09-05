@@ -1,37 +1,37 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useState, useEffect, useContext } from 'react';
 
-const ThemeContext = createContext(null);
-const THEME_STORAGE_KEY = 'app_theme';
-
-const getInitialTheme = () => {
-  if (typeof window === 'undefined') return 'light';
-
-  const storedTheme = window.localStorage.getItem(THEME_STORAGE_KEY);
-  return storedTheme === 'dark' ? 'dark' : 'light';
-};
+const ThemeContext = createContext();
 
 export const ThemeProvider = ({ children }) => {
-  const [theme, setTheme] = useState(getInitialTheme);
+  // Default to 'light' (White theme) as requested, unless user previously set a preference
+  const [theme, setThemeState] = useState(() => {
+    const savedTheme = localStorage.getItem('app_theme');
+    return savedTheme || 'light';
+  });
 
   useEffect(() => {
-    document.documentElement.dataset.theme = theme;
-    document.body.dataset.theme = theme;
-    window.localStorage.setItem(THEME_STORAGE_KEY, theme);
+    document.documentElement.setAttribute('data-theme', theme);
+    document.body.setAttribute('data-theme', theme);
+    localStorage.setItem('app_theme', theme);
   }, [theme]);
 
   const toggleTheme = () => {
-    setTheme((currentTheme) => currentTheme === 'light' ? 'dark' : 'light');
+    setThemeState((prevTheme) => (prevTheme === 'light' ? 'dark' : 'light'));
+  };
+
+  const setTheme = (newTheme) => {
+    if (newTheme === 'light' || newTheme === 'dark') {
+      setThemeState(newTheme);
+    }
   };
 
   return (
-    <ThemeContext.Provider value={{ theme, toggleTheme }}>
+    <ThemeContext.Provider value={{ theme, toggleTheme, setTheme }}>
       {children}
     </ThemeContext.Provider>
   );
 };
 
-export const useTheme = () => {
-  const context = useContext(ThemeContext);
-  if (!context) throw new Error('useTheme must be used within a ThemeProvider');
-  return context;
-};
+export const useTheme = () => useContext(ThemeContext);
+
+export default ThemeContext;

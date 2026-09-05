@@ -1134,4 +1134,151 @@
   font-size: 11px;
 }
 
+/* ============================================================
+   LIGHT THEME OVERRIDES (Dark theme remains 100% as usual)
+   ============================================================ */
+[data-theme="light"] .filter-tab-btn:not(.active) {
+  background: #ffffff !important;
+  border-color: #cbd5e1 !important;
+  color: #334155 !important;
+}
+
+[data-theme="light"] .filter-tab-btn:not(.active):hover {
+  background: #f1f5f9 !important;
+  color: #0f172a !important;
+  border-color: #94a3b8 !important;
+}
+
+[data-theme="light"] .test-sheet-card {
+  background: #ffffff !important;
+  border-color: #e2e8f0 !important;
+  box-shadow: 0 2px 10px rgba(15, 23, 42, 0.04) !important;
+}
+
+[data-theme="light"] .test-sheet-card h3 {
+  color: #0f172a !important;
+}
+
+[data-theme="light"] .test-sheet-card p {
+  color: #475569 !important;
+}
+
+[data-theme="light"] .duration-tag,
+[data-theme="light"] .question-count-badge {
+  color: #64748b !important;
+}
+
+[data-theme="light"] .exam-details-header h2 {
+  color: #0f172a !important;
+}
+
+[data-theme="light"] .exam-timer-widget {
+  background: #f1f5f9 !important;
+  border-color: #e2e8f0 !important;
+  color: #0f172a !important;
+}
+
+[data-theme="light"] .question-navigation-panel h4 {
+  color: #475569 !important;
+}
+
+[data-theme="light"] .nav-grid-circle {
+  background: #f8fafc !important;
+  border-color: #cbd5e1 !important;
+  color: #334155 !important;
+}
+
+[data-theme="light"] .nav-grid-circle:hover {
+  background: #e2e8f0 !important;
+  color: #0f172a !important;
+  border-color: #94a3b8 !important;
+}
+
+[data-theme="light"] .nav-grid-circle.current {
+  background: var(--primary) !important;
+  border-color: var(--primary) !important;
+  color: #ffffff !important;
+}
+
+[data-theme="light"] .nav-grid-circle.answered {
+  background: #10b981 !important;
+  border-color: #10b981 !important;
+  color: #ffffff !important;
+}
+
+[data-theme="light"] .question-number-header {
+  color: #64748b !important;
+}
+
+[data-theme="light"] .question-text {
+  color: #0f172a !important;
+  font-weight: 600;
+}
+
+[data-theme="light"] .option-item-label {
+  background: #ffffff !important;
+  border-color: #cbd5e1 !important;
+  color: #0f172a !important;
+}
+
+[data-theme="light"] .option-item-label:hover {
+  background: #f8fafc !important;
+  border-color: #94a3b8 !important;
+}
+
+[data-theme="light"] .option-item-label.selected {
+  background: #eff6ff !important;
+  border-color: var(--primary) !important;
+  color: #0f172a !important;
+}
+
+[data-theme="light"] .option-letter {
+  background: #f1f5f9 !important;
+  border-color: #cbd5e1 !important;
+  color: #334155 !important;
+}
+
+[data-theme="light"] .option-item-label.selected .option-letter {
+  background: var(--primary) !important;
+  border-color: var(--primary) !important;
+  color: #ffffff !important;
+}
+
+[data-theme="light"] .warning-alert {
+  background: #fef2f2 !important;
+  border-color: #fecaca !important;
+}
+
+[data-theme="light"] .warning-alert h3 {
+  color: #991b1b !important;
+}
+
+[data-theme="light"] .warning-alert p {
+  color: #7f1d1d !important;
+}
+
+[data-theme="light"] .results-scorecard-card {
+  background: #ffffff !important;
+  border-color: #e2e8f0 !important;
+}
+
+[data-theme="light"] .results-scorecard-card h3 {
+  color: #0f172a !important;
+}
+
+[data-theme="light"] .solution-code-container {
+  background: #f8fafc !important;
+  border-color: #e2e8f0 !important;
+}
+
+[data-theme="light"] .solution-code-header {
+  background: #f1f5f9 !important;
+  border-bottom-color: #e2e8f0 !important;
+  color: #334155 !important;
+}
+
+[data-theme="light"] .solution-code-block code {
+  color: #0369a1 !important;
+}
+
 
