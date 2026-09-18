@@ -542,6 +542,119 @@ h1, h2, h3, h4, h5 {
   background: #94a3b8;
 }
 
+/* ============================================================
+   NUCLEAR LIGHT-MODE TEXT FIX
+   Catches ALL remaining white / light-grey text (hardcoded CSS
+   AND inline JSX styles) that individual component overrides miss.
+   ============================================================ */
+
+/* ---- 1. Global catch-all: every element defaults to dark text ---- */
+[data-theme="light"] *:not(.btn-primary):not(.btn-primary *)
+                      :not(.btn-accent):not(.btn-accent *)
+                      :not(.btn-danger):not(.btn-danger *)
+                      :not(.btn-code):not(.btn-code *)
+                      :not(.btn-take-test):not(.btn-take-test *)
+                      :not(.btn-stage):not(.btn-stage *)
+                      :not(.nav-link.active):not(.nav-link.active *)
+                      :not(.filter-tab-btn.active):not(.test-tab-button.active)
+                      :not(.qb-tab-btn.active)
+                      :not(.consistency-toggles .toggle-btn.active)
+                      :not(.state-tag-option.correct):not(.state-tag-option.wrong)
+                      :not(.role-option.active)
+                      :not(.stage-number)
+                      :not([class*="gradient"]):not([class*="-gradient"]) {
+  color: #0f172a;
+}
+
+/* ---- 2. Secondary / muted text (descriptions, labels, meta) ---- */
+[data-theme="light"] p,
+[data-theme="light"] small,
+[data-theme="light"] .text-muted,
+[data-theme="light"] [class*="-desc"],
+[data-theme="light"] [class*="-description"],
+[data-theme="light"] [class*="-subtitle"],
+[data-theme="light"] [class*="-subtext"],
+[data-theme="light"] [class*="-meta"],
+[data-theme="light"] [class*="-label"]:not(.form-label),
+[data-theme="light"] [class*="-footer-text"],
+[data-theme="light"] [class*="-secondary"] {
+  color: #475569 !important;
+}
+
+/* ---- 3. Override inline style="color: white / #fff / #f8fafc" in JSX ---- */
+[data-theme="light"] [style*="color: white"]:not(.btn-primary):not(.btn-accent):not(.btn-danger):not(.btn-stage):not(.btn-take-test):not(.btn-code):not(.stage-number):not(.difficulty-lbl),
+[data-theme="light"] [style*="color: #fff"]:not(.btn-primary):not(.btn-accent):not(.btn-danger):not(.btn-stage):not(.btn-take-test):not(.btn-code):not(.stage-number):not(.difficulty-lbl),
+[data-theme="light"] [style*="color: '#fff"]:not(.btn-primary):not(.btn-accent):not(.btn-danger):not(.btn-stage):not(.btn-take-test):not(.btn-code):not(.stage-number):not(.difficulty-lbl),
+[data-theme="light"] [style*="color:'white"]:not(.btn-primary):not(.btn-accent):not(.btn-danger):not(.btn-stage):not(.btn-take-test):not(.btn-code):not(.stage-number):not(.difficulty-lbl),
+[data-theme="light"] [style*="color: 'white"]:not(.btn-primary):not(.btn-accent):not(.btn-danger):not(.btn-stage):not(.btn-take-test):not(.btn-code):not(.stage-number):not(.difficulty-lbl) {
+  color: #0f172a !important;
+}
+
+/* ---- 4. Inline-styled inputs / selects / textareas (dark-bg inline) ---- */
+[data-theme="light"] [style*="background: #0f172a"],
+[data-theme="light"] [style*="background: '#0f172a"],
+[data-theme="light"] [style*="background: #1e293b"],
+[data-theme="light"] [style*="background: '#1e293b"],
+[data-theme="light"] [style*="background:#0f172a"],
+[data-theme="light"] [style*="background:#1e293b"] {
+  background: #ffffff !important;
+  border-color: #cbd5e1 !important;
+  color: #0f172a !important;
+}
+
+/* ---- 5. Preserve white text on colored/gradient backgrounds ---- */
+[data-theme="light"] .btn-primary,
+[data-theme="light"] .btn-primary *,
+[data-theme="light"] .btn-accent,
+[data-theme="light"] .btn-accent *,
+[data-theme="light"] .btn-danger,
+[data-theme="light"] .btn-danger *,
+[data-theme="light"] .btn-code,
+[data-theme="light"] .btn-code *,
+[data-theme="light"] .btn-take-test,
+[data-theme="light"] .btn-take-test *,
+[data-theme="light"] .btn-stage,
+[data-theme="light"] .btn-stage *,
+[data-theme="light"] .nav-link.active,
+[data-theme="light"] .nav-link.active *,
+[data-theme="light"] .consistency-toggles .toggle-btn.active,
+[data-theme="light"] .filter-tab-btn.active,
+[data-theme="light"] .test-tab-button.active,
+[data-theme="light"] .qb-tab-btn.active,
+[data-theme="light"] .state-tag-option.correct,
+[data-theme="light"] .state-tag-option.wrong,
+[data-theme="light"] .role-option.active,
+[data-theme="light"] .stage-number,
+[data-theme="light"] .difficulty-lbl {
+  color: #ffffff !important;
+}
+
+/* ---- 6. Gradient text elements must keep their fill ---- */
+[data-theme="light"] [style*="-webkit-text-fill-color"],
+[data-theme="light"] [class*="gradient-text"],
+[data-theme="light"] .header-section h1,
+[data-theme="light"] .company-header-section h1 {
+  color: unset !important;
+}
+
+/* ---- 7. SVG strokes that were white ---- */
+[data-theme="light"] svg:not(.btn-primary svg):not(.btn-accent svg) {
+  --icon-color: #334155;
+}
+[data-theme="light"] .query-arrow-icon {
+  stroke: #64748b !important;
+}
+
+/* ---- 8. Placeholder text ---- */
+[data-theme="light"] ::placeholder {
+  color: #94a3b8 !important;
+}
+
+/* ---- 9. Code / monospace areas keep dark bg in light mode ---- */
+[data-theme="light"] .modal-loading-wrapper {
+  color: #0f172a !important;
+}
+
 /* Grid & Layout Wrappers */
 .main-container {
   display: flex;
