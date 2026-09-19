@@ -164,26 +164,6 @@
   gap: 8px;
 }
 
-.chatgpt-status-pill {
-  font-size: 10px;
-  font-weight: 700;
-  background: linear-gradient(135deg, rgba(16, 185, 129, 0.2) 0%, rgba(5, 150, 105, 0.25) 100%);
-  color: #10b981;
-  border: 1px solid rgba(16, 185, 129, 0.4);
-  padding: 1px 7px;
-  border-radius: 9999px;
-  letter-spacing: 0.3px;
-}
-
-.chatgpt-mini-tag {
-  font-size: 10px;
-  font-weight: 700;
-  background: rgba(255, 255, 255, 0.25);
-  padding: 2px 7px;
-  border-radius: 9999px;
-  letter-spacing: 0.3px;
-  margin-left: 2px;
-}
 
 .chatbot-status-subtitle {
   font-size: 11px;
@@ -295,7 +275,7 @@
   color: #a5b4fc;
 }
 
-/* ChatGPT Settings Panel */
+/* AI Settings Panel */
 .chatbot-settings-panel {
   background: rgba(30, 41, 59, 0.95);
   border-bottom: 1px solid rgba(99, 102, 241, 0.3);
@@ -380,20 +360,6 @@
   padding: 0;
 }
 
-.chatgpt-verified-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  background: rgba(16, 185, 129, 0.15);
-  border: 1px solid rgba(16, 185, 129, 0.3);
-  color: #34d399;
-  font-size: 9.5px;
-  font-weight: 700;
-  padding: 1px 6px;
-  border-radius: 4px;
-  margin-bottom: 6px;
-  letter-spacing: 0.3px;
-}
 
 /* Messages Area */
 .chatbot-messages {

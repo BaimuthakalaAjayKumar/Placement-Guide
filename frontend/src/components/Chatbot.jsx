@@ -67,8 +67,8 @@ const Chatbot = () => {
     {
       id: 'welcome',
       role: 'assistant',
-      source: 'chatgpt',
-      text: `👋 **Hi! I am your GRIET Placement AI Assistant, powered by ChatGPT.**\n\nI can **interact directly with your live screen** to explain the problem you are solving, review your code, or resolve doubts on **Computer Science subjects** (DSA, DBMS, OS, OOP, CN).\n\nAsk whatever doubt you have or click any topic below:`,
+      source: 'ai',
+      text: `👋 **Hi! I am your GRIET Placement AI Assistant.**\n\nI can **interact directly with your live screen** to explain the problem you are solving, review your code, or resolve doubts on **Computer Science subjects** (DSA, DBMS, OS, OOP, CN).\n\nAsk whatever doubt you have or click any topic below:`,
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     }
   ]);
@@ -181,8 +181,8 @@ const Chatbot = () => {
             id: `ai-${Date.now()}`,
             role: 'assistant',
             text,
-            source: data.source || 'chatgpt',
-            model: data.model || 'ChatGPT',
+            source: data.source || 'ai',
+            model: data.model || 'AI Assistant',
             time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
           }
         ]);
@@ -195,7 +195,7 @@ const Chatbot = () => {
         {
           id: `ai-err-${Date.now()}`,
           role: 'assistant',
-          text: `⚠️ **Could not connect to ChatGPT service.** Please check your connection or try asking again.`,
+          text: `⚠️ **Could not connect to AI service.** Please check your connection or try asking again.`,
           time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
         }
       ]);
@@ -274,7 +274,7 @@ const Chatbot = () => {
           type="button"
           className="chatbot-launcher-btn animate-fade"
           onClick={() => setIsOpen(true)}
-          title="Ask AI Assistant (ChatGPT with Live Screen Interaction)"
+          title="Ask AI Assistant (with Live Screen Interaction)"
         >
           <div className="chatbot-launcher-icon">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -284,7 +284,6 @@ const Chatbot = () => {
             </svg>
           </div>
           <span className="chatbot-launcher-text">Ask AI Assistant</span>
-          <span className="chatgpt-mini-tag">ChatGPT</span>
           <span className="chatbot-pulse-ring"></span>
         </button>
       )}
@@ -308,7 +307,6 @@ const Chatbot = () => {
               <div className="chatbot-title-group">
                 <div className="chatbot-title-line">
                   <h3>GRIET AI Assistant</h3>
-                  <span className="chatgpt-status-pill">⚡ ChatGPT</span>
                 </div>
                 <span className="chatbot-status-subtitle">
                   {screenContextActive ? '🎯 Live Screen Reader Active' : 'Subject Doubts & Portal Guidance'}
@@ -329,7 +327,7 @@ const Chatbot = () => {
                 type="button"
                 className={`chatbot-icon-btn ${showSettings ? 'active-btn' : ''}`}
                 onClick={() => setShowSettings(!showSettings)}
-                title="Configure ChatGPT Key"
+                title="Configure AI Assistant Key"
               >
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: '15px', height: '15px' }}>
                   <circle cx="12" cy="12" r="3"></circle>
@@ -365,15 +363,15 @@ const Chatbot = () => {
             </div>
           )}
 
-          {/* ChatGPT Settings Panel */}
+          {/* AI Settings Panel */}
           {showSettings && (
             <div className="chatbot-settings-panel animate-fade">
               <div className="settings-panel-header">
-                <h4>⚡ ChatGPT (OpenAI) Key</h4>
+                <h4>⚡ AI Assistant Key</h4>
                 <button type="button" className="settings-close-x" onClick={() => setShowSettings(false)}>✕</button>
               </div>
               <p className="settings-panel-text">
-                Enter your OpenAI API key to query <strong>ChatGPT</strong> directly for any technical question:
+                Enter your API key to query the assistant directly for any technical question:
               </p>
               <div className="settings-panel-row">
                 <input
@@ -416,11 +414,6 @@ const Chatbot = () => {
                   </div>
                 )}
                 <div className={`chatbot-bubble ${msg.role === 'user' ? 'user-bubble' : 'bot-bubble'}`}>
-                  {msg.source === 'chatgpt' && (
-                    <div className="chatgpt-verified-badge">
-                      <span>⚡ ChatGPT</span>
-                    </div>
-                  )}
                   {renderFormattedText(msg.text)}
                   <span className="chatbot-time">{msg.time}</span>
                 </div>
@@ -462,7 +455,7 @@ const Chatbot = () => {
             <textarea
               ref={inputRef}
               className="chatbot-input"
-              placeholder={screenContextActive ? "Ask ChatGPT about your screen or any subject doubt..." : "Ask ChatGPT any doubt on OS, DBMS, DSA..."}
+              placeholder={screenContextActive ? "Ask about your screen or any subject doubt..." : "Ask any doubt on OS, DBMS, DSA..."}
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}

@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import LeetCodeThemeToggle from './LeetCodeThemeToggle';
 import { API_URL } from '../config/api';
 import './Sidebar.css';
 
@@ -212,9 +211,6 @@ const Sidebar = () => {
       </nav>
 
       <div className="sidebar-footer" style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-        <div className="sidebar-theme-row">
-          <LeetCodeThemeToggle showLabel={true} />
-        </div>
         {user.role === 'student' ? (
           <>
             <div className="user-badge-container">
