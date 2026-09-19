@@ -99,8 +99,8 @@ const Sidebar = () => {
             </NavLink>
 
             <NavLink to="/aptitude-tests" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
-              <svg viewBox="0 0 24 24" className="nav-icon"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.73 21a2 2 0 0 1-3.46 0" /></svg>
-              <span>Progress Tracker</span>
+              <svg viewBox="0 0 24 24" className="nav-icon" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+              <span>Practice Modules</span>
             </NavLink>
 
             <NavLink to="/core-cse" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
@@ -133,21 +133,9 @@ const Sidebar = () => {
               <span>Discussion Forum</span>
             </NavLink>
 
-            <NavLink to="/company-prep" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
-              <svg viewBox="0 0 24 24" className="nav-icon"><path d="M3 21h18M5 21V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16M9 9h6M9 13h6M9 17h6" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" /></svg>
-              <span>Company Pathways</span>
-            </NavLink>
-
             <NavLink to="/jobs" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
               <svg viewBox="0 0 24 24" className="nav-icon"><rect x="2" y="7" width="20" height="14" rx="2" ry="2" /><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" /></svg>
               <span>Job Board</span>
-            </NavLink>
-
-            <NavLink to="/doubt-solver" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
-              <svg viewBox="0 0 24 24" className="nav-icon" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="12" cy="12" r="10" /><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" /><line x1="12" y1="17" x2="12.01" y2="17" />
-              </svg>
-              <span>Doubt Solver</span>
             </NavLink>
           </>
         )}
@@ -213,12 +201,6 @@ const Sidebar = () => {
               <span>Coding Playground</span>
             </NavLink>
 
-            <NavLink to="/admin/doubt-solver" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
-              <svg viewBox="0 0 24 24" className="nav-icon" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="12" cy="12" r="10" /><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" /><line x1="12" y1="17" x2="12.01" y2="17" />
-              </svg>
-              <span>Doubt Resolving</span>
-            </NavLink>
 
             <NavLink to="/discussion-forum" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
               <svg viewBox="0 0 24 24" className="nav-icon" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" /></svg>

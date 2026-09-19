@@ -4,6 +4,7 @@ const {
   getJobRecommendations,
   createJob,
   deleteJob,
+  updateJobExpiry,
   bulkCreateJobs,
   toggleSaveJob,
   getSavedJobs,
@@ -28,6 +29,7 @@ router.post('/:id/apply', applyJob);
 // Admin only routes
 router.post('/', authorize('admin'), createJob);
 router.post('/bulk', authorize('admin'), bulkCreateJobs);
+router.put('/:id/expiry', authorize('admin'), updateJobExpiry);
 router.delete('/:id', authorize('admin'), deleteJob);
 router.put('/:id/status', authorize('admin'), updateApplicationStatus);
 

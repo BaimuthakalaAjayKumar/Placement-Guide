@@ -886,9 +886,9 @@ const Dashboard = () => {
 
             {/* Row 3: Progress Modules & Recent Activities */}
             <div className="dashboard-row-bottom">
-              {/* Progress Tracker Modules */}
+              {/* Practice Modules */}
               <div className="glass-card charts-card">
-                <h3>Progress Tracker Modules</h3>
+                <h3>Practice Modules</h3>
                 <p className="card-desc">Your average performance across the 4 modules. Click on any module to view your complete attempt history.</p>
 
                 <div className="bar-chart-container">
@@ -1086,17 +1086,18 @@ const Dashboard = () => {
               </div>
             </div>
 
-            {/* Live Query Resolution Banner */}
+            {/* AI Doubt Assistant Banner */}
             <div
               className="live-query-banner-container animate-fade"
-              onClick={() => navigate('/doubt-solver')}
+              onClick={() => window.dispatchEvent(new CustomEvent('open-ai-chatbot'))}
+              style={{ cursor: 'pointer' }}
             >
-              <div className="query-play-box">
-                <svg viewBox="0 0 24 24" className="query-play-icon"><polygon points="5 3 19 12 5 21 5 3" /></svg>
+              <div className="query-play-box" style={{ background: 'linear-gradient(135deg, #6366f1, #a855f7)' }}>
+                <svg viewBox="0 0 24 24" className="query-play-icon" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><circle cx="9" cy="10" r="1"/><circle cx="15" cy="10" r="1"/></svg>
               </div>
               <div className="query-text-box">
-                <h4>Live Query Resolution</h4>
-                <p>Get instant assistance from engineering mentors</p>
+                <h4>AI Doubt Assistant</h4>
+                <p>Instant answers on Core CSE, DSA, Aptitude & Portal Tools</p>
               </div>
               <div className="query-arrow-box">
                 <svg viewBox="0 0 24 24" className="query-arrow-icon"><polyline points="9 18 15 12 9 6" /></svg>
@@ -1315,7 +1316,7 @@ const Dashboard = () => {
         </div>
       )}
 
-      {/* Progress Tracker Attempts History Modal */}
+      {/* Practice Modules Attempts History Modal */}
       {isHistoryModalOpen && (
         <div className="modal-overlay">
           <div className="modal-content glass-card history-modal-content">

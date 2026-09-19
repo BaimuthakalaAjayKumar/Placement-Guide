@@ -18,7 +18,13 @@ const ResumeBuilder = () => {
         projects: [
             { title: 'Placement Preparation Portal', tech: 'MERN Stack, Socket.IO', description: 'A comprehensive SAAS platform for interview preparation featuring real-time collaborative coding and AI resume reviews.' }
         ],
-        skills: 'JavaScript, React.js, Node.js, Express, MongoDB, Python, Java, C++, SQL'
+        skills: 'JavaScript, React.js, Node.js, Express, MongoDB, Python, Java, C++, SQL',
+        certifications: [
+            { name: 'AWS Certified Cloud Practitioner', issuer: 'Amazon Web Services', year: '2023', link: 'aws.amazon.com/verification' }
+        ],
+        achievements: [
+            { title: 'Winner - National Smart India Hackathon', organization: 'Ministry of Education / AICTE', year: '2023', description: 'Secured 1st place among 450+ teams nationally for developing an AI-driven student placement readiness analytics engine.' }
+        ]
     });
 
     const handleChange = (e, section, index, field) => {
@@ -35,6 +41,11 @@ const ResumeBuilder = () => {
 
     const handleAddField = (section, defaultObj) => {
         setFormData({ ...formData, [section]: [...formData[section], defaultObj] });
+    };
+
+    const handleRemoveField = (section, index) => {
+        const updatedSection = formData[section].filter((_, i) => i !== index);
+        setFormData({ ...formData, [section]: updatedSection });
     };
 
     const handlePrint = () => {
@@ -63,6 +74,19 @@ const ResumeBuilder = () => {
                             <h3>Education</h3>
                             {formData.education.map((edu, i) => (
                                 <div key={i} className="dynamic-field">
+                                    <div className="dynamic-field-header">
+                                        <span className="field-badge">Education #{i + 1}</span>
+                                        {formData.education.length > 1 && (
+                                            <button
+                                                type="button"
+                                                className="btn-remove-item"
+                                                onClick={() => handleRemoveField('education', i)}
+                                                title="Remove this education"
+                                            >
+                                                ✕ Remove
+                                            </button>
+                                        )}
+                                    </div>
                                     <input type="text" value={edu.institution} onChange={(e) => handleChange(e, 'education', i, 'institution')} placeholder="Institution Name" />
                                     <input type="text" value={edu.degree} onChange={(e) => handleChange(e, 'education', i, 'degree')} placeholder="Degree (e.g., B.Tech CSE)" />
                                     <input type="text" value={edu.year} onChange={(e) => handleChange(e, 'education', i, 'year')} placeholder="Duration (e.g., 2020 - 2024)" />
@@ -82,6 +106,17 @@ const ResumeBuilder = () => {
                             <h3>Experience (Internships/Jobs)</h3>
                             {formData.experience.map((exp, i) => (
                                 <div key={i} className="dynamic-field">
+                                    <div className="dynamic-field-header">
+                                        <span className="field-badge">Experience #{i + 1}</span>
+                                        <button
+                                            type="button"
+                                            className="btn-remove-item"
+                                            onClick={() => handleRemoveField('experience', i)}
+                                            title="Remove this experience"
+                                        >
+                                            ✕ Remove
+                                        </button>
+                                    </div>
                                     <input type="text" value={exp.company} onChange={(e) => handleChange(e, 'experience', i, 'company')} placeholder="Company Name" />
                                     <input type="text" value={exp.role} onChange={(e) => handleChange(e, 'experience', i, 'role')} placeholder="Role" />
                                     <input type="text" value={exp.duration} onChange={(e) => handleChange(e, 'experience', i, 'duration')} placeholder="Duration" />
@@ -101,6 +136,17 @@ const ResumeBuilder = () => {
                             <h3>Projects</h3>
                             {formData.projects.map((proj, i) => (
                                 <div key={i} className="dynamic-field">
+                                    <div className="dynamic-field-header">
+                                        <span className="field-badge">Project #{i + 1}</span>
+                                        <button
+                                            type="button"
+                                            className="btn-remove-item"
+                                            onClick={() => handleRemoveField('projects', i)}
+                                            title="Remove this project"
+                                        >
+                                            ✕ Remove
+                                        </button>
+                                    </div>
                                     <input type="text" value={proj.title} onChange={(e) => handleChange(e, 'projects', i, 'title')} placeholder="Project Title" />
                                     <input type="text" value={proj.tech} onChange={(e) => handleChange(e, 'projects', i, 'tech')} placeholder="Tech Stack" />
                                     <textarea value={proj.description} onChange={(e) => handleChange(e, 'projects', i, 'description')} placeholder="Project Description" rows="3"></textarea>
@@ -118,6 +164,68 @@ const ResumeBuilder = () => {
                         <div className="form-section">
                             <h3>Technical Skills</h3>
                             <textarea name="skills" value={formData.skills} onChange={(e) => handleChange(e, 'skills')} placeholder="Comma separated skills (e.g., React.js, Node.js, Python)" rows="3"></textarea>
+                        </div>
+
+                        {/* Certifications Section */}
+                        <div className="form-section">
+                            <h3>Certifications</h3>
+                            {formData.certifications.map((cert, i) => (
+                                <div key={i} className="dynamic-field">
+                                    <div className="dynamic-field-header">
+                                        <span className="field-badge">Certification #{i + 1}</span>
+                                        <button
+                                            type="button"
+                                            className="btn-remove-item"
+                                            onClick={() => handleRemoveField('certifications', i)}
+                                            title="Remove this certification"
+                                        >
+                                            ✕ Remove
+                                        </button>
+                                    </div>
+                                    <input type="text" value={cert.name} onChange={(e) => handleChange(e, 'certifications', i, 'name')} placeholder="Certification Name (e.g. AWS Solutions Architect)" />
+                                    <input type="text" value={cert.issuer} onChange={(e) => handleChange(e, 'certifications', i, 'issuer')} placeholder="Issuing Organization (e.g. Amazon Web Services)" />
+                                    <input type="text" value={cert.year} onChange={(e) => handleChange(e, 'certifications', i, 'year')} placeholder="Issue Date / Year (e.g. 2023)" />
+                                    <input type="text" value={cert.link} onChange={(e) => handleChange(e, 'certifications', i, 'link')} placeholder="Credential URL or ID" />
+                                </div>
+                            ))}
+                            <button
+                                type="button"
+                                className="btn-add"
+                                onClick={() => handleAddField('certifications', { name: '', issuer: '', year: '', link: '' })}
+                            >
+                                + Add Certification
+                            </button>
+                        </div>
+
+                        {/* Achievements & Honors Section */}
+                        <div className="form-section">
+                            <h3>Achievements & Honors</h3>
+                            {formData.achievements.map((ach, i) => (
+                                <div key={i} className="dynamic-field">
+                                    <div className="dynamic-field-header">
+                                        <span className="field-badge">Achievement #{i + 1}</span>
+                                        <button
+                                            type="button"
+                                            className="btn-remove-item"
+                                            onClick={() => handleRemoveField('achievements', i)}
+                                            title="Remove this achievement"
+                                        >
+                                            ✕ Remove
+                                        </button>
+                                    </div>
+                                    <input type="text" value={ach.title} onChange={(e) => handleChange(e, 'achievements', i, 'title')} placeholder="Achievement Title / Honor" />
+                                    <input type="text" value={ach.organization} onChange={(e) => handleChange(e, 'achievements', i, 'organization')} placeholder="Awarding Organization / Context" />
+                                    <input type="text" value={ach.year} onChange={(e) => handleChange(e, 'achievements', i, 'year')} placeholder="Year (e.g. 2023)" />
+                                    <textarea value={ach.description} onChange={(e) => handleChange(e, 'achievements', i, 'description')} placeholder="Achievement Description / Details" rows="2"></textarea>
+                                </div>
+                            ))}
+                            <button
+                                type="button"
+                                className="btn-add"
+                                onClick={() => handleAddField('achievements', { title: '', organization: '', year: '', description: '' })}
+                            >
+                                + Add Achievement
+                            </button>
                         </div>
 
                         <div className="form-actions">
@@ -194,6 +302,48 @@ const ResumeBuilder = () => {
                                                 <em> | {proj.tech}</em>
                                             </div>
                                             <p className="item-desc mt-1">{proj.description}</p>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+
+                            {/* CERTIFICATIONS PREVIEW */}
+                            {formData.certifications && formData.certifications.length > 0 && formData.certifications[0].name !== '' && (
+                                <div className="resume-section">
+                                    <h2>CERTIFICATIONS</h2>
+                                    <hr />
+                                    {formData.certifications.map((cert, i) => (
+                                        <div key={i} className="resume-item">
+                                            <div className="item-header">
+                                                <strong>{cert.name}</strong>
+                                                <span>{cert.year}</span>
+                                            </div>
+                                            <div className="item-subheader">
+                                                <span>{cert.issuer}</span>
+                                                {cert.link && <span className="cert-link">{cert.link}</span>}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+
+                            {/* ACHIEVEMENTS PREVIEW */}
+                            {formData.achievements && formData.achievements.length > 0 && formData.achievements[0].title !== '' && (
+                                <div className="resume-section">
+                                    <h2>ACHIEVEMENTS & HONORS</h2>
+                                    <hr />
+                                    {formData.achievements.map((ach, i) => (
+                                        <div key={i} className="resume-item">
+                                            <div className="item-header">
+                                                <strong>{ach.title}</strong>
+                                                <span>{ach.year}</span>
+                                            </div>
+                                            {ach.organization && (
+                                                <div className="item-subheader">
+                                                    <em>{ach.organization}</em>
+                                                </div>
+                                            )}
+                                            {ach.description && <p className="item-desc mt-1">{ach.description}</p>}
                                         </div>
                                     ))}
                                 </div>

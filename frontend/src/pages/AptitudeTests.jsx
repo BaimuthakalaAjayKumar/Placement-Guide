@@ -159,11 +159,27 @@ const getHackerrankSolvedIds = (username, hackerrankStats, problems) => {
   return new Set(selectedIds);
 };
 
+const isCoreCseTest = (test) => {
+  const cat = (test?.category || '').toLowerCase();
+  const title = (test?.title || '').toLowerCase();
+  return (
+    ['dbms', 'os', 'oop', 'networks', 'cn', 'core-cse', 'dsa'].includes(cat) ||
+    title.includes('dbms') ||
+    title.includes('database') ||
+    title.includes('operating system') ||
+    title.includes('object-oriented') ||
+    title.includes('oop') ||
+    title.includes('network')
+  );
+};
+
 const AptitudeTests = () => {
   const { token, user, loadUser } = useAuth();
   
   const queryParams = new URLSearchParams(window.location.search);
   const companyFilter = queryParams.get('company') || '';
+  const initialCategory = (queryParams.get('category') || '').toLowerCase();
+  const isInitialCoreCategory = ['dbms', 'os', 'oop', 'networks', 'cn', 'core-cse', 'dsa'].includes(initialCategory);
 
   // States
   const [tests, setTests] = useState([]);
@@ -176,8 +192,8 @@ const AptitudeTests = () => {
   const [codechefProblems, setCodechefProblems] = useState(defaultCodechefProblems);
   const [hackerrankProblems, setHackerrankProblems] = useState(defaultHackerrankProblems);
 
-  // Tab control
-  const [activeTab, setActiveTab] = useState('aptitude');
+  // Tab control (auto-select core-cse if navigating with core cse category)
+  const [activeTab, setActiveTab] = useState(isInitialCoreCategory ? 'core-cse' : 'aptitude');
 
   // LeetCode states
   const [leetcodeUsernameInput, setLeetcodeUsernameInput] = useState(user?.leetcodeUsername || '');
@@ -238,7 +254,7 @@ const AptitudeTests = () => {
   // Fetch practice questions from database on tab change
   useEffect(() => {
     const fetchPracticeQuestions = async () => {
-      if (activeTab === 'aptitude' || activeTab === 'leaderboard') return;
+      if (activeTab === 'aptitude' || activeTab === 'core-cse' || activeTab === 'leaderboard') return;
       try {
         let endpoint = `${API_URL}/tests/practice-questions/${activeTab}`;
         if (companyFilter) endpoint += `?company=${companyFilter}`;
@@ -697,7 +713,7 @@ const AptitudeTests = () => {
 
   return (
     <>
-      <Header title="Progress Tracker" />
+      <Header title="Practice Modules" />
 
       <div className="content-wrapper test-content animate-fade">
         {error && (
@@ -708,12 +724,18 @@ const AptitudeTests = () => {
 
         {/* Tab Buttons */}
         {!testStarted && !examResult && (
-          <div className="test-tabs-container" style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+          <div className="test-tabs-container">
             <button 
               className={`test-tab-button ${activeTab === 'aptitude' ? 'active' : ''}`}
               onClick={() => setActiveTab('aptitude')}
             >
               Aptitude Modules
+            </button>
+            <button 
+              className={`test-tab-button ${activeTab === 'core-cse' ? 'active' : ''}`}
+              onClick={() => setActiveTab('core-cse')}
+            >
+              Core CSE Practice
             </button>
             <button 
               className={`test-tab-button ${activeTab === 'leetcode' ? 'active' : ''}`}
@@ -742,12 +764,12 @@ const AptitudeTests = () => {
           </div>
         )}
 
-        {/* VIEW 1: TEST LIST SELECTOR */}
+        {/* VIEW 1: TEST LIST SELECTOR - APTITUDE */}
         {!testStarted && !examResult && activeTab === 'aptitude' && (
           <div className="test-selector-view">
             <h3 className="selector-section-title">Ace Your Interviews — Aptitude</h3>
             <div className="progress-modules-list">
-              {tests.map((test) => (
+              {tests.filter(test => !isCoreCseTest(test)).map((test) => (
                 <div className="progress-module-row glass-card animate-fade" key={test._id}>
                   <div className="module-left-icon">
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="module-brain-icon">
@@ -780,6 +802,66 @@ const AptitudeTests = () => {
                   </div>
                 </div>
               ))}
+              {tests.filter(test => !isCoreCseTest(test)).length === 0 && (
+                <div className="glass-card" style={{ padding: '30px', textAlign: 'center', color: '#94a3b8' }}>
+                  <p>No Aptitude modules found matching current criteria.</p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* VIEW 1.2: TEST LIST SELECTOR - CORE CSE */}
+        {!testStarted && !examResult && activeTab === 'core-cse' && (
+          <div className="test-selector-view">
+            <h3 className="selector-section-title">Ace Your Interviews — Core CSE</h3>
+            <div className="progress-modules-list">
+              {tests.filter(test => isCoreCseTest(test)).map((test) => (
+                <div className="progress-module-row glass-card animate-fade" key={test._id}>
+                  <div className="module-left-icon">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="module-brain-icon">
+                      <rect x="4" y="4" width="16" height="16" rx="2" ry="2"></rect>
+                      <rect x="9" y="9" width="6" height="6"></rect>
+                      <line x1="9" y1="1" x2="9" y2="4"></line>
+                      <line x1="15" y1="1" x2="15" y2="4"></line>
+                      <line x1="9" y1="20" x2="9" y2="23"></line>
+                      <line x1="15" y1="20" x2="15" y2="23"></line>
+                      <line x1="20" y1="9" x2="23" y2="9"></line>
+                      <line x1="20" y1="14" x2="23" y2="14"></line>
+                      <line x1="1" y1="9" x2="4" y2="9"></line>
+                      <line x1="1" y1="14" x2="4" y2="14"></line>
+                    </svg>
+                  </div>
+                  <div className="module-content">
+                    <h4 className="module-title">{test.title}</h4>
+                    <p className="module-desc">{test.description}</p>
+                    <div className="module-meta">
+                      <span className="meta-badge">{test.questionCount} Questions</span>
+                      <span className="meta-divider">•</span>
+                      <span className="meta-badge">{test.duration} Mins</span>
+                    </div>
+                  </div>
+                  <div className="module-action">
+                    {test.completed ? (
+                      <div className="completed-action-wrapper">
+                        <span className="module-score-mark">Scored {Math.round((test.score / test.questionCount) * 100)}%</span>
+                        <button className="btn btn-secondary btn-sm" onClick={() => handleStartExam(test._id)}>
+                          Retake Test
+                        </button>
+                      </div>
+                    ) : (
+                      <button className="btn btn-primary" onClick={() => handleStartExam(test._id)}>
+                        Start Test
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+              {tests.filter(test => isCoreCseTest(test)).length === 0 && (
+                <div className="glass-card" style={{ padding: '30px', textAlign: 'center', color: '#94a3b8' }}>
+                  <p>No Core CSE modules found matching current criteria.</p>
+                </div>
+              )}
             </div>
           </div>
         )}

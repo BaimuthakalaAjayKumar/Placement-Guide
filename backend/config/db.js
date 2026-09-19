@@ -110,7 +110,8 @@ const connectDB = async () => {
 
   } catch (err) {
     console.error(`MongoDB Connection Error: ${err.message}`);
-    process.exit(1);
+    console.log('Retrying MongoDB connection in 5 seconds...');
+    setTimeout(connectDB, 5000);
   }
 };
 

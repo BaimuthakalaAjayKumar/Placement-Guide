@@ -5,6 +5,7 @@ import { ThemeProvider } from './context/ThemeContext';
 
 // Components
 import Sidebar from './components/Sidebar';
+import Chatbot from './components/Chatbot';
 
 // Pages
 import HomePage from './pages/HomePage';
@@ -60,6 +61,7 @@ const PrivateRoute = ({ children, allowedRoles }) => {
     <div className="main-container">
       <Sidebar />
       {children}
+      <Chatbot />
     </div>
   );
 };
@@ -149,6 +151,14 @@ const AppRoutes = () => {
         }
       />
       <Route
+        path="/practice-modules"
+        element={
+          <PrivateRoute allowedRoles={['student']}>
+            <AptitudeTests />
+          </PrivateRoute>
+        }
+      />
+      <Route
         path="/mock-interviews"
         element={
           <PrivateRoute allowedRoles={['student']}>
@@ -166,11 +176,7 @@ const AppRoutes = () => {
       />
       <Route
         path="/company-prep"
-        element={
-          <PrivateRoute allowedRoles={['student']}>
-            <CompanyPrep />
-          </PrivateRoute>
-        }
+        element={<Navigate to="/dashboard" replace />}
       />
       <Route
         path="/jobs"
@@ -191,11 +197,7 @@ const AppRoutes = () => {
 
       <Route
         path="/doubt-solver"
-        element={
-          <PrivateRoute allowedRoles={['student']}>
-            <DoubtSolver />
-          </PrivateRoute>
-        }
+        element={<Navigate to="/dashboard" replace />}
       />
 
       {/* Private Admin Routes */}
@@ -226,11 +228,7 @@ const AppRoutes = () => {
 
       <Route
         path="/admin/doubt-solver"
-        element={
-          <PrivateRoute allowedRoles={['admin']}>
-            <AdminDoubtSolver />
-          </PrivateRoute>
-        }
+        element={<Navigate to="/admin" replace />}
       />
 
       {/* Private Shared Routes */}

@@ -19,6 +19,9 @@ const AdminPanel = () => {
   // Job options list & deletion
   const [jobs, setJobs] = useState([]);
   const [fetchJobsLoading, setFetchJobsLoading] = useState(false);
+  const [selectedJobForExpiry, setSelectedJobForExpiry] = useState(null);
+  const [jobExpiryDate, setJobExpiryDate] = useState('');
+  const [updatingJobExpiry, setUpdatingJobExpiry] = useState(false);
 
   // Job form fields
   const [jobTitle, setJobTitle] = useState('');
@@ -98,12 +101,6 @@ const AdminPanel = () => {
   const [submittingRole, setSubmittingRole] = useState(false);
   const [submittingTech, setSubmittingTech] = useState(false);
   const [metaSuccess, setMetaSuccess] = useState('');
-
-  // Settings / Holidays states
-  const [holidays, setHolidays] = useState([]);
-  const [holidayDate, setHolidayDate] = useState('');
-  const [holidayDesc, setHolidayDesc] = useState('');
-  const [submittingHoliday, setSubmittingHoliday] = useState(false);
 
   // Bulk delete state
   const [deleteYear, setDeleteYear] = useState('');
@@ -261,6 +258,44 @@ const AdminPanel = () => {
       }
     } catch (err) {
       setError('Could not connect to job deletion service.');
+    }
+  };
+
+  const openJobExpiryEditor = (job) => {
+    setSelectedJobForExpiry(job);
+    setJobExpiryDate(job.expiresAt ? new Date(job.expiresAt).toISOString().slice(0, 10) : '');
+    setError('');
+    setSuccess('');
+  };
+
+  const handleUpdateJobExpiry = async (e) => {
+    e.preventDefault();
+    if (!selectedJobForExpiry || !jobExpiryDate) return;
+
+    try {
+      setUpdatingJobExpiry(true);
+      setError('');
+      const res = await fetch(`${API_URL}/jobs/${selectedJobForExpiry._id}/expiry`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ expiresAt: jobExpiryDate })
+      });
+      const data = await res.json();
+
+      if (data.success) {
+        setJobs(prev => prev.map(job => job._id === data.data._id ? data.data : job));
+        setSuccess(data.message);
+        setSelectedJobForExpiry(null);
+      } else {
+        setError(data.error || 'Failed to update the job deadline.');
+      }
+    } catch (err) {
+      setError('Could not connect to the job deadline service.');
+    } finally {
+      setUpdatingJobExpiry(false);
     }
   };
 
@@ -1091,77 +1126,6 @@ const AdminPanel = () => {
     URL.revokeObjectURL(url);
   };
 
-  const fetchHolidays = async () => {
-    try {
-      const res = await fetch(`${API_URL}/holidays`, {
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
-      });
-      const data = await res.json();
-      if (data.success) {
-        setHolidays(data.data);
-      }
-    } catch (err) {
-      console.error('Failed to retrieve holidays:', err);
-    }
-  };
-
-  const handleCreateHoliday = async (e) => {
-    e.preventDefault();
-    if (!holidayDate) return alert('Please select a date.');
-    setSubmittingHoliday(true);
-    try {
-      const res = await fetch(`${API_URL}/holidays`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          date: holidayDate,
-          description: holidayDesc || 'Holiday'
-        })
-      });
-      const data = await res.json();
-      if (data.success) {
-        setSuccess('Holiday added successfully!');
-        setHolidayDate('');
-        setHolidayDesc('');
-        fetchHolidays();
-        setTimeout(() => setSuccess(''), 3000);
-      } else {
-        alert(data.error || 'Failed to add holiday.');
-      }
-    } catch (err) {
-      alert('Error adding holiday.');
-    } finally {
-      setSubmittingHoliday(false);
-    }
-  };
-
-  const handleDeleteHoliday = async (id) => {
-    if (!window.confirm('Are you sure you want to delete this holiday?')) return;
-    try {
-      const res = await fetch(`${API_URL}/holidays/${id}`, {
-        method: 'DELETE',
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
-      });
-      const data = await res.json();
-      if (data.success) {
-        setSuccess('Holiday deleted successfully.');
-        fetchHolidays();
-        setTimeout(() => setSuccess(''), 3000);
-      } else {
-        alert(data.error || 'Failed to delete holiday.');
-      }
-    } catch (err) {
-      alert('Error deleting holiday.');
-    }
-  };
-
   const handleDownloadStudentReport = async () => {
     try {
       const res = await fetch(`${API_URL}/users/students/export`, {
@@ -1462,6 +1426,43 @@ const AdminPanel = () => {
     <>
       <Header title="Admin Command Console" />
 
+      {selectedJobForExpiry && (
+        <div className="modal-overlay" onClick={() => setSelectedJobForExpiry(null)}>
+          <div className="modal-content medium-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <div>
+                <h3>Extend Job Deadline</h3>
+                <p className="modal-subtitle">{selectedJobForExpiry.title} at {selectedJobForExpiry.company}</p>
+              </div>
+              <button className="close-btn" onClick={() => setSelectedJobForExpiry(null)}>×</button>
+            </div>
+            <form className="admin-job-form" onSubmit={handleUpdateJobExpiry}>
+              <div className="form-group">
+                <label className="form-label" htmlFor="jobExpiryDate">New application deadline</label>
+                <input
+                  id="jobExpiryDate"
+                  type="date"
+                  className="form-control"
+                  value={jobExpiryDate}
+                  min={new Date().toISOString().slice(0, 10)}
+                  onChange={(e) => setJobExpiryDate(e.target.value)}
+                  required
+                />
+              </div>
+              <p className="card-desc">Matching students will receive an in-app notification and email about the new deadline.</p>
+              <div className="modal-actions">
+                <button type="button" className="btn btn-secondary" onClick={() => setSelectedJobForExpiry(null)}>
+                  Cancel
+                </button>
+                <button type="submit" className="btn btn-primary" disabled={updatingJobExpiry}>
+                  {updatingJobExpiry ? 'Updating...' : 'Update & Notify Students'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* Mock Interview Report Modal — placed at fragment root so overlay is truly fullscreen */}
       {selectedMockReport && (
         <div className="modal-overlay" onClick={() => setSelectedMockReport(null)}>
@@ -1574,7 +1575,6 @@ const AdminPanel = () => {
             className={`admin-tab-btn ${activeTab === 'settings' ? 'active' : ''}`}
             onClick={() => {
               setActiveTab('settings');
-              fetchHolidays();
             }}
           >
             ⚙️ Settings
@@ -1718,6 +1718,13 @@ const AdminPanel = () => {
                                 </td>
                                 <td>
                                   <div style={{ display: 'flex', justifyContent: 'center' }}>
+                                    <button
+                                      className="btn btn-secondary btn-sm"
+                                      onClick={() => openJobExpiryEditor(job)}
+                                      title="Extend application deadline"
+                                    >
+                                      Extend Deadline
+                                    </button>
                                     <button
                                       className="btn btn-danger btn-sm"
                                       onClick={() => handleDeleteJob(job._id, job.title)}
@@ -2413,84 +2420,7 @@ const AdminPanel = () => {
 
         {activeTab === 'settings' && (
           <div className="admin-settings-wrapper animate-fade">
-            <div className="glass-card admin-settings-header-card">
-              <h3>⚙️ Console Settings & System Administration</h3>
-              <p>Assign academic holidays, export bulk student academic data, or decommission candidates registry by year.</p>
-            </div>
-
             <div className="admin-settings-grid">
-              {/* Holiday Manager */}
-              <div className="glass-card holiday-manager-section">
-                <h3>🗓 Academic Holiday Manager</h3>
-                <p className="card-desc">Add official holidays to clear student calendar dashboard benchmarks.</p>
-
-                <form onSubmit={handleCreateHoliday} className="holiday-form" style={{ display: 'flex', gap: '12px', marginBottom: '20px' }}>
-                  <div style={{ flex: 1 }}>
-                    <input
-                      type="date"
-                      className="form-control"
-                      value={holidayDate}
-                      onChange={(e) => setHolidayDate(e.target.value)}
-                      required
-                    />
-                  </div>
-                  <div style={{ flex: 2 }}>
-                    <input
-                      type="text"
-                      className="form-control"
-                      placeholder="e.g. Independence Day"
-                      value={holidayDesc}
-                      onChange={(e) => setHolidayDesc(e.target.value)}
-                    />
-                  </div>
-                  <button type="submit" className="btn btn-primary" disabled={submittingHoliday}>
-                    {submittingHoliday ? 'Adding...' : 'Add Holiday'}
-                  </button>
-                </form>
-
-                <div className="table-responsive-wrapper" style={{ maxHeight: '300px', overflowY: 'auto' }}>
-                  <table className="student-roster-table mini-table">
-                    <thead>
-                      <tr>
-                        <th>Date</th>
-                        <th>Holiday Event Description</th>
-                        <th style={{ textAlign: 'right' }}>Action</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {holidays.length > 0 ? (
-                        holidays.map((h) => {
-                          const localShowDate = new Date(h.date).toLocaleDateString('en-US', {
-                            weekday: 'short',
-                            year: 'numeric',
-                            month: 'short',
-                            day: 'numeric'
-                          });
-                          return (
-                            <tr key={h._id}>
-                              <td><strong>{localShowDate}</strong></td>
-                              <td>{h.description}</td>
-                              <td style={{ textAlign: 'right' }}>
-                                <button
-                                  className="btn btn-danger btn-sm"
-                                  onClick={() => handleDeleteHoliday(h._id)}
-                                >
-                                  🗑 Delete
-                                </button>
-                              </td>
-                            </tr>
-                          );
-                        })
-                      ) : (
-                        <tr>
-                          <td colSpan="3" className="table-empty-msg">No academic holidays defined yet.</td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
               {/* Data & Batch Management */}
               <div className="glass-card data-management-section">
                 <h3>🗄 System Data & Registry Manager</h3>

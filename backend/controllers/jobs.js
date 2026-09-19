@@ -1,5 +1,6 @@
 const Job = require('../models/Job');
 const User = require('../models/User');
+const Notification = require('../models/Notification');
 const sendEmail = require('../utils/sendEmail');
 
 // Seed default jobs if database has none
@@ -95,7 +96,9 @@ exports.getJobRecommendations = async (req, res, next) => {
     const user = await User.findById(req.user.id);
     const userSkills = user.skills.map(s => s.toLowerCase());
 
-    const jobs = await Job.find();
+    const jobs = await Job.find({
+      $or: [{ expiresAt: null }, { expiresAt: { $gt: new Date() } }]
+    });
 
     const recommendedJobs = jobs.map(job => {
       const jobReqs = job.requirements.map(r => r.toLowerCase());
@@ -128,6 +131,7 @@ exports.getJobRecommendations = async (req, res, next) => {
         salary: job.salary,
         experienceLevel: job.experienceLevel,
         applyLink: job.applyLink,
+        expiresAt: job.expiresAt,
         matchPercentage: matchPercent,
         matchedSkills: matchedSkillsDisplay,
         missingSkills
@@ -141,6 +145,68 @@ exports.getJobRecommendations = async (req, res, next) => {
       success: true,
       count: recommendedJobs.length,
       data: recommendedJobs
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// @desc    Extend or set a job deadline (Admin only)
+// @route   PUT /api/jobs/:id/expiry
+// @access  Private/Admin
+exports.updateJobExpiry = async (req, res, next) => {
+  try {
+    const { expiresAt } = req.body;
+    const expiryDate = new Date(expiresAt);
+
+    if (!expiresAt || Number.isNaN(expiryDate.getTime())) {
+      return res.status(400).json({ success: false, error: 'Please provide a valid expiry date.' });
+    }
+
+    if (expiryDate <= new Date()) {
+      return res.status(400).json({ success: false, error: 'Expiry date must be in the future.' });
+    }
+
+    const job = await Job.findByIdAndUpdate(
+      req.params.id,
+      { expiresAt: expiryDate },
+      { new: true, runValidators: true }
+    );
+
+    if (!job) {
+      return res.status(404).json({ success: false, error: 'Job not found' });
+    }
+
+    const studentQuery = { role: 'student' };
+    if (job.targetBatch && job.targetBatch !== 'All') {
+      studentQuery.year = job.targetBatch.trim();
+    }
+    const students = await User.find(studentQuery).select('_id name email');
+    const formattedExpiry = expiryDate.toLocaleDateString('en-IN', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric'
+    });
+
+    await Notification.insertMany(students.map(student => ({
+      user: student._id,
+      type: 'job_update',
+      message: `Application deadline extended for ${job.title} at ${job.company}. Apply by ${formattedExpiry}.`,
+      metadata: { jobId: job._id, expiresAt: expiryDate }
+    })));
+
+    students.forEach(student => {
+      sendEmail({
+        to: student.email,
+        subject: `Application deadline extended: ${job.title}`,
+        text: `Hello ${student.name},\n\nThe application deadline for ${job.title} at ${job.company} has been extended to ${formattedExpiry}. Log in to PrepPortal to view the job and apply.\n\nBest regards,\nPrepPortal Team`
+      }).catch(err => console.error(`Error sending job deadline update to ${student.email}:`, err.message));
+    });
+
+    res.status(200).json({
+      success: true,
+      message: `Job deadline updated and ${students.length} student notification(s) sent.`,
+      data: job
     });
   } catch (err) {
     next(err);

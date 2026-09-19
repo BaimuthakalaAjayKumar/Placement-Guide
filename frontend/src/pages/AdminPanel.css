@@ -89,7 +89,7 @@
   padding: 16px;
   border-bottom: 1px solid var(--border-color);
   font-size: 14px;
-  color: white;
+  color: var(--text-primary);
   vertical-align: middle;
 }
 
@@ -190,6 +190,12 @@
   border-color: transparent;
   color: white;
   box-shadow: 0 0 12px rgba(108, 99, 255, 0.25);
+}
+
+[data-theme="light"] .admin-tab-btn:hover {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+  color: #0f172a;
 }
 
 /* Modal Windows styling */
@@ -729,21 +735,35 @@
 .admin-settings-wrapper {
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 16px;
   width: 100%;
 }
 
 .admin-settings-header-card {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 4px;
+  padding: 18px 24px;
 }
 
 .admin-settings-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 24px;
+  grid-template-columns: minmax(0, 760px);
+  justify-content: center;
+  gap: 16px;
   align-items: start;
+}
+
+.holiday-manager-section {
+  padding: 18px;
+}
+
+.holiday-manager-section .holiday-form {
+  margin-bottom: 12px !important;
+}
+
+.holiday-manager-section .table-responsive-wrapper {
+  margin-top: 8px;
 }
 
 @media (max-width: 1024px) {

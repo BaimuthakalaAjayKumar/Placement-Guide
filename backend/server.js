@@ -179,6 +179,7 @@ const holidayRoutes = require('./routes/holidays');
 const notificationRoutes = require('./routes/notifications');
 const roadmapRoutes = require('./routes/roadmaps');
 const discussionRoutes = require('./routes/discussions');
+const aiChatRoutes = require('./routes/aiChat');
 
 // ============================================================
 // MOUNT API ROUTES
@@ -197,6 +198,7 @@ app.use('/api/holidays', holidayRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/roadmaps', roadmapRoutes);
 app.use('/api/discussions', discussionRoutes);
+app.use('/api/ai', aiChatRoutes);
 
 // ============================================================
 // HEALTH CHECK
