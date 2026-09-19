@@ -9,7 +9,9 @@ const {
   submitQuestion,
   finishContest,
   getContestReport,
-  getContestLeaderboard
+  getContestLeaderboard,
+  disqualifyAttempt,
+  dismissPlagiarism
 } = require('../controllers/internalContests');
 const { protect } = require('../middleware/auth');
 
@@ -34,5 +36,7 @@ router.post('/internal/:id/submit-question', submitQuestion);
 router.post('/internal/:id/finish', finishContest);
 router.get('/internal/:id/report', getContestReport);
 router.get('/internal/:id/leaderboard', getContestLeaderboard);
+router.put('/internal/:id/disqualify/:attemptId', disqualifyAttempt);
+router.put('/internal/:id/dismiss-plagiarism/:attemptId', dismissPlagiarism);
 
 module.exports = router;

@@ -2,7 +2,15 @@ const Contest = require('../models/Contest');
 const ContestAttempt = require('../models/ContestAttempt');
 const Question = require('../models/Question');
 const User = require('../models/User');
+const Notification = require('../models/Notification');
+const PlagiarismReport = require('../models/PlagiarismReport');
 const { evaluateCode } = require('../services/judgeService');
+const {
+  normalizeCode,
+  calculateStringSimilarity,
+  calculateTokenOverlap,
+  findMatchingFragments
+} = require('../services/plagiarismService');
 const sendEmail = require('../utils/sendEmail');
 
 // @desc    Create an internal contest
@@ -408,7 +416,112 @@ exports.submitQuestion = async (req, res, next) => {
   }
 };
 
-// @desc    Finish the contest attempt
+/**
+ * Automated Pairwise Plagiarism Audit for Contest Exam Submissions
+ */
+async function runContestPlagiarismAudit(contestId, attemptId) {
+  try {
+    const attempt = await ContestAttempt.findById(attemptId).populate('user', 'name email rollNumber');
+    if (!attempt || !attempt.submissions || attempt.submissions.length === 0) return;
+
+    // Fetch all other candidates' attempts in this contest
+    const otherAttempts = await ContestAttempt.find({
+      contest: contestId,
+      _id: { $ne: attempt._id }
+    }).populate('user', 'name email rollNumber');
+
+    let overallMaxSimilarity = 0;
+
+    for (let i = 0; i < attempt.submissions.length; i++) {
+      const sub = attempt.submissions[i];
+      if (!sub.code || sub.code.trim().length < 15) continue;
+
+      let subMaxSimilarity = 0;
+      let matchingCandidate = null;
+      let matchedFragments = [];
+
+      const currentNorm = normalizeCode(sub.code, sub.language || 'javascript');
+
+      for (const other of otherAttempts) {
+        const otherSubs = (other.submissions || []).filter(
+          s => s.question && s.question.toString() === sub.question.toString() && s.code && s.code.trim().length >= 15
+        );
+
+        for (const oSub of otherSubs) {
+          const otherNorm = normalizeCode(oSub.code, oSub.language || 'javascript');
+
+          const strSim = calculateStringSimilarity(currentNorm.normalizedString, otherNorm.normalizedString);
+          const tokSim = calculateTokenOverlap(
+            currentNorm.normalizedString.split(' '),
+            otherNorm.normalizedString.split(' ')
+          );
+
+          // Combined weighted score (normalized structural match + tokens)
+          const combinedSim = Math.round((strSim * 0.45) + (tokSim * 0.55));
+
+          if (combinedSim > subMaxSimilarity) {
+            subMaxSimilarity = combinedSim;
+            matchingCandidate = other.user;
+            matchedFragments = findMatchingFragments(sub.code, oSub.code);
+          }
+        }
+      }
+
+      sub.plagiarismPercentage = subMaxSimilarity;
+      if (matchingCandidate) {
+        sub.similarityRefUser = matchingCandidate._id;
+      }
+      sub.matchingFragments = matchedFragments;
+
+      if (subMaxSimilarity > overallMaxSimilarity) {
+        overallMaxSimilarity = subMaxSimilarity;
+      }
+
+      if (subMaxSimilarity >= 60) {
+        sub.status = 'Plagiarized';
+        attempt.proctoringLogs.push({
+          message: `[Post-Exam Plagiarism Flag]: High similarity (${subMaxSimilarity}%) identified against candidate "${matchingCandidate?.name || 'Anonymous'}". Marked as Plagiarized.`,
+          type: 'violation',
+          timestamp: new Date()
+        });
+      } else if (subMaxSimilarity >= 40) {
+        attempt.proctoringLogs.push({
+          message: `[Post-Exam Plagiarism Flag]: Moderate similarity (${subMaxSimilarity}%) identified against candidate "${matchingCandidate?.name || 'Anonymous'}".`,
+          type: 'warning',
+          timestamp: new Date()
+        });
+      }
+    }
+
+    attempt.maxPlagiarismPercentage = overallMaxSimilarity;
+    attempt.plagiarismAudited = true;
+
+    // Notify admins if critical plagiarism detected
+    if (overallMaxSimilarity >= 60) {
+      const admins = await User.find({ role: 'admin' }).select('_id');
+      if (admins.length > 0) {
+        const contest = await Contest.findById(contestId).select('title');
+        const alertMsg = `[Contest Plagiarism Alert]: Candidate "${attempt.user.name}" submitted solutions with ${overallMaxSimilarity}% similarity in contest "${contest?.title || 'Contest'}". Review proctoring report.`;
+        await Notification.insertMany(admins.map(admin => ({
+          user: admin._id,
+          type: 'plagiarism_alert',
+          message: alertMsg,
+          metadata: {
+            plagiarismPercentage: overallMaxSimilarity,
+            studentName: attempt.user.name,
+            jobId: null
+          }
+        }))).catch(e => console.warn('Notification insert error:', e.message));
+      }
+    }
+
+    await attempt.save();
+  } catch (err) {
+    console.error('Error running contest plagiarism audit:', err);
+  }
+}
+
+// @desc    Finish the contest attempt and run automated plagiarism audit
 // @route   POST /api/contests/internal/:id/finish
 // @access  Private
 exports.finishContest = async (req, res, next) => {
@@ -421,7 +534,83 @@ exports.finishContest = async (req, res, next) => {
     attempt.isFinished = true;
     attempt.submittedAt = new Date();
     attempt.proctoringLogs.push({
-      message: 'Exam completed and submitted by candidate.',
+      message: 'Exam completed and submitted by candidate. Automated plagiarism audit initiating...',
+      type: 'info',
+      timestamp: new Date()
+    });
+
+    await attempt.save();
+
+    // Run automated pairwise plagiarism audit against all peers in this contest
+    await runContestPlagiarismAudit(req.params.id, attempt._id);
+
+    const updatedAttempt = await ContestAttempt.findById(attempt._id)
+      .populate('submissions.similarityRefUser', 'name email rollNumber');
+
+    res.status(200).json({
+      success: true,
+      data: updatedAttempt
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// @desc    Disqualify candidate attempt from contest (Admin only)
+// @route   PUT /api/contests/internal/:id/disqualify/:attemptId
+// @access  Private/Admin
+exports.disqualifyAttempt = async (req, res, next) => {
+  try {
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ success: false, error: 'Only admins can perform this action' });
+    }
+    const attempt = await ContestAttempt.findById(req.params.attemptId).populate('user', 'name email');
+    if (!attempt) {
+      return res.status(404).json({ success: false, error: 'Candidate attempt not found' });
+    }
+
+    attempt.isDisqualified = true;
+    attempt.score = 0;
+    attempt.proctoringLogs.push({
+      message: `Candidate disqualified by Admin due to verified plagiarism/integrity violations. Score set to 0.`,
+      type: 'violation',
+      timestamp: new Date()
+    });
+
+    await attempt.save();
+
+    res.status(200).json({
+      success: true,
+      message: `Candidate ${attempt.user.name} disqualified. Score set to 0.`,
+      data: attempt
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// @desc    Dismiss plagiarism flag for attempt (Admin only)
+// @route   PUT /api/contests/internal/:id/dismiss-plagiarism/:attemptId
+// @access  Private/Admin
+exports.dismissPlagiarism = async (req, res, next) => {
+  try {
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ success: false, error: 'Only admins can perform this action' });
+    }
+    const attempt = await ContestAttempt.findById(req.params.attemptId);
+    if (!attempt) {
+      return res.status(404).json({ success: false, error: 'Candidate attempt not found' });
+    }
+
+    attempt.isDisqualified = false;
+    attempt.submissions.forEach(sub => {
+      if (sub.status === 'Plagiarized') {
+        sub.status = 'Accepted';
+      }
+    });
+
+    attempt.proctoringLogs.push({
+      message: `Plagiarism flag manually reviewed and dismissed as false positive by Admin.`,
       type: 'info',
       timestamp: new Date()
     });
@@ -430,6 +619,7 @@ exports.finishContest = async (req, res, next) => {
 
     res.status(200).json({
       success: true,
+      message: 'Plagiarism flag dismissed successfully.',
       data: attempt
     });
   } catch (err) {
@@ -437,7 +627,7 @@ exports.finishContest = async (req, res, next) => {
   }
 };
 
-// @desc    Get detailed Admin report for a contest
+// @desc    Get detailed Admin report for a contest including plagiarism audit
 // @route   GET /api/contests/internal/:id/report
 // @access  Private/Admin
 exports.getContestReport = async (req, res, next) => {
@@ -453,8 +643,8 @@ exports.getContestReport = async (req, res, next) => {
 
     const attempts = await ContestAttempt.find({ contest: contest._id })
       .populate('user', 'name email rollNumber branch')
-      .populate('submissions.question', 'title')
-      .populate('submissions.similarityRefUser', 'name')
+      .populate('submissions.question', 'title difficulty')
+      .populate('submissions.similarityRefUser', 'name email rollNumber')
       .sort({ score: -1, submittedAt: 1 });
 
     res.status(200).json({
@@ -467,7 +657,10 @@ exports.getContestReport = async (req, res, next) => {
           startedAt: a.startedAt,
           submittedAt: a.submittedAt,
           isFinished: a.isFinished,
-          score: a.score,
+          isDisqualified: a.isDisqualified,
+          maxPlagiarismPercentage: a.maxPlagiarismPercentage,
+          plagiarismAudited: a.plagiarismAudited,
+          score: a.isDisqualified ? 0 : a.score,
           fullscreenExits: a.fullscreenExits,
           proctoringLogs: a.proctoringLogs,
           disqualifiedQuestions: a.disqualifiedQuestions,

@@ -169,13 +169,27 @@ Searches a **sorted** collection by repeatedly halving the search interval:
 exports.askAIChat = async (req, res) => {
   try {
     const raw = req.body.question || req.body.message || '';
-    const { history = [] } = req.body;
+    const { history = [], screenContext } = req.body;
 
     if (!raw || typeof raw !== 'string' || raw.trim() === '') {
       return res.status(400).json({ success: false, error: 'Please provide a valid question.' });
     }
 
     const cleanQuestion = raw.trim();
+
+    // Format live screen context if student sent active screen details
+    let screenContextPrompt = '';
+    if (screenContext && typeof screenContext === 'object') {
+      screenContextPrompt = `\n\n[STUDENT'S LIVE SCREEN CONTEXT]:
+- Active Page: "${screenContext.pageTitle || 'Placement Portal'}" (${screenContext.path || '/'})
+${screenContext.activeSection ? `- Current Section/Test: "${screenContext.activeSection}"` : ''}
+${screenContext.problemTitle ? `- Problem/Question Title: "${screenContext.problemTitle}"` : ''}
+${screenContext.problemDescription ? `- Problem Statement Snippet:\n"""\n${screenContext.problemDescription.substring(0, 700)}\n"""` : ''}
+${screenContext.editorCode ? `- Student's Current Editor Code:\n\`\`\`\n${screenContext.editorCode.substring(0, 900)}\n\`\`\`` : ''}
+
+Live Screen Instructions:
+The student may ask doubts about the specific question, test, or code shown above. Use this context to provide direct, specific, and insightful guidance. For coding questions, explain logic, edge cases, and time/space complexity without simply dumping a full cheating solution.`;
+    }
 
     // 1. ChatGPT (OpenAI) Integration
     const openaiApiKey = req.body.openaiApiKey || req.headers['x-openai-key'] || process.env.OPENAI_API_KEY || process.env.CHATGPT_API_KEY;
@@ -191,7 +205,7 @@ You answer:
 Guidelines:
 - Provide clear, well-structured, encouraging, and accurate answers.
 - Use clean Markdown with headers, bold highlights, bullet points, and code snippets where helpful.
-- Keep explanations easy to understand for campus recruitment preparation.`;
+- Keep explanations easy to understand for campus recruitment preparation.${screenContextPrompt}`;
 
         const chatMessages = [
           { role: 'system', content: systemPrompt }
@@ -258,7 +272,7 @@ Guidelines:
           You answer:
           1. Computer Science subject doubts (DSA, DBMS, OS, OOP, Computer Networks, Web Dev, Java, C++, Python, SQL, Aptitude).
           2. GRIET Placement Portal guidance: explain tools like Practice Modules (Aptitude & Core CSE tests), Coding Contests & multi-platform sync (LeetCode, Codeforces, CodeChef, HackerRank), AI Resume Builder & Analyzer, Learning Roadmaps with Field Trackers & Study TODOs, Coding Playground, and Discussion Forum.
-          Format your answer using clean Markdown, bold highlights, bullet points, and code snippets where appropriate. Keep explanations clear, friendly, and concise.
+          Format your answer using clean Markdown, bold highlights, bullet points, and code snippets where appropriate. Keep explanations clear, friendly, and concise.${screenContextPrompt}
         `;
 
         const contents = [

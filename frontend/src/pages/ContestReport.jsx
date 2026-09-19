@@ -47,49 +47,120 @@ const ContestReport = () => {
   // Find all plagiarism submissions across all attempts
   const plagiarismIncidents = [];
   attempts.forEach(attempt => {
-    attempt.submissions.forEach(sub => {
-      if (sub.status === 'Plagiarized') {
+    (attempt.submissions || []).forEach(sub => {
+      if (
+        sub.status === 'Plagiarized' ||
+        (sub.plagiarismPercentage && sub.plagiarismPercentage > 0) ||
+        (attempt.maxPlagiarismPercentage && attempt.maxPlagiarismPercentage > 0)
+      ) {
+        // Also look up peer submission code if similarityRefUser is populated
+        let matchedSubmissionCode = '';
+        if (sub.similarityRefUser?._id) {
+          const matchedAttempt = attempts.find(
+            a => a.user?._id?.toString() === sub.similarityRefUser._id.toString()
+          );
+          if (matchedAttempt) {
+            const matchedSub = matchedAttempt.submissions?.find(
+              ms => (ms.question?._id || ms.question)?.toString() === (sub.question?._id || sub.question)?.toString()
+            );
+            if (matchedSub) {
+              matchedSubmissionCode = matchedSub.code;
+            }
+          }
+        }
+
         plagiarismIncidents.push({
+          attemptId: attempt._id,
           candidate: attempt.user,
+          isDisqualified: attempt.isDisqualified,
           question: sub.question,
           code: sub.code,
           language: sub.language,
+          plagiarismPercentage: sub.plagiarismPercentage || attempt.maxPlagiarismPercentage || 0,
+          status: sub.status,
           similarityRefUser: sub.similarityRefUser,
-          submittedAt: sub.submittedAt
+          matchingFragments: sub.matchingFragments || [],
+          matchedSubmissionCode,
+          submittedAt: sub.submittedAt || attempt.submittedAt
         });
       }
     });
   });
 
+  const handleDisqualify = async (attemptId, candidateName) => {
+    if (!window.confirm(`Are you sure you want to DISQUALIFY candidate "${candidateName}"? Their score will be set to 0 and their contest attempt marked as Disqualified.`)) {
+      return;
+    }
+    try {
+      const res = await fetch(`${API_URL}/contests/internal/${id}/disqualify/${attemptId}`, {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (data.success) {
+        alert(`Candidate "${candidateName}" has been disqualified.`);
+        fetchReport();
+      } else {
+        alert(data.error || 'Failed to disqualify candidate');
+      }
+    } catch (e) {
+      alert(e.message || 'Error occurred while disqualifying candidate');
+    }
+  };
+
+  const handleDismissPlagiarism = async (attemptId, candidateName) => {
+    if (!window.confirm(`Dismiss plagiarism flag for "${candidateName}"? Plagiarized submissions will be restored to Accepted status.`)) {
+      return;
+    }
+    try {
+      const res = await fetch(`${API_URL}/contests/internal/${id}/dismiss-plagiarism/${attemptId}`, {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (data.success) {
+        alert(`Plagiarism flag dismissed for "${candidateName}".`);
+        fetchReport();
+      } else {
+        alert(data.error || 'Failed to dismiss flag');
+      }
+    } catch (e) {
+      alert(e.message || 'Error occurred while dismissing plagiarism flag');
+    }
+  };
+
   if (loading) {
     return (
       <div className="exam-loading">
         <div className="spinner-loader"></div>
-        <p>Loading assessment reports...</p>
+        <p>Loading assessment reports & plagiarism audit...</p>
       </div>
     );
   }
 
+  const disqualifiedCount = attempts.filter(a => a.isDisqualified).length;
+  const criticalCount = attempts.filter(a => a.maxPlagiarismPercentage >= 60).length;
+
   return (
     <>
-      <Header title="Contest Proctoring Report" />
+      <Header title="Contest Proctoring & Plagiarism Report" />
 
       <div className="content-wrapper">
         <div className="report-summary-cards mb-20 animate-fade">
           <div className="glass-card summary-card-item">
             <h3>Contest Title</h3>
             <p className="summary-val text-yellow">{contest.title}</p>
-            <p className="summary-sub">Duration: {contest.duration} minutes</p>
+            <p className="summary-sub">Duration: {contest.duration} mins | {contest.questions?.length || 0} Problems</p>
           </div>
           <div className="glass-card summary-card-item">
             <h3>Total Candidates</h3>
             <p className="summary-val">{attempts.length}</p>
-            <p className="summary-sub">Active Attempts logged</p>
+            <p className="summary-sub">Audited Attempts: {attempts.filter(a => a.plagiarismAudited).length}</p>
           </div>
           <div className="glass-card summary-card-item">
-            <h3>Plagiarism Cases</h3>
+            <h3>Plagiarism Incidents</h3>
             <p className="summary-val text-red">{plagiarismIncidents.length}</p>
-            <p className="summary-sub">Identical code matching cases</p>
+            <p className="summary-sub">{criticalCount} High Risk (&ge;60%) | {disqualifiedCount} Disqualified</p>
           </div>
         </div>
 
@@ -105,7 +176,7 @@ const ContestReport = () => {
             className={`report-nav-btn ${activeReportTab === 'plagiarism' ? 'active' : ''}`}
             onClick={() => setActiveReportTab('plagiarism')}
           >
-            🕵️ Plagiarism Matches ({plagiarismIncidents.length})
+            🛡️ Plagiarism Audit ({plagiarismIncidents.length})
           </button>
           <button
             className={`report-nav-btn ${activeReportTab === 'proctoring' ? 'active' : ''}`}
@@ -118,7 +189,7 @@ const ContestReport = () => {
         {/* TAB 1: SCOREBOARD */}
         {activeReportTab === 'scoreboard' && (
           <div className="glass-card scoreboard-card animate-fade">
-            <h3 className="card-heading">Contest Ranking & Candidate Scores</h3>
+            <h3 className="card-heading">Contest Ranking, Scores & Integrity Status</h3>
             <div className="table-responsive">
               <table className="report-table">
                 <thead>
@@ -128,30 +199,54 @@ const ContestReport = () => {
                     <th>Candidate</th>
                     <th>Branch</th>
                     <th>Score</th>
+                    <th>Plagiarism Audit</th>
                     <th>Fullscreen Exits</th>
                     <th>Status</th>
-                    <th>Finished At</th>
+                    <th>Action</th>
                   </tr>
                 </thead>
                 <tbody>
                   {attempts.map((attempt, index) => {
-                    const isPlagiarised = attempt.submissions.some(s => s.status === 'Plagiarized');
+                    const isPlagiarised = attempt.submissions?.some(s => s.status === 'Plagiarized');
+                    const maxPlag = attempt.maxPlagiarismPercentage || 0;
                     return (
-                      <tr key={attempt._id} className={attempt.fullscreenExits >= 3 ? 'row-critical' : ''}>
+                      <tr key={attempt._id} className={attempt.isDisqualified ? 'row-critical' : ''}>
                         <td><strong>#{index + 1}</strong></td>
-                        <td>{attempt.user.rollNumber || 'N/A'}</td>
+                        <td>{attempt.user?.rollNumber || 'N/A'}</td>
                         <td>
                           <div>
-                            <strong>{attempt.user.name}</strong>
-                            <div style={{ fontSize: '0.75rem', color: '#a0aec0' }}>{attempt.user.email}</div>
+                            <strong>{attempt.user?.name}</strong>
+                            {attempt.isDisqualified && (
+                              <span className="disqualified-pill ml-5">DISQUALIFIED</span>
+                            )}
+                            <div style={{ fontSize: '0.75rem', color: '#a0aec0' }}>{attempt.user?.email}</div>
                           </div>
                         </td>
-                        <td>{attempt.user.branch || 'General'}</td>
+                        <td>{attempt.user?.branch || 'General'}</td>
                         <td>
-                          <span className="score-badge">{attempt.score}/100</span>
+                          {attempt.isDisqualified ? (
+                            <span className="score-badge text-red" style={{ textDecoration: 'line-through' }}>
+                              0 / 100
+                            </span>
+                          ) : (
+                            <span className="score-badge">{attempt.score}/100</span>
+                          )}
                         </td>
                         <td>
-                          <span className={attempt.fullscreenExits > 0 ? 'text-red font-bold' : ''}>
+                          {maxPlag >= 60 ? (
+                            <span className="plag-pill critical">🚨 {maxPlag}% Critical</span>
+                          ) : maxPlag >= 40 ? (
+                            <span className="plag-pill warning">⚠️ {maxPlag}% Moderate</span>
+                          ) : maxPlag > 0 ? (
+                            <span className="plag-pill safe">✓ {maxPlag}% Low</span>
+                          ) : attempt.plagiarismAudited ? (
+                            <span className="plag-pill clean">✓ 0% Clean</span>
+                          ) : (
+                            <span className="plag-pill clean">Auditing...</span>
+                          )}
+                        </td>
+                        <td>
+                          <span className={attempt.fullscreenExits >= 3 ? 'text-red font-bold' : ''}>
                             {attempt.fullscreenExits} / 3
                           </span>
                         </td>
@@ -160,18 +255,34 @@ const ContestReport = () => {
                             {attempt.isFinished ? 'Finished' : 'In Progress'}
                           </span>
                           {isPlagiarised && (
-                            <span className="status-badge-inline plagiarized ml-5">Plagiarism Flagged</span>
+                            <span className="status-badge-inline plagiarized ml-5">Flagged</span>
                           )}
                         </td>
                         <td>
-                          {attempt.submittedAt ? new Date(attempt.submittedAt).toLocaleTimeString() : '--'}
+                          {attempt.isDisqualified ? (
+                            <button
+                              className="btn btn-secondary btn-xs"
+                              onClick={() => handleDismissPlagiarism(attempt._id, attempt.user?.name)}
+                              title="Restore candidate status"
+                            >
+                              Restore
+                            </button>
+                          ) : (
+                            <button
+                              className="btn btn-danger btn-xs"
+                              onClick={() => handleDisqualify(attempt._id, attempt.user?.name)}
+                              title="Disqualify candidate and set score to 0"
+                            >
+                              Disqualify
+                            </button>
+                          )}
                         </td>
                       </tr>
                     );
                   })}
                   {attempts.length === 0 && (
                     <tr>
-                      <td colSpan="8" style={{ textAlign: 'center', padding: '20px', color: '#718096' }}>
+                      <td colSpan="9" style={{ textAlign: 'center', padding: '20px', color: '#718096' }}>
                         No candidates have started this contest yet.
                       </td>
                     </tr>
@@ -182,34 +293,92 @@ const ContestReport = () => {
           </div>
         )}
 
-        {/* TAB 2: PLAGIARISM INCIDENTS */}
+        {/* TAB 2: PLAGIARISM INCIDENTS & SIDE-BY-SIDE DIFF */}
         {activeReportTab === 'plagiarism' && (
           <div className="plagiarism-tab-content">
             <div className="plagiarism-list">
-              {plagiarismIncidents.map((incident, idx) => (
-                <div key={idx} className="glass-card plagiarism-incident-card animate-fade">
-                  <div className="incident-header">
-                    <span className="incident-badge">FLAGGED MATCH</span>
-                    <span className="incident-time">
-                      📅 {new Date(incident.submittedAt).toLocaleTimeString()}
-                    </span>
-                  </div>
-                  <div className="incident-description">
-                    Candidate <strong>{incident.candidate.name}</strong> submitted code for question{' '}
-                    <strong>{incident.question?.title || 'Unknown Question'}</strong> matching Candidate{' '}
-                    <strong>{incident.similarityRefUser?.name || 'Anonymous'}</strong> exactly.
-                  </div>
-                  <div className="side-by-side-code">
-                    <div className="code-box">
-                      <div className="code-title">Submitted Code ({incident.language})</div>
-                      <pre className="code-block-report">{incident.code}</pre>
+              {plagiarismIncidents.map((incident, idx) => {
+                const sim = incident.plagiarismPercentage;
+                const isCritical = sim >= 60;
+                const isWarning = sim >= 40 && sim < 60;
+
+                return (
+                  <div key={idx} className={`glass-card plagiarism-incident-card animate-fade ${isCritical ? 'border-critical' : ''}`}>
+                    <div className="incident-header">
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span className={`incident-badge ${isCritical ? 'critical' : isWarning ? 'warning' : 'info'}`}>
+                          {isCritical ? '🚨 CRITICAL MATCH' : isWarning ? '⚠️ MODERATE MATCH' : '🔍 SIMILARITY MATCH'}: {sim}%
+                        </span>
+                        {incident.isDisqualified && (
+                          <span className="disqualified-pill">⛔ CANDIDATE DISQUALIFIED</span>
+                        )}
+                      </div>
+                      <span className="incident-time">
+                        📅 {incident.submittedAt ? new Date(incident.submittedAt).toLocaleTimeString() : '--'}
+                      </span>
+                    </div>
+
+                    <div className="incident-description">
+                      Candidate <strong>{incident.candidate?.name}</strong> ({incident.candidate?.rollNumber || incident.candidate?.email}) submitted code for problem <strong>"{incident.question?.title || 'Contest Problem'}"</strong> ({incident.question?.difficulty || 'Medium'}) matching Candidate <strong>"{incident.similarityRefUser?.name || 'Anonymous Peer'}"</strong> ({incident.similarityRefUser?.rollNumber || incident.similarityRefUser?.email || ''}) with <strong>{sim}%</strong> token &amp; structural AST similarity.
+                    </div>
+
+                    {incident.matchingFragments?.length > 0 && (
+                      <div className="matching-fragments-banner">
+                        🧩 <strong>Matching Code Blocks:</strong> Detected {incident.matchingFragments.length} identical AST statement fragments between candidate and peer submissions.
+                      </div>
+                    )}
+
+                    {/* Side-by-Side Code Viewer */}
+                    <div className="side-by-side-code">
+                      <div className="code-box">
+                        <div className="code-title">
+                          👤 {incident.candidate?.name}'s Submission ({incident.language})
+                        </div>
+                        <pre className="code-block-report">{incident.code}</pre>
+                      </div>
+                      <div className="code-box">
+                        <div className="code-title">
+                          👥 Matched Peer: {incident.similarityRefUser?.name || 'Peer Code'} ({incident.language})
+                        </div>
+                        <pre className="code-block-report">
+                          {incident.matchedSubmissionCode || '// Peer code stored in pairwise audit repository'}
+                        </pre>
+                      </div>
+                    </div>
+
+                    {/* Admin Action Controls */}
+                    <div className="incident-actions-bar">
+                      {!incident.isDisqualified ? (
+                        <button
+                          className="btn btn-danger btn-sm"
+                          onClick={() => handleDisqualify(incident.attemptId, incident.candidate?.name)}
+                        >
+                          ⛔ Disqualify Candidate (Score 0)
+                        </button>
+                      ) : (
+                        <button
+                          className="btn btn-secondary btn-sm"
+                          onClick={() => handleDismissPlagiarism(incident.attemptId, incident.candidate?.name)}
+                        >
+                          ✓ Restore Candidate &amp; Reset Status
+                        </button>
+                      )}
+                      <button
+                        className="btn btn-outline btn-sm ml-10"
+                        onClick={() => handleDismissPlagiarism(incident.attemptId, incident.candidate?.name)}
+                      >
+                        Dismiss Flag (False Positive)
+                      </button>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
+
               {plagiarismIncidents.length === 0 && (
                 <div className="empty-state-box">
-                  <p>✓ No plagiarism incidents detected for this contest.</p>
+                  <div style={{ fontSize: '2.5rem', marginBottom: '10px' }}>🛡️</div>
+                  <h4>No Plagiarism Incidents Detected</h4>
+                  <p>All submitted solutions are verified clean with independent AST syntax and token distributions.</p>
                 </div>
               )}
             </div>
@@ -230,8 +399,8 @@ const ContestReport = () => {
                     onClick={() => setSelectedAttempt(a)}
                   >
                     <div style={{ textAlign: 'left' }}>
-                      <div className="cand-name">{a.user.name}</div>
-                      <div className="cand-sub">Violations: {a.fullscreenExits} exits</div>
+                      <div className="cand-name">{a.user?.name}</div>
+                      <div className="cand-sub">Violations: {a.fullscreenExits} exits | Plag: {a.maxPlagiarismPercentage || 0}%</div>
                     </div>
                     {a.fullscreenExits >= 3 && <span className="red-dot">🚫</span>}
                   </button>
@@ -249,7 +418,7 @@ const ContestReport = () => {
               {selectedAttempt ? (
                 <>
                   <div className="timeline-header-report">
-                    <h3>Proctor Logs: {selectedAttempt.user.name}</h3>
+                    <h3>Proctor Logs: {selectedAttempt.user?.name}</h3>
                     <div className="violation-summary-tag">
                       Fullscreen Exits: {selectedAttempt.fullscreenExits} / 3
                     </div>
@@ -262,7 +431,7 @@ const ContestReport = () => {
                           <span className="timestamp">
                             {new Date(log.timestamp).toLocaleTimeString()}
                           </span>
-                          <span className="log-type-tag">{log.type.toUpperCase()}</span>
+                          <span className="log-type-tag">{log.type?.toUpperCase()}</span>
                           <span className="msg">{log.message}</span>
                         </div>
                       ))

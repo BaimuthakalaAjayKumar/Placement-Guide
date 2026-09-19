@@ -43,6 +43,18 @@ const ContestAttemptSchema = new mongoose.Schema({
       ref: 'Question'
     }
   ],
+  isDisqualified: {
+    type: Boolean,
+    default: false
+  },
+  maxPlagiarismPercentage: {
+    type: Number,
+    default: 0
+  },
+  plagiarismAudited: {
+    type: Boolean,
+    default: false
+  },
   submissions: [
     {
       question: {
@@ -71,10 +83,20 @@ const ContestAttemptSchema = new mongoose.Schema({
         type: Date,
         default: Date.now
       },
+      plagiarismPercentage: {
+        type: Number,
+        default: 0
+      },
       similarityRefUser: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User'
-      }
+      },
+      matchingFragments: [
+        {
+          line: { type: Number },
+          matchedCode: { type: String }
+        }
+      ]
     }
   ]
 });

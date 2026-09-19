@@ -3,26 +3,72 @@ import { API_URL } from '../config/api';
 import './Chatbot.css';
 
 const QUICK_PROMPTS = [
+  '🎯 Explain question on my screen',
+  '💡 Hint for current problem',
   'Explain ACID properties in DBMS',
   'Difference between Process and Thread',
   'What are the 4 pillars of OOP?',
   'Explain TCP vs UDP',
   'How do Practice Modules tests work?',
-  'How does the Coding Contest work?',
   'Explain MergeSort time complexity'
 ];
+
+const captureLiveScreenContext = () => {
+  try {
+    const pageTitle = document.title || 'GRIET Placement Portal';
+    const path = window.location.pathname;
+
+    const context = {
+      pageTitle,
+      path,
+      activeSection: '',
+      problemTitle: '',
+      problemDescription: '',
+      editorCode: ''
+    };
+
+    // 1. Contest Workspace or Question Bank
+    const contestTitleElem = document.querySelector('.exam-header-title, .contest-exam-title, .workspace-header h3');
+    const problemTitleElem = document.querySelector('.problem-title, .question-title, .qb-problem-title, .exam-question-title');
+    const problemDescElem = document.querySelector('.problem-desc-content, .question-description, .exam-desc, .problem-statement');
+
+    if (contestTitleElem) context.activeSection = contestTitleElem.innerText.trim();
+    if (problemTitleElem) context.problemTitle = problemTitleElem.innerText.trim();
+    if (problemDescElem) context.problemDescription = problemDescElem.innerText.trim().slice(0, 1000);
+
+    // 2. Practice Modules / Roadmaps
+    const activeTabElem = document.querySelector('.test-tab-button.active, .filter-tab-btn.active, .nav-link.active');
+    const activeTestElem = document.querySelector('.selector-section-title, .test-question-text, .roadmap-active-title');
+    if (activeTabElem) context.activeSection = (context.activeSection ? `${context.activeSection} - ` : '') + activeTabElem.innerText.trim();
+    if (activeTestElem && !context.problemTitle) context.problemTitle = activeTestElem.innerText.trim();
+
+    // 3. Current code in Monaco Editor if present on screen
+    const monacoLines = document.querySelectorAll('.monaco-editor .view-line');
+    if (monacoLines && monacoLines.length > 0) {
+      const codeLines = Array.from(monacoLines).map(l => l.innerText).slice(0, 50);
+      context.editorCode = codeLines.join('\n').trim();
+    }
+
+    return context;
+  } catch (err) {
+    return { path: window.location.pathname, pageTitle: document.title };
+  }
+};
 
 const Chatbot = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [userApiKey, setUserApiKey] = useState(() => localStorage.getItem('griet_openai_key') || '');
   const [savedStatus, setSavedStatus] = useState(false);
+  const [screenContextActive, setScreenContextActive] = useState(true);
+  const [currentScreenSummary, setCurrentScreenSummary] = useState('');
+
   const [messages, setMessages] = useState([
     {
       id: 'welcome',
       role: 'assistant',
       source: 'chatgpt',
-      text: `👋 **Hi! I am your GRIET Placement AI Assistant, powered by ChatGPT.**\n\nI can help resolve your doubts on **Computer Science subjects** (DSA, DBMS, OS, OOP, CN), quantitative aptitude, interview questions, and how to use every tool on this website.\n\nClick any topic below or ask whatever doubt you have:`,
+      text: `👋 **Hi! I am your GRIET Placement AI Assistant, powered by ChatGPT.**\n\nI can **interact directly with your live screen** to explain the problem you are solving, review your code, or resolve doubts on **Computer Science subjects** (DSA, DBMS, OS, OOP, CN).\n\nAsk whatever doubt you have or click any topic below:`,
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     }
   ]);
@@ -30,6 +76,15 @@ const Chatbot = () => {
   const [loading, setLoading] = useState(false);
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
+
+  // Auto detect screen on open and periodically
+  useEffect(() => {
+    if (isOpen && screenContextActive) {
+      const ctx = captureLiveScreenContext();
+      const label = ctx.problemTitle || ctx.activeSection || ctx.pageTitle || 'Current Page';
+      setCurrentScreenSummary(label);
+    }
+  }, [isOpen, screenContextActive]);
 
   // Listen for custom event from anywhere in the app to open the bot
   useEffect(() => {
@@ -69,8 +124,24 @@ const Chatbot = () => {
   };
 
   const handleSend = async (userText) => {
-    const query = (userText || input).trim();
+    let query = (userText || input).trim();
     if (!query || loading) return;
+
+    // Expand quick prompt for screen
+    const liveScreenContext = screenContextActive ? captureLiveScreenContext() : null;
+    if (query === '🎯 Explain question on my screen') {
+      if (liveScreenContext && (liveScreenContext.problemTitle || liveScreenContext.problemDescription)) {
+        query = `Can you explain the problem currently displayed on my screen ("${liveScreenContext.problemTitle || liveScreenContext.pageTitle}") and give me an intuitive breakdown of what it asks?`;
+      } else {
+        query = `Can you explain what is currently displayed on my screen (${document.title})?`;
+      }
+    } else if (query === '💡 Hint for current problem') {
+      if (liveScreenContext && liveScreenContext.problemTitle) {
+        query = `Can you give me a conceptual hint for solving "${liveScreenContext.problemTitle}" on my screen without giving away the full answer?`;
+      } else {
+        query = `Can you give me a hint for the coding problem on my screen?`;
+      }
+    }
 
     const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     const userMsg = {
@@ -96,6 +167,7 @@ const Chatbot = () => {
         body: JSON.stringify({
           question: query,
           openaiApiKey: activeKey,
+          screenContext: liveScreenContext,
           history: messages.slice(-6).map(m => ({ role: m.role, text: m.text }))
         })
       });
@@ -137,18 +209,6 @@ const Chatbot = () => {
       e.preventDefault();
       handleSend();
     }
-  };
-
-  const clearChat = () => {
-    setMessages([
-      {
-        id: `welcome-${Date.now()}`,
-        role: 'assistant',
-        source: 'chatgpt',
-        text: `🧹 **Chat cleared.** How can ChatGPT help you with your subjects or the portal today?`,
-        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-      }
-    ]);
   };
 
   // Helper to render basic markdown lines
@@ -214,7 +274,7 @@ const Chatbot = () => {
           type="button"
           className="chatbot-launcher-btn animate-fade"
           onClick={() => setIsOpen(true)}
-          title="Ask AI Assistant (ChatGPT)"
+          title="Ask AI Assistant (ChatGPT with Live Screen Interaction)"
         >
           <div className="chatbot-launcher-icon">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -251,12 +311,20 @@ const Chatbot = () => {
                   <span className="chatgpt-status-pill">⚡ ChatGPT</span>
                 </div>
                 <span className="chatbot-status-subtitle">
-                  {userApiKey ? '🟢 Custom OpenAI Key Active' : 'Subject Doubts & Portal Guidance'}
+                  {screenContextActive ? '🎯 Live Screen Reader Active' : 'Subject Doubts & Portal Guidance'}
                 </span>
               </div>
             </div>
 
             <div className="chatbot-header-actions">
+              <button
+                type="button"
+                className={`chatbot-icon-btn ${screenContextActive ? 'active-screen-btn' : ''}`}
+                onClick={() => setScreenContextActive(!screenContextActive)}
+                title={screenContextActive ? 'Live Screen Reader: Connected (Click to toggle)' : 'Enable Live Screen Reader'}
+              >
+                🎯
+              </button>
               <button
                 type="button"
                 className={`chatbot-icon-btn ${showSettings ? 'active-btn' : ''}`}
@@ -268,14 +336,7 @@ const Chatbot = () => {
                   <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
                 </svg>
               </button>
-              <button
-                type="button"
-                className="chatbot-icon-btn"
-                onClick={clearChat}
-                title="Clear conversation"
-              >
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></svg>
-              </button>
+              {/* Note: Delete/Clear button removed per user request */}
               <button
                 type="button"
                 className="chatbot-icon-btn close-btn"
@@ -286,6 +347,23 @@ const Chatbot = () => {
               </button>
             </div>
           </div>
+
+          {/* Live Screen Context Bar */}
+          {screenContextActive && currentScreenSummary && (
+            <div className="chatbot-screen-bar animate-fade">
+              <span className="screen-bar-indicator"></span>
+              <span className="screen-bar-text">
+                Live Screen: <strong>{currentScreenSummary}</strong>
+              </span>
+              <button
+                type="button"
+                className="screen-bar-action"
+                onClick={() => handleSend('🎯 Explain question on my screen')}
+              >
+                Ask about screen ➜
+              </button>
+            </div>
+          )}
 
           {/* ChatGPT Settings Panel */}
           {showSettings && (
@@ -374,7 +452,7 @@ const Chatbot = () => {
                 className="chatbot-chip"
                 onClick={() => handleSend(prompt)}
               >
-                💡 {prompt}
+                {prompt}
               </button>
             ))}
           </div>
@@ -384,7 +462,7 @@ const Chatbot = () => {
             <textarea
               ref={inputRef}
               className="chatbot-input"
-              placeholder="Ask ChatGPT any doubt on OS, DBMS, DSA, or portal..."
+              placeholder={screenContextActive ? "Ask ChatGPT about your screen or any subject doubt..." : "Ask ChatGPT any doubt on OS, DBMS, DSA..."}
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}

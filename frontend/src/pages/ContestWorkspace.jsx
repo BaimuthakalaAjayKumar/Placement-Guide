@@ -29,6 +29,11 @@ const ContestWorkspace = () => {
   // Screen states: 'disclaimer', 'exam', 'terminated', 'finished'
   const [examState, setExamState] = useState('disclaimer');
 
+  // LeetCode Contest Agreement States
+  const [agreedScoring, setAgreedScoring] = useState(false);
+  const [agreedHonor, setAgreedHonor] = useState(false);
+  const [agreedPlagiarism, setAgreedPlagiarism] = useState(false);
+
   // Contest data
   const [contest, setContest] = useState(null);
   const [questions, setQuestions] = useState([]);
@@ -425,27 +430,133 @@ const ContestWorkspace = () => {
     );
   }
 
-  // SCREEN 1: DISCLAIMER SCREEN
+  // SCREEN 1: LEETCODE CONTEST BRIEFING & DISCLAIMER SCREEN
   if (examState === 'disclaimer') {
+    const totalContestPoints = questions.reduce(
+      (acc, q, idx) => acc + (q.difficulty === 'Easy' ? 3 : q.difficulty === 'Medium' ? (idx % 2 === 0 ? 4 : 5) : 6),
+      0
+    ) || 18;
+
+    const canStart = agreedScoring && agreedHonor && agreedPlagiarism;
+
     return (
       <div className="exam-disclaimer-wrapper">
-        <div className="glass-card disclaimer-card animate-fade">
-          <h2>🔒 AI Proctored Coding Assessment</h2>
-          <h3 style={{ color: '#ecc94b', marginTop: '10px' }}>{contest.title}</h3>
-          <p className="disclaimer-desc">{contest.description || 'Rules & regulations apply.'}</p>
-
-          <div className="rules-list">
-            <h4>EXAM RULES & SECURITY PROTOCOLS:</h4>
-            <ul>
-              <li>⚠️ **Full Screen Mode**: The exam must run in full screen. Exiting full screen 3 times terminates your exam automatically.</li>
-              <li>📷 **Webcam Monitoring**: The AI proctor monitors your facial movements. Looking away, speaking, or switching devices registers as a proctoring violation.</li>
-              <li>🛡️ **Plagiarism Enforcement**: Plagiarism checks run in real-time. If your code matches another candidate's submissions, **the question is terminated instantly** with a score of 0.</li>
-            </ul>
+        <div className="glass-card leetcode-briefing-card animate-fade">
+          <div className="lc-briefing-header">
+            <div className="lc-badge">🏆 OFFICIAL LEETCODE CONTEST PROTOCOL</div>
+            <h2>{contest.title}</h2>
+            <p className="disclaimer-desc">
+              {contest.description || 'Welcome to the GRIET Internal Coding Contest. Please carefully review the official contest guidelines, scoring rules, 5-minute penalty system, and automated plagiarism detection protocols below before entering.'}
+            </p>
+            <div className="lc-meta-strip">
+              <span className="lc-meta-item">⏱️ Duration: <strong>{contest.duration} Mins</strong></span>
+              <span className="lc-meta-item">🎯 Total Problems: <strong>{questions.length || 4}</strong></span>
+              <span className="lc-meta-item">⭐ Max Points: <strong>{totalContestPoints} pts</strong></span>
+              <span className="lc-meta-item">🛡️ Plagiarism Engine: <strong>Pairwise AST & Token Audit</strong></span>
+            </div>
           </div>
 
-          <button className="btn btn-primary btn-lg start-exam-btn" onClick={startExam}>
-            I Agree, Start Exam & Enter Full Screen ➜
-          </button>
+          {/* Problem Breakdown Grid */}
+          <div className="lc-problems-section">
+            <h4>📋 CONTEST PROBLEMS & POINT DISTRIBUTION</h4>
+            <div className="lc-problems-grid">
+              {questions.map((q, idx) => {
+                const pts = q.difficulty === 'Easy' ? 3 : q.difficulty === 'Medium' ? (idx % 2 === 0 ? 4 : 5) : 6;
+                return (
+                  <div key={q._id || idx} className="lc-problem-card">
+                    <div className="lc-prob-num">Problem {idx + 1}</div>
+                    <div className="lc-prob-title">{q.title}</div>
+                    <div className="lc-prob-footer">
+                      <span className={`difficulty-badge ${q.difficulty?.toLowerCase() || 'easy'}`}>
+                        {q.difficulty || 'Easy'}
+                      </span>
+                      <span className="lc-prob-pts">{pts} points</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* LeetCode Instructions & Rules */}
+          <div className="lc-rules-section">
+            <h4>📜 OFFICIAL CONTEST INSTRUCTIONS & PENALTY RULES:</h4>
+            <div className="lc-rules-list">
+              <div className="lc-rule-item">
+                <span className="lc-rule-icon">⏱️</span>
+                <div>
+                  <strong>5-Minute Penalty Rule for Unaccepted Submissions:</strong>
+                  <p>Each incorrect submission (Wrong Answer, Time Limit Exceeded, Runtime Error) on a problem that you eventually solve will add a <strong>5-minute penalty</strong> to your total finish time. Submissions on problems that are never solved do not incur penalties.</p>
+                </div>
+              </div>
+              <div className="lc-rule-item">
+                <span className="lc-rule-icon">📊</span>
+                <div>
+                  <strong>Ranking & Leaderboard Criteria:</strong>
+                  <p>Participants are ranked first by <strong>Highest Total Score</strong>. In case of ties, rank is decided by <strong>Lowest Total Time</strong> (Finish Time + Accumulated Penalty Minutes).</p>
+                </div>
+              </div>
+              <div className="lc-rule-item">
+                <span className="lc-rule-icon">🛡️</span>
+                <div>
+                  <strong>Automated Pairwise Plagiarism Audit:</strong>
+                  <p>Upon submission of your exam, an automated pairwise AST token and structural plagiarism engine audits all candidate submissions. Solutions with high similarity (&ge;40% moderate, &ge;60% critical) are flagged, marked as Plagiarized, and reported directly to the Admin console with side-by-side code diffs for immediate candidate disqualification.</p>
+                </div>
+              </div>
+              <div className="lc-rule-item">
+                <span className="lc-rule-icon">🔒</span>
+                <div>
+                  <strong>Integrity & Fullscreen Enforcement:</strong>
+                  <p>The workspace strictly enforces full-screen mode. Exiting fullscreen 3 times locks you out and automatically terminates your contest attempt. Continuous AI webcam proctoring monitors facial orientation and tab-switching.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Candidate Checkbox Checklist */}
+          <div className="lc-agreements-box">
+            <h4>✍️ CANDIDATE INTEGRITY AGREEMENT</h4>
+            <label className="lc-checkbox-row">
+              <input
+                type="checkbox"
+                checked={agreedScoring}
+                onChange={e => setAgreedScoring(e.target.checked)}
+              />
+              <span>
+                I understand the <strong>Scoring &amp; 5-Minute Penalty Rule</strong> (each wrong attempt on a solved problem adds 5 minutes to my total time).
+              </span>
+            </label>
+            <label className="lc-checkbox-row">
+              <input
+                type="checkbox"
+                checked={agreedHonor}
+                onChange={e => setAgreedHonor(e.target.checked)}
+              />
+              <span>
+                I agree to the <strong>LeetCode Contest Code of Honor</strong>: I will solve all problems independently without external assistance, ChatGPT/AI generation, or unauthorized tabs.
+              </span>
+            </label>
+            <label className="lc-checkbox-row">
+              <input
+                type="checkbox"
+                checked={agreedPlagiarism}
+                onChange={e => setAgreedPlagiarism(e.target.checked)}
+              />
+              <span>
+                I acknowledge the <strong>Automated Pairwise Plagiarism Audit</strong>: All my code will be compared against peer submissions upon completion, and any detected plagiarism leads to immediate disqualification (Score 0).
+              </span>
+            </label>
+          </div>
+
+          <div className="lc-briefing-actions">
+            <button
+              className={`btn btn-primary btn-lg start-exam-btn ${!canStart ? 'disabled' : ''}`}
+              disabled={!canStart}
+              onClick={startExam}
+            >
+              {canStart ? 'I Agree, Enter Contest & Fullscreen ➜' : '⚠️ Please Accept All 3 Agreements to Enter'}
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -499,8 +610,11 @@ const ContestWorkspace = () => {
       {/* Workspace Header */}
       <div className="workspace-header">
         <div className="header-left">
-          <span className="exam-title-badge">EXAM</span>
+          <span className="exam-title-badge">LEETCODE CONTEST</span>
           <span className="exam-title">{contest.title}</span>
+          <span className="lc-penalty-pill" title="5-min penalty added per wrong submission on solved problems">
+            ⏱️ 5m Penalty Rule
+          </span>
         </div>
         <div className="header-right">
           <div className="timer-box">
@@ -520,18 +634,21 @@ const ContestWorkspace = () => {
         {/* Left Column: Description & Questions */}
         <div className="left-panel" style={{ width: `${leftWidth}%` }}>
           <div className="questions-nav-tabs">
-            {questions.map((q, idx) => (
-              <button
-                key={q._id}
-                className={`q-tab-btn ${activeQuestionIdx === idx ? 'active' : ''} ${disqualifiedQuestions.includes(q._id) ? 'disqualified' : ''}`}
-                onClick={() => {
-                  setActiveQuestionIdx(idx);
-                  setSubResult(null);
-                }}
-              >
-                Q{idx + 1} {submissionsStatus[q._id]?.status === 'Accepted' && '✓'}
-              </button>
-            ))}
+            {questions.map((q, idx) => {
+              const pts = q.difficulty === 'Easy' ? 3 : q.difficulty === 'Medium' ? (idx % 2 === 0 ? 4 : 5) : 6;
+              return (
+                <button
+                  key={q._id}
+                  className={`q-tab-btn ${activeQuestionIdx === idx ? 'active' : ''} ${disqualifiedQuestions.includes(q._id) ? 'disqualified' : ''}`}
+                  onClick={() => {
+                    setActiveQuestionIdx(idx);
+                    setSubResult(null);
+                  }}
+                >
+                  Q{idx + 1} ({pts} pts) {submissionsStatus[q._id]?.status === 'Accepted' && '✓'}
+                </button>
+              );
+            })}
           </div>
 
           {activeQuestion && (
