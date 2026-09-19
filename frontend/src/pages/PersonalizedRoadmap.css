@@ -1623,3 +1623,80 @@
   color: #ffffff !important;
 }
 
+/* ==========================================================================
+   LeetCode Light Theme Overrides for Personalized Roadmaps
+   ========================================================================== */
+[data-theme="light"] .rm-card {
+  background: #ffffff !important;
+  border-color: #e5e7eb !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05) !important;
+}
+
+[data-theme="light"] .rm-card:hover {
+  border-color: #ffa116 !important;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08) !important;
+}
+
+[data-theme="light"] .rm-card-title {
+  color: #111827 !important;
+}
+
+[data-theme="light"] .rm-card-desc {
+  color: #4b5563 !important;
+}
+
+[data-theme="light"] .rm-tracker-strip,
+[data-theme="light"] .rm-active-tracker-bar {
+  background: #ffffff !important;
+  border-color: #e5e7eb !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05) !important;
+}
+
+[data-theme="light"] .rm-tracker-title {
+  color: #111827 !important;
+}
+
+[data-theme="light"] .rm-todo-container {
+  background: #ffffff !important;
+  border-color: #e5e7eb !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05) !important;
+}
+
+[data-theme="light"] .rm-todo-row {
+  background: #f9fafb !important;
+  border-color: #e5e7eb !important;
+}
+
+[data-theme="light"] .rm-todo-row:hover {
+  background: #f3f4f6 !important;
+}
+
+[data-theme="light"] .rm-todo-text {
+  color: #111827 !important;
+}
+
+[data-theme="light"] .rm-todo-row.completed .rm-todo-text {
+  color: #9ca3af !important;
+}
+
+[data-theme="light"] .rm-todo-input {
+  background: #ffffff !important;
+  border: 1px solid #d1d5db !important;
+  color: #111827 !important;
+}
+
+[data-theme="light"] .rm-modal-box {
+  background: #ffffff !important;
+  border-color: #e5e7eb !important;
+}
+
+[data-theme="light"] .rm-modal-header {
+  background: #f9fafb !important;
+  border-bottom-color: #e5e7eb !important;
+}
+
+[data-theme="light"] .rm-modal-title {
+  color: #111827 !important;
+}
+
+

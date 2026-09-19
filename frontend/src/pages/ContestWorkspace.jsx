@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
 import { API_URL } from '../config/api';
 import Editor from '@monaco-editor/react';
+import LeetCodeThemeToggle from '../components/LeetCodeThemeToggle';
 import './ContestsPortal.css';
 
 const ALL_CORER_LANGUAGES = [
@@ -25,6 +27,7 @@ const ContestWorkspace = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { token, user } = useAuth();
+  const { theme } = useTheme();
 
   // Screen states: 'disclaimer', 'exam', 'terminated', 'finished'
   const [examState, setExamState] = useState('disclaimer');
@@ -617,6 +620,7 @@ const ContestWorkspace = () => {
           </span>
         </div>
         <div className="header-right">
+          <LeetCodeThemeToggle size="sm" />
           <div className="timer-box">
             <span className="timer-icon">⏱️</span>
             <span className={`timer-value ${timeRemaining < 300 ? 'critical' : ''}`}>
@@ -744,7 +748,7 @@ const ContestWorkspace = () => {
           <div className="editor-textarea-container" style={{ position: 'relative', height: '550px', border: '1px solid #334155', borderRadius: '6px', overflow: 'hidden' }}>
             <Editor
               height="100%"
-              theme="vs-dark"
+              theme={theme === 'light' ? 'light' : 'vs-dark'}
               language={
                 language === 'cpp' ? 'cpp' :
                 language === 'python' ? 'python' :

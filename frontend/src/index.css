@@ -1,77 +1,83 @@
 @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Inter:wght@300;400;500;600;700&display=swap');
 
 :root {
-  /* Color Palette */
-  --bg-dark: #090d16;
-  --bg-card: rgba(17, 25, 40, 0.75);
-  --bg-sidebar: #0e1626;
+  /* Color Palette - Default LeetCode Dark */
+  --bg-dark: #1a1a1a;
+  --bg-card: #262626;
+  --bg-sidebar: #1e1e1e;
   --border-color: rgba(255, 255, 255, 0.08);
-  --border-hover: rgba(99, 102, 241, 0.4);
+  --border-hover: rgba(255, 161, 22, 0.4);
   
-  --primary: #6366f1;
-  --primary-hover: #4f46e5;
-  --primary-glow: rgba(99, 102, 241, 0.35);
+  --primary: #ffa116;
+  --primary-hover: #e28a00;
+  --primary-glow: rgba(255, 161, 22, 0.35);
   
-  --secondary: #a855f7;
-  --secondary-glow: rgba(168, 85, 247, 0.25);
+  --secondary: #6366f1;
+  --secondary-glow: rgba(99, 102, 241, 0.25);
   
-  --success: #10b981;
-  --success-glow: rgba(16, 185, 129, 0.2);
+  --success: #00b8a3;
+  --success-glow: rgba(0, 184, 163, 0.2);
   
-  --warning: #f59e0b;
-  --danger: #ef4444;
+  --warning: #ffc01e;
+  --danger: #ff375f;
   
-  --text-primary: #f8fafc;
-  --text-secondary: #94a3b8;
+  --text-primary: #eff1f6;
+  --text-secondary: #8a8a8a;
   --text-muted: #64748b;
   
   /* Layout Metrics */
   --sidebar-width: 260px;
   --header-height: 70px;
   --border-radius-sm: 8px;
-  --border-radius-md: 16px;
-  --border-radius-lg: 24px;
+  --border-radius-md: 14px;
+  --border-radius-lg: 20px;
   
   /* Font Families */
   --font-display: 'Outfit', 'Inter', sans-serif;
-  --font-sans: 'Inter', sans-serif;
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
 
 [data-theme="light"] {
-  --bg-dark: #ffffff;
+  --bg-dark: #f7f8fa;
   --bg-card: #ffffff;
   --bg-sidebar: #ffffff;
-  --border-color: #e2e8f0;
+  --border-color: #e5e7eb;
   --border-hover: #cbd5e1;
-  --text-primary: #0f172a;
-  --text-secondary: #334155;
-  --text-muted: #475569;
-  --primary-glow: rgba(99, 102, 241, 0.18);
-  --secondary-glow: rgba(168, 85, 247, 0.12);
+  --text-primary: #262626;
+  --text-secondary: #595959;
+  --text-muted: #8c8c8c;
+  --primary: #ffa116;
+  --primary-hover: #e28a00;
+  --primary-glow: rgba(255, 161, 22, 0.2);
+  --secondary: #6366f1;
+  --secondary-glow: rgba(99, 102, 241, 0.15);
+  --success: #00b8a3;
+  --warning: #d97706;
+  --danger: #ef4444;
 }
 
 [data-theme="dark"] {
-  --bg-dark: #090d16;
-  --bg-card: rgba(17, 25, 40, 0.75);
-  --bg-sidebar: #0e1626;
+  --bg-dark: #1a1a1a;
+  --bg-card: #262626;
+  --bg-sidebar: #1e1e1e;
   --border-color: rgba(255, 255, 255, 0.08);
-  --border-hover: rgba(99, 102, 241, 0.4);
+  --border-hover: rgba(255, 161, 22, 0.4);
   
-  --primary: #6366f1;
-  --primary-hover: #4f46e5;
-  --primary-glow: rgba(99, 102, 241, 0.35);
+  --primary: #ffa116;
+  --primary-hover: #e28a00;
+  --primary-glow: rgba(255, 161, 22, 0.35);
   
-  --secondary: #a855f7;
-  --secondary-glow: rgba(168, 85, 247, 0.25);
+  --secondary: #6366f1;
+  --secondary-glow: rgba(99, 102, 241, 0.25);
   
-  --success: #10b981;
-  --success-glow: rgba(16, 185, 129, 0.2);
+  --success: #00b8a3;
+  --success-glow: rgba(0, 184, 163, 0.2);
   
-  --warning: #f59e0b;
-  --danger: #ef4444;
+  --warning: #ffc01e;
+  --danger: #ff375f;
   
-  --text-primary: #f8fafc;
-  --text-secondary: #94a3b8;
+  --text-primary: #eff1f6;
+  --text-secondary: #8a8a8a;
   --text-muted: #64748b;
 }
 
@@ -89,14 +95,22 @@ body {
   overflow-x: hidden;
   min-height: 100vh;
   -webkit-font-smoothing: antialiased;
-  background-image: 
-    radial-gradient(circle at 10% 20%, rgba(99, 102, 241, 0.08) 0%, transparent 40%),
-    radial-gradient(circle at 90% 80%, rgba(168, 85, 247, 0.06) 0%, transparent 40%);
+  transition: background-color 0.25s ease, color 0.25s ease;
 }
 
-button, input, textarea, select {
-  font-family: inherit;
-  color: inherit;
+[data-theme="dark"] body,
+body[data-theme="dark"] {
+  background-color: #1a1a1a;
+  background-image: 
+    radial-gradient(circle at 10% 20%, rgba(255, 161, 22, 0.03) 0%, transparent 40%),
+    radial-gradient(circle at 90% 80%, rgba(99, 102, 241, 0.04) 0%, transparent 40%);
+}
+
+[data-theme="light"] body,
+body[data-theme="light"] {
+  background-color: #f7f8fa !important;
+  background-image: none !important;
+  color: #262626 !important;
 }
 
 /* Animations */
@@ -107,7 +121,7 @@ button, input, textarea, select {
 
 @keyframes pulseGlow {
   0%, 100% { box-shadow: 0 0 15px var(--primary-glow); }
-  50% { box-shadow: 0 0 25px rgba(99, 102, 241, 0.6); }
+  50% { box-shadow: 0 0 25px rgba(255, 161, 22, 0.5); }
 }
 
 @keyframes fillGauge {
@@ -129,13 +143,73 @@ button, input, textarea, select {
   border-radius: var(--border-radius-md);
   padding: 24px;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.2);
+  box-shadow: 0 4px 20px 0 rgba(0, 0, 0, 0.25);
 }
 
 .glass-card:hover {
   border-color: var(--border-hover);
-  box-shadow: 0 12px 40px 0 rgba(99, 102, 241, 0.08);
+  box-shadow: 0 8px 30px 0 rgba(0, 0, 0, 0.3);
   transform: translateY(-2px);
+}
+
+[data-theme="light"] .glass-card {
+  background: #ffffff !important;
+  border-color: #e5e7eb !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.03) !important;
+  color: #262626 !important;
+}
+
+[data-theme="light"] .glass-card:hover {
+  border-color: #cbd5e1 !important;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08) !important;
+}
+
+[data-theme="light"] h1,
+[data-theme="light"] h2,
+[data-theme="light"] h3,
+[data-theme="light"] h4,
+[data-theme="light"] h5 {
+  color: #1f2937 !important;
+}
+
+[data-theme="light"] .form-label {
+  color: #4b5563;
+}
+
+[data-theme="light"] .form-control {
+  background: #ffffff !important;
+  border: 1px solid #d1d5db !important;
+  color: #1f2937 !important;
+}
+
+[data-theme="light"] .form-control:focus {
+  border-color: #ffa116 !important;
+  box-shadow: 0 0 0 2px rgba(255, 161, 22, 0.2) !important;
+  background: #ffffff !important;
+}
+
+[data-theme="light"] .btn-secondary {
+  background: #f3f4f6 !important;
+  border: 1px solid #d1d5db !important;
+  color: #1f2937 !important;
+}
+
+[data-theme="light"] .btn-secondary:hover {
+  background: #e5e7eb !important;
+  border-color: #9ca3af !important;
+  color: #111827 !important;
+}
+
+[data-theme="light"] ::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+}
+
+[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+[data-theme="light"] ::-webkit-scrollbar-track {
+  background: #f1f5f9;
 }
 
 /* Title Styling */

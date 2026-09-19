@@ -383,3 +383,19 @@
 [data-theme="light"] .popover-item:hover { color: #0f172a; background: #f1f5f9; }
 [data-theme="light"] .contact-success-state h4 { color: #0f172a; }
 
+.sidebar-theme-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 10px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-sm);
+  transition: all 0.2s ease;
+}
+
+[data-theme="light"] .sidebar-theme-row {
+  background: #f8fafc;
+  border-color: #e2e8f0;
+}
+

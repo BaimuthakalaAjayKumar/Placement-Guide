@@ -1308,4 +1308,50 @@
   color: #0369a1 !important;
 }
 
+/* LeetCode Light Theme Overrides for Practice Modules & Tabs */
+[data-theme="light"] .aptitude-tabs {
+  background: #ffffff !important;
+  border-bottom: 2px solid #e5e7eb !important;
+}
+
+[data-theme="light"] .aptitude-tab-btn {
+  color: #6b7280 !important;
+}
+
+[data-theme="light"] .aptitude-tab-btn:hover {
+  color: #111827 !important;
+  background: #f3f4f6 !important;
+}
+
+[data-theme="light"] .aptitude-tab-btn.active {
+  color: #111827 !important;
+  background: #ffffff !important;
+  border: 1px solid #e5e7eb !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08) !important;
+}
+
+[data-theme="light"] .practice-card-alt,
+[data-theme="light"] .module-card {
+  background: #ffffff !important;
+  border-color: #e5e7eb !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05) !important;
+}
+
+[data-theme="light"] .practice-card-alt:hover,
+[data-theme="light"] .module-card:hover {
+  border-color: #ffa116 !important;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08) !important;
+}
+
+[data-theme="light"] .module-card-title,
+[data-theme="light"] .practice-card-alt h3 {
+  color: #111827 !important;
+}
+
+[data-theme="light"] .practice-card-alt p,
+[data-theme="light"] .module-card-desc {
+  color: #4b5563 !important;
+}
+
+
 

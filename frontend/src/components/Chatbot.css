@@ -697,6 +697,24 @@
   background: #ffffff;
 }
 
+[data-theme="light"] .chatbot-screen-bar {
+  background: #f0fdf4 !important;
+  border-bottom-color: #bbf7d0 !important;
+}
+
+[data-theme="light"] .screen-bar-text {
+  color: #166534 !important;
+}
+
+[data-theme="light"] .screen-bar-text strong {
+  color: #15803d !important;
+}
+
+[data-theme="light"] .screen-bar-action {
+  color: #2563eb !important;
+}
+
+
 @media (max-width: 480px) {
   .chatbot-root {
     bottom: 16px;

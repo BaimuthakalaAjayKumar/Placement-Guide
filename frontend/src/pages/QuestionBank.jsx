@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
 import { API_URL } from '../config/api';
 import Editor from '@monaco-editor/react';
 import Header from '../components/Header';
+import LeetCodeThemeToggle from '../components/LeetCodeThemeToggle';
 import './QuestionBank.css';
 
 const ALL_CORER_LANGUAGES = [
@@ -23,6 +25,7 @@ const ALL_CORER_LANGUAGES = [
 
 const QuestionBank = () => {
   const { user, token } = useAuth();
+  const { theme } = useTheme();
   
   const queryParams = new URLSearchParams(window.location.search);
   const companyFilter = queryParams.get('company') || '';
@@ -771,12 +774,13 @@ const QuestionBank = () => {
                               </option>
                             ))}
                           </select>
+                          <LeetCodeThemeToggle size="sm" />
                         </div>
 
                         <div className="editor-textarea-wrapper" style={{ height: '400px', border: '1px solid #334155', borderRadius: '6px', overflow: 'hidden' }}>
                           <Editor
                             height="100%"
-                            theme="vs-dark"
+                            theme={theme === 'light' ? 'light' : 'vs-dark'}
                             language={
                               selectedLanguage === 'cpp' ? 'cpp' :
                               selectedLanguage === 'python' ? 'python' :
@@ -1253,12 +1257,13 @@ const QuestionBank = () => {
                             </option>
                           ))}
                         </select>
+                        <LeetCodeThemeToggle size="sm" />
                       </div>
 
                       <div className="editor-textarea-wrapper" style={{ height: '400px', border: '1px solid #334155', borderRadius: '6px', overflow: 'hidden' }}>
                         <Editor
                           height="100%"
-                          theme="vs-dark"
+                          theme={theme === 'light' ? 'light' : 'vs-dark'}
                           language={
                             selectedLanguage === 'cpp' ? 'cpp' :
                             selectedLanguage === 'python' ? 'python' :

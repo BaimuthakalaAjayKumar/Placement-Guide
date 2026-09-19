@@ -1,0 +1,142 @@
+/* LeetCodeThemeToggle.css - Authentic LeetCode Segmented Slider Switch */
+.lc-theme-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: 20px;
+  transition: all 0.2s ease;
+  user-select: none;
+}
+
+.lc-theme-toggle-btn:focus-visible {
+  outline: 2px solid #ffa116;
+  outline-offset: 2px;
+}
+
+.lc-toggle-pill {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  width: 58px;
+  height: 28px;
+  border-radius: 14px;
+  padding: 2px;
+  background: #2a2a2a;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+[data-theme="light"] .lc-toggle-pill {
+  background: #e5e7eb;
+  border-color: #d1d5db;
+}
+
+.lc-pill-icon {
+  position: relative;
+  z-index: 2;
+  width: 26px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #718096;
+  transition: all 0.2s ease;
+  font-size: 11px;
+}
+
+.lc-pill-icon svg {
+  transition: transform 0.2s ease, stroke 0.2s ease;
+}
+
+.lc-pill-icon.sun.active {
+  color: #f59e0b;
+}
+
+.lc-pill-icon.sun.active svg {
+  stroke: #f59e0b;
+  transform: scale(1.1);
+}
+
+.lc-pill-icon.moon.active {
+  color: #fbbf24;
+}
+
+.lc-pill-icon.moon.active svg {
+  stroke: #fbbf24;
+  transform: scale(1.1);
+}
+
+.lc-pill-slider {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 26px;
+  height: 22px;
+  border-radius: 11px;
+  background: #383838;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.35);
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), background 0.2s ease;
+  z-index: 1;
+}
+
+.lc-pill-slider.slider-dark {
+  transform: translateX(26px);
+  background: #3e3e3e;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.45);
+}
+
+.lc-pill-slider.slider-light {
+  transform: translateX(0px);
+  background: #ffffff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.18);
+}
+
+.lc-toggle-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  letter-spacing: 0.3px;
+}
+
+[data-theme="light"] .lc-toggle-label {
+  color: #4b5563;
+}
+
+[data-theme="dark"] .lc-toggle-label {
+  color: #a0aec0;
+}
+
+.lc-theme-toggle-btn:hover .lc-toggle-pill {
+  border-color: #ffa116;
+}
+
+/* Small variant */
+.lc-theme-toggle-btn.sm .lc-toggle-pill {
+  width: 50px;
+  height: 24px;
+  border-radius: 12px;
+}
+
+.lc-theme-toggle-btn.sm .lc-pill-icon {
+  width: 22px;
+  height: 20px;
+}
+
+.lc-theme-toggle-btn.sm .lc-pill-icon svg {
+  width: 12px;
+  height: 12px;
+}
+
+.lc-theme-toggle-btn.sm .lc-pill-slider {
+  width: 22px;
+  height: 18px;
+  border-radius: 9px;
+}
+
+.lc-theme-toggle-btn.sm .lc-pill-slider.slider-dark {
+  transform: translateX(22px);
+}
