@@ -14,11 +14,15 @@ const QUICK_PROMPTS = [
 
 const Chatbot = () => {
   const [isOpen, setIsOpen] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [userApiKey, setUserApiKey] = useState(() => localStorage.getItem('griet_openai_key') || '');
+  const [savedStatus, setSavedStatus] = useState(false);
   const [messages, setMessages] = useState([
     {
       id: 'welcome',
       role: 'assistant',
-      text: `👋 **Hi! I am your GRIET Placement AI Assistant.**\n\nI can help resolve your doubts about **Computer Science subjects** (DSA, DBMS, OS, OOP, CN) as well as guide you on how to use any tool on this website.\n\nClick any topic below or type your question:`,
+      source: 'chatgpt',
+      text: `👋 **Hi! I am your GRIET Placement AI Assistant, powered by ChatGPT.**\n\nI can help resolve your doubts on **Computer Science subjects** (DSA, DBMS, OS, OOP, CN), quantitative aptitude, interview questions, and how to use every tool on this website.\n\nClick any topic below or ask whatever doubt you have:`,
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     }
   ]);
@@ -50,6 +54,20 @@ const Chatbot = () => {
     }
   }, [isOpen]);
 
+  const handleSaveKey = () => {
+    const trimmed = userApiKey.trim();
+    if (trimmed) {
+      localStorage.setItem('griet_openai_key', trimmed);
+    } else {
+      localStorage.removeItem('griet_openai_key');
+    }
+    setSavedStatus(true);
+    setTimeout(() => {
+      setSavedStatus(false);
+      setShowSettings(false);
+    }, 1500);
+  };
+
   const handleSend = async (userText) => {
     const query = (userText || input).trim();
     if (!query || loading) return;
@@ -67,22 +85,32 @@ const Chatbot = () => {
     setLoading(true);
 
     try {
+      const activeKey = userApiKey.trim() || localStorage.getItem('griet_openai_key') || undefined;
+
       const res = await fetch(`${API_URL}/ai/chat`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          ...(activeKey ? { 'X-OpenAI-Key': activeKey } : {})
         },
-        body: JSON.stringify({ question: query })
+        body: JSON.stringify({
+          question: query,
+          openaiApiKey: activeKey,
+          history: messages.slice(-6).map(m => ({ role: m.role, text: m.text }))
+        })
       });
 
       const data = await res.json();
-      if (data.success && data.answer) {
+      if (data.success && (data.answer || data.reply)) {
+        const text = data.answer || data.reply;
         setMessages(prev => [
           ...prev,
           {
             id: `ai-${Date.now()}`,
             role: 'assistant',
-            text: data.answer,
+            text,
+            source: data.source || 'chatgpt',
+            model: data.model || 'ChatGPT',
             time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
           }
         ]);
@@ -95,7 +123,7 @@ const Chatbot = () => {
         {
           id: `ai-err-${Date.now()}`,
           role: 'assistant',
-          text: `⚠️ **Could not connect to AI service.** Please make sure the backend server is running, or try asking again.`,
+          text: `⚠️ **Could not connect to ChatGPT service.** Please check your connection or try asking again.`,
           time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
         }
       ]);
@@ -116,7 +144,8 @@ const Chatbot = () => {
       {
         id: `welcome-${Date.now()}`,
         role: 'assistant',
-        text: `🧹 **Chat cleared.** How can I assist you with your subjects or the portal today?`,
+        source: 'chatgpt',
+        text: `🧹 **Chat cleared.** How can ChatGPT help you with your subjects or the portal today?`,
         time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
       }
     ]);
@@ -185,7 +214,7 @@ const Chatbot = () => {
           type="button"
           className="chatbot-launcher-btn animate-fade"
           onClick={() => setIsOpen(true)}
-          title="Ask AI Doubt Assistant"
+          title="Ask AI Assistant (ChatGPT)"
         >
           <div className="chatbot-launcher-icon">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -195,6 +224,7 @@ const Chatbot = () => {
             </svg>
           </div>
           <span className="chatbot-launcher-text">Ask AI Assistant</span>
+          <span className="chatgpt-mini-tag">ChatGPT</span>
           <span className="chatbot-pulse-ring"></span>
         </button>
       )}
@@ -216,12 +246,28 @@ const Chatbot = () => {
                 <span className="online-indicator"></span>
               </div>
               <div className="chatbot-title-group">
-                <h3>GRIET AI Assistant</h3>
-                <span className="chatbot-status-subtitle">Subject Doubts & Portal Guide</span>
+                <div className="chatbot-title-line">
+                  <h3>GRIET AI Assistant</h3>
+                  <span className="chatgpt-status-pill">⚡ ChatGPT</span>
+                </div>
+                <span className="chatbot-status-subtitle">
+                  {userApiKey ? '🟢 Custom OpenAI Key Active' : 'Subject Doubts & Portal Guidance'}
+                </span>
               </div>
             </div>
 
             <div className="chatbot-header-actions">
+              <button
+                type="button"
+                className={`chatbot-icon-btn ${showSettings ? 'active-btn' : ''}`}
+                onClick={() => setShowSettings(!showSettings)}
+                title="Configure ChatGPT Key"
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: '15px', height: '15px' }}>
+                  <circle cx="12" cy="12" r="3"></circle>
+                  <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                </svg>
+              </button>
               <button
                 type="button"
                 className="chatbot-icon-btn"
@@ -241,6 +287,47 @@ const Chatbot = () => {
             </div>
           </div>
 
+          {/* ChatGPT Settings Panel */}
+          {showSettings && (
+            <div className="chatbot-settings-panel animate-fade">
+              <div className="settings-panel-header">
+                <h4>⚡ ChatGPT (OpenAI) Key</h4>
+                <button type="button" className="settings-close-x" onClick={() => setShowSettings(false)}>✕</button>
+              </div>
+              <p className="settings-panel-text">
+                Enter your OpenAI API key to query <strong>ChatGPT</strong> directly for any technical question:
+              </p>
+              <div className="settings-panel-row">
+                <input
+                  type="password"
+                  placeholder="sk-proj-..."
+                  value={userApiKey}
+                  onChange={(e) => setUserApiKey(e.target.value)}
+                  className="settings-panel-input"
+                />
+                <button
+                  type="button"
+                  className="settings-panel-save-btn"
+                  onClick={handleSaveKey}
+                >
+                  {savedStatus ? '✓ Saved!' : 'Save'}
+                </button>
+              </div>
+              {userApiKey && (
+                <button
+                  type="button"
+                  className="settings-panel-remove-btn"
+                  onClick={() => {
+                    localStorage.removeItem('griet_openai_key');
+                    setUserApiKey('');
+                  }}
+                >
+                  Remove personal key
+                </button>
+              )}
+            </div>
+          )}
+
           {/* Messages Container */}
           <div className="chatbot-messages">
             {messages.map((msg) => (
@@ -251,6 +338,11 @@ const Chatbot = () => {
                   </div>
                 )}
                 <div className={`chatbot-bubble ${msg.role === 'user' ? 'user-bubble' : 'bot-bubble'}`}>
+                  {msg.source === 'chatgpt' && (
+                    <div className="chatgpt-verified-badge">
+                      <span>⚡ ChatGPT</span>
+                    </div>
+                  )}
                   {renderFormattedText(msg.text)}
                   <span className="chatbot-time">{msg.time}</span>
                 </div>
@@ -292,7 +384,7 @@ const Chatbot = () => {
             <textarea
               ref={inputRef}
               className="chatbot-input"
-              placeholder="Ask a doubt about OS, DBMS, DSA or the portal..."
+              placeholder="Ask ChatGPT any doubt on OS, DBMS, DSA, or portal..."
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}

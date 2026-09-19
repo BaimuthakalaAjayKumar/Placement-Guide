@@ -176,9 +176,81 @@ exports.askAIChat = async (req, res) => {
     }
 
     const cleanQuestion = raw.trim();
+
+    // 1. ChatGPT (OpenAI) Integration
+    const openaiApiKey = req.body.openaiApiKey || req.headers['x-openai-key'] || process.env.OPENAI_API_KEY || process.env.CHATGPT_API_KEY;
+
+    if (openaiApiKey && typeof openaiApiKey === 'string' && openaiApiKey.trim() !== '') {
+      try {
+        const systemPrompt = `You are the official GRIET Placement AI Assistant, powered by ChatGPT.
+Your purpose is to help engineering students resolve doubts and prepare for technical placement drives.
+You answer:
+1. Technical and Computer Science subject doubts: Data Structures & Algorithms, Operating Systems, DBMS, OOPs, Computer Networks, System Design, Web Development (HTML, CSS, React, Node.js), Programming Languages (C, C++, Java, Python, JavaScript), and Quantitative/Logical Aptitude.
+2. GRIET Placement Preparation Portal guidance: explain Practice Modules (Aptitude & Core CSE tests), Coding Contests (LeetCode, Codeforces, CodeChef, HackerRank multi-platform sync), AI Resume Builder & Analyzer, Learning Roadmaps with Field Trackers & Study TODOs, and Coding Playground.
+
+Guidelines:
+- Provide clear, well-structured, encouraging, and accurate answers.
+- Use clean Markdown with headers, bold highlights, bullet points, and code snippets where helpful.
+- Keep explanations easy to understand for campus recruitment preparation.`;
+
+        const chatMessages = [
+          { role: 'system', content: systemPrompt }
+        ];
+
+        if (Array.isArray(history) && history.length > 0) {
+          const recentHistory = history.slice(-6);
+          recentHistory.forEach(msg => {
+            const role = msg.role === 'user' ? 'user' : 'assistant';
+            const content = msg.text || msg.content || '';
+            if (content) {
+              chatMessages.push({ role, content });
+            }
+          });
+        }
+
+        chatMessages.push({
+          role: 'user',
+          content: cleanQuestion
+        });
+
+        const chatGptRes = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${openaiApiKey.trim()}`
+          },
+          body: JSON.stringify({
+            model: 'gpt-4o-mini',
+            messages: chatMessages,
+            temperature: 0.7,
+            max_tokens: 1200
+          })
+        });
+
+        if (chatGptRes.ok) {
+          const chatGptData = await chatGptRes.json();
+          const answerText = chatGptData.choices?.[0]?.message?.content;
+          if (answerText) {
+            return res.status(200).json({
+              success: true,
+              answer: answerText,
+              reply: answerText,
+              source: 'chatgpt',
+              model: 'gpt-4o-mini'
+            });
+          }
+        } else {
+          const errData = await chatGptRes.json().catch(() => ({}));
+          console.warn('ChatGPT API call error response:', chatGptRes.status, errData);
+        }
+      } catch (chatGptErr) {
+        console.warn('ChatGPT API call failed, continuing to next fallback:', chatGptErr.message);
+      }
+    }
+
+    // 2. Google Gemini Fallback
     const apiKey = process.env.GEMINI_API_KEY;
 
-    // 1. If Gemini API key is configured, use live LLM with GRIET portal context
     if (apiKey) {
       try {
         const systemInstruction = `
@@ -239,15 +311,17 @@ exports.askAIChat = async (req, res) => {
     }
 
     // 3. Helpful Default Fallback
-    const fallbackResponse = `### 💡 Quick Answer
-I'm here to help you prepare for technical interviews and navigate the **GRIET Placement Portal**!
+    const fallbackResponse = `### 💡 Ask AI Assistant (ChatGPT Connected)
+I'm your **GRIET Placement AI Assistant**, powered by **ChatGPT**!
 
-You can ask me about:
-- **Core CSE**: DBMS (ACID, Normalization), Operating Systems (Processes, Deadlocks), OOP (Pillars, Polymorphism), Computer Networks (OSI, TCP/IP).
-- **DSA & Coding**: Time complexities, Sorting algorithms, Tree/Graph traversals.
-- **Portal Guidance**: Practice Modules, Resume Builder, Coding Contests, or Learning Roadmaps.
+I can help resolve your doubts on:
+- **Core Computer Science**: DBMS (ACID, Normalization, SQL), Operating Systems (Processes, Deadlocks, Paging), OOPs (Pillars, Polymorphism), Computer Networks (OSI, TCP/IP, UDP).
+- **DSA & Algorithms**: Time & Space complexities, Sorting, Trees, Graphs, DP.
+- **Programming**: C, C++, Java, Python, JavaScript, and Web Development.
+- **Placement Portal Guidance**: Practice Modules, Resume Builder, Contests, and Roadmaps.
 
-*Try asking: "Explain ACID properties in DBMS" or "How do Practice Modules tests work?"*`;
+*Try asking: "Explain ACID properties in DBMS" or "Difference between Process and Thread"*
+*(Tip: You can also configure your personal OpenAI Key in the ⚙️ settings icon in the top right of this chat window or in backend `.env` for direct ChatGPT answers!)*`;
 
     return res.status(200).json({
       success: true,
