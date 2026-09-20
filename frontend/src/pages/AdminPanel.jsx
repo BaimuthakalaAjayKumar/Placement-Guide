@@ -556,6 +556,7 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
 
       if (activeTab === 'analytics') {
         fetchStudents();
+      } else if (activeTab === 'job-opportunities' || activeTab === 'jobs' || activeTab === 'job-postings') {
         fetchJobs();
       } else if (activeTab === 'interviews') {
         fetchMockInterviewReports();
@@ -2085,7 +2086,15 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
 
   return (
     <>
-      <Header title="Admin Command Console" />
+      <Header
+        title={
+          activeTab === 'job-opportunities' || activeTab === 'jobs' || activeTab === 'job-postings'
+            ? 'Job Opportunities & Placement Drives'
+            : activeTab === 'faculty-staff'
+            ? 'Faculty & Administrator Management'
+            : 'Admin Command Console'
+        }
+      />
 
       {selectedJobForExpiry && (
         <div className="modal-overlay" onClick={() => setSelectedJobForExpiry(null)}>
@@ -2255,6 +2264,15 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
             📊 Candidate Analytics
           </button>
           <button
+            className={`admin-tab-btn ${activeTab === 'job-opportunities' || activeTab === 'jobs' || activeTab === 'job-postings' ? 'active' : ''}`}
+            onClick={() => {
+              setActiveTab('job-opportunities');
+              fetchJobs();
+            }}
+          >
+            💼 Job Opportunities
+          </button>
+          <button
             className={`admin-tab-btn ${activeTab === 'interviews' ? 'active' : ''}`}
             onClick={() => setActiveTab('interviews')}
           >
@@ -2351,91 +2369,115 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
                 </div>
               </div>
 
-              <div className="admin-split-layout">
-                {/* Admin Panels Left Column */}
-                <div className="admin-left-column" style={{ display: 'flex', flexDirection: 'column', gap: '24px', minWidth: 0 }}>
-
-                  {/* List of Students */}
-                  <div className="glass-card student-roster-card">
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', marginBottom: '14px' }}>
-                      <div>
-                        <h3 style={{ margin: 0 }}>Student Preparedness Roster</h3>
-                        <p className="card-desc" style={{ margin: '4px 0 0' }}>Comprehensive log of students ranked by Placement Readiness Index (PRI).</p>
-                      </div>
-                      <button
-                        type="button"
-                        className="btn btn-primary btn-sm"
-                        onClick={downloadStudentsRosterCSV}
-                        disabled={!students.length}
-                        style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
-                      >
-                        📥 Download Students Report (CSV)
-                      </button>
-                    </div>
-
-                    <div className="table-responsive-wrapper">
-                      <table className="student-roster-table">
-                        <thead>
-                          <tr>
-                            <th>Student Name</th>
-                            <th>Email Address</th>
-                            <th>Target Role</th>
-                            <th>PRI Score</th>
-                            <th>Status</th>
-                            <th style={{ textAlign: 'center' }}>Action</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {students.length > 0 ? (
-                            students.map((student) => (
-                              <tr key={student._id}>
-                                <td>
-                                  <div className="table-student-name">
-                                    <span className="table-avatar">{student.name.charAt(0).toUpperCase()}</span>
-                                    <span>{student.name}</span>
-                                  </div>
-                                </td>
-                                <td>{student.email}</td>
-                                <td className="text-secondary">{student.targetRole || 'Software Engineer'}</td>
-                                <td>
-                                  <strong className="text-glow">{student.readinessScore}%</strong>
-                                </td>
-                                <td>
-                                  <span className={`pri-level-badge scale-down`} data-level={student.readinessScore >= 80 ? 'high' : student.readinessScore >= 50 ? 'medium' : 'low'}>
-                                    {student.readinessScore >= 80 ? 'Job Ready' : student.readinessScore >= 50 ? 'Medium' : 'Low'}
-                                  </span>
-                                </td>
-                                <td>
-                                  <div style={{ display: 'flex', justifyContent: 'center', gap: '8px' }}>
-                                    <button
-                                      className="btn btn-secondary btn-sm"
-                                      onClick={() => openAcademicsModal(student)}
-                                      title="Edit Academics"
-                                    >
-                                      🎓 Academics
-                                    </button>
-                                    <button
-                                      className="btn btn-danger btn-sm"
-                                      onClick={() => handleDeleteStudent(student._id, student.name)}
-                                      title="Remove Student"
-                                    >
-                                      🗑 Remove
-                                    </button>
-                                  </div>
-                                </td>
-                              </tr>
-                            ))
-                          ) : (
-                            <tr>
-                              <td colSpan="6" className="table-empty-msg">No students registered yet.</td>
-                            </tr>
-                          )}
-                        </tbody>
-                      </table>
-                    </div>
+              {/* List of Students */}
+              <div className="glass-card student-roster-card" style={{ marginTop: '24px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', marginBottom: '14px' }}>
+                  <div>
+                    <h3 style={{ margin: 0 }}>Student Preparedness Roster</h3>
+                    <p className="card-desc" style={{ margin: '4px 0 0' }}>Comprehensive log of students ranked by Placement Readiness Index (PRI).</p>
                   </div>
+                  <button
+                    type="button"
+                    className="btn btn-primary btn-sm"
+                    onClick={downloadStudentsRosterCSV}
+                    disabled={!students.length}
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                  >
+                    📥 Download Students Report (CSV)
+                  </button>
+                </div>
 
-                  {/* Posted Job Listings */}
+                <div className="table-responsive-wrapper">
+                  <table className="student-roster-table">
+                    <thead>
+                      <tr>
+                        <th>Student Name</th>
+                        <th>Email Address</th>
+                        <th>Target Role</th>
+                        <th>PRI Score</th>
+                        <th>Status</th>
+                        <th style={{ textAlign: 'center' }}>Action</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {students.length > 0 ? (
+                        students.map((student) => (
+                          <tr key={student._id}>
+                            <td>
+                              <div className="table-student-name">
+                                <span className="table-avatar">{student.name.charAt(0).toUpperCase()}</span>
+                                <span>{student.name}</span>
+                              </div>
+                            </td>
+                            <td>{student.email}</td>
+                            <td className="text-secondary">{student.targetRole || 'Software Engineer'}</td>
+                            <td>
+                              <strong className="text-glow">{student.readinessScore}%</strong>
+                            </td>
+                            <td>
+                              <span className={`pri-level-badge scale-down`} data-level={student.readinessScore >= 80 ? 'high' : student.readinessScore >= 50 ? 'medium' : 'low'}>
+                                {student.readinessScore >= 80 ? 'Job Ready' : student.readinessScore >= 50 ? 'Medium' : 'Low'}
+                              </span>
+                            </td>
+                            <td>
+                              <div style={{ display: 'flex', justifyContent: 'center', gap: '8px' }}>
+                                <button
+                                  className="btn btn-secondary btn-sm"
+                                  onClick={() => openAcademicsModal(student)}
+                                  title="Edit Academics"
+                                >
+                                  🎓 Academics
+                                </button>
+                                <button
+                                  className="btn btn-danger btn-sm"
+                                  onClick={() => handleDeleteStudent(student._id, student.name)}
+                                  title="Remove Student"
+                                >
+                                  🗑 Remove
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td colSpan="6" className="table-empty-msg">No students registered yet.</td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </>
+          )
+        }
+
+        {
+          (activeTab === 'job-opportunities' || activeTab === 'jobs' || activeTab === 'job-postings') && (
+            <div className="job-opportunities-management-wrapper animate-fade">
+              {/* Header / Intro Card */}
+              <div className="glass-card" style={{ marginBottom: '24px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
+                  <div>
+                    <h3 style={{ margin: '0 0 6px 0' }}>💼 Job Opportunities & Placement Drives</h3>
+                    <p className="card-desc" style={{ margin: 0 }}>
+                      Publish job opportunities that notify matching students, manage application deadlines, and monitor posted listings.
+                    </p>
+                  </div>
+                  <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                    <span className="badge" style={{ backgroundColor: 'rgba(99, 102, 241, 0.15)', color: '#818cf8', border: '1px solid rgba(99, 102, 241, 0.3)', padding: '6px 14px', borderRadius: '6px', fontSize: '13px', fontWeight: 600 }}>
+                      {jobs.length} Active Job Listings
+                    </span>
+                    <button type="button" className="btn btn-secondary btn-sm" onClick={fetchJobs} title="Refresh Jobs">
+                      🔄 Refresh Listings
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="admin-split-layout">
+                {/* Admin Panels Left Column: Posted Job Listings (Image 2) */}
+                <div className="admin-left-column" style={{ display: 'flex', flexDirection: 'column', gap: '24px', minWidth: 0 }}>
                   <div className="glass-card posted-jobs-card">
                     <h3>Posted Job Listings</h3>
                     <p className="card-desc">Review and manage job postings currently visible to students.</p>
@@ -2502,12 +2544,10 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
                       </table>
                     </div>
                   </div>
-
                 </div>
 
-                {/* Admin Panels Right Column */}
+                {/* Admin Panels Right Column: Post Job Opportunities (Image 1) */}
                 <div className="admin-right-column" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-                  {/* Add Job form */}
                   <div className="glass-card create-job-form-card">
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap', gap: '8px' }}>
                       <h3 style={{ margin: 0 }}>Post Job Opportunities</h3>
@@ -2772,7 +2812,7 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
                   </div>
                 </div>
               </div>
-            </>
+            </div>
           )
         }
 

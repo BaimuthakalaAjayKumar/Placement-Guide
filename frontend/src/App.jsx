@@ -213,9 +213,15 @@ const AppRoutes = () => {
       <Route
         path="/jobs"
         element={
-          <PrivateRoute allowedRoles={['student']}>
-            <JobBoard />
-          </PrivateRoute>
+          user?.role === 'admin' ? (
+            <PrivateRoute allowedRoles={['admin']}>
+              <AdminPanel defaultTab="job-opportunities" />
+            </PrivateRoute>
+          ) : (
+            <PrivateRoute allowedRoles={['student']}>
+              <JobBoard />
+            </PrivateRoute>
+          )
         }
       />
       <Route
@@ -238,6 +244,30 @@ const AppRoutes = () => {
         element={
           <PrivateRoute allowedRoles={['admin']}>
             <AdminPanel />
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/job-opportunities"
+        element={
+          <PrivateRoute allowedRoles={['admin']}>
+            <AdminPanel defaultTab="job-opportunities" />
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/job-postings"
+        element={
+          <PrivateRoute allowedRoles={['admin']}>
+            <AdminPanel defaultTab="job-opportunities" />
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/manage-jobs"
+        element={
+          <PrivateRoute allowedRoles={['admin']}>
+            <AdminPanel defaultTab="job-opportunities" />
           </PrivateRoute>
         }
       />
