@@ -411,6 +411,22 @@ exports.createTest = async (req, res, next) => {
   }
 };
 
+// @desc    Delete a practice test
+// @route   DELETE /api/tests/:id
+// @access  Private/Admin & Faculty
+exports.deleteTest = async (req, res, next) => {
+  try {
+    const test = await AptitudeTest.findById(req.params.id);
+    if (!test) {
+      return res.status(404).json({ success: false, error: 'Test not found' });
+    }
+    await AptitudeTest.findByIdAndDelete(req.params.id);
+    res.status(200).json({ success: true, message: 'Practice test deleted successfully' });
+  } catch (err) {
+    next(err);
+  }
+};
+
 // @desc    Get all questions for a test (Admin only)
 // @route   GET /api/tests/:id/questions
 // @access  Private/Admin

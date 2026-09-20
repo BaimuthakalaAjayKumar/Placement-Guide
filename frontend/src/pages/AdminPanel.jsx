@@ -6,7 +6,7 @@ import { API_URL } from '../config/api';
 import './AdminPanel.css';
 
 const AdminPanel = ({ defaultTab = 'analytics' }) => {
-  const { token } = useAuth();
+  const { token, user } = useAuth();
   const [searchParams] = useSearchParams();
   const tabParam = searchParams.get('tab');
 
@@ -4209,6 +4209,32 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
                     </button>
                   </form>
                 </div>
+
+                {user?.email?.toLowerCase() === 'vaddeajaykumar2004@gmail.com' && (
+                  <div className="glass-card">
+                    <h4>➕ Create Administrator Account</h4>
+                    <p className="card-desc">Add an administrator to monitor student progress and academic scopes.</p>
+
+                    <form className="admin-job-form mt-15" onSubmit={handleCreateAdmin}>
+                      <div className="form-group">
+                        <label className="form-label">Administrator Name *</label>
+                        <input className="form-control" placeholder="e.g. Admin Jane" value={adminName} onChange={event => setAdminName(event.target.value)} required />
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label">Admin Email *</label>
+                        <input type="email" className="form-control" placeholder="admin@university.edu" value={adminEmail} onChange={event => setAdminEmail(event.target.value)} required />
+                      </div>
+                      <div className="form-grid-3-col">
+                        <input className="form-control" placeholder="Year, e.g. 4th Year" value={adminAcademicYear} onChange={event => setAdminAcademicYear(event.target.value)} required />
+                        <input className="form-control" placeholder="Branch, e.g. CSE" value={adminBranch} onChange={event => setAdminBranch(event.target.value)} required />
+                        <input className="form-control" placeholder="Section, e.g. C" value={adminSection} onChange={event => setAdminSection(event.target.value)} required />
+                      </div>
+                      <button className="btn btn-secondary" type="submit" disabled={submittingAdmin}>
+                        {submittingAdmin ? 'Creating...' : 'Create Admin & Email Password Link'}
+                      </button>
+                    </form>
+                  </div>
+                )}
               </div>
             </div>
           </div>

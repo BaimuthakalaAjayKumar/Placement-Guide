@@ -7,11 +7,14 @@ const { checkLabTaskPlagiarism } = require('../services/plagiarismService');
 
 const studentYear = user => user.academicYear || user.year || '';
 const canManage = (user, task) => user.role === 'admin' || (
-  user.role === 'faculty' && user.managedScopes.some(scope =>
-    scope.academicYear === task.academicYear &&
-    (!scope.branch || scope.branch === task.branch) &&
-    (!scope.section || scope.section === task.section) &&
-    (!scope.subject || scope.subject.toString() === task.subject.toString())
+  user.role === 'faculty' && (
+    (task.createdBy && task.createdBy.toString() === user.id) ||
+    (user.managedScopes && user.managedScopes.some(scope =>
+      scope.academicYear === task.academicYear &&
+      (!scope.branch || scope.branch === task.branch) &&
+      (!scope.section || scope.section === task.section) &&
+      (!scope.subject || scope.subject.toString() === task.subject.toString())
+    ))
   )
 );
 
@@ -136,6 +139,72 @@ exports.createTask = async (req, res, next) => {
       createdBy: req.user.id
     });
     res.status(201).json({ success: true, data: task });
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.updateTask = async (req, res, next) => {
+  try {
+    const task = await LabTask.findById(req.params.id);
+    if (!task) return res.status(404).json({ success: false, error: 'Lab task not found.' });
+    if (!canManage(req.user, task)) {
+      return res.status(403).json({ success: false, error: 'Not authorized to edit this lab task.' });
+    }
+
+    const {
+      title,
+      instructions,
+      subject,
+      academicYear,
+      branch,
+      section,
+      maxScore,
+      dueDate,
+      referenceSolution,
+      solutionLanguage,
+      referenceSolutions,
+      allowedLanguages,
+      isActive
+    } = req.body;
+
+    if (title !== undefined) task.title = title;
+    if (instructions !== undefined) task.instructions = instructions;
+    if (subject !== undefined) task.subject = subject;
+    if (academicYear !== undefined) task.academicYear = academicYear;
+    if (branch !== undefined) task.branch = branch;
+    if (section !== undefined) task.section = section;
+    if (maxScore !== undefined) task.maxScore = maxScore;
+    if (dueDate !== undefined) task.dueDate = dueDate;
+    if (referenceSolutions !== undefined) task.referenceSolutions = referenceSolutions;
+    if (solutionLanguage !== undefined) task.solutionLanguage = solutionLanguage;
+    if (allowedLanguages !== undefined) task.allowedLanguages = allowedLanguages;
+    if (isActive !== undefined) task.isActive = isActive;
+
+    let primaryRef = referenceSolution;
+    if (!primaryRef && task.referenceSolutions) {
+      primaryRef = task.referenceSolutions[task.solutionLanguage] || Object.values(task.referenceSolutions).find(v => (v || '').trim()) || '';
+    }
+    if (primaryRef !== undefined) task.referenceSolution = primaryRef;
+
+    await task.save();
+    const updated = await LabTask.findById(task._id).populate('subject', 'name code').populate('createdBy', 'name email');
+    res.status(200).json({ success: true, data: updated });
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.deleteTask = async (req, res, next) => {
+  try {
+    const task = await LabTask.findById(req.params.id);
+    if (!task) return res.status(404).json({ success: false, error: 'Lab task not found.' });
+    if (!canManage(req.user, task)) {
+      return res.status(403).json({ success: false, error: 'Not authorized to delete this lab task.' });
+    }
+
+    await LabTask.findByIdAndDelete(req.params.id);
+    res.status(200).json({ success: true, message: 'Lab task deleted successfully.' });
   } catch (err) {
     next(err);
   }

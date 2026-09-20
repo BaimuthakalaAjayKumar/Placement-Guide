@@ -108,6 +108,36 @@ const FacultyDashboard = () => {
     const [submittingLab, setSubmittingLab] = useState(false);
     const [selectedLabReviewAttempt, setSelectedLabReviewAttempt] = useState(null);
 
+    // Edit Lab Task states
+    const [editingLabTask, setEditingLabTask] = useState(null);
+    const [editLabTaskForm, setEditLabTaskForm] = useState({
+        title: '',
+        instructions: '',
+        subject: '',
+        academicYear: '',
+        branch: '',
+        section: '',
+        maxScore: 100,
+        referenceSolutions: {
+            cpp: '',
+            java: '',
+            python: '',
+            c: '',
+            javascript: '',
+            sql: ''
+        }
+    });
+    const [activeEditLangTab, setActiveEditLangTab] = useState('cpp');
+    const [savingEditLab, setSavingEditLab] = useState(false);
+
+    // Records & Academic Repository states
+    const [repoSubTab, setRepoSubTab] = useState('labs'); // 'labs' | 'tests' | 'notes'
+    const [repoSearch, setRepoSearch] = useState('');
+    const [repoTests, setRepoTests] = useState([]);
+    const [loadingRepoTests, setLoadingRepoTests] = useState(false);
+    const [previewSolutionsTask, setPreviewSolutionsTask] = useState(null);
+    const [previewLangTab, setPreviewLangTab] = useState('cpp');
+
     const navigate = useNavigate();
 
     const getAuthHeaders = () => {
@@ -180,8 +210,24 @@ const FacultyDashboard = () => {
             fetchLabTasks();
             fetchSubjects();
             fetchLabReports();
+        } else if (activeTab === 'repository') {
+            fetchLabTasks();
+            fetchSubjects();
+            fetchRepoTests();
         }
     }, [activeTab]);
+
+    const fetchRepoTests = async () => {
+        try {
+            setLoadingRepoTests(true);
+            const res = await axios.get(`${API_URL}/tests`, getAuthHeaders());
+            setRepoTests(res.data?.data || []);
+        } catch (err) {
+            console.error('Failed to load repo tests:', err);
+        } finally {
+            setLoadingRepoTests(false);
+        }
+    };
 
     const fetchLabReports = async () => {
         try {
@@ -515,6 +561,80 @@ const FacultyDashboard = () => {
         }
     };
 
+    // Lab task edit & delete handlers
+    const handleStartEditLab = (task) => {
+        const existingRefSols = {
+            cpp: task.referenceSolutions?.cpp || (task.solutionLanguage === 'cpp' ? task.referenceSolution : '') || '',
+            java: task.referenceSolutions?.java || (task.solutionLanguage === 'java' ? task.referenceSolution : '') || '',
+            python: task.referenceSolutions?.python || (task.solutionLanguage === 'python' ? task.referenceSolution : '') || '',
+            c: task.referenceSolutions?.c || (task.solutionLanguage === 'c' ? task.referenceSolution : '') || '',
+            javascript: task.referenceSolutions?.javascript || (task.solutionLanguage === 'javascript' ? task.referenceSolution : '') || '',
+            sql: task.referenceSolutions?.sql || (task.solutionLanguage === 'sql' ? task.referenceSolution : '') || ''
+        };
+        setEditLabTaskForm({
+            title: task.title || '',
+            instructions: task.instructions || '',
+            subject: task.subject?._id || task.subject || '',
+            academicYear: task.academicYear || '',
+            branch: task.branch || '',
+            section: task.section || '',
+            maxScore: task.maxScore || 100,
+            referenceSolutions: existingRefSols
+        });
+        const firstFilled = Object.keys(existingRefSols).find(k => existingRefSols[k]?.trim());
+        setActiveEditLangTab(firstFilled || task.solutionLanguage || 'cpp');
+        setEditingLabTask(task);
+    };
+
+    const handleSaveEditLab = async (e) => {
+        e.preventDefault();
+        if (!editingLabTask) return;
+        try {
+            setSavingEditLab(true);
+            const primaryRef = editLabTaskForm.referenceSolutions?.[activeEditLangTab] || Object.values(editLabTaskForm.referenceSolutions || {}).find(v => (v || '').trim()) || '';
+            const payload = {
+                ...editLabTaskForm,
+                referenceSolution: primaryRef,
+                solutionLanguage: activeEditLangTab
+            };
+            const res = await axios.put(`${API_URL}/labs/tasks/${editingLabTask._id}`, payload, getAuthHeaders());
+            if (res.data?.success) {
+                setSuccessMsg(`Lab Task "${res.data.data.title}" updated successfully!`);
+                setLabTasks(prev => prev.map(t => t._id === editingLabTask._id ? res.data.data : t));
+                setEditingLabTask(null);
+            }
+        } catch (err) {
+            setError(err.response?.data?.error || 'Failed to update lab task.');
+        } finally {
+            setSavingEditLab(false);
+        }
+    };
+
+    const handleDeleteLabTask = async (taskId, taskTitle) => {
+        if (!window.confirm(`Are you sure you want to remove the lab task "${taskTitle}"?`)) return;
+        try {
+            const res = await axios.delete(`${API_URL}/labs/tasks/${taskId}`, getAuthHeaders());
+            if (res.data?.success) {
+                setSuccessMsg('Lab task removed successfully.');
+                setLabTasks(prev => prev.filter(t => t._id !== taskId));
+            }
+        } catch (err) {
+            setError(err.response?.data?.error || 'Failed to delete lab task.');
+        }
+    };
+
+    const handleDeleteRepoTest = async (testId, testTitle) => {
+        if (!window.confirm(`Are you sure you want to remove the practice test "${testTitle}"?`)) return;
+        try {
+            await axios.delete(`${API_URL}/tests/${testId}`, getAuthHeaders());
+            setRepoTests(prev => prev.filter(t => t._id !== testId));
+            setSubjectTests(prev => prev.filter(t => t._id !== testId));
+            setSuccessMsg('Practice test removed successfully.');
+        } catch (err) {
+            setError(err.response?.data?.error || 'Failed to delete practice test.');
+        }
+    };
+
     // Filter students
     const filteredStudents = students.filter(student => {
         const matchesSearch = !studentSearch ||
@@ -557,6 +677,12 @@ const FacultyDashboard = () => {
                             onClick={() => { setActiveTab('labs'); setError(null); setSuccessMsg(''); }}
                         >
                             🔬 Lab Tasks & Practice
+                        </button>
+                        <button
+                            className={`faculty-tab-btn ${activeTab === 'repository' ? 'active' : ''}`}
+                            onClick={() => { setActiveTab('repository'); setError(null); setSuccessMsg(''); }}
+                        >
+                            🗃️ Records & Academic Repository
                         </button>
                     </div>
 
@@ -1444,6 +1570,7 @@ const FacultyDashboard = () => {
                                                     <th>Branch / Sec</th>
                                                     <th>Max Score</th>
                                                     <th>Status</th>
+                                                    <th style={{ textAlign: 'right' }}>Actions</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
@@ -1455,10 +1582,28 @@ const FacultyDashboard = () => {
                                                         <td>{task.branch || 'All'} {task.section ? `· Sec ${task.section}` : ''}</td>
                                                         <td>{task.maxScore || 100}</td>
                                                         <td><span className="status-badge-active">Active</span></td>
+                                                        <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
+                                                            <button
+                                                                type="button"
+                                                                className="btn-secondary-action"
+                                                                style={{ padding: '4px 10px', fontSize: '12px', marginRight: '6px' }}
+                                                                onClick={() => handleStartEditLab(task)}
+                                                            >
+                                                                ✏️ Edit
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                className="btn-secondary-action"
+                                                                style={{ padding: '4px 10px', fontSize: '12px', background: 'rgba(239, 68, 68, 0.15)', borderColor: 'rgba(239, 68, 68, 0.3)', color: '#f87171' }}
+                                                                onClick={() => handleDeleteLabTask(task._id, task.title)}
+                                                            >
+                                                                🗑️ Remove
+                                                            </button>
+                                                        </td>
                                                     </tr>
                                                 ))}
                                                 {!labTasks.length && (
-                                                    <tr><td colSpan="6" style={{ textAlign: 'center', padding: '24px', color: '#94a3b8' }}>No lab tasks assigned yet.</td></tr>
+                                                    <tr><td colSpan="7" style={{ textAlign: 'center', padding: '24px', color: '#94a3b8' }}>No lab tasks assigned yet.</td></tr>
                                                 )}
                                             </tbody>
                                         </table>
@@ -1467,6 +1612,412 @@ const FacultyDashboard = () => {
                             </div>
                         </div>
                     )}
+
+                    {/* TAB 5: ACADEMIC RECORDS & STORAGE REPOSITORY */}
+                    {activeTab === 'repository' && (() => {
+                        // Gather all notes across subjects
+                        const allStoredNotes = subjects.flatMap(s => (s.notes || []).map(n => ({
+                            ...n,
+                            subjectId: s._id,
+                            subjectName: s.name,
+                            subjectCode: s.code,
+                            academicYear: s.academicYear,
+                            branch: s.branch,
+                            section: s.section
+                        })));
+
+                        // Filter lab tasks by search
+                        const filteredRepoTasks = labTasks.filter(t => !repoSearch ||
+                            t.title?.toLowerCase().includes(repoSearch.toLowerCase()) ||
+                            t.subject?.name?.toLowerCase().includes(repoSearch.toLowerCase()) ||
+                            t.subject?.code?.toLowerCase().includes(repoSearch.toLowerCase()) ||
+                            t.academicYear?.toLowerCase().includes(repoSearch.toLowerCase())
+                        );
+
+                        // Filter tests by search
+                        const filteredRepoTests = repoTests.filter(t => !repoSearch ||
+                            t.title?.toLowerCase().includes(repoSearch.toLowerCase()) ||
+                            t.category?.toLowerCase().includes(repoSearch.toLowerCase()) ||
+                            t.academicYear?.toLowerCase().includes(repoSearch.toLowerCase())
+                        );
+
+                        // Filter notes by search
+                        const filteredRepoNotes = allStoredNotes.filter(n => !repoSearch ||
+                            n.title?.toLowerCase().includes(repoSearch.toLowerCase()) ||
+                            n.subjectName?.toLowerCase().includes(repoSearch.toLowerCase()) ||
+                            n.subjectCode?.toLowerCase().includes(repoSearch.toLowerCase()) ||
+                            n.description?.toLowerCase().includes(repoSearch.toLowerCase())
+                        );
+
+                        return (
+                            <div className="faculty-repository-wrapper animate-fade">
+                                {/* Header Card */}
+                                <div className="faculty-card" style={{ marginBottom: '22px', background: 'linear-gradient(180deg, rgba(30, 41, 59, 0.8) 0%, rgba(15, 23, 42, 0.95) 100%)' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '14px' }}>
+                                        <div>
+                                            <h2 style={{ margin: 0, fontSize: '1.4rem', display: 'flex', alignItems: 'center', gap: '10px', color: '#f8fafc' }}>
+                                                <span>🗃️</span> Academic Records & Storage Repository
+                                            </h2>
+                                            <p className="card-desc" style={{ marginTop: '4px' }}>
+                                                Centralized storage archive for all lab tasks, practice tests, and study notes configured for your students.
+                                            </p>
+                                        </div>
+                                        <div style={{ display: 'flex', gap: '8px' }}>
+                                            <button
+                                                type="button"
+                                                className="btn-primary-action"
+                                                onClick={() => { setActiveTab('labs'); }}
+                                                style={{ fontSize: '12.5px', padding: '7px 14px' }}
+                                            >
+                                                + New Lab Task
+                                            </button>
+                                            <button
+                                                type="button"
+                                                className="btn-secondary-action"
+                                                onClick={() => { setActiveTab('subjects'); }}
+                                                style={{ fontSize: '12.5px', padding: '7px 14px' }}
+                                            >
+                                                + Manage Subjects
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    {/* Storage Counters */}
+                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '14px', marginTop: '20px' }}>
+                                        <div
+                                            onClick={() => setRepoSubTab('labs')}
+                                            style={{
+                                                background: repoSubTab === 'labs' ? 'rgba(99, 102, 241, 0.18)' : '#0f172a',
+                                                border: repoSubTab === 'labs' ? '1px solid #6366f1' : '1px solid #334155',
+                                                borderRadius: '10px',
+                                                padding: '16px',
+                                                cursor: 'pointer',
+                                                transition: 'all 0.2s'
+                                            }}
+                                        >
+                                            <span style={{ fontSize: '12px', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>🔬 Lab Tasks Records</span>
+                                            <div style={{ fontSize: '26px', fontWeight: 800, color: '#f8fafc', marginTop: '4px' }}>{labTasks.length}</div>
+                                            <span style={{ fontSize: '11px', color: '#818cf8' }}>Multi-language solutions storage</span>
+                                        </div>
+
+                                        <div
+                                            onClick={() => setRepoSubTab('tests')}
+                                            style={{
+                                                background: repoSubTab === 'tests' ? 'rgba(56, 189, 248, 0.18)' : '#0f172a',
+                                                border: repoSubTab === 'tests' ? '1px solid #38bdf8' : '1px solid #334155',
+                                                borderRadius: '10px',
+                                                padding: '16px',
+                                                cursor: 'pointer',
+                                                transition: 'all 0.2s'
+                                            }}
+                                        >
+                                            <span style={{ fontSize: '12px', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>📝 Practice Tests Records</span>
+                                            <div style={{ fontSize: '26px', fontWeight: 800, color: '#f8fafc', marginTop: '4px' }}>{repoTests.length}</div>
+                                            <span style={{ fontSize: '11px', color: '#38bdf8' }}>Timed MCQ practice assessments</span>
+                                        </div>
+
+                                        <div
+                                            onClick={() => setRepoSubTab('notes')}
+                                            style={{
+                                                background: repoSubTab === 'notes' ? 'rgba(16, 185, 129, 0.18)' : '#0f172a',
+                                                border: repoSubTab === 'notes' ? '1px solid #10b981' : '1px solid #334155',
+                                                borderRadius: '10px',
+                                                padding: '16px',
+                                                cursor: 'pointer',
+                                                transition: 'all 0.2s'
+                                            }}
+                                        >
+                                            <span style={{ fontSize: '12px', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>📚 Study Notes Records</span>
+                                            <div style={{ fontSize: '26px', fontWeight: 800, color: '#f8fafc', marginTop: '4px' }}>{allStoredNotes.length}</div>
+                                            <span style={{ fontSize: '11px', color: '#34d399' }}>Uploaded notes & materials</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Main Records Table Card */}
+                                <div className="faculty-card" style={{ marginBottom: '36px' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '14px', marginBottom: '18px', borderBottom: '1px solid #334155', paddingBottom: '16px' }}>
+                                        {/* Sub Tabs */}
+                                        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                                            <button
+                                                type="button"
+                                                className={`faculty-tab-btn ${repoSubTab === 'labs' ? 'active' : ''}`}
+                                                onClick={() => setRepoSubTab('labs')}
+                                                style={{ padding: '8px 16px', fontSize: '13px' }}
+                                            >
+                                                🔬 Lab Tasks Storage ({filteredRepoTasks.length})
+                                            </button>
+                                            <button
+                                                type="button"
+                                                className={`faculty-tab-btn ${repoSubTab === 'tests' ? 'active' : ''}`}
+                                                onClick={() => setRepoSubTab('tests')}
+                                                style={{ padding: '8px 16px', fontSize: '13px' }}
+                                            >
+                                                📝 Practice Tests Storage ({filteredRepoTests.length})
+                                            </button>
+                                            <button
+                                                type="button"
+                                                className={`faculty-tab-btn ${repoSubTab === 'notes' ? 'active' : ''}`}
+                                                onClick={() => setRepoSubTab('notes')}
+                                                style={{ padding: '8px 16px', fontSize: '13px' }}
+                                            >
+                                                📚 Study Notes Storage ({filteredRepoNotes.length})
+                                            </button>
+                                        </div>
+
+                                        {/* Search Filter */}
+                                        <div style={{ minWidth: '260px' }}>
+                                            <input
+                                                className="form-control"
+                                                placeholder="🔍 Search records by title, subject, or year..."
+                                                value={repoSearch}
+                                                onChange={e => setRepoSearch(e.target.value)}
+                                                style={{ fontSize: '13px', padding: '8px 14px' }}
+                                            />
+                                        </div>
+                                    </div>
+
+                                    {/* 1. Lab Tasks Records */}
+                                    {repoSubTab === 'labs' && (
+                                        <div className="students-table-scroll">
+                                            <table className="students-table">
+                                                <thead>
+                                                    <tr>
+                                                        <th>Lab Task Title</th>
+                                                        <th>Subject</th>
+                                                        <th>Target Scope</th>
+                                                        <th>Max Score</th>
+                                                        <th>Reference Solutions</th>
+                                                        <th>Created Date</th>
+                                                        <th style={{ textAlign: 'right' }}>Actions</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {filteredRepoTasks.map(task => {
+                                                        const solutionsCount = Object.values(task.referenceSolutions || {}).filter(s => s?.trim()).length || (task.referenceSolution ? 1 : 0);
+                                                        return (
+                                                            <tr key={task._id}>
+                                                                <td>
+                                                                    <strong>{task.title}</strong>
+                                                                    <div style={{ fontSize: '11.5px', color: '#94a3b8', maxWidth: '320px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                                                        {task.instructions}
+                                                                    </div>
+                                                                </td>
+                                                                <td>
+                                                                    <span className="code-pill">{task.subject?.code || 'Subject'}</span>
+                                                                    <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '2px' }}>{task.subject?.name}</div>
+                                                                </td>
+                                                                <td>
+                                                                    <span style={{ fontSize: '12px', color: '#e2e8f0' }}>{task.academicYear}</span>
+                                                                    <div style={{ fontSize: '11px', color: '#94a3b8' }}>
+                                                                        {task.branch || 'All Branches'} {task.section ? `· Sec ${task.section}` : ''}
+                                                                    </div>
+                                                                </td>
+                                                                <td><strong>{task.maxScore || 100}</strong> pts</td>
+                                                                <td>
+                                                                    <span className="repo-badge repo-badge-info">
+                                                                        ⚡ {solutionsCount} / 6 Languages
+                                                                    </span>
+                                                                </td>
+                                                                <td style={{ fontSize: '12px', color: '#94a3b8' }}>
+                                                                    {task.createdAt ? new Date(task.createdAt).toLocaleDateString() : 'N/A'}
+                                                                </td>
+                                                                <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
+                                                                    <button
+                                                                        type="button"
+                                                                        className="btn-secondary-action"
+                                                                        style={{ padding: '4px 10px', fontSize: '12px', marginRight: '6px' }}
+                                                                        onClick={() => {
+                                                                            setPreviewSolutionsTask(task);
+                                                                            const firstKey = Object.keys(task.referenceSolutions || {}).find(k => task.referenceSolutions?.[k]?.trim());
+                                                                            setPreviewLangTab(firstKey || task.solutionLanguage || 'cpp');
+                                                                        }}
+                                                                    >
+                                                                        👁️ Solutions
+                                                                    </button>
+                                                                    <button
+                                                                        type="button"
+                                                                        className="btn-secondary-action"
+                                                                        style={{ padding: '4px 10px', fontSize: '12px', marginRight: '6px' }}
+                                                                        onClick={() => handleStartEditLab(task)}
+                                                                    >
+                                                                        ✏️ Edit
+                                                                    </button>
+                                                                    <button
+                                                                        type="button"
+                                                                        className="btn-secondary-action"
+                                                                        style={{ padding: '4px 10px', fontSize: '12px', background: 'rgba(239, 68, 68, 0.15)', borderColor: 'rgba(239, 68, 68, 0.3)', color: '#f87171' }}
+                                                                        onClick={() => handleDeleteLabTask(task._id, task.title)}
+                                                                    >
+                                                                        🗑️ Remove
+                                                                    </button>
+                                                                </td>
+                                                            </tr>
+                                                        );
+                                                    })}
+                                                    {!filteredRepoTasks.length && (
+                                                        <tr>
+                                                            <td colSpan="7" style={{ textAlign: 'center', padding: '36px', color: '#94a3b8' }}>
+                                                                No lab task records found matching your search.
+                                                            </td>
+                                                        </tr>
+                                                    )}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    )}
+
+                                    {/* 2. Practice Tests Records */}
+                                    {repoSubTab === 'tests' && (
+                                        <div className="students-table-scroll">
+                                            {loadingRepoTests ? (
+                                                <p className="loading-text mt-20">Loading practice test records...</p>
+                                            ) : (
+                                                <table className="students-table">
+                                                    <thead>
+                                                        <tr>
+                                                            <th>Test Title</th>
+                                                            <th>Category & Subject</th>
+                                                            <th>Target Year / Scope</th>
+                                                            <th>Duration</th>
+                                                            <th>Question Limit</th>
+                                                            <th>Difficulty</th>
+                                                            <th style={{ textAlign: 'right' }}>Actions</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        {filteredRepoTests.map(test => (
+                                                            <tr key={test._id}>
+                                                                <td>
+                                                                    <strong>{test.title}</strong>
+                                                                    {test.description && (
+                                                                        <div style={{ fontSize: '11.5px', color: '#94a3b8', maxWidth: '300px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                                                            {test.description}
+                                                                        </div>
+                                                                    )}
+                                                                </td>
+                                                                <td>
+                                                                    <span className="repo-badge repo-badge-purple" style={{ textTransform: 'capitalize' }}>
+                                                                        {test.category || 'core-cse'}
+                                                                    </span>
+                                                                    {test.subject && (
+                                                                        <div style={{ fontSize: '11.5px', color: '#cbd5e1', marginTop: '3px' }}>
+                                                                            {test.subject.name || test.subject}
+                                                                        </div>
+                                                                    )}
+                                                                </td>
+                                                                <td>
+                                                                    <span style={{ fontSize: '12px', color: '#e2e8f0' }}>{test.academicYear || 'All Years'}</span>
+                                                                    <div style={{ fontSize: '11px', color: '#94a3b8' }}>
+                                                                        {test.branch || 'All Branches'} {test.section ? `· Sec ${test.section}` : ''}
+                                                                    </div>
+                                                                </td>
+                                                                <td>{test.duration ? `${test.duration} mins` : 'Untimed'}</td>
+                                                                <td>{test.questionLimit || 20} Questions</td>
+                                                                <td>
+                                                                    <span className={`repo-badge ${test.difficulty === 'hard' ? 'repo-badge-warning' : test.difficulty === 'easy' ? 'repo-badge-success' : 'repo-badge-info'}`} style={{ textTransform: 'capitalize' }}>
+                                                                        {test.difficulty || 'medium'}
+                                                                    </span>
+                                                                </td>
+                                                                <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
+                                                                    <button
+                                                                        type="button"
+                                                                        className="btn-secondary-action"
+                                                                        style={{ padding: '4px 10px', fontSize: '12px', marginRight: '6px' }}
+                                                                        onClick={() => openQuestionsModal(test)}
+                                                                    >
+                                                                        ⚙️ Manage Questions
+                                                                    </button>
+                                                                    <button
+                                                                        type="button"
+                                                                        className="btn-secondary-action"
+                                                                        style={{ padding: '4px 10px', fontSize: '12px', background: 'rgba(239, 68, 68, 0.15)', borderColor: 'rgba(239, 68, 68, 0.3)', color: '#f87171' }}
+                                                                        onClick={() => handleDeleteRepoTest(test._id, test.title)}
+                                                                    >
+                                                                        🗑️ Remove
+                                                                    </button>
+                                                                </td>
+                                                            </tr>
+                                                        ))}
+                                                        {!filteredRepoTests.length && (
+                                                            <tr>
+                                                                <td colSpan="7" style={{ textAlign: 'center', padding: '36px', color: '#94a3b8' }}>
+                                                                    No practice test records found matching your search.
+                                                                </td>
+                                                            </tr>
+                                                        )}
+                                                    </tbody>
+                                                </table>
+                                            )}
+                                        </div>
+                                    )}
+
+                                    {/* 3. Study Notes Records */}
+                                    {repoSubTab === 'notes' && (
+                                        <div className="students-table-scroll">
+                                            <table className="students-table">
+                                                <thead>
+                                                    <tr>
+                                                        <th>Note Title</th>
+                                                        <th>Subject</th>
+                                                        <th>Description / Content</th>
+                                                        <th>Attachment Link</th>
+                                                        <th>Uploaded Date</th>
+                                                        <th style={{ textAlign: 'right' }}>Actions</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {filteredRepoNotes.map(note => (
+                                                        <tr key={note._id}>
+                                                            <td><strong>{note.title}</strong></td>
+                                                            <td>
+                                                                <span className="code-pill">{note.subjectCode}</span>
+                                                                <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '2px' }}>{note.subjectName}</div>
+                                                            </td>
+                                                            <td>
+                                                                <div style={{ fontSize: '12px', color: '#cbd5e1', maxWidth: '320px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                                                    {note.description || note.content || 'Study notes documentation'}
+                                                                </div>
+                                                            </td>
+                                                            <td>
+                                                                {note.fileUrl ? (
+                                                                    <a href={note.fileUrl} target="_blank" rel="noreferrer" className="repo-badge repo-badge-info" style={{ textDecoration: 'none' }}>
+                                                                        📥 Open Material
+                                                                    </a>
+                                                                ) : (
+                                                                    <span style={{ fontSize: '12px', color: '#64748b' }}>No file attached</span>
+                                                                )}
+                                                            </td>
+                                                            <td style={{ fontSize: '12px', color: '#94a3b8' }}>
+                                                                {note.createdAt ? new Date(note.createdAt).toLocaleDateString() : 'N/A'}
+                                                            </td>
+                                                            <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
+                                                                <button
+                                                                    type="button"
+                                                                    className="btn-secondary-action"
+                                                                    style={{ padding: '4px 10px', fontSize: '12px', background: 'rgba(239, 68, 68, 0.15)', borderColor: 'rgba(239, 68, 68, 0.3)', color: '#f87171' }}
+                                                                    onClick={() => handleDeleteNote(note._id)}
+                                                                >
+                                                                    🗑️ Delete Note
+                                                                </button>
+                                                            </td>
+                                                        </tr>
+                                                    ))}
+                                                    {!filteredRepoNotes.length && (
+                                                        <tr>
+                                                            <td colSpan="6" style={{ textAlign: 'center', padding: '36px', color: '#94a3b8' }}>
+                                                                No study notes records found matching your search.
+                                                            </td>
+                                                        </tr>
+                                                    )}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        );
+                    })()}
 
                     {/* Progress Detail Modal */}
                     {progressLoading && <div className="progress-loading">Loading student progress dossier...</div>}
@@ -2032,6 +2583,249 @@ const FacultyDashboard = () => {
                                             <p style={{ margin: '8px 0 0 0', fontSize: '13px', color: '#64748b' }}>When students in this academic year take the practice tests, their live performance will appear here.</p>
                                         </div>
                                     )}
+                                </div>
+                            </section>
+                        </div>
+                    )}
+
+                    {/* EDIT LAB TASK MODAL */}
+                    {editingLabTask && (
+                        <div className="progress-modal-overlay" onClick={() => setEditingLabTask(null)}>
+                            <section className="progress-modal modal-wide" style={{ width: 'min(920px, 95vw)', maxHeight: '90vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
+                                <div className="progress-modal-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <div>
+                                        <h2 style={{ margin: 0, fontSize: '1.25rem' }}>✏️ Edit Lab Practice Task</h2>
+                                        <p style={{ margin: '4px 0 0', color: '#94a3b8', fontSize: '13px' }}>
+                                            Modify task details, instructions, score, and default multi-language reference solutions.
+                                        </p>
+                                    </div>
+                                    <button className="progress-close" type="button" onClick={() => setEditingLabTask(null)}>×</button>
+                                </div>
+
+                                <form onSubmit={handleSaveEditLab} style={{ marginTop: '20px' }}>
+                                    <div className="form-group">
+                                        <label className="form-label">Task Title *</label>
+                                        <input
+                                            className="form-control"
+                                            value={editLabTaskForm.title}
+                                            onChange={e => setEditLabTaskForm({ ...editLabTaskForm, title: e.target.value })}
+                                            required
+                                        />
+                                    </div>
+
+                                    <div className="form-grid-2">
+                                        <div className="form-group">
+                                            <label className="form-label">Subject *</label>
+                                            <select
+                                                className="form-control"
+                                                value={editLabTaskForm.subject}
+                                                onChange={e => setEditLabTaskForm({ ...editLabTaskForm, subject: e.target.value })}
+                                                required
+                                            >
+                                                <option value="">Select Academic Subject</option>
+                                                {subjects.map(s => (
+                                                    <option key={s._id} value={s._id}>{s.code} - {s.name} ({s.academicYear})</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                        <div className="form-group">
+                                            <label className="form-label">Academic Year *</label>
+                                            <input
+                                                className="form-control"
+                                                value={editLabTaskForm.academicYear}
+                                                onChange={e => setEditLabTaskForm({ ...editLabTaskForm, academicYear: e.target.value })}
+                                                required
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="form-grid-3-col">
+                                        <div className="form-group">
+                                            <label className="form-label">Branch</label>
+                                            <input
+                                                className="form-control"
+                                                value={editLabTaskForm.branch}
+                                                onChange={e => setEditLabTaskForm({ ...editLabTaskForm, branch: e.target.value })}
+                                            />
+                                        </div>
+                                        <div className="form-group">
+                                            <label className="form-label">Section</label>
+                                            <input
+                                                className="form-control"
+                                                value={editLabTaskForm.section}
+                                                onChange={e => setEditLabTaskForm({ ...editLabTaskForm, section: e.target.value })}
+                                            />
+                                        </div>
+                                        <div className="form-group">
+                                            <label className="form-label">Max Score</label>
+                                            <input
+                                                type="number"
+                                                className="form-control"
+                                                min="1"
+                                                max="1000"
+                                                value={editLabTaskForm.maxScore}
+                                                onChange={e => setEditLabTaskForm({ ...editLabTaskForm, maxScore: Number(e.target.value) || 100 })}
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="form-group">
+                                        <label className="form-label">Task Instructions & Criteria *</label>
+                                        <textarea
+                                            className="form-control"
+                                            rows="4"
+                                            value={editLabTaskForm.instructions}
+                                            onChange={e => setEditLabTaskForm({ ...editLabTaskForm, instructions: e.target.value })}
+                                            required
+                                        />
+                                    </div>
+
+                                    {/* Multi-Language Solution Tabs */}
+                                    <div className="form-group" style={{ marginTop: '14px' }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', flexWrap: 'wrap', gap: '8px' }}>
+                                            <label className="form-label" style={{ margin: 0, fontWeight: 700, fontSize: '13.5px', color: '#f8fafc' }}>
+                                                Default Reference Solutions (Multi-Language)
+                                            </label>
+                                            <span style={{ fontSize: '11px', color: '#38bdf8', background: 'rgba(56, 189, 248, 0.12)', padding: '2px 8px', borderRadius: '4px' }}>
+                                                ⚡ AST Normalized • Auto-matches student language
+                                            </span>
+                                        </div>
+
+                                        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '10px' }}>
+                                            {LAB_LANGUAGES.map(lang => {
+                                                const hasCode = Boolean(editLabTaskForm.referenceSolutions?.[lang.key]?.trim());
+                                                const isActive = activeEditLangTab === lang.key;
+                                                return (
+                                                    <button
+                                                        key={lang.key}
+                                                        type="button"
+                                                        onClick={() => setActiveEditLangTab(lang.key)}
+                                                        style={{
+                                                            display: 'inline-flex',
+                                                            alignItems: 'center',
+                                                            gap: '6px',
+                                                            padding: '6px 12px',
+                                                            borderRadius: '8px',
+                                                            fontSize: '12.5px',
+                                                            fontWeight: 600,
+                                                            cursor: 'pointer',
+                                                            border: isActive ? '1px solid #6366f1' : '1px solid #334155',
+                                                            background: isActive ? '#4f46e5' : '#1e293b',
+                                                            color: isActive ? '#ffffff' : '#94a3b8'
+                                                        }}
+                                                    >
+                                                        <span>{lang.icon} {lang.label}</span>
+                                                        {hasCode ? (
+                                                            <span style={{ fontSize: '10px', background: '#10b981', color: '#ffffff', padding: '1px 5px', borderRadius: '8px' }}>✓</span>
+                                                        ) : (
+                                                            <span style={{ fontSize: '10px', opacity: 0.5 }}>—</span>
+                                                        )}
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+
+                                        <textarea
+                                            className="form-control"
+                                            rows="7"
+                                            style={{
+                                                fontFamily: 'Consolas, Monaco, monospace',
+                                                fontSize: '13px',
+                                                background: 'rgba(15, 23, 42, 0.8)',
+                                                lineHeight: '1.5'
+                                            }}
+                                            placeholder={`Reference solution for ${LAB_LANGUAGES.find(l => l.key === activeEditLangTab)?.label}...`}
+                                            value={editLabTaskForm.referenceSolutions?.[activeEditLangTab] || ''}
+                                            onChange={e => {
+                                                const newCode = e.target.value;
+                                                setEditLabTaskForm({
+                                                    ...editLabTaskForm,
+                                                    referenceSolutions: {
+                                                        ...editLabTaskForm.referenceSolutions,
+                                                        [activeEditLangTab]: newCode
+                                                    }
+                                                });
+                                            }}
+                                        />
+                                    </div>
+
+                                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '20px', paddingTop: '16px', borderTop: '1px solid #334155' }}>
+                                        <button type="button" className="btn-secondary-action" onClick={() => setEditingLabTask(null)}>
+                                            Cancel
+                                        </button>
+                                        <button type="submit" className="btn-primary-action" disabled={savingEditLab}>
+                                            {savingEditLab ? 'Saving Changes...' : '💾 Save Changes'}
+                                        </button>
+                                    </div>
+                                </form>
+                            </section>
+                        </div>
+                    )}
+
+                    {/* PREVIEW SOLUTIONS MODAL */}
+                    {previewSolutionsTask && (
+                        <div className="progress-modal-overlay" onClick={() => setPreviewSolutionsTask(null)}>
+                            <section className="progress-modal" style={{ width: 'min(820px, 95vw)', maxHeight: '85vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
+                                <div className="progress-modal-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <div>
+                                        <h2 style={{ margin: 0, fontSize: '1.25rem' }}>🎯 Reference Solutions: {previewSolutionsTask.title}</h2>
+                                        <p style={{ margin: '4px 0 0', color: '#94a3b8', fontSize: '13px' }}>
+                                            {previewSolutionsTask.subject?.name} · {previewSolutionsTask.academicYear} · Max Score: {previewSolutionsTask.maxScore || 100} pts
+                                        </p>
+                                    </div>
+                                    <button className="progress-close" type="button" onClick={() => setPreviewSolutionsTask(null)}>×</button>
+                                </div>
+
+                                <div style={{ marginTop: '18px' }}>
+                                    {/* Language Switch Tabs */}
+                                    <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '12px' }}>
+                                        {LAB_LANGUAGES.map(lang => {
+                                            const code = previewSolutionsTask.referenceSolutions?.[lang.key] || (previewSolutionsTask.solutionLanguage === lang.key ? previewSolutionsTask.referenceSolution : '');
+                                            const hasCode = Boolean(code?.trim());
+                                            const isActive = previewLangTab === lang.key;
+                                            return (
+                                                <button
+                                                    key={lang.key}
+                                                    type="button"
+                                                    onClick={() => setPreviewLangTab(lang.key)}
+                                                    style={{
+                                                        padding: '6px 12px',
+                                                        borderRadius: '6px',
+                                                        fontSize: '12px',
+                                                        fontWeight: 600,
+                                                        cursor: 'pointer',
+                                                        border: isActive ? '1px solid #fbbf24' : '1px solid #334155',
+                                                        background: isActive ? '#fbbf24' : '#1e293b',
+                                                        color: isActive ? '#000000' : hasCode ? '#e2e8f0' : '#64748b'
+                                                    }}
+                                                >
+                                                    {lang.icon} {lang.label} {hasCode ? '✓' : ''}
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+
+                                    <pre style={{
+                                        background: '#090d16',
+                                        color: '#fef08a',
+                                        padding: '16px',
+                                        borderRadius: '8px',
+                                        fontSize: '13px',
+                                        fontFamily: 'Consolas, Monaco, monospace',
+                                        maxHeight: '400px',
+                                        overflowY: 'auto',
+                                        whiteSpace: 'pre-wrap',
+                                        border: '1px solid rgba(251, 191, 36, 0.25)',
+                                        lineHeight: '1.6'
+                                    }}>
+                                        {previewSolutionsTask.referenceSolutions?.[previewLangTab] ||
+                                         (previewSolutionsTask.solutionLanguage === previewLangTab ? previewSolutionsTask.referenceSolution : '') ||
+                                         '// No reference solution code added for this language.'}
+                                    </pre>
+                                </div>
+
+                                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '16px', paddingTop: '12px', borderTop: '1px solid #334155' }}>
+                                    <button className="btn-secondary-action" type="button" onClick={() => setPreviewSolutionsTask(null)}>Close</button>
                                 </div>
                             </section>
                         </div>

@@ -5,6 +5,7 @@ const {
   submitTestAttempt,
   getAttemptsHistory,
   createTest,
+  deleteTest,
   getTestQuestionsAdmin,
   addQuestion,
   editQuestion,
@@ -41,6 +42,7 @@ router.get('/subject/:subjectId/reports', authorize('admin', 'faculty'), getSubj
 // Admin and Faculty Test & Question Management
 router.get('/admin/attempts', authorize('admin'), getAdminAttempts);
 router.post('/', authorize('admin', 'faculty'), createTest);
+router.delete('/:id', authorize('admin', 'faculty'), deleteTest);
 router.get('/:id/questions', authorize('admin', 'faculty'), getTestQuestionsAdmin);
 router.post('/:id/questions', authorize('admin', 'faculty'), addQuestion);
 router.put('/:id/questions/:qId', authorize('admin', 'faculty'), editQuestion);
