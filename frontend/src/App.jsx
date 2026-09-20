@@ -242,6 +242,14 @@ const AppRoutes = () => {
         }
       />
       <Route
+        path="/faculty-staff"
+        element={
+          <PrivateRoute allowedRoles={['admin']}>
+            <AdminPanel defaultTab="faculty-staff" />
+          </PrivateRoute>
+        }
+      />
+      <Route
         path="/faculty"
         element={
           <PrivateRoute allowedRoles={['faculty', 'admin']}>
