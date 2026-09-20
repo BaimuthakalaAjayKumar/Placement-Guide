@@ -7,7 +7,7 @@ router.use(protect);
 router.get('/tasks', getTasks);
 router.post('/tasks', authorize('admin', 'faculty'), createTask);
 router.get('/reports', authorize('admin', 'faculty'), getAllLabReports);
-router.post('/tasks/:id/submit', authorize('student'), submitAttempt);
+router.post('/tasks/:id/submit', authorize('student', 'faculty', 'admin'), submitAttempt);
 router.get('/tasks/:id/reports', authorize('admin', 'faculty'), getReports);
 router.put('/attempts/:attemptId/review', authorize('admin', 'faculty'), reviewAttempt);
 

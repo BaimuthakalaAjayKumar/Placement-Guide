@@ -9,6 +9,9 @@ const LabTaskSchema = new mongoose.Schema({
   section: { type: String, default: '' },
   maxScore: { type: Number, default: 100, min: 1 },
   dueDate: { type: Date },
+  referenceSolution: { type: String, default: '' },
+  solutionLanguage: { type: String, default: 'cpp' },
+  allowedLanguages: { type: [String], default: ['cpp', 'java', 'python', 'c', 'javascript', 'sql'] },
   isActive: { type: Boolean, default: true },
   createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true }
 }, { timestamps: true });

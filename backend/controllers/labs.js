@@ -1,5 +1,9 @@
 const LabTask = require('../models/LabTask');
 const LabPracticeAttempt = require('../models/LabPracticeAttempt');
+const Notification = require('../models/Notification');
+const User = require('../models/User');
+const { evaluateLabSubmission } = require('../services/labEvaluationService');
+const { checkLabTaskPlagiarism } = require('../services/plagiarismService');
 
 const studentYear = user => user.academicYear || user.year || '';
 const canManage = (user, task) => user.role === 'admin' || (
@@ -55,7 +59,29 @@ exports.getTasks = async (req, res, next) => {
       query.subject = req.query.subject;
     }
 
-    const tasks = await LabTask.find(query).populate('subject', 'name code').sort({ createdAt: -1 });
+    let tasks = await LabTask.find(query)
+      .populate('subject', 'name code')
+      .populate('createdBy', 'name email')
+      .sort({ createdAt: -1 });
+
+    // Attach caller's previous attempt if any
+    const userAttempts = await LabPracticeAttempt.find({
+      task: { $in: tasks.map(t => t._id) },
+      student: req.user.id
+    }).lean();
+
+    const attemptMap = new Map();
+    userAttempts.forEach(a => attemptMap.set(a.task.toString(), a));
+
+    tasks = tasks.map(t => {
+      const obj = t.toObject();
+      if (req.user.role === 'student') {
+        delete obj.referenceSolution;
+      }
+      obj.myAttempt = attemptMap.get(t._id.toString()) || null;
+      return obj;
+    });
+
     res.status(200).json({ success: true, count: tasks.length, data: tasks });
   } catch (err) {
     next(err);
@@ -64,7 +90,20 @@ exports.getTasks = async (req, res, next) => {
 
 exports.createTask = async (req, res, next) => {
   try {
-    const { title, instructions, subject, academicYear, branch = '', section = '', maxScore, dueDate } = req.body;
+    const {
+      title,
+      instructions,
+      subject,
+      academicYear,
+      branch = '',
+      section = '',
+      maxScore,
+      dueDate,
+      referenceSolution = '',
+      solutionLanguage = 'cpp',
+      allowedLanguages
+    } = req.body;
+
     if (!title || !instructions || !subject || !academicYear) {
       return res.status(400).json({ success: false, error: 'Title, instructions, subject, and academic year are required.' });
     }
@@ -74,7 +113,20 @@ exports.createTask = async (req, res, next) => {
       return res.status(403).json({ success: false, error: 'You are not assigned to this lab scope.' });
     }
 
-    const task = await LabTask.create({ title, instructions, subject, academicYear, branch, section, maxScore, dueDate, createdBy: req.user.id });
+    const task = await LabTask.create({
+      title,
+      instructions,
+      subject,
+      academicYear,
+      branch,
+      section,
+      maxScore: maxScore || 100,
+      dueDate,
+      referenceSolution,
+      solutionLanguage,
+      allowedLanguages: allowedLanguages || ['cpp', 'java', 'python', 'c', 'javascript', 'sql'],
+      createdBy: req.user.id
+    });
     res.status(201).json({ success: true, data: task });
   } catch (err) {
     next(err);
@@ -86,28 +138,111 @@ exports.submitAttempt = async (req, res, next) => {
     const task = await LabTask.findById(req.params.id);
     if (!task) return res.status(404).json({ success: false, error: 'Lab task not found.' });
 
-    const studentYr = (studentYear(req.user) || '').toLowerCase();
-    const taskYr = (task.academicYear || '').toLowerCase();
-    const isYearMatch = !task.academicYear || taskYr === 'all' || !studentYr || taskYr === studentYr;
+    if (req.user.role === 'student') {
+      const studentYr = (studentYear(req.user) || '').toLowerCase();
+      const taskYr = (task.academicYear || '').toLowerCase();
+      const isYearMatch = !task.academicYear || taskYr === 'all' || !studentYr || taskYr === studentYr;
 
-    const studentBr = (req.user.branch || '').toLowerCase();
-    const taskBr = (task.branch || '').toLowerCase();
-    const isBranchMatch = !task.branch || taskBr === 'all' || !studentBr || taskBr === studentBr;
+      const studentBr = (req.user.branch || '').toLowerCase();
+      const taskBr = (task.branch || '').toLowerCase();
+      const isBranchMatch = !task.branch || taskBr === 'all' || !studentBr || taskBr === studentBr;
 
-    const studentSec = (req.user.section || '').toLowerCase();
-    const taskSec = (task.section || '').toLowerCase();
-    const isSectionMatch = !task.section || taskSec === 'all' || !studentSec || taskSec === studentSec;
+      const studentSec = (req.user.section || '').toLowerCase();
+      const taskSec = (task.section || '').toLowerCase();
+      const isSectionMatch = !task.section || taskSec === 'all' || !studentSec || taskSec === studentSec;
 
-    if (!isYearMatch || !isBranchMatch || !isSectionMatch) {
-      return res.status(403).json({ success: false, error: 'This lab task is not assigned to you.' });
+      if (!isYearMatch || !isBranchMatch || !isSectionMatch) {
+        return res.status(403).json({ success: false, error: 'This lab task is not assigned to you.' });
+      }
     }
 
+    const submittedCode = req.body.code || req.body.submission || '';
+    const submittedLang = req.body.language || task.solutionLanguage || 'cpp';
+
+    // 1. Evaluate student's code against the faculty reference solution
+    const evalResult = evaluateLabSubmission(
+      submittedCode,
+      submittedLang,
+      task.referenceSolution || '',
+      task.solutionLanguage || 'cpp',
+      task.maxScore || 100
+    );
+
+    // 2. Run Plagiarism Checker across all other student submissions for this specific Lab Task
+    const plagResult = await checkLabTaskPlagiarism(
+      task._id,
+      req.user.id,
+      submittedCode,
+      submittedLang
+    );
+
+    // 3. Upsert attempt with score, code, evaluation breakdown and plagiarism report
     const attempt = await LabPracticeAttempt.findOneAndUpdate(
       { task: task._id, student: req.user.id },
-      { submission: req.body.submission || '', report: req.body.report || '', status: 'submitted' },
+      {
+        submission: submittedCode,
+        code: submittedCode,
+        language: submittedLang,
+        report: req.body.report || '',
+        score: evalResult.score,
+        feedback: evalResult.remarks,
+        evaluationDetails: evalResult,
+        plagiarismPercentage: plagResult.plagiarismPercentage,
+        plagiarismStatus: plagResult.status,
+        plagiarizedWith: plagResult.plagiarizedWith,
+        matchedLines: plagResult.matchedLines,
+        status: 'submitted'
+      },
       { new: true, upsert: true, setDefaultsOnInsert: true }
     );
-    res.status(200).json({ success: true, data: attempt });
+
+    // 4. Send Plagiarism Alert Notification if plagiarism > 40%
+    if (plagResult.plagiarismPercentage > 40) {
+      try {
+        const recipients = new Set();
+        if (task.createdBy) recipients.add(task.createdBy.toString());
+
+        // Notify Admins
+        const admins = await User.find({ role: 'admin' }).select('_id');
+        admins.forEach(a => recipients.add(a._id.toString()));
+
+        for (const recipientId of recipients) {
+          await Notification.create({
+            user: recipientId,
+            type: 'plagiarism_alert',
+            message: `🚨 Plagiarism Alert! Student "${req.user.name}" (${req.user.rollNumber || 'N/A'}) submitted code with ${plagResult.plagiarismPercentage}% similarity to peer ${plagResult.plagiarizedWith?.studentName || ''} for Lab Task "${task.title}".`,
+            metadata: {
+              taskId: task._id,
+              taskTitle: task.title,
+              studentId: req.user.id,
+              studentName: req.user.name,
+              plagiarismPercentage: plagResult.plagiarismPercentage,
+              plagiarizedWithName: plagResult.plagiarizedWith?.studentName
+            }
+          });
+        }
+
+        const io = req.app.get('socketio');
+        if (io) {
+          io.emit('plagiarism_alert', {
+            taskId: task._id,
+            taskTitle: task.title,
+            studentName: req.user.name,
+            plagiarismPercentage: plagResult.plagiarismPercentage,
+            plagiarizedWithName: plagResult.plagiarizedWith?.studentName
+          });
+        }
+      } catch (notifyErr) {
+        console.error('Error dispatching lab plagiarism notification:', notifyErr.message);
+      }
+    }
+
+    res.status(200).json({
+      success: true,
+      data: attempt,
+      evaluation: evalResult,
+      plagiarism: plagResult
+    });
   } catch (err) {
     next(err);
   }
@@ -122,6 +257,7 @@ exports.getReports = async (req, res, next) => {
     const reports = await LabPracticeAttempt.find({ task: task._id })
       .populate('student', 'name email rollNumber branch section academicYear year')
       .populate('reviewedBy', 'name email')
+      .populate('plagiarizedWith.student', 'name email rollNumber')
       .sort({ updatedAt: -1 });
     res.status(200).json({ success: true, count: reports.length, data: reports });
   } catch (err) {
@@ -175,11 +311,12 @@ exports.getAllLabReports = async (req, res, next) => {
     const reports = await LabPracticeAttempt.find({ task: { $in: taskIds } })
       .populate({
         path: 'task',
-        select: 'title maxScore academicYear branch section createdBy',
+        select: 'title maxScore academicYear branch section referenceSolution solutionLanguage createdBy',
         populate: { path: 'createdBy', select: 'name email' }
       })
       .populate('student', 'name email rollNumber branch section academicYear year')
       .populate('reviewedBy', 'name email')
+      .populate('plagiarizedWith.student', 'name email rollNumber')
       .sort({ updatedAt: -1 });
 
     res.status(200).json({ success: true, count: reports.length, data: reports });
@@ -187,3 +324,4 @@ exports.getAllLabReports = async (req, res, next) => {
     next(err);
   }
 };
+

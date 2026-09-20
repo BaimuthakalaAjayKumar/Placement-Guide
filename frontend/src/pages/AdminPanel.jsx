@@ -123,6 +123,7 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
   const [loadingQuestionBankReports, setLoadingQuestionBankReports] = useState(false);
   const [adminLabReports, setAdminLabReports] = useState([]);
   const [loadingAdminLabReports, setLoadingAdminLabReports] = useState(false);
+  const [selectedAdminLabReviewAttempt, setSelectedAdminLabReviewAttempt] = useState(null);
   const [academicSubjects, setAcademicSubjects] = useState([]);
   const [academicProjects, setAcademicProjects] = useState([]);
   const [loadingAcademicContent, setLoadingAcademicContent] = useState(false);
@@ -1571,7 +1572,7 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
 
   const downloadAdminLabReportsCSV = () => {
     if (!adminLabReports.length) return;
-    const headers = ['Student Name', 'Email', 'Roll Number', 'Branch', 'Section', 'Academic Year', 'Lab Task Title', 'Assigned Faculty', 'Faculty Email', 'Score', 'Max Score', 'Status', 'Feedback', 'Submitted Date'];
+    const headers = ['Student Name', 'Email', 'Roll Number', 'Branch', 'Section', 'Academic Year', 'Lab Task Title', 'Assigned Faculty', 'Faculty Email', 'Language', 'Score', 'Max Score', 'Logic Match %', 'Plagiarism %', 'Plagiarism Status', 'Matched Peer', 'Status', 'Feedback', 'Submitted Date'];
     const rows = adminLabReports.map(r => [
       `"${(r.student?.name || '').replace(/"/g, '""')}"`,
       `"${(r.student?.email || '').replace(/"/g, '""')}"`,
@@ -1582,8 +1583,13 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
       `"${(r.task?.title || '').replace(/"/g, '""')}"`,
       `"${(r.task?.createdBy?.name || r.reviewedBy?.name || 'Faculty').replace(/"/g, '""')}"`,
       `"${(r.task?.createdBy?.email || r.reviewedBy?.email || '').replace(/"/g, '""')}"`,
+      `"${(r.language || 'cpp').toUpperCase()}"`,
       r.score ?? 'N/A',
       r.task?.maxScore || 100,
+      r.evaluationDetails?.logicMatchPercentage !== undefined ? `${r.evaluationDetails.logicMatchPercentage}%` : 'N/A',
+      r.plagiarismPercentage !== undefined ? `${r.plagiarismPercentage}%` : '0%',
+      `"${r.plagiarismStatus || 'Original'}"`,
+      `"${(r.plagiarizedWith?.studentName || '').replace(/"/g, '""')}"`,
       r.status || 'submitted',
       `"${(r.feedback || '').replace(/"/g, '""')}"`,
       `"${r.updatedAt ? new Date(r.updatedAt).toLocaleDateString() : ''}"`
@@ -3554,10 +3560,12 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
                         <th>Scope (Year / Branch / Sec)</th>
                         <th>Lab Task</th>
                         <th>Assigned Faculty</th>
+                        <th>Language</th>
+                        <th>Score & Match</th>
+                        <th>Plagiarism Check</th>
                         <th>Status</th>
-                        <th>Score</th>
-                        <th>Feedback</th>
                         <th>Submitted Date</th>
+                        <th style={{ textAlign: 'right' }}>Review</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -3585,20 +3593,60 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
                             </div>
                           </td>
                           <td>
-                            <span className={`pri-level-badge scale-down`} data-level={report.status === 'reviewed' ? 'high' : 'medium'}>
-                              {report.status || 'Submitted'}
+                            <span className="status-pill submitted" style={{ textTransform: 'uppercase', fontSize: '11px' }}>
+                              {report.language || report.task?.solutionLanguage || 'cpp'}
                             </span>
                           </td>
                           <td>
                             <strong className="text-glow" style={{ color: report.score !== undefined && report.score !== null ? '#10b981' : '#f59e0b' }}>
                               {report.score !== undefined && report.score !== null ? `${report.score}/${report.task?.maxScore || 100}` : 'Pending'}
                             </strong>
+                            {report.evaluationDetails?.logicMatchPercentage !== undefined && (
+                              <div style={{ fontSize: '11px', color: '#38bdf8' }}>Match: {report.evaluationDetails.logicMatchPercentage}%</div>
+                            )}
                           </td>
-                          <td style={{ fontSize: '12px', maxWidth: '220px' }}>
-                            {report.feedback || <span className="text-secondary">—</span>}
+                          <td>
+                            {report.plagiarismPercentage > 40 ? (
+                              <div>
+                                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '3px 8px', borderRadius: '6px', background: 'rgba(239, 68, 68, 0.2)', color: '#f87171', border: '1px solid rgba(239, 68, 68, 0.4)', fontWeight: 700, fontSize: '11px' }}>
+                                  🚨 {report.plagiarismPercentage}% Flagged
+                                </span>
+                                {report.plagiarizedWith?.studentName && (
+                                  <div style={{ fontSize: '10.5px', color: '#fca5a5', marginTop: '2px' }}>Peer: {report.plagiarizedWith.studentName}</div>
+                                )}
+                              </div>
+                            ) : report.plagiarismPercentage > 15 ? (
+                              <div>
+                                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '3px 8px', borderRadius: '6px', background: 'rgba(245, 158, 11, 0.2)', color: '#fbbf24', border: '1px solid rgba(245, 158, 11, 0.4)', fontWeight: 600, fontSize: '11px' }}>
+                                  ⚠️ {report.plagiarismPercentage}% Moderate
+                                </span>
+                                {report.plagiarizedWith?.studentName && (
+                                  <div style={{ fontSize: '10.5px', color: '#fde047', marginTop: '2px' }}>Peer: {report.plagiarizedWith.studentName}</div>
+                                )}
+                              </div>
+                            ) : (
+                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '3px 8px', borderRadius: '6px', background: 'rgba(16, 185, 129, 0.15)', color: '#34d399', border: '1px solid rgba(16, 185, 129, 0.3)', fontSize: '11px' }}>
+                                ✅ {report.plagiarismPercentage || 0}% Original
+                              </span>
+                            )}
+                          </td>
+                          <td>
+                            <span className={`pri-level-badge scale-down`} data-level={report.status === 'reviewed' ? 'high' : 'medium'}>
+                              {report.status || 'Submitted'}
+                            </span>
                           </td>
                           <td style={{ fontSize: '12px' }}>
                             {report.updatedAt ? new Date(report.updatedAt).toLocaleDateString() : 'N/A'}
+                          </td>
+                          <td style={{ textAlign: 'right' }}>
+                            <button
+                              type="button"
+                              className="btn btn-secondary btn-sm"
+                              style={{ padding: '5px 10px', fontSize: '11.5px' }}
+                              onClick={() => setSelectedAdminLabReviewAttempt(report)}
+                            >
+                              👁️ Review
+                            </button>
                           </td>
                         </tr>
                       ))}
@@ -4285,6 +4333,118 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
               <button type="button" className="btn btn-secondary" onClick={() => setShowAcademicsModal(false)}>
                 Close
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ADMIN LAB REPORT & PLAGIARISM REVIEW MODAL */}
+      {selectedAdminLabReviewAttempt && (
+        <div className="modal-overlay">
+          <div className="modal-content glass-card" style={{ maxWidth: '900px', width: '95%', maxHeight: '90vh', overflowY: 'auto' }}>
+            <div className="modal-header">
+              <div>
+                <h3>🔬 Lab Submission Review & Plagiarism Audit</h3>
+                <p style={{ margin: 0, color: '#94a3b8', fontSize: '13px' }}>
+                  {selectedAdminLabReviewAttempt.student?.name} ({selectedAdminLabReviewAttempt.student?.rollNumber || 'N/A'}) · {selectedAdminLabReviewAttempt.task?.title}
+                </p>
+              </div>
+              <button className="close-btn" onClick={() => setSelectedAdminLabReviewAttempt(null)}>×</button>
+            </div>
+            <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '18px', padding: '20px' }}>
+              {/* Plagiarism Alert Banner */}
+              {selectedAdminLabReviewAttempt.plagiarismPercentage > 40 ? (
+                <div style={{ background: 'rgba(239, 68, 68, 0.15)', border: '1px solid rgba(239, 68, 68, 0.4)', borderRadius: '8px', padding: '14px 18px', display: 'flex', alignItems: 'center', gap: '14px' }}>
+                  <span style={{ fontSize: '24px' }}>🚨</span>
+                  <div>
+                    <strong style={{ color: '#f87171' }}>High Plagiarism Detected: {selectedAdminLabReviewAttempt.plagiarismPercentage}% Similarity</strong>
+                    <p style={{ margin: '4px 0 0', color: '#e2e8f0', fontSize: '13px' }}>
+                      This submission matched significantly with peer student <strong>{selectedAdminLabReviewAttempt.plagiarizedWith?.studentName || 'a registered student'}</strong>.
+                    </p>
+                  </div>
+                </div>
+              ) : selectedAdminLabReviewAttempt.plagiarismPercentage > 15 ? (
+                <div style={{ background: 'rgba(245, 158, 11, 0.15)', border: '1px solid rgba(245, 158, 11, 0.4)', borderRadius: '8px', padding: '12px 16px' }}>
+                  <strong style={{ color: '#fbbf24' }}>⚠️ Moderate Structural Similarity: {selectedAdminLabReviewAttempt.plagiarismPercentage}%</strong>
+                  <span style={{ fontSize: '13px', color: '#cbd5e1', marginLeft: '8px' }}>Matched logic with peer {selectedAdminLabReviewAttempt.plagiarizedWith?.studentName || ''}.</span>
+                </div>
+              ) : (
+                <div style={{ background: 'rgba(16, 185, 129, 0.15)', border: '1px solid rgba(16, 185, 129, 0.3)', borderRadius: '8px', padding: '12px 16px', color: '#34d399', fontSize: '13px' }}>
+                  ✅ <strong>Verified Original Submission</strong> ({selectedAdminLabReviewAttempt.plagiarismPercentage || 0}% peer similarity).
+                </div>
+              )}
+
+              {/* Evaluation Summary */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px', background: 'rgba(255, 255, 255, 0.03)', padding: '14px', borderRadius: '8px', border: '1px solid rgba(255, 255, 255, 0.08)' }}>
+                <div>
+                  <span style={{ fontSize: '12px', color: '#94a3b8' }}>Evaluation Score:</span>
+                  <div style={{ fontSize: '18px', fontWeight: 700, color: '#10b981' }}>{selectedAdminLabReviewAttempt.score ?? 0} / {selectedAdminLabReviewAttempt.task?.maxScore || 100}</div>
+                </div>
+                <div>
+                  <span style={{ fontSize: '12px', color: '#94a3b8' }}>Logic Match %:</span>
+                  <div style={{ fontSize: '18px', fontWeight: 700, color: '#38bdf8' }}>{selectedAdminLabReviewAttempt.evaluationDetails?.logicMatchPercentage ?? 100}%</div>
+                </div>
+                <div>
+                  <span style={{ fontSize: '12px', color: '#94a3b8' }}>Student Language:</span>
+                  <div style={{ fontSize: '16px', fontWeight: 600, color: '#e2e8f0', textTransform: 'uppercase' }}>{selectedAdminLabReviewAttempt.language || 'cpp'}</div>
+                </div>
+              </div>
+
+              {selectedAdminLabReviewAttempt.feedback && (
+                <div style={{ fontSize: '13px', color: '#cbd5e1', background: 'rgba(255, 255, 255, 0.02)', padding: '10px 14px', borderRadius: '6px' }}>
+                  <strong>Evaluation Remarks:</strong> {selectedAdminLabReviewAttempt.feedback}
+                </div>
+              )}
+
+              {/* Code Viewer */}
+              <div>
+                <label style={{ display: 'block', fontWeight: 600, marginBottom: '6px', fontSize: '13px' }}>
+                  💻 Student Submitted Code ({(selectedAdminLabReviewAttempt.language || 'cpp').toUpperCase()})
+                </label>
+                <pre style={{
+                  background: '#090d16',
+                  color: '#e2e8f0',
+                  padding: '16px',
+                  borderRadius: '8px',
+                  fontSize: '13px',
+                  fontFamily: 'Consolas, Monaco, monospace',
+                  maxHeight: '280px',
+                  overflowY: 'auto',
+                  whiteSpace: 'pre-wrap',
+                  border: '1px solid rgba(255, 255, 255, 0.1)'
+                }}>
+                  {selectedAdminLabReviewAttempt.code || selectedAdminLabReviewAttempt.submission || '// No code content recorded'}
+                </pre>
+              </div>
+
+              {/* Faculty Reference Code */}
+              {selectedAdminLabReviewAttempt.task?.referenceSolution && (
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                    <label style={{ fontWeight: 600, fontSize: '13px', color: '#fbbf24' }}>
+                      🎯 Faculty Reference Solution ({(selectedAdminLabReviewAttempt.task?.solutionLanguage || 'cpp').toUpperCase()})
+                    </label>
+                    <span style={{ fontSize: '11px', color: '#94a3b8' }}>Variables normalized during evaluation</span>
+                  </div>
+                  <pre style={{
+                    background: '#0f172a',
+                    color: '#cbd5e1',
+                    padding: '16px',
+                    borderRadius: '8px',
+                    fontSize: '13px',
+                    fontFamily: 'Consolas, Monaco, monospace',
+                    maxHeight: '220px',
+                    overflowY: 'auto',
+                    whiteSpace: 'pre-wrap',
+                    border: '1px solid rgba(251, 191, 36, 0.2)'
+                  }}>
+                    {selectedAdminLabReviewAttempt.task.referenceSolution}
+                  </pre>
+                </div>
+              )}
+            </div>
+            <div className="modal-footer" style={{ display: 'flex', justifyContent: 'flex-end', padding: '14px 20px', borderTop: '1px solid rgba(255, 255, 255, 0.08)' }}>
+              <button className="btn btn-secondary" onClick={() => setSelectedAdminLabReviewAttempt(null)}>Close</button>
             </div>
           </div>
         </div>

@@ -233,7 +233,90 @@ async function checkPlagiarism(submissionId, questionId, code, language, current
   };
 }
 
+/**
+ * Runs Plagiarism Checker for Lab Tasks against all other student submissions for this specific LabTask.
+ */
+async function checkLabTaskPlagiarism(taskId, currentStudentId, code, language) {
+  const LabPracticeAttempt = require('../models/LabPracticeAttempt');
+  if (!code || code.trim().length < 15) {
+    return {
+      plagiarismPercentage: 0,
+      status: 'Original',
+      plagiarizedWith: null,
+      matchedLines: []
+    };
+  }
+
+  const currentNormalized = normalizeCode(code, language || 'cpp');
+
+  const otherAttempts = await LabPracticeAttempt.find({
+    task: taskId,
+    student: { $ne: currentStudentId },
+    $or: [
+      { code: { $exists: true, $ne: '' } },
+      { submission: { $exists: true, $ne: '' } }
+    ]
+  }).populate('student', 'name email rollNumber');
+
+  let maxSimilarity = 0;
+  let bestMatchAttempt = null;
+
+  for (let other of otherAttempts) {
+    const otherCode = other.code || other.submission || '';
+    if (!otherCode || otherCode.trim().length < 15) continue;
+
+    const otherNormalized = normalizeCode(otherCode, other.language || 'cpp');
+
+    // 1. Structural AST token string similarity
+    const structSim = calculateStringSimilarity(currentNormalized.normalizedString, otherNormalized.normalizedString);
+
+    // 2. Token overlap
+    const tokensA = currentNormalized.normalizedString.split(' ').filter(Boolean);
+    const tokensB = otherNormalized.normalizedString.split(' ').filter(Boolean);
+    const tokenSim = calculateTokenOverlap(tokensA, tokensB);
+
+    // 3. Raw clean text similarity
+    const rawCleanSim = calculateStringSimilarity(
+      code.replace(/\s+/g, ''),
+      otherCode.replace(/\s+/g, '')
+    );
+
+    const combinedSim = Math.round((structSim * 0.5) + (tokenSim * 0.3) + (rawCleanSim * 0.2));
+
+    if (combinedSim > maxSimilarity) {
+      maxSimilarity = combinedSim;
+      bestMatchAttempt = other;
+    }
+  }
+
+  let status = 'Original';
+  if (maxSimilarity > 60) {
+    status = 'High Plagiarism';
+  } else if (maxSimilarity > 40) {
+    status = 'Moderate Similarity';
+  } else if (maxSimilarity > 15) {
+    status = 'Low Similarity';
+  }
+
+  let matchedLines = [];
+  if (bestMatchAttempt && maxSimilarity >= 25) {
+    matchedLines = findMatchingFragments(code, bestMatchAttempt.code || bestMatchAttempt.submission || '');
+  }
+
+  return {
+    plagiarismPercentage: maxSimilarity,
+    status,
+    plagiarizedWith: bestMatchAttempt ? {
+      student: bestMatchAttempt.student?._id,
+      studentName: bestMatchAttempt.student?.name || 'Peer Candidate',
+      percentage: maxSimilarity
+    } : null,
+    matchedLines
+  };
+}
+
 module.exports = {
   checkPlagiarism,
+  checkLabTaskPlagiarism,
   normalizeCode
 };
