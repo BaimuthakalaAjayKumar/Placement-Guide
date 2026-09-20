@@ -3625,25 +3625,6 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
                 </div>
               </div>
 
-              <form className="admin-job-form mt-20" onSubmit={createAcademicExam}>
-                <h4>Create Scoped MCQ Exam</h4>
-                <div className="form-grid-2-col">
-                  <input className="form-control" placeholder="Exam title" value={examForm.title} onChange={event => setExamForm({ ...examForm, title: event.target.value })} required />
-                  <select className="form-control" value={examForm.subject} onChange={event => setExamForm({ ...examForm, subject: event.target.value })}><option value="">General / No Subject</option>{academicSubjects.map(subject => <option key={subject._id} value={subject._id}>{subject.code} - {subject.name}</option>)}</select>
-                </div>
-                <textarea className="form-control" placeholder="Exam description" value={examForm.description} onChange={event => setExamForm({ ...examForm, description: event.target.value })} />
-                <div className="form-grid-3-col">
-                  <input className="form-control" placeholder="Academic year" value={examForm.academicYear} onChange={event => setExamForm({ ...examForm, academicYear: event.target.value })} required />
-                  <input className="form-control" placeholder="Branch" value={examForm.branch} onChange={event => setExamForm({ ...examForm, branch: event.target.value })} />
-                  <input className="form-control" placeholder="Section" value={examForm.section} onChange={event => setExamForm({ ...examForm, section: event.target.value })} />
-                </div>
-                <div className="form-grid-2-col">
-                  <input className="form-control" type="number" min="1" placeholder="Duration (minutes)" value={examForm.duration} onChange={event => setExamForm({ ...examForm, duration: event.target.value })} required />
-                  <input className="form-control" type="number" min="1" placeholder="Question limit" value={examForm.questionLimit} onChange={event => setExamForm({ ...examForm, questionLimit: event.target.value })} required />
-                </div>
-                <button className="btn btn-primary" type="submit" disabled={creatingExam}>{creatingExam ? 'Creating...' : 'Create Exam'}</button>
-              </form>
-
               <div className="table-responsive-wrapper mt-20">
                 <table className="student-roster-table">
                   <thead>
