@@ -152,9 +152,23 @@ const LabPractice = () => {
   const openPracticeIDE = (task) => {
     setSelectedTask(task);
     setReportsTask(null);
-    const lang = task.myAttempt?.language || task.solutionLanguage || 'cpp';
-    setLanguage(lang);
-    setCode(task.myAttempt?.code || task.myAttempt?.submission || TEMPLATES[lang] || '');
+
+    // Smart initial language: check existing attempt, task reference language, or infer from code/subject
+    let initialLang = task.myAttempt?.language || task.solutionLanguage || 'cpp';
+    const existingCode = task.myAttempt?.code || task.myAttempt?.submission || '';
+
+    if (existingCode) {
+      if (/\b(create\s+(table|database)|select\s+.*from|insert\s+into|update\s+.*set|delete\s+from|alter\s+table|use\s+[a-zA-Z0-9_]+;?)\b/i.test(existingCode)) {
+        initialLang = 'sql';
+      }
+    } else if (task.subject?.name && /database|dbms|sql/i.test(task.subject.name)) {
+      initialLang = 'sql';
+    } else if (task.title && /database|dbms|sql/i.test(task.title)) {
+      initialLang = 'sql';
+    }
+
+    setLanguage(initialLang);
+    setCode(existingCode || TEMPLATES[initialLang] || '');
     setReport(task.myAttempt?.report || '');
     setInput('');
     setOutput('');
@@ -241,12 +255,23 @@ const LabPractice = () => {
     }
     try {
       setSubmitting(true);
+
+      // Auto-detect language if student code is SQL or Python
+      let submitLang = language;
+      if (/\b(create\s+(table|database)|select\s+.*from|insert\s+into|update\s+.*set|delete\s+from|alter\s+table|use\s+[a-zA-Z0-9_]+;?)\b/i.test(code)) {
+        submitLang = 'sql';
+        if (language !== 'sql') setLanguage('sql');
+      } else if (/^\s*(import\s+(sys|os|numpy|math|pandas)|def\s+[a-zA-Z_]\w*\(|print\(|elif\s+)/m.test(code)) {
+        submitLang = 'python';
+        if (language !== 'python') setLanguage('python');
+      }
+
       const data = await request(`${API_URL}/labs/tasks/${selectedTask._id}/submit`, {
         method: 'POST',
         body: JSON.stringify({
           code,
           submission: code,
-          language,
+          language: submitLang,
           report
         })
       });
@@ -341,30 +366,34 @@ const LabPractice = () => {
           <div className="lab-ide-workspace animate-fade">
             {/* Top Workspace Bar */}
             <div className="lab-ide-topbar glass-card">
-              <div className="lab-ide-meta">
-                <button className="btn btn-secondary btn-sm" onClick={() => setSelectedTask(null)}>
-                  ← Back to Lab Tasks
-                </button>
-                <div>
-                  <h2 className="lab-ide-title">{selectedTask.title}</h2>
-                  <div className="lab-ide-tags">
-                    <span className="badge badge-subject">{selectedTask.subject?.name || 'Subject'}</span>
-                    <span className="badge badge-scope">
-                      {selectedTask.academicYear} {selectedTask.branch} {selectedTask.section}
-                    </span>
-                    <span className="badge badge-maxscore">Max: {selectedTask.maxScore || 100} pts</span>
-                    {selectedTask.solutionLanguage && (
-                      <span className="badge badge-faculty-lang">
-                        Reference: {selectedTask.solutionLanguage.toUpperCase()}
+              <div className="lab-topbar-row-1">
+                <div className="lab-ide-meta">
+                  <button className="btn btn-secondary btn-sm" onClick={() => setSelectedTask(null)}>
+                    ← Back to Lab Tasks
+                  </button>
+                  <div>
+                    <h2 className="lab-ide-title">{selectedTask.title}</h2>
+                    <div className="lab-ide-tags">
+                      <span className="badge badge-subject">{selectedTask.subject?.name || 'Subject'}</span>
+                      <span className="badge badge-scope">
+                        {selectedTask.academicYear} {selectedTask.branch} {selectedTask.section}
                       </span>
-                    )}
+                      <span className="badge badge-maxscore">Max: {selectedTask.maxScore || 100} pts</span>
+                      {selectedTask.solutionLanguage && (
+                        <span className="badge badge-faculty-lang">
+                          Reference: {selectedTask.solutionLanguage.toUpperCase()}
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
 
-              <div className="lab-ide-actions">
+              <div className="lab-topbar-row-2">
                 <div className="lang-picker-wrap">
-                  <label>Language:</label>
+                  <label style={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    💻 Select Language:
+                  </label>
                   <select
                     className="lab-lang-select"
                     value={language}
@@ -377,27 +406,30 @@ const LabPractice = () => {
                     ))}
                   </select>
                 </div>
-                <button
-                  className="btn btn-secondary btn-sm"
-                  onClick={() => setCode(TEMPLATES[language] || '')}
-                  title="Reset code to default template"
-                >
-                  ↺ Reset Code
-                </button>
-                <button
-                  className="btn btn-primary btn-sm btn-run"
-                  onClick={handleRunCode}
-                  disabled={running || submitting}
-                >
-                  {running ? '⚙️ Running...' : '▶ Run Code'}
-                </button>
-                <button
-                  className="btn btn-success btn-sm btn-submit-eval"
-                  onClick={handleSubmitAttempt}
-                  disabled={running || submitting}
-                >
-                  {submitting ? '⏳ Evaluating...' : '🚀 Evaluate & Submit'}
-                </button>
+
+                <div className="lab-ide-actions">
+                  <button
+                    className="btn btn-secondary btn-sm"
+                    onClick={() => setCode(TEMPLATES[language] || '')}
+                    title="Reset code to default template"
+                  >
+                    ↺ Reset Code
+                  </button>
+                  <button
+                    className="btn btn-primary btn-sm btn-run"
+                    onClick={handleRunCode}
+                    disabled={running || submitting}
+                  >
+                    {running ? '⚙️ Running...' : '▶ Run Code'}
+                  </button>
+                  <button
+                    className="btn btn-success btn-sm btn-submit-eval"
+                    onClick={handleSubmitAttempt}
+                    disabled={running || submitting}
+                  >
+                    {submitting ? '⏳ Evaluating...' : '🚀 Evaluate & Submit'}
+                  </button>
+                </div>
               </div>
             </div>
 

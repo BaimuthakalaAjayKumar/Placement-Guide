@@ -11,6 +11,7 @@ function normalizeCode(code, language) {
   let cleanCode = code
     .replace(/\/\*[\s\S]*?\*\//g, '')  // C-style block comments
     .replace(/\/\/.*/g, '')            // Line comments
+    .replace(/--.*/g, '')              // SQL line comments
     .replace(/#.*/g, '');              // Python-style comments
 
   // 2. Tokenize structure using regex rules
@@ -20,13 +21,19 @@ function normalizeCode(code, language) {
   // Replace numeric literals with 'LIT_NUM'
   cleanCode = cleanCode.replace(/\b\d+(\.\d+)?\b/g, 'LIT_NUM');
 
-  // Keywords across C/C++/Java/JS/Python
+  // Keywords across C/C++/Java/JS/Python/SQL
   const keywords = new Set([
     'function', 'let', 'const', 'var', 'if', 'else', 'for', 'while', 'do',
     'return', 'class', 'import', 'require', 'include', 'using', 'namespace',
     'int', 'float', 'double', 'char', 'void', 'public', 'private', 'protected',
     'static', 'def', 'import', 'from', 'as', 'try', 'except', 'catch', 'finally',
-    'throw', 'new', 'true', 'false', 'null', 'undefined'
+    'throw', 'new', 'true', 'false', 'null', 'undefined',
+    // SQL Keywords
+    'select', 'from', 'where', 'insert', 'into', 'values', 'update', 'set', 'delete',
+    'create', 'table', 'database', 'drop', 'alter', 'join', 'inner', 'left', 'right',
+    'on', 'group', 'by', 'order', 'having', 'primary', 'key', 'foreign', 'references',
+    'not', 'null', 'unique', 'check', 'default', 'use', 'view', 'index', 'distinct',
+    'count', 'sum', 'avg', 'min', 'max', 'like', 'in', 'between', 'exists', 'case', 'when', 'then', 'end'
   ]);
 
   // Split by symbols but preserve structure
@@ -37,7 +44,7 @@ function normalizeCode(code, language) {
     const word = words[i].trim();
     if (!word) continue;
 
-    if (keywords.has(word)) {
+    if (keywords.has(word.toLowerCase())) {
       tokens.push(word.toUpperCase());
     } else if (/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(word)) {
       if (word === 'LIT_STR' || word === 'LIT_NUM') {

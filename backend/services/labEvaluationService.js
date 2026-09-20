@@ -64,6 +64,24 @@ function extractLogicSignature(code, language) {
   return signature;
 }
 
+function detectLanguage(code, declaredLang) {
+  const clean = (code || '').trim();
+  const lower = clean.toLowerCase();
+  if (/\b(create\s+(table|database)|select\s+.*from|insert\s+into|update\s+.*set|delete\s+from|alter\s+table|use\s+[a-zA-Z0-9_]+;?)\b/i.test(lower)) {
+    return 'sql';
+  }
+  if (/^\s*(import\s+(sys|os|numpy|math|pandas)|def\s+[a-zA-Z_]\w*\(|print\(|elif\s+)/m.test(clean)) {
+    return 'python';
+  }
+  if (/^\s*(#include\s*<|using\s+namespace\s+std;|int\s+main\s*\()/m.test(clean)) {
+    return 'cpp';
+  }
+  if (/^\s*(import\s+java\.|public\s+class\s+|System\.out\.println)/m.test(clean)) {
+    return 'java';
+  }
+  return (declaredLang || 'cpp').toLowerCase();
+}
+
 /**
  * Evaluates student's code against the faculty reference solution.
  * Handles different variable names via AST/identifier tokenization.
@@ -97,8 +115,8 @@ function evaluateLabSubmission(studentCode, studentLanguage, referenceSolution, 
     };
   }
 
-  const sLang = (studentLanguage || 'cpp').toLowerCase();
-  const rLang = (referenceLanguage || 'cpp').toLowerCase();
+  const sLang = detectLanguage(cleanStudentCode, studentLanguage);
+  const rLang = detectLanguage(cleanRefCode, referenceLanguage);
 
   // 1. Normalize code: replaces variable and function identifiers with 'ID', strips comments & literals
   const normStudent = normalizeCode(cleanStudentCode, sLang);
@@ -110,14 +128,8 @@ function evaluateLabSubmission(studentCode, studentLanguage, referenceSolution, 
   let structuralMatch = 0;
   let logicMatch = 0;
 
-  // Case A: Same programming language
-  if (sLang === rLang) {
-    const strSim = calculateStringSimilarity(normStudent.normalizedString, normRef.normalizedString);
-    const tokenSim = calculateTokenOverlap(studentTokens, refTokens);
-    structuralMatch = Math.round((strSim * 0.6) + (tokenSim * 0.4));
-    logicMatch = structuralMatch;
-  } else if (sLang === 'sql' && rLang === 'sql') {
-    // SQL matching: check clauses and query structure
+  // Case A: SQL matching (query structure and clause presence)
+  if (sLang === 'sql' && rLang === 'sql') {
     const sigStudent = extractLogicSignature(cleanStudentCode, 'sql');
     const sigRef = extractLogicSignature(cleanRefCode, 'sql');
     let matchedClauses = 0;
@@ -129,11 +141,18 @@ function evaluateLabSubmission(studentCode, studentLanguage, referenceSolution, 
       }
     }
     const clauseSim = totalClauses > 0 ? Math.round((matchedClauses / totalClauses) * 100) : 100;
+    const strSim = calculateStringSimilarity(normStudent.normalizedString, normRef.normalizedString);
     const tokenSim = calculateTokenOverlap(studentTokens, refTokens);
-    structuralMatch = Math.round((clauseSim * 0.7) + (tokenSim * 0.3));
+    structuralMatch = Math.max(clauseSim, Math.round((strSim * 0.4) + (tokenSim * 0.6)));
+    logicMatch = Math.max(structuralMatch, clauseSim);
+  } else if (sLang === rLang) {
+    // Case B: Same programming language
+    const strSim = calculateStringSimilarity(normStudent.normalizedString, normRef.normalizedString);
+    const tokenSim = calculateTokenOverlap(studentTokens, refTokens);
+    structuralMatch = Math.round((strSim * 0.6) + (tokenSim * 0.4));
     logicMatch = structuralMatch;
   } else {
-    // Case B: Cross-language logic match (e.g. C++ vs Python or Java)
+    // Case C: Cross-language logic match (e.g. C++ vs Python or Java)
     const sigStudent = extractLogicSignature(cleanStudentCode, sLang);
     const sigRef = extractLogicSignature(cleanRefCode, rLang);
 

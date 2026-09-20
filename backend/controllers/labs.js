@@ -157,7 +157,14 @@ exports.submitAttempt = async (req, res, next) => {
     }
 
     const submittedCode = req.body.code || req.body.submission || '';
-    const submittedLang = req.body.language || task.solutionLanguage || 'cpp';
+    let submittedLang = req.body.language || task.solutionLanguage || 'cpp';
+
+    // Auto-detect language if code has distinctive SQL or Python syntax
+    if (/\b(create\s+(table|database)|select\s+.*from|insert\s+into|update\s+.*set|delete\s+from|alter\s+table|use\s+[a-zA-Z0-9_]+;?)\b/i.test(submittedCode)) {
+      submittedLang = 'sql';
+    } else if (/^\s*(import\s+(sys|os|numpy|math|pandas)|def\s+[a-zA-Z_]\w*\(|print\(|elif\s+)/m.test(submittedCode)) {
+      submittedLang = 'python';
+    }
 
     // 1. Evaluate student's code against the faculty reference solution
     const evalResult = evaluateLabSubmission(

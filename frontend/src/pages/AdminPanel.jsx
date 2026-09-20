@@ -4340,18 +4340,18 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
 
       {/* ADMIN LAB REPORT & PLAGIARISM REVIEW MODAL */}
       {selectedAdminLabReviewAttempt && (
-        <div className="modal-overlay">
-          <div className="modal-content glass-card" style={{ maxWidth: '900px', width: '95%', maxHeight: '90vh', overflowY: 'auto' }}>
-            <div className="modal-header">
+        <div className="progress-modal-overlay" onClick={() => setSelectedAdminLabReviewAttempt(null)}>
+          <div className="progress-modal" style={{ width: 'min(960px, 95vw)', maxHeight: '90vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
+            <div className="progress-modal-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
-                <h3>🔬 Lab Submission Review & Plagiarism Audit</h3>
-                <p style={{ margin: 0, color: '#94a3b8', fontSize: '13px' }}>
+                <h2 style={{ margin: 0, fontSize: '1.25rem' }}>🔬 Lab Submission Review & Plagiarism Audit</h2>
+                <p style={{ margin: '4px 0 0', color: '#94a3b8', fontSize: '13px' }}>
                   {selectedAdminLabReviewAttempt.student?.name} ({selectedAdminLabReviewAttempt.student?.rollNumber || 'N/A'}) · {selectedAdminLabReviewAttempt.task?.title}
                 </p>
               </div>
-              <button className="close-btn" onClick={() => setSelectedAdminLabReviewAttempt(null)}>×</button>
+              <button className="progress-close" type="button" onClick={() => setSelectedAdminLabReviewAttempt(null)}>×</button>
             </div>
-            <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '18px', padding: '20px' }}>
+            <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '18px', padding: '20px 0 10px' }}>
               {/* Plagiarism Alert Banner */}
               {selectedAdminLabReviewAttempt.plagiarismPercentage > 40 ? (
                 <div style={{ background: 'rgba(239, 68, 68, 0.15)', border: '1px solid rgba(239, 68, 68, 0.4)', borderRadius: '8px', padding: '14px 18px', display: 'flex', alignItems: 'center', gap: '14px' }}>
@@ -4443,7 +4443,7 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
                 </div>
               )}
             </div>
-            <div className="modal-footer" style={{ display: 'flex', justifyContent: 'flex-end', padding: '14px 20px', borderTop: '1px solid rgba(255, 255, 255, 0.08)' }}>
+            <div className="modal-footer" style={{ display: 'flex', justifyContent: 'flex-end', padding: '14px 0 0', borderTop: '1px solid rgba(255, 255, 255, 0.08)' }}>
               <button className="btn btn-secondary" onClick={() => setSelectedAdminLabReviewAttempt(null)}>Close</button>
             </div>
           </div>
