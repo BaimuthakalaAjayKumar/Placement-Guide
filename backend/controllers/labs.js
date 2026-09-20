@@ -146,3 +146,44 @@ exports.reviewAttempt = async (req, res, next) => {
     next(err);
   }
 };
+
+exports.getAllLabReports = async (req, res, next) => {
+  try {
+    let taskFilter = {};
+    const isMainAdmin = req.user.role === 'admin' && (!req.user.managedScopes || req.user.managedScopes.length === 0);
+    if (!isMainAdmin && req.user.managedScopes && req.user.managedScopes.length > 0) {
+      taskFilter = {
+        $or: req.user.managedScopes.map(scope => {
+          const cond = {};
+          if (scope.academicYear && scope.academicYear.toLowerCase() !== 'all') {
+            cond.academicYear = new RegExp(scope.academicYear.trim(), 'i');
+          }
+          if (scope.branch && scope.branch.toLowerCase() !== 'all') {
+            cond.branch = new RegExp(`^${scope.branch.trim()}$`, 'i');
+          }
+          if (scope.section && scope.section.toLowerCase() !== 'all') {
+            cond.section = new RegExp(`^${scope.section.trim()}$`, 'i');
+          }
+          return cond;
+        })
+      };
+    }
+
+    const tasks = await LabTask.find(taskFilter).select('_id');
+    const taskIds = tasks.map(t => t._id);
+
+    const reports = await LabPracticeAttempt.find({ task: { $in: taskIds } })
+      .populate({
+        path: 'task',
+        select: 'title maxScore academicYear branch section createdBy',
+        populate: { path: 'createdBy', select: 'name email' }
+      })
+      .populate('student', 'name email rollNumber branch section academicYear year')
+      .populate('reviewedBy', 'name email')
+      .sort({ updatedAt: -1 });
+
+    res.status(200).json({ success: true, count: reports.length, data: reports });
+  } catch (err) {
+    next(err);
+  }
+};

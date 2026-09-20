@@ -110,6 +110,8 @@ const AdminPanel = () => {
 
   const [questionBankReports, setQuestionBankReports] = useState([]);
   const [loadingQuestionBankReports, setLoadingQuestionBankReports] = useState(false);
+  const [adminLabReports, setAdminLabReports] = useState([]);
+  const [loadingAdminLabReports, setLoadingAdminLabReports] = useState(false);
   const [academicSubjects, setAcademicSubjects] = useState([]);
   const [academicProjects, setAcademicProjects] = useState([]);
   const [loadingAcademicContent, setLoadingAcademicContent] = useState(false);
@@ -517,6 +519,8 @@ const AdminPanel = () => {
         fetchMockInterviewReports();
       } else if (activeTab === 'question-bank') {
         fetchQuestionBankReports();
+      } else if (activeTab === 'lab-reports') {
+        fetchAdminLabReports();
       } else if (activeTab === 'academic-content') {
         fetchAcademicContent();
       } else if (activeTab === 'aptitude') {
@@ -526,6 +530,9 @@ const AdminPanel = () => {
           .then(data => { if (data.success) setAcademicSubjects(data.data); })
           .catch(() => {});
       } else if (activeTab === 'interview-settings') {
+        fetchStaff();
+        fetchAcademicContent();
+      } else if (activeTab === 'faculty-staff') {
         fetchStaff();
         fetchAcademicContent();
       } else if (activeTab === 'settings') {
@@ -733,13 +740,64 @@ const AdminPanel = () => {
     }
   };
 
+  const handleDeleteStaffScope = async (staffId, scopeId) => {
+    if (!window.confirm('Are you sure you want to remove this academic scope from the staff member?')) return;
+    try {
+      setError('');
+      setSuccess('');
+      const res = await fetch(`${API_URL}/users/staff/${staffId}/scopes/${scopeId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error || 'Failed to remove scope.');
+      setStaffMembers(previous => previous.map(m => m._id === data.data._id ? data.data : m));
+      setSuccess('Academic scope removed successfully.');
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  const handleDeleteSubject = async (subjectId, subjectName) => {
+    if (!window.confirm(`Are you sure you want to delete the academic subject "${subjectName}"? This cannot be undone.`)) return;
+    try {
+      setError('');
+      setSuccess('');
+      const res = await fetch(`${API_URL}/academic/subjects/${subjectId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error || 'Failed to delete subject.');
+      setSuccess(`Subject "${subjectName}" deleted successfully.`);
+      fetchAcademicContent();
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
   const saveStaffScope = async (event) => {
     event.preventDefault();
     if (!scopeStaffId || !scopeForm.academicYear) return setError('Select a staff member and academic year.');
     try {
       setSavingScope(true);
       const staff = staffMembers.find(member => member._id === scopeStaffId);
-      const scopes = [...(staff?.managedScopes || []), scopeForm];
+      const existing = staff?.managedScopes || [];
+
+      // Check if duplicate scope already exists
+      const isDuplicate = existing.some(s =>
+        (s.academicYear || '').trim().toLowerCase() === scopeForm.academicYear.trim().toLowerCase() &&
+        (s.branch || '').trim().toLowerCase() === (scopeForm.branch || '').trim().toLowerCase() &&
+        (s.section || '').trim().toLowerCase() === (scopeForm.section || '').trim().toLowerCase() &&
+        (s.subject || '') === (scopeForm.subject || '')
+      );
+      if (isDuplicate) {
+        setError('This staff member is already assigned to this exact academic scope.');
+        setSavingScope(false);
+        return;
+      }
+
+      const scopes = [...existing, scopeForm];
       const res = await fetch(`${API_URL}/users/staff/${scopeStaffId}/scopes`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
@@ -749,7 +807,7 @@ const AdminPanel = () => {
       if (!data.success) throw new Error(data.error || 'Failed to assign scope.');
       setStaffMembers(previous => previous.map(member => member._id === data.data._id ? data.data : member));
       setScopeForm({ academicYear: '', branch: '', section: '', subject: '' });
-      setSuccess('Academic scope assigned.');
+      setSuccess('Academic scope assigned successfully.');
     } catch (err) { setError(err.message); }
     finally { setSavingScope(false); }
   };
@@ -1312,6 +1370,83 @@ const AdminPanel = () => {
     } catch (err) {
       alert('Error downloading report: ' + err.message);
     }
+  };
+
+  const fetchAdminLabReports = async () => {
+    try {
+      setLoadingAdminLabReports(true);
+      const res = await fetch(`${API_URL}/labs/reports`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (data.success) {
+        setAdminLabReports(data.data || []);
+      } else {
+        setError(data.error || 'Failed to fetch lab reports.');
+      }
+    } catch (err) {
+      setError('Could not connect to lab reports service.');
+    } finally {
+      setLoadingAdminLabReports(false);
+    }
+  };
+
+  const downloadAdminLabReportsCSV = () => {
+    if (!adminLabReports.length) return;
+    const headers = ['Student Name', 'Email', 'Roll Number', 'Branch', 'Section', 'Academic Year', 'Lab Task Title', 'Assigned Faculty', 'Faculty Email', 'Score', 'Max Score', 'Status', 'Feedback', 'Submitted Date'];
+    const rows = adminLabReports.map(r => [
+      `"${(r.student?.name || '').replace(/"/g, '""')}"`,
+      `"${(r.student?.email || '').replace(/"/g, '""')}"`,
+      `"${(r.student?.rollNumber || '').replace(/"/g, '""')}"`,
+      `"${(r.student?.branch || '').replace(/"/g, '""')}"`,
+      `"${(r.student?.section || '').replace(/"/g, '""')}"`,
+      `"${(r.student?.academicYear || r.student?.year || '').replace(/"/g, '""')}"`,
+      `"${(r.task?.title || '').replace(/"/g, '""')}"`,
+      `"${(r.task?.createdBy?.name || r.reviewedBy?.name || 'Faculty').replace(/"/g, '""')}"`,
+      `"${(r.task?.createdBy?.email || r.reviewedBy?.email || '').replace(/"/g, '""')}"`,
+      r.score ?? 'N/A',
+      r.task?.maxScore || 100,
+      r.status || 'submitted',
+      `"${(r.feedback || '').replace(/"/g, '""')}"`,
+      `"${r.updatedAt ? new Date(r.updatedAt).toLocaleDateString() : ''}"`
+    ]);
+
+    const csvContent = "\uFEFF" + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `Student_Lab_Reports_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const downloadStudentsRosterCSV = () => {
+    if (!students.length) return;
+    const headers = ['Name', 'Email', 'Roll Number', 'Academic Year', 'Branch', 'Section', 'Target Role', 'PRI Readiness Score (%)', 'Readiness Status', 'Registered Date'];
+    const rows = students.map(s => [
+      `"${(s.name || '').replace(/"/g, '""')}"`,
+      `"${(s.email || '').replace(/"/g, '""')}"`,
+      `"${(s.rollNumber || '').replace(/"/g, '""')}"`,
+      `"${(s.academicYear || s.year || '').replace(/"/g, '""')}"`,
+      `"${(s.branch || '').replace(/"/g, '""')}"`,
+      `"${(s.section || '').replace(/"/g, '""')}"`,
+      `"${(s.targetRole || 'Software Engineer').replace(/"/g, '""')}"`,
+      s.readinessScore || 0,
+      s.readinessScore >= 80 ? 'Job Ready' : s.readinessScore >= 50 ? 'Medium' : 'Low',
+      `"${s.createdAt ? new Date(s.createdAt).toLocaleDateString() : ''}"`
+    ]);
+
+    const csvContent = "\uFEFF" + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `Students_Preparedness_Roster_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   if (loading && !showQuestionsModal && !showAttemptsModal) {
@@ -1908,10 +2043,28 @@ const AdminPanel = () => {
             🛡️ Question Bank Reports
           </button>
           <button
+            className={`admin-tab-btn ${activeTab === 'lab-reports' ? 'active' : ''}`}
+            onClick={() => {
+              setActiveTab('lab-reports');
+              fetchAdminLabReports();
+            }}
+          >
+            🔬 Lab Practice Reports
+          </button>
+          <button
             className={`admin-tab-btn ${activeTab === 'academic-content' ? 'active' : ''}`}
             onClick={() => setActiveTab('academic-content')}
           >
             📚 Academic Subjects & Projects
+          </button>
+          <button
+            className={`admin-tab-btn ${activeTab === 'faculty-staff' ? 'active' : ''}`}
+            onClick={() => {
+              setActiveTab('faculty-staff');
+              fetchStaff();
+            }}
+          >
+            👨‍🏫 Faculty & Administrators
           </button>
           <button
             className={`admin-tab-btn ${activeTab === 'aptitude' ? 'active' : ''}`}
@@ -1979,8 +2132,21 @@ const AdminPanel = () => {
 
                   {/* List of Students */}
                   <div className="glass-card student-roster-card">
-                    <h3>Student Preparedness Roster</h3>
-                    <p className="card-desc">Comprehensive log of students ranked by Placement Readiness Index (PRI).</p>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', marginBottom: '14px' }}>
+                      <div>
+                        <h3 style={{ margin: 0 }}>Student Preparedness Roster</h3>
+                        <p className="card-desc" style={{ margin: '4px 0 0' }}>Comprehensive log of students ranked by Placement Readiness Index (PRI).</p>
+                      </div>
+                      <button
+                        type="button"
+                        className="btn btn-primary btn-sm"
+                        onClick={downloadStudentsRosterCSV}
+                        disabled={!students.length}
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                      >
+                        📥 Download Students Report (CSV)
+                      </button>
+                    </div>
 
                     <div className="table-responsive-wrapper">
                       <table className="student-roster-table">
@@ -2509,12 +2675,35 @@ const AdminPanel = () => {
                   </form>
                   <div className="table-responsive-wrapper mt-20">
                     <table className="student-roster-table">
-                      <thead><tr><th>Subject</th><th>Code</th><th>Academic Year</th><th>Status</th></tr></thead>
+                      <thead>
+                        <tr>
+                          <th>Subject</th>
+                          <th>Code</th>
+                          <th>Academic Year</th>
+                          <th>Status</th>
+                          <th>Action</th>
+                        </tr>
+                      </thead>
                       <tbody>
                         {academicSubjects.map(subject => (
-                          <tr key={subject._id}><td>{subject.name}</td><td>{subject.code}</td><td>{subject.academicYear}</td><td>{subject.isActive ? 'Active' : 'Inactive'}</td></tr>
+                          <tr key={subject._id}>
+                            <td><strong>{subject.name}</strong></td>
+                            <td><span className="code-pill">{subject.code}</span></td>
+                            <td>{subject.academicYear}{subject.branch ? ` (${subject.branch})` : ''}</td>
+                            <td><span className="status-badge-active">{subject.isActive ? 'Active' : 'Inactive'}</span></td>
+                            <td>
+                              <button
+                                className="btn btn-danger btn-sm"
+                                type="button"
+                                onClick={() => handleDeleteSubject(subject._id, subject.name)}
+                                title="Delete Subject"
+                              >
+                                🗑 Remove
+                              </button>
+                            </td>
+                          </tr>
                         ))}
-                        {!academicSubjects.length && <tr><td colSpan="4">No subjects found.</td></tr>}
+                        {!academicSubjects.length && <tr><td colSpan="5">No subjects found.</td></tr>}
                       </tbody>
                     </table>
                   </div>
@@ -2629,6 +2818,109 @@ const AdminPanel = () => {
               ) : (
                 <div className="empty-history-placeholder glass-card">
                   <p>No Question Bank submissions recorded yet.</p>
+                </div>
+              )}
+            </div>
+          )
+        }
+
+        {
+          activeTab === 'lab-reports' && (
+            <div className="glass-card animate-fade">
+              <div className="manager-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
+                <div>
+                  <h3>🔬 Lab Practice Reports & Student Submissions</h3>
+                  <p className="card-desc">Audit laboratory experiments, student submissions, assigned faculty mentors, scores, and download reports.</p>
+                </div>
+                <div style={{ display: 'flex', gap: '10px' }}>
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-sm"
+                    onClick={fetchAdminLabReports}
+                    title="Refresh lab records"
+                  >
+                    🔄 Refresh
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-primary btn-sm"
+                    onClick={downloadAdminLabReportsCSV}
+                    disabled={adminLabReports.length === 0}
+                    title="Download Student Lab reports as CSV"
+                  >
+                    📥 Download Student Lab Reports (CSV)
+                  </button>
+                </div>
+              </div>
+
+              {loadingAdminLabReports ? (
+                <div className="dashboard-loading-container">
+                  <div className="spinner-loader"></div>
+                  <p>Loading lab reports and submissions...</p>
+                </div>
+              ) : adminLabReports.length > 0 ? (
+                <div className="table-responsive-wrapper mt-20">
+                  <table className="student-roster-table">
+                    <thead>
+                      <tr>
+                        <th>Student</th>
+                        <th>Scope (Year / Branch / Sec)</th>
+                        <th>Lab Task</th>
+                        <th>Assigned Faculty</th>
+                        <th>Status</th>
+                        <th>Score</th>
+                        <th>Feedback</th>
+                        <th>Submitted Date</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {adminLabReports.map((report) => (
+                        <tr key={report._id}>
+                          <td>
+                            <strong>{report.student?.name || 'Student'}</strong>
+                            <div className="text-secondary" style={{ fontSize: '12px' }}>{report.student?.email || 'No email'}</div>
+                            {report.student?.rollNumber && (
+                              <div style={{ fontSize: '11px', color: '#818cf8' }}>Roll: {report.student.rollNumber}</div>
+                            )}
+                          </td>
+                          <td>
+                            {report.student?.academicYear || report.student?.year || 'Year N/A'}
+                            {report.student?.branch ? ` · ${report.student.branch}` : ''}
+                            {report.student?.section ? ` (Sec ${report.student.section})` : ''}
+                          </td>
+                          <td>
+                            <strong>{report.task?.title || 'Lab Task'}</strong>
+                          </td>
+                          <td>
+                            <strong>{report.task?.createdBy?.name || report.reviewedBy?.name || 'Faculty'}</strong>
+                            <div className="text-secondary" style={{ fontSize: '11px' }}>
+                              {report.task?.createdBy?.email || report.reviewedBy?.email || ''}
+                            </div>
+                          </td>
+                          <td>
+                            <span className={`pri-level-badge scale-down`} data-level={report.status === 'reviewed' ? 'high' : 'medium'}>
+                              {report.status || 'Submitted'}
+                            </span>
+                          </td>
+                          <td>
+                            <strong className="text-glow" style={{ color: report.score !== undefined && report.score !== null ? '#10b981' : '#f59e0b' }}>
+                              {report.score !== undefined && report.score !== null ? `${report.score}/${report.task?.maxScore || 100}` : 'Pending'}
+                            </strong>
+                          </td>
+                          <td style={{ fontSize: '12px', maxWidth: '220px' }}>
+                            {report.feedback || <span className="text-secondary">—</span>}
+                          </td>
+                          <td style={{ fontSize: '12px' }}>
+                            {report.updatedAt ? new Date(report.updatedAt).toLocaleDateString() : 'N/A'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="empty-history-placeholder glass-card" style={{ textAlign: 'center', padding: '36px' }}>
+                  <p>No student lab practice submissions found.</p>
                 </div>
               )}
             </div>
@@ -2920,55 +3212,6 @@ const AdminPanel = () => {
                     <p className="isection-empty">No roles loaded. Click the tab again to refresh.</p>
                   )}
                 </div>
-                <form className="admin-job-form mt-20" onSubmit={saveStaffScope}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                    <h4 style={{ margin: 0 }}>Assign Academic Scope</h4>
-                    <button type="button" className="btn btn-secondary btn-sm" onClick={fetchStaff} title="Refresh Staff List">
-                      🔄 Refresh Staff ({staffMembers.length})
-                    </button>
-                  </div>
-                  <p className="card-desc" style={{ marginBottom: '12px' }}>
-                    Assign academic year, branch, section, or subject to faculty members or administrators.
-                  </p>
-                  <select
-                    className="form-control"
-                    value={scopeStaffId}
-                    onChange={event => setScopeStaffId(event.target.value)}
-                    onFocus={() => { if (!staffMembers.length) fetchStaff(); }}
-                    required
-                  >
-                    <option value="">
-                      {loadingStaff ? 'Loading staff records...' : (staffMembers.length === 0 ? 'No staff found — click "Refresh Staff"' : `Select Faculty or Administrator (${staffMembers.length} available)`)}
-                    </option>
-                    {staffMembers.map(member => (
-                      <option key={member._id} value={member._id}>
-                        {member.name} — {member.email} ({member.role === 'admin' ? 'Administrator' : 'Faculty'})
-                      </option>
-                    ))}
-                  </select>
-                  {scopeStaffId && (() => {
-                    const selected = staffMembers.find(m => m._id === scopeStaffId);
-                    if (!selected) return null;
-                    return (
-                      <div style={{ padding: '8px 12px', background: 'rgba(99, 102, 241, 0.1)', border: '1px solid rgba(99, 102, 241, 0.25)', borderRadius: '6px', fontSize: '12px', color: '#c7d2fe', marginTop: '6px' }}>
-                        <strong>{selected.name}</strong> ({selected.email}) · Role: <strong>{selected.role === 'admin' ? 'Administrator' : 'Faculty'}</strong>
-                        <div style={{ marginTop: '4px' }}>
-                          Current Scopes: {selected.managedScopes?.length > 0 ? selected.managedScopes.map((s, i) => `${s.academicYear}${s.branch ? ` (${s.branch})` : ''}${s.section ? ` Sec ${s.section}` : ''}`).join(', ') : 'None (General Access)'}
-                        </div>
-                      </div>
-                    );
-                  })()}
-                  <input className="form-control" placeholder="Academic year, e.g. 4th Year" value={scopeForm.academicYear} onChange={event => setScopeForm({ ...scopeForm, academicYear: event.target.value })} required />
-                  <div className="form-grid-3-col">
-                    <input className="form-control" placeholder="Branch, e.g. CSE" value={scopeForm.branch} onChange={event => setScopeForm({ ...scopeForm, branch: event.target.value })} />
-                    <input className="form-control" placeholder="Section, e.g. C" value={scopeForm.section} onChange={event => setScopeForm({ ...scopeForm, section: event.target.value })} />
-                    <select className="form-control" value={scopeForm.subject} onChange={event => setScopeForm({ ...scopeForm, subject: event.target.value })}>
-                      <option value="">All Subjects</option>
-                      {academicSubjects.map(subject => <option key={subject._id} value={subject._id}>{subject.code} - {subject.name}</option>)}
-                    </select>
-                  </div>
-                  <button className="btn btn-secondary" type="submit" disabled={savingScope}>{savingScope ? 'Assigning...' : 'Assign Scope'}</button>
-                </form>
               </div>
 
               {/* Technologies Section */}
@@ -3002,6 +3245,277 @@ const AdminPanel = () => {
                   {interviewTechnologies.length === 0 && (
                     <p className="isection-empty">No technologies loaded. Click the tab again to refresh.</p>
                   )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'faculty-staff' && (
+          <div className="faculty-staff-management-wrapper animate-fade">
+            {/* Header / Intro Card */}
+            <div className="glass-card" style={{ marginBottom: '20px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
+                <div>
+                  <h3 style={{ margin: '0 0 6px 0' }}>👨‍🏫 Faculty & Administrator Management</h3>
+                  <p className="card-desc">
+                    View all faculty and administrator accounts created by the Main Admin, monitor their assigned academic scopes, assign multiple preparation scopes, or remove individual scopes.
+                  </p>
+                </div>
+                <button type="button" className="btn btn-secondary btn-sm" onClick={fetchStaff} title="Refresh Directory">
+                  🔄 Refresh Directory ({staffMembers.length})
+                </button>
+              </div>
+            </div>
+
+            {/* Main Showcase Table */}
+            <div className="glass-card" style={{ marginBottom: '24px' }}>
+              <div className="manager-header">
+                <div>
+                  <h4 style={{ margin: 0 }}>📋 Registered Staff Directory & Assigned Academic Scopes</h4>
+                  <p className="text-secondary small mt-5">
+                    Click the red ✕ button on any scope chip to remove that academic scope from the faculty/administrator.
+                  </p>
+                </div>
+              </div>
+
+              <div className="table-responsive-wrapper mt-15">
+                {loadingStaff ? <p className="text-secondary">Loading staff records...</p> : (
+                  <table className="student-roster-table">
+                    <thead>
+                      <tr>
+                        <th>Staff Member</th>
+                        <th>Login Email</th>
+                        <th>System Role</th>
+                        <th>Assigned Academic Scopes</th>
+                        <th>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {staffMembers.map(staff => (
+                        <tr key={staff._id}>
+                          <td><strong>{staff.name}</strong></td>
+                          <td>{staff.email}</td>
+                          <td>
+                            <span style={{
+                              textTransform: 'capitalize',
+                              padding: '3px 8px',
+                              borderRadius: '4px',
+                              fontSize: '12px',
+                              background: staff.role === 'admin' ? 'rgba(99, 102, 241, 0.2)' : 'rgba(16, 185, 129, 0.2)',
+                              color: staff.role === 'admin' ? '#818cf8' : '#34d399',
+                              border: `1px solid ${staff.role === 'admin' ? 'rgba(99, 102, 241, 0.4)' : 'rgba(16, 185, 129, 0.4)'}`
+                            }}>
+                              {staff.role === 'admin' ? 'Administrator' : 'Faculty'}
+                            </span>
+                          </td>
+                          <td>
+                            {staff.managedScopes && staff.managedScopes.length > 0 ? (
+                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                                {staff.managedScopes.map((s, idx) => (
+                                  <span
+                                    key={s._id || idx}
+                                    style={{
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: '6px',
+                                      background: 'rgba(99, 102, 241, 0.15)',
+                                      color: '#c7d2fe',
+                                      border: '1px solid rgba(99, 102, 241, 0.35)',
+                                      padding: '2px 8px',
+                                      borderRadius: '6px',
+                                      fontSize: '11px',
+                                      fontWeight: '500'
+                                    }}
+                                  >
+                                    <span>{s.academicYear}{s.branch ? ` · ${s.branch}` : ''}{s.section ? ` · Sec ${s.section}` : ''}</span>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleDeleteStaffScope(staff._id, s._id || idx)}
+                                      title="Remove this academic scope from staff member"
+                                      style={{
+                                        background: 'transparent',
+                                        border: 'none',
+                                        color: '#f87171',
+                                        cursor: 'pointer',
+                                        padding: '0 2px',
+                                        fontSize: '13px',
+                                        fontWeight: 'bold',
+                                        lineHeight: 1
+                                      }}
+                                    >
+                                      ✕
+                                    </button>
+                                  </span>
+                                ))}
+                              </div>
+                            ) : (
+                              <span style={{ color: '#94a3b8', fontSize: '12px' }}>General / All Scopes</span>
+                            )}
+                          </td>
+                          <td>
+                            <div style={{ display: 'flex', gap: '8px' }}>
+                              <button
+                                className="btn btn-secondary btn-sm"
+                                type="button"
+                                onClick={() => resetStaffPassword(staff)}
+                                title="Send secure password setup link"
+                              >
+                                🔑 Password Link
+                              </button>
+                              <button
+                                className="btn btn-secondary btn-sm"
+                                type="button"
+                                onClick={() => {
+                                  setScopeStaffId(staff._id);
+                                  const formEl = document.getElementById('assignScopeFormCard');
+                                  if (formEl) formEl.scrollIntoView({ behavior: 'smooth' });
+                                }}
+                                title="Assign new academic scope to this staff"
+                              >
+                                ➕ Assign Scope
+                              </button>
+                              <button
+                                className="btn btn-danger btn-sm"
+                                type="button"
+                                onClick={() => deleteStaff(staff)}
+                                title="Remove staff account"
+                              >
+                                🗑 Remove
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                      {!staffMembers.length && (
+                        <tr><td colSpan="5" style={{ textAlign: 'center', padding: '24px', color: '#94a3b8' }}>No faculty or administrator accounts registered.</td></tr>
+                      )}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            </div>
+
+            {/* Split Form: Assign Scope & Create Staff */}
+            <div className="admin-split-layout" id="assignScopeFormCard">
+              {/* Assign Academic Scope to Staff */}
+              <div className="glass-card">
+                <h4>🎯 Assign Academic Scope to Staff</h4>
+                <p className="card-desc">
+                  Assign different academic years, branches, sections, or subjects to any faculty member or administrator. Multiple distinct scopes can be assigned to the same staff member.
+                </p>
+
+                <form className="admin-job-form mt-20" onSubmit={saveStaffScope}>
+                  <div className="form-group">
+                    <label className="form-label">Select Staff Member *</label>
+                    <select
+                      className="form-control"
+                      value={scopeStaffId}
+                      onChange={event => setScopeStaffId(event.target.value)}
+                      onFocus={() => { if (!staffMembers.length) fetchStaff(); }}
+                      required
+                    >
+                      <option value="">
+                        {loadingStaff ? 'Loading staff records...' : (staffMembers.length === 0 ? 'No staff found — click Refresh' : `Select Faculty or Administrator (${staffMembers.length} available)`)}
+                      </option>
+                      {staffMembers.map(member => (
+                        <option key={member._id} value={member._id}>
+                          {member.name} — {member.email} ({member.role === 'admin' ? 'Administrator' : 'Faculty'})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {scopeStaffId && (() => {
+                    const selected = staffMembers.find(m => m._id === scopeStaffId);
+                    if (!selected) return null;
+                    return (
+                      <div style={{ padding: '10px 14px', background: 'rgba(99, 102, 241, 0.1)', border: '1px solid rgba(99, 102, 241, 0.25)', borderRadius: '6px', fontSize: '12px', color: '#c7d2fe', marginBottom: '12px' }}>
+                        <strong>{selected.name}</strong> ({selected.email}) · Role: <strong>{selected.role === 'admin' ? 'Administrator' : 'Faculty'}</strong>
+                        <div style={{ marginTop: '5px' }}>
+                          Current Scopes ({selected.managedScopes?.length || 0}): {selected.managedScopes?.length > 0 ? selected.managedScopes.map((s, i) => `${s.academicYear}${s.branch ? ` (${s.branch})` : ''}${s.section ? ` Sec ${s.section}` : ''}`).join(', ') : 'None (General Access)'}
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  <div className="form-group">
+                    <label className="form-label">Academic Year *</label>
+                    <input className="form-control" placeholder="e.g. 4th Year or 3rd Year" value={scopeForm.academicYear} onChange={event => setScopeForm({ ...scopeForm, academicYear: event.target.value })} required />
+                  </div>
+
+                  <div className="form-grid-3-col">
+                    <div className="form-group">
+                      <label className="form-label">Branch (Optional)</label>
+                      <input className="form-control" placeholder="e.g. CSE" value={scopeForm.branch} onChange={event => setScopeForm({ ...scopeForm, branch: event.target.value })} />
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">Section (Optional)</label>
+                      <input className="form-control" placeholder="e.g. C" value={scopeForm.section} onChange={event => setScopeForm({ ...scopeForm, section: event.target.value })} />
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">Subject (Optional)</label>
+                      <select className="form-control" value={scopeForm.subject} onChange={event => setScopeForm({ ...scopeForm, subject: event.target.value })}>
+                        <option value="">All Subjects</option>
+                        {academicSubjects.map(subject => <option key={subject._id} value={subject._id}>{subject.code} - {subject.name}</option>)}
+                      </select>
+                    </div>
+                  </div>
+
+                  <button className="btn btn-primary" type="submit" disabled={savingScope}>
+                    {savingScope ? 'Assigning...' : '+ Assign Academic Scope'}
+                  </button>
+                </form>
+              </div>
+
+              {/* Create Staff Account Cards */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                <div className="glass-card">
+                  <h4>➕ Create Faculty Account</h4>
+                  <p className="card-desc">Create a faculty account and email them a secure password setup link.</p>
+
+                  <form className="admin-job-form mt-15" onSubmit={handleCreateFaculty}>
+                    <div className="form-group">
+                      <label className="form-label">Faculty Full Name *</label>
+                      <input className="form-control" placeholder="e.g. Dr. Ramesh Kumar" value={facultyName} onChange={event => setFacultyName(event.target.value)} required />
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">Login Email *</label>
+                      <input type="email" className="form-control" placeholder="faculty@university.edu" value={facultyEmail} onChange={event => setFacultyEmail(event.target.value)} required />
+                    </div>
+                    <div className="form-grid-3-col">
+                      <input className="form-control" placeholder="Year, e.g. 4th Year" value={facultyAcademicYear} onChange={event => setFacultyAcademicYear(event.target.value)} required />
+                      <input className="form-control" placeholder="Branch, e.g. CSE" value={facultyBranch} onChange={event => setFacultyBranch(event.target.value)} required />
+                      <input className="form-control" placeholder="Section, e.g. C" value={facultySection} onChange={event => setFacultySection(event.target.value)} required />
+                    </div>
+                    <button className="btn btn-accent" type="submit" disabled={submittingFaculty}>
+                      {submittingFaculty ? 'Creating...' : 'Create Faculty & Email Password Link'}
+                    </button>
+                  </form>
+                </div>
+
+                <div className="glass-card">
+                  <h4>➕ Create Administrator Account</h4>
+                  <p className="card-desc">Add a secondary administrator to monitor student progress and academic scopes.</p>
+
+                  <form className="admin-job-form mt-15" onSubmit={handleCreateAdmin}>
+                    <div className="form-group">
+                      <label className="form-label">Administrator Name *</label>
+                      <input className="form-control" placeholder="e.g. Admin Jane" value={adminName} onChange={event => setAdminName(event.target.value)} required />
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">Admin Email *</label>
+                      <input type="email" className="form-control" placeholder="admin@university.edu" value={adminEmail} onChange={event => setAdminEmail(event.target.value)} required />
+                    </div>
+                    <div className="form-grid-3-col">
+                      <input className="form-control" placeholder="Year, e.g. 4th Year" value={adminAcademicYear} onChange={event => setAdminAcademicYear(event.target.value)} required />
+                      <input className="form-control" placeholder="Branch, e.g. CSE" value={adminBranch} onChange={event => setAdminBranch(event.target.value)} required />
+                      <input className="form-control" placeholder="Section, e.g. C" value={adminSection} onChange={event => setAdminSection(event.target.value)} required />
+                    </div>
+                    <button className="btn btn-secondary" type="submit" disabled={submittingAdmin}>
+                      {submittingAdmin ? 'Creating...' : 'Create Admin & Email Password Link'}
+                    </button>
+                  </form>
                 </div>
               </div>
             </div>

@@ -78,6 +78,18 @@ exports.createSubject = async (req, res, next) => {
   }
 };
 
+exports.deleteSubject = async (req, res, next) => {
+  try {
+    const subject = await Subject.findById(req.params.id);
+    if (!subject) return res.status(404).json({ success: false, error: 'Subject not found.' });
+
+    await Subject.findByIdAndDelete(req.params.id);
+    res.status(200).json({ success: true, message: `Subject "${subject.name}" (${subject.code}) removed successfully.` });
+  } catch (err) {
+    next(err);
+  }
+};
+
 exports.getProjects = async (req, res, next) => {
   try {
     const query = {};

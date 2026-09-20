@@ -7,6 +7,7 @@ const {
   createFaculty,
   getStaff,
   updateStaffScopes,
+  deleteStaffScope,
   resetStaffPassword,
   deleteStaff,
   updateLeetcodeProfile,
@@ -46,6 +47,7 @@ router.post('/admins', protect, authorize('admin'), createAdmin);
 router.post('/faculty', protect, authorize('admin'), createFaculty);
 router.get('/staff', protect, authorize('admin'), getStaff);
 router.put('/staff/:id/scopes', protect, authorize('admin'), updateStaffScopes);
+router.delete('/staff/:id/scopes/:scopeId', protect, authorize('admin'), deleteStaffScope);
 router.put('/staff/:id/reset-password', protect, authorize('admin'), resetStaffPassword);
 router.delete('/staff/:id', protect, authorize('admin'), deleteStaff);
 

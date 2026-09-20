@@ -508,10 +508,60 @@ exports.getDashboardStats = async (req, res, next) => {
 
 // @desc    Get all students (Admin only)
 // @route   GET /api/users/students
-// @access  Private/Admin
+// @access  Private/Admin/Faculty
 exports.getAllStudents = async (req, res, next) => {
   try {
-    const students = await User.find({ role: 'student' }).sort({ readinessScore: -1 });
+    const isMainAdmin = req.user.role === 'admin' && (!req.user.managedScopes || req.user.managedScopes.length === 0);
+
+    if (isMainAdmin) {
+      const students = await User.find({ role: 'student' }).sort({ readinessScore: -1 });
+      return res.status(200).json({
+        success: true,
+        count: students.length,
+        data: students
+      });
+    }
+
+    // Scoped Faculty or Secondary Administrator: only show students in their assigned scope
+    const scopes = req.user.managedScopes || [];
+    if (scopes.length === 0) {
+      return res.status(200).json({
+        success: true,
+        count: 0,
+        data: []
+      });
+    }
+
+    const orConditions = scopes.map(scope => {
+      const condList = [{ role: 'student' }];
+      const sYear = String(scope.academicYear || '').trim();
+      const sBranch = String(scope.branch || '').trim();
+      const sSection = String(scope.section || '').trim();
+
+      if (sYear && sYear.toLowerCase() !== 'all') {
+        const escapedYear = sYear.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        condList.push({
+          $or: [
+            { academicYear: new RegExp(escapedYear, 'i') },
+            { year: new RegExp(escapedYear, 'i') }
+          ]
+        });
+      }
+
+      if (sBranch && sBranch.toLowerCase() !== 'all') {
+        condList.push({ branch: new RegExp(`^${sBranch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') });
+      }
+
+      if (sSection && sSection.toLowerCase() !== 'all') {
+        condList.push({ section: new RegExp(`^${sSection.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') });
+      }
+
+      return { $and: condList };
+    });
+
+    const query = { $or: orConditions };
+    const students = await User.find(query).sort({ readinessScore: -1 });
+
     res.status(200).json({
       success: true,
       count: students.length,
@@ -738,15 +788,52 @@ exports.updateStaffScopes = async (req, res, next) => {
       return res.status(400).json({ success: false, error: 'managedScopes must be an array.' });
     }
 
-    staff.managedScopes = req.body.managedScopes.map(scope => ({
-      academicYear: String(scope.academicYear || '').trim(),
-      branch: String(scope.branch || '').trim(),
-      section: String(scope.section || '').trim(),
-      subject: scope.subject || undefined
-    })).filter(scope => scope.academicYear);
-    staff.managedAcademicYears = [...new Set(staff.managedScopes.map(scope => scope.academicYear))];
+    const seen = new Set();
+    const uniqueScopes = [];
+
+    for (const scope of req.body.managedScopes) {
+      const year = String(scope.academicYear || '').trim();
+      const branch = String(scope.branch || '').trim();
+      const section = String(scope.section || '').trim();
+      const subject = String(scope.subject || '').trim();
+      if (!year) continue;
+
+      const key = `${year.toLowerCase()}|${branch.toLowerCase()}|${section.toLowerCase()}|${subject.toLowerCase()}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        uniqueScopes.push({
+          academicYear: year,
+          branch,
+          section,
+          subject: scope.subject || undefined
+        });
+      }
+    }
+
+    staff.managedScopes = uniqueScopes;
+    staff.managedAcademicYears = [...new Set(uniqueScopes.map(s => s.academicYear))];
     await staff.save();
     res.status(200).json({ success: true, data: staff });
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.deleteStaffScope = async (req, res, next) => {
+  try {
+    const staff = await User.findOne({ _id: req.params.id, role: { $in: ['admin', 'faculty'] } });
+    if (!staff) return res.status(404).json({ success: false, error: 'Administrator or faculty member not found.' });
+
+    const scopeIdentifier = req.params.scopeId;
+    staff.managedScopes = staff.managedScopes.filter((scope, index) => {
+      if (scope._id && String(scope._id) === String(scopeIdentifier)) return false;
+      if (String(index) === String(scopeIdentifier)) return false;
+      return true;
+    });
+
+    staff.managedAcademicYears = [...new Set(staff.managedScopes.map(s => s.academicYear))];
+    await staff.save();
+    res.status(200).json({ success: true, message: 'Academic scope removed successfully.', data: staff });
   } catch (err) {
     next(err);
   }

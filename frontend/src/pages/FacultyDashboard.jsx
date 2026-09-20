@@ -25,16 +25,9 @@ const FacultyDashboard = () => {
     const [studentSearch, setStudentSearch] = useState('');
     const [branchFilter, setBranchFilter] = useState('');
 
-    // Subject creation form state
-    const [subjectForm, setSubjectForm] = useState({
-        name: '',
-        code: '',
-        academicYear: '',
-        branch: '',
-        section: '',
-        description: ''
-    });
-    const [submittingSubject, setSubmittingSubject] = useState(false);
+    // Lab Reports state
+    const [labReports, setLabReports] = useState([]);
+    const [loadingReports, setLoadingReports] = useState(false);
 
     // Project review state
     const [selectedProject, setSelectedProject] = useState(null);
@@ -125,8 +118,51 @@ const FacultyDashboard = () => {
         } else if (activeTab === 'labs') {
             fetchLabTasks();
             fetchSubjects();
+            fetchLabReports();
         }
     }, [activeTab]);
+
+    const fetchLabReports = async () => {
+        try {
+            setLoadingReports(true);
+            const res = await axios.get(`${API_URL}/labs/reports`, getAuthHeaders());
+            setLabReports(res.data?.data || []);
+        } catch (err) {
+            console.error('Failed to load lab reports:', err);
+        } finally {
+            setLoadingReports(false);
+        }
+    };
+
+    const downloadLabReportsCSV = () => {
+        if (!labReports.length) return;
+        const headers = ['Student Name', 'Email', 'Roll Number', 'Branch', 'Section', 'Academic Year', 'Lab Task Title', 'Assigned Faculty', 'Faculty Email', 'Score', 'Max Score', 'Status', 'Feedback', 'Submitted Date'];
+        const rows = labReports.map(r => [
+            `"${(r.student?.name || '').replace(/"/g, '""')}"`,
+            `"${(r.student?.email || '').replace(/"/g, '""')}"`,
+            `"${(r.student?.rollNumber || '').replace(/"/g, '""')}"`,
+            `"${(r.student?.branch || '').replace(/"/g, '""')}"`,
+            `"${(r.student?.section || '').replace(/"/g, '""')}"`,
+            `"${(r.student?.academicYear || r.student?.year || '').replace(/"/g, '""')}"`,
+            `"${(r.task?.title || '').replace(/"/g, '""')}"`,
+            `"${(r.task?.createdBy?.name || r.reviewedBy?.name || 'Faculty').replace(/"/g, '""')}"`,
+            `"${(r.task?.createdBy?.email || r.reviewedBy?.email || '').replace(/"/g, '""')}"`,
+            r.score ?? 'N/A',
+            r.task?.maxScore || 100,
+            r.status || 'submitted',
+            `"${(r.feedback || '').replace(/"/g, '""')}"`,
+            `"${r.updatedAt ? new Date(r.updatedAt).toLocaleDateString() : ''}"`
+        ]);
+
+        const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement('a');
+        link.setAttribute('href', encodedUri);
+        link.setAttribute('download', `Lab_Practice_Reports_${new Date().toISOString().split('T')[0]}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
 
     // Student progress detail viewer
     const viewProgress = async (student) => {
@@ -140,31 +176,6 @@ const FacultyDashboard = () => {
             setError(err.response?.data?.error || 'Failed to load student progress.');
         } finally {
             setProgressLoading(false);
-        }
-    };
-
-    // Subject creation handler
-    const handleAddSubject = async (e) => {
-        e.preventDefault();
-        setError(null);
-        setSuccessMsg('');
-        if (!subjectForm.name || !subjectForm.code || !subjectForm.academicYear) {
-            setError('Subject Name, Code, and Academic Year are required.');
-            return;
-        }
-
-        try {
-            setSubmittingSubject(true);
-            const res = await axios.post(`${API_URL}/academic/subjects`, subjectForm, getAuthHeaders());
-            if (res.data?.success) {
-                setSuccessMsg(`Subject "${res.data.data.name}" (${res.data.data.code}) created successfully!`);
-                setSubjectForm({ name: '', code: '', academicYear: '', branch: '', section: '', description: '' });
-                fetchSubjects();
-            }
-        } catch (err) {
-            setError(err.response?.data?.error || 'Failed to add academic subject.');
-        } finally {
-            setSubmittingSubject(false);
         }
     };
 
@@ -269,6 +280,20 @@ const FacultyDashboard = () => {
                     {/* TAB 1: STUDENT MONITORING */}
                     {activeTab === 'students' && (
                         <div>
+                            <div style={{ background: 'rgba(99, 102, 241, 0.08)', border: '1px solid rgba(99, 102, 241, 0.25)', borderRadius: '10px', padding: '12px 18px', marginBottom: '20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#c7d2fe', fontSize: '13px' }}>
+                                    <span style={{ fontSize: '18px' }}>🎯</span>
+                                    <span>Showing students registered within your assigned academic scope (Year, Branch, Section).</span>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={fetchStudents}
+                                    style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.15)', color: '#f8fafc', padding: '5px 12px', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}
+                                >
+                                    🔄 Refresh Roster
+                                </button>
+                            </div>
+
                             <div className="stats-cards">
                                 <div className="stat-card">
                                     <h3>Total Assigned Students</h3>
@@ -355,120 +380,49 @@ const FacultyDashboard = () => {
                         </div>
                     )}
 
-                    {/* TAB 2: ACADEMIC SUBJECTS (WHERE FACULTY CAN ADD SUBJECTS) */}
+                    {/* TAB 2: ACADEMIC SUBJECTS (VIEW ONLY FOR FACULTY) */}
                     {activeTab === 'subjects' && (
-                        <div className="faculty-split-layout">
-                            <div className="faculty-card">
-                                <h3>➕ Add New Academic Subject</h3>
-                                <p className="card-desc">Configure academic preparation subjects for your assigned academic year and branch.</p>
-
-                                <form className="faculty-form mt-20" onSubmit={handleAddSubject}>
-                                    <div className="form-group">
-                                        <label className="form-label" htmlFor="subjName">Subject Name *</label>
-                                        <input
-                                            id="subjName"
-                                            className="form-control"
-                                            placeholder="e.g. Database Management Systems"
-                                            value={subjectForm.name}
-                                            onChange={e => setSubjectForm({ ...subjectForm, name: e.target.value })}
-                                            required
-                                        />
-                                    </div>
-                                    <div className="form-group">
-                                        <label className="form-label" htmlFor="subjCode">Subject Code *</label>
-                                        <input
-                                            id="subjCode"
-                                            className="form-control"
-                                            placeholder="e.g. CS401 or GR22A2069"
-                                            value={subjectForm.code}
-                                            onChange={e => setSubjectForm({ ...subjectForm, code: e.target.value })}
-                                            required
-                                        />
-                                    </div>
-                                    <div className="form-group">
-                                        <label className="form-label" htmlFor="subjYear">Academic Year *</label>
-                                        <input
-                                            id="subjYear"
-                                            className="form-control"
-                                            placeholder="e.g. 4th Year or 2026"
-                                            value={subjectForm.academicYear}
-                                            onChange={e => setSubjectForm({ ...subjectForm, academicYear: e.target.value })}
-                                            required
-                                        />
-                                    </div>
-                                    <div className="form-grid-2">
-                                        <div className="form-group">
-                                            <label className="form-label">Branch (Optional)</label>
-                                            <input
-                                                className="form-control"
-                                                placeholder="e.g. CSE"
-                                                value={subjectForm.branch}
-                                                onChange={e => setSubjectForm({ ...subjectForm, branch: e.target.value })}
-                                            />
-                                        </div>
-                                        <div className="form-group">
-                                            <label className="form-label">Section (Optional)</label>
-                                            <input
-                                                className="form-control"
-                                                placeholder="e.g. C"
-                                                value={subjectForm.section}
-                                                onChange={e => setSubjectForm({ ...subjectForm, section: e.target.value })}
-                                            />
-                                        </div>
-                                    </div>
-                                    <div className="form-group">
-                                        <label className="form-label" htmlFor="subjDesc">Description</label>
-                                        <textarea
-                                            id="subjDesc"
-                                            className="form-control"
-                                            placeholder="Course objectives, curriculum topics, key outcomes..."
-                                            value={subjectForm.description}
-                                            onChange={e => setSubjectForm({ ...subjectForm, description: e.target.value })}
-                                            rows="3"
-                                        />
-                                    </div>
-                                    <button className="btn-primary-action" type="submit" disabled={submittingSubject}>
-                                        {submittingSubject ? 'Creating...' : '+ Create Subject'}
-                                    </button>
-                                </form>
+                        <div className="faculty-card">
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+                                <div>
+                                    <h3>📚 Registered Academic Preparation Subjects ({subjects.length})</h3>
+                                    <p className="card-desc">Curriculum preparation subjects registered by administrators and available for student practice.</p>
+                                </div>
                             </div>
 
-                            <div className="faculty-card">
-                                <h3>📚 Active Academic Subjects ({subjects.length})</h3>
-                                <p className="card-desc">Subjects currently registered and available for student practice and lab assignments.</p>
-
-                                {loading ? (
-                                    <p className="loading-text">Loading subjects...</p>
-                                ) : (
-                                    <div className="students-table-scroll mt-20">
-                                        <table className="students-table">
-                                            <thead>
-                                                <tr>
-                                                    <th>Code</th>
-                                                    <th>Name</th>
-                                                    <th>Year</th>
-                                                    <th>Branch / Sec</th>
-                                                    <th>Status</th>
+                            {loading ? (
+                                <p className="loading-text mt-20">Loading academic subjects...</p>
+                            ) : (
+                                <div className="students-table-scroll mt-20">
+                                    <table className="students-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Code</th>
+                                                <th>Subject Name</th>
+                                                <th>Academic Year</th>
+                                                <th>Branch / Section</th>
+                                                <th>Description</th>
+                                                <th>Status</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {subjects.map(s => (
+                                                <tr key={s._id}>
+                                                    <td><span className="code-pill">{s.code}</span></td>
+                                                    <td><strong>{s.name}</strong></td>
+                                                    <td>{s.academicYear}</td>
+                                                    <td>{s.branch || 'All'} {s.section ? `· Sec ${s.section}` : ''}</td>
+                                                    <td style={{ fontSize: '13px', color: '#94a3b8', maxWidth: '300px' }}>{s.description || '—'}</td>
+                                                    <td><span className="status-badge-active">Active</span></td>
                                                 </tr>
-                                            </thead>
-                                            <tbody>
-                                                {subjects.map(s => (
-                                                    <tr key={s._id}>
-                                                        <td><span className="code-pill">{s.code}</span></td>
-                                                        <td><strong>{s.name}</strong></td>
-                                                        <td>{s.academicYear}</td>
-                                                        <td>{s.branch || 'All'} {s.section ? `· Sec ${s.section}` : ''}</td>
-                                                        <td><span className="status-badge-active">Active</span></td>
-                                                    </tr>
-                                                ))}
-                                                {!subjects.length && (
-                                                    <tr><td colSpan="5" style={{ textAlign: 'center', padding: '24px', color: '#94a3b8' }}>No subjects created yet. Use the form on the left to add your first subject!</td></tr>
-                                                )}
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                )}
-                            </div>
+                                            ))}
+                                            {!subjects.length && (
+                                                <tr><td colSpan="6" style={{ textAlign: 'center', padding: '30px', color: '#94a3b8' }}>No academic subjects registered yet.</td></tr>
+                                            )}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            )}
                         </div>
                     )}
 
@@ -583,10 +537,11 @@ const FacultyDashboard = () => {
 
                     {/* TAB 4: LAB TASKS & PRACTICE */}
                     {activeTab === 'labs' && (
-                        <div className="faculty-split-layout">
-                            <div className="faculty-card">
+                        <div className="faculty-labs-wrapper">
+                            {/* 1. TOP: Create Lab Practice Task */}
+                            <div className="faculty-card" style={{ marginBottom: '36px' }}>
                                 <h3>➕ Create Lab Practice Task</h3>
-                                <p className="card-desc">Assign hands-on laboratory programming tasks to students in your scope.</p>
+                                <p className="card-desc">Assign hands-on laboratory programming tasks to students in your assigned academic scope.</p>
 
                                 <form className="faculty-form mt-20" onSubmit={handleCreateLabTask}>
                                     <div className="form-group">
@@ -599,27 +554,29 @@ const FacultyDashboard = () => {
                                             required
                                         />
                                     </div>
-                                    <div className="form-group">
-                                        <label className="form-label">Associated Subject *</label>
-                                        <select
-                                            className="form-control"
-                                            value={labTaskForm.subject}
-                                            onChange={e => setLabTaskForm({ ...labTaskForm, subject: e.target.value })}
-                                            required
-                                        >
-                                            <option value="">Select a Subject</option>
-                                            {subjects.map(s => <option key={s._id} value={s._id}>{s.code} - {s.name}</option>)}
-                                        </select>
-                                    </div>
-                                    <div className="form-group">
-                                        <label className="form-label">Academic Year *</label>
-                                        <input
-                                            className="form-control"
-                                            placeholder="e.g. 4th Year"
-                                            value={labTaskForm.academicYear}
-                                            onChange={e => setLabTaskForm({ ...labTaskForm, academicYear: e.target.value })}
-                                            required
-                                        />
+                                    <div className="form-grid-2">
+                                        <div className="form-group">
+                                            <label className="form-label">Associated Subject *</label>
+                                            <select
+                                                className="form-control"
+                                                value={labTaskForm.subject}
+                                                onChange={e => setLabTaskForm({ ...labTaskForm, subject: e.target.value })}
+                                                required
+                                            >
+                                                <option value="">Select a Subject</option>
+                                                {subjects.map(s => <option key={s._id} value={s._id}>{s.code} - {s.name}</option>)}
+                                            </select>
+                                        </div>
+                                        <div className="form-group">
+                                            <label className="form-label">Academic Year *</label>
+                                            <input
+                                                className="form-control"
+                                                placeholder="e.g. 4th Year"
+                                                value={labTaskForm.academicYear}
+                                                onChange={e => setLabTaskForm({ ...labTaskForm, academicYear: e.target.value })}
+                                                required
+                                            />
+                                        </div>
                                     </div>
                                     <div className="form-grid-2">
                                         <div className="form-group">
@@ -658,12 +615,92 @@ const FacultyDashboard = () => {
                                 </form>
                             </div>
 
+                            {/* 2. BELOW: Space followed by Reports of the Students and Faculty with CSV Download */}
+                            <div className="faculty-card" style={{ marginBottom: '36px' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+                                    <div>
+                                        <h3>📊 Lab Practice Reports & Student Submissions ({labReports.length})</h3>
+                                        <p className="card-desc">Review lab experiment attempts, student code submissions, scores, and download performance spreadsheets.</p>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        className="btn-primary-action"
+                                        onClick={downloadLabReportsCSV}
+                                        disabled={!labReports.length}
+                                        style={{ padding: '8px 16px', fontSize: '13px' }}
+                                    >
+                                        📥 Download Lab Reports (CSV)
+                                    </button>
+                                </div>
+
+                                {loadingReports ? (
+                                    <p className="loading-text mt-20">Loading student lab reports...</p>
+                                ) : (
+                                    <div className="students-table-scroll mt-20">
+                                        <table className="students-table">
+                                            <thead>
+                                                <tr>
+                                                    <th>Student</th>
+                                                    <th>Branch / Section</th>
+                                                    <th>Lab Task</th>
+                                                    <th>Assigned Faculty</th>
+                                                    <th>Status</th>
+                                                    <th>Score</th>
+                                                    <th>Feedback</th>
+                                                    <th>Submitted Date</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {labReports.map(report => (
+                                                    <tr key={report._id}>
+                                                        <td>
+                                                            <strong>{report.student?.name || 'Student'}</strong>
+                                                            <div style={{ fontSize: '12px', color: '#94a3b8' }}>{report.student?.email}</div>
+                                                        </td>
+                                                        <td>{report.student?.branch || 'N/A'} {report.student?.section ? `(Sec ${report.student.section})` : ''}</td>
+                                                        <td><strong>{report.task?.title || 'Lab Task'}</strong></td>
+                                                        <td>
+                                                            <strong>{report.task?.createdBy?.name || report.reviewedBy?.name || 'Faculty'}</strong>
+                                                            <div style={{ fontSize: '11px', color: '#94a3b8' }}>{report.task?.createdBy?.email || report.reviewedBy?.email || ''}</div>
+                                                        </td>
+                                                        <td>
+                                                            <span className={`status-pill ${report.status || 'submitted'}`}>
+                                                                {report.status || 'Submitted'}
+                                                            </span>
+                                                        </td>
+                                                        <td>
+                                                            <span style={{ fontWeight: 'bold', color: report.score !== undefined && report.score !== null ? '#10b981' : '#f59e0b' }}>
+                                                                {report.score !== undefined && report.score !== null ? `${report.score}/${report.task?.maxScore || 100}` : 'Pending'}
+                                                            </span>
+                                                        </td>
+                                                        <td style={{ fontSize: '12px', maxWidth: '200px' }}>
+                                                            {report.feedback || <span style={{ color: '#94a3b8' }}>—</span>}
+                                                        </td>
+                                                        <td style={{ fontSize: '12px', color: '#94a3b8' }}>
+                                                            {report.updatedAt ? new Date(report.updatedAt).toLocaleDateString() : 'N/A'}
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                                {!labReports.length && (
+                                                    <tr>
+                                                        <td colSpan="8" style={{ textAlign: 'center', padding: '30px', color: '#94a3b8' }}>
+                                                            No student lab submissions recorded yet.
+                                                        </td>
+                                                    </tr>
+                                                )}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* 3. Active Lab Tasks Overview */}
                             <div className="faculty-card">
                                 <h3>🔬 Active Lab Tasks ({labTasks.length})</h3>
-                                <p className="card-desc">Hands-on lab experiments created for student practice.</p>
+                                <p className="card-desc">Hands-on lab experiments currently assigned for practice.</p>
 
                                 {loading ? (
-                                    <p className="loading-text">Loading lab tasks...</p>
+                                    <p className="loading-text mt-20">Loading lab tasks...</p>
                                 ) : (
                                     <div className="students-table-scroll mt-20">
                                         <table className="students-table">
@@ -672,6 +709,8 @@ const FacultyDashboard = () => {
                                                     <th>Task</th>
                                                     <th>Subject</th>
                                                     <th>Year</th>
+                                                    <th>Branch / Sec</th>
+                                                    <th>Max Score</th>
                                                     <th>Status</th>
                                                 </tr>
                                             </thead>
@@ -681,11 +720,13 @@ const FacultyDashboard = () => {
                                                         <td><strong>{task.title}</strong></td>
                                                         <td><span className="code-pill">{task.subject?.code || 'Subject'}</span></td>
                                                         <td>{task.academicYear}</td>
+                                                        <td>{task.branch || 'All'} {task.section ? `· Sec ${task.section}` : ''}</td>
+                                                        <td>{task.maxScore || 100}</td>
                                                         <td><span className="status-badge-active">Active</span></td>
                                                     </tr>
                                                 ))}
                                                 {!labTasks.length && (
-                                                    <tr><td colSpan="4" style={{ textAlign: 'center', padding: '24px', color: '#94a3b8' }}>No lab tasks assigned yet.</td></tr>
+                                                    <tr><td colSpan="6" style={{ textAlign: 'center', padding: '24px', color: '#94a3b8' }}>No lab tasks assigned yet.</td></tr>
                                                 )}
                                             </tbody>
                                         </table>
