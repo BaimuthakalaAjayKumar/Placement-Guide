@@ -5,6 +5,7 @@ const AptitudeTest = require('../models/AptitudeTest');
 const TestAttempt = require('../models/TestAttempt');
 const PracticeQuestion = require('../models/PracticeQuestion');
 const User = require('../models/User');
+const Notification = require('../models/Notification');
 
 // Seed practice questions from frontend data files if database has none
 const seedPracticeQuestions = async () => {
@@ -402,6 +403,41 @@ exports.createTest = async (req, res, next) => {
     }
 
     const test = await AptitudeTest.create(req.body);
+
+    // Notify matching students about new test
+    try {
+      const studentQuery = { role: 'student' };
+      if (test.academicYear && test.academicYear !== 'All' && test.academicYear !== 'All Years') {
+        studentQuery.$or = [{ academicYear: test.academicYear }, { year: test.academicYear }];
+      }
+      if (test.branch && test.branch !== 'All' && test.branch !== 'All Branches') {
+        studentQuery.branch = new RegExp(`^${test.branch}$`, 'i');
+      }
+      if (test.section && test.section !== 'All' && test.section !== 'All Sections') {
+        studentQuery.section = new RegExp(`^${test.section}$`, 'i');
+      }
+
+      const students = await User.find(studentQuery).select('_id');
+      if (students && students.length > 0) {
+        const notifDocs = students.map(s => ({
+          user: s._id,
+          type: 'test_assigned',
+          message: `📝 New Practice Test Available: "${test.title}" (${test.duration || 20} mins). Test your skills!`,
+          metadata: {
+            testId: test._id,
+            subjectId: test.subject || undefined
+          }
+        }));
+        await Notification.insertMany(notifDocs);
+        const io = req.app.get('socketio');
+        if (io) {
+          notifDocs.forEach(n => io.to(`user_${n.user}`).emit('new_notification', n));
+        }
+      }
+    } catch (notifErr) {
+      console.warn('Error dispatching student test notification:', notifErr.message);
+    }
+
     res.status(201).json({
       success: true,
       data: test

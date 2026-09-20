@@ -860,6 +860,12 @@ exports.deleteStaff = async (req, res, next) => {
     }
     const staff = await User.findOne({ _id: req.params.id, role: { $in: ['admin', 'faculty'] } });
     if (!staff) return res.status(404).json({ success: false, error: 'Administrator or faculty member not found.' });
+
+    const superAdminEmail = (process.env.SUPER_ADMIN_EMAIL || 'vaddeajaykumar2004@gmail.com').toLowerCase().trim();
+    if ((staff.email && staff.email.toLowerCase().trim() === superAdminEmail) || staff.isSuperAdmin) {
+      return res.status(403).json({ success: false, error: 'The Super Administrator account is permanently protected and cannot be removed by any administrator.' });
+    }
+
     await staff.deleteOne();
     res.status(200).json({ success: true, message: `${staff.role} account removed successfully.` });
   } catch (err) {

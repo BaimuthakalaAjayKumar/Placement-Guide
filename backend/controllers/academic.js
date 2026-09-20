@@ -1,5 +1,7 @@
 const Subject = require('../models/Subject');
 const Project = require('../models/Project');
+const User = require('../models/User');
+const Notification = require('../models/Notification');
 const getStudentAcademicYear = (user) => user.academicYear || user.year || '';
 
 const canManageYear = (user, academicYear) => {
@@ -115,11 +117,26 @@ exports.addSubjectNote = async (req, res, next) => {
       return res.status(403).json({ success: false, error: 'You are not assigned to manage this subject.' });
     }
 
+    let finalFileUrl = fileUrl || '';
+    let finalFileName = req.body.fileName || '';
+    let finalFileType = '';
+    let finalFileSize = 0;
+
+    if (req.file) {
+      finalFileUrl = `/uploads/notes/${req.file.filename}`;
+      finalFileName = req.file.originalname;
+      finalFileType = req.file.mimetype || 'application/pdf';
+      finalFileSize = req.file.size || 0;
+    }
+
     const newNote = {
       title,
       description,
       content,
-      fileUrl,
+      fileUrl: finalFileUrl,
+      fileName: finalFileName,
+      fileType: finalFileType,
+      fileSize: finalFileSize,
       uploadedBy: req.user.id,
       uploaderName: req.user.name || 'Instructor',
       uploaderRole: req.user.role,
@@ -130,6 +147,41 @@ exports.addSubjectNote = async (req, res, next) => {
     await subject.save();
 
     const createdNote = subject.notes[subject.notes.length - 1];
+
+    // Notify relevant students
+    try {
+      const studentQuery = { role: 'student' };
+      if (subject.academicYear && subject.academicYear !== 'All' && subject.academicYear !== 'All Years') {
+        studentQuery.$or = [{ academicYear: subject.academicYear }, { year: subject.academicYear }];
+      }
+      if (subject.branch && subject.branch !== 'All' && subject.branch !== 'All Branches') {
+        studentQuery.branch = new RegExp(`^${subject.branch}$`, 'i');
+      }
+      if (subject.section && subject.section !== 'All' && subject.section !== 'All Sections') {
+        studentQuery.section = new RegExp(`^${subject.section}$`, 'i');
+      }
+
+      const students = await User.find(studentQuery).select('_id');
+      if (students && students.length > 0) {
+        const notifDocs = students.map(s => ({
+          user: s._id,
+          type: 'academic_update',
+          message: `📚 New Study Notes / PDF Posted for ${subject.code} (${subject.name}): "${title}".`,
+          metadata: {
+            subjectId: subject._id,
+            subjectName: subject.name
+          }
+        }));
+        await Notification.insertMany(notifDocs);
+        const io = req.app.get('socketio');
+        if (io) {
+          notifDocs.forEach(n => io.to(`user_${n.user}`).emit('new_notification', n));
+        }
+      }
+    } catch (notifErr) {
+      console.warn('Error dispatching student note notification:', notifErr.message);
+    }
+
     res.status(201).json({ success: true, data: createdNote });
   } catch (err) {
     next(err);

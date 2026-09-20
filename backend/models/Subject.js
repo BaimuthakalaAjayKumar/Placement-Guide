@@ -18,6 +18,18 @@ const NoteSchema = new mongoose.Schema({
     type: String,
     default: ''
   },
+  fileName: {
+    type: String,
+    default: ''
+  },
+  fileType: {
+    type: String,
+    default: ''
+  },
+  fileSize: {
+    type: Number,
+    default: 0
+  },
   uploadedBy: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User'

@@ -138,6 +138,41 @@ exports.createTask = async (req, res, next) => {
       allowedLanguages: allowedLanguages || ['cpp', 'java', 'python', 'c', 'javascript', 'sql'],
       createdBy: req.user.id
     });
+
+    // Notify matching students about new lab task
+    try {
+      const studentQuery = { role: 'student' };
+      if (academicYear && academicYear !== 'All' && academicYear !== 'All Years') {
+        studentQuery.$or = [{ academicYear: academicYear }, { year: academicYear }];
+      }
+      if (branch && branch !== 'All' && branch !== 'All Branches') {
+        studentQuery.branch = new RegExp(`^${branch}$`, 'i');
+      }
+      if (section && section !== 'All' && section !== 'All Sections') {
+        studentQuery.section = new RegExp(`^${section}$`, 'i');
+      }
+
+      const students = await User.find(studentQuery).select('_id');
+      if (students && students.length > 0) {
+        const notifDocs = students.map(s => ({
+          user: s._id,
+          type: 'lab_assigned',
+          message: `🔬 New Lab Task Assigned: "${task.title}". Due date: ${task.dueDate ? new Date(task.dueDate).toLocaleDateString() : 'No deadline'}.`,
+          metadata: {
+            taskId: task._id,
+            expiresAt: task.dueDate || undefined
+          }
+        }));
+        await Notification.insertMany(notifDocs);
+        const io = req.app.get('socketio');
+        if (io) {
+          notifDocs.forEach(n => io.to(`user_${n.user}`).emit('new_notification', n));
+        }
+      }
+    } catch (notifErr) {
+      console.warn('Error dispatching student lab task notification:', notifErr.message);
+    }
+
     res.status(201).json({ success: true, data: task });
   } catch (err) {
     next(err);

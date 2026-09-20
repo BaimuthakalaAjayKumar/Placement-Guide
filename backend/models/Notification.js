@@ -8,8 +8,8 @@ const NotificationSchema = new mongoose.Schema({
   },
   type: {
     type: String,
-    enum: ['plagiarism_alert', 'job_update', 'general'],
-    default: 'plagiarism_alert'
+    enum: ['plagiarism_alert', 'job_update', 'general', 'test_assigned', 'lab_assigned', 'academic_update'],
+    default: 'general'
   },
   message: {
     type: String,
@@ -19,6 +19,10 @@ const NotificationSchema = new mongoose.Schema({
     submissionId: { type: mongoose.Schema.Types.ObjectId, ref: 'Submission' },
     questionId: { type: mongoose.Schema.Types.ObjectId, ref: 'Question' },
     jobId: { type: mongoose.Schema.Types.ObjectId, ref: 'Job' },
+    testId: { type: mongoose.Schema.Types.ObjectId, ref: 'AptitudeTest' },
+    taskId: { type: mongoose.Schema.Types.ObjectId, ref: 'LabTask' },
+    subjectId: { type: mongoose.Schema.Types.ObjectId, ref: 'Subject' },
+    subjectName: { type: String },
     expiresAt: { type: Date },
     plagiarismPercentage: { type: Number },
     studentName: { type: String }
