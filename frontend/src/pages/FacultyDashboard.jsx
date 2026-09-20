@@ -133,10 +133,19 @@ const FacultyDashboard = () => {
     // Records & Academic Repository states
     const [repoSubTab, setRepoSubTab] = useState('labs'); // 'labs' | 'tests' | 'notes'
     const [repoSearch, setRepoSearch] = useState('');
+    const [repoSubjectFilter, setRepoSubjectFilter] = useState('all');
     const [repoTests, setRepoTests] = useState([]);
     const [loadingRepoTests, setLoadingRepoTests] = useState(false);
     const [previewSolutionsTask, setPreviewSolutionsTask] = useState(null);
     const [previewLangTab, setPreviewLangTab] = useState('cpp');
+    const [copiedLang, setCopiedLang] = useState(false);
+
+    const handleCopyReferenceCode = (code) => {
+        if (!code) return;
+        navigator.clipboard.writeText(code);
+        setCopiedLang(true);
+        setTimeout(() => setCopiedLang(false), 2000);
+    };
 
     const navigate = useNavigate();
 
@@ -563,6 +572,7 @@ const FacultyDashboard = () => {
 
     // Lab task edit & delete handlers
     const handleStartEditLab = (task) => {
+        setPreviewSolutionsTask(null);
         const existingRefSols = {
             cpp: task.referenceSolutions?.cpp || (task.solutionLanguage === 'cpp' ? task.referenceSolution : '') || '',
             java: task.referenceSolutions?.java || (task.solutionLanguage === 'java' ? task.referenceSolution : '') || '',
@@ -587,7 +597,7 @@ const FacultyDashboard = () => {
     };
 
     const handleSaveEditLab = async (e) => {
-        e.preventDefault();
+        if (e && e.preventDefault) e.preventDefault();
         if (!editingLabTask) return;
         try {
             setSavingEditLab(true);
@@ -635,6 +645,367 @@ const FacultyDashboard = () => {
         }
     };
 
+    // Render Inline Edit Lab Task Panel (Fits inside Tab Space without popup cutoffs)
+    const renderEditLabPanel = (backAction) => {
+        if (!editingLabTask) return null;
+        return (
+            <div className="faculty-inline-tab-panel animate-fade">
+                <div className="inline-panel-header">
+                    <div>
+                        <h3 className="inline-panel-title">
+                            <span>✏️ Edit Lab Practice Task:</span>
+                            <span style={{ color: '#818cf8' }}>{editingLabTask.title}</span>
+                        </h3>
+                        <p className="inline-panel-desc">
+                            Modify task configuration, instructions, score, and default reference solutions across 6 programming languages.
+                        </p>
+                    </div>
+                    <div className="inline-panel-actions">
+                        <button
+                            type="button"
+                            className="btn-secondary-action"
+                            onClick={backAction || (() => setEditingLabTask(null))}
+                            style={{ padding: '8px 16px', fontSize: '13px' }}
+                        >
+                            ← Back to List
+                        </button>
+                        <button
+                            type="button"
+                            className="btn-primary-action"
+                            onClick={handleSaveEditLab}
+                            disabled={savingEditLab}
+                            style={{ padding: '8px 20px', fontSize: '13px' }}
+                        >
+                            {savingEditLab ? 'Saving Changes...' : '💾 Save Changes'}
+                        </button>
+                    </div>
+                </div>
+
+                <form onSubmit={handleSaveEditLab} style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+                    <div className="form-group">
+                        <label className="form-label">Task Title *</label>
+                        <input
+                            className="form-control"
+                            value={editLabTaskForm.title}
+                            onChange={e => setEditLabTaskForm({ ...editLabTaskForm, title: e.target.value })}
+                            placeholder="e.g. Design and Implement a Student Management Database"
+                            required
+                        />
+                    </div>
+
+                    <div className="form-grid-2">
+                        <div className="form-group">
+                            <label className="form-label">Subject *</label>
+                            <select
+                                className="form-control"
+                                value={editLabTaskForm.subject}
+                                onChange={e => setEditLabTaskForm({ ...editLabTaskForm, subject: e.target.value })}
+                                required
+                            >
+                                <option value="">Select Academic Subject</option>
+                                {subjects.map(s => (
+                                    <option key={s._id} value={s._id}>{s.code} - {s.name} ({s.academicYear})</option>
+                                ))}
+                            </select>
+                        </div>
+                        <div className="form-group">
+                            <label className="form-label">Academic Year *</label>
+                            <input
+                                className="form-control"
+                                value={editLabTaskForm.academicYear}
+                                onChange={e => setEditLabTaskForm({ ...editLabTaskForm, academicYear: e.target.value })}
+                                placeholder="e.g. 4th Year"
+                                required
+                            />
+                        </div>
+                    </div>
+
+                    <div className="form-grid-3-col">
+                        <div className="form-group">
+                            <label className="form-label">Branch</label>
+                            <input
+                                className="form-control"
+                                value={editLabTaskForm.branch}
+                                onChange={e => setEditLabTaskForm({ ...editLabTaskForm, branch: e.target.value })}
+                                placeholder="e.g. CSE (or leave blank for All)"
+                            />
+                        </div>
+                        <div className="form-group">
+                            <label className="form-label">Section</label>
+                            <input
+                                className="form-control"
+                                value={editLabTaskForm.section}
+                                onChange={e => setEditLabTaskForm({ ...editLabTaskForm, section: e.target.value })}
+                                placeholder="e.g. C"
+                            />
+                        </div>
+                        <div className="form-group">
+                            <label className="form-label">Max Score</label>
+                            <input
+                                type="number"
+                                className="form-control"
+                                min="1"
+                                max="1000"
+                                value={editLabTaskForm.maxScore}
+                                onChange={e => setEditLabTaskForm({ ...editLabTaskForm, maxScore: Number(e.target.value) || 100 })}
+                            />
+                        </div>
+                    </div>
+
+                    <div className="form-group">
+                        <label className="form-label">Task Instructions & Criteria *</label>
+                        <textarea
+                            className="form-control"
+                            rows="4"
+                            style={{ minHeight: '110px' }}
+                            value={editLabTaskForm.instructions}
+                            onChange={e => setEditLabTaskForm({ ...editLabTaskForm, instructions: e.target.value })}
+                            placeholder="Detail the problem statement, requirements, and test criteria..."
+                            required
+                        />
+                    </div>
+
+                    {/* Multi-Language Solution Tabs */}
+                    <div className="form-group" style={{ marginTop: '10px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', flexWrap: 'wrap', gap: '8px' }}>
+                            <div>
+                                <label className="form-label" style={{ margin: 0, fontWeight: 700, fontSize: '14px', color: '#f8fafc' }}>
+                                    Default Reference Solutions (Multi-Language)
+                                </label>
+                                <p style={{ margin: '3px 0 0', fontSize: '12px', color: '#94a3b8' }}>
+                                    Provide faculty reference logic in one or more languages. Students can submit in any language, and the engine automatically evaluates against the matching reference.
+                                </p>
+                            </div>
+                            <span style={{ fontSize: '11.5px', color: '#38bdf8', background: 'rgba(56, 189, 248, 0.12)', border: '1px solid rgba(56, 189, 248, 0.25)', padding: '3px 10px', borderRadius: '6px', fontWeight: 600 }}>
+                                ⚡ AST Normalized • Auto-matches student language
+                            </span>
+                        </div>
+
+                        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '12px' }}>
+                            {LAB_LANGUAGES.map(lang => {
+                                const hasCode = Boolean(editLabTaskForm.referenceSolutions?.[lang.key]?.trim());
+                                const isActive = activeEditLangTab === lang.key;
+                                return (
+                                    <button
+                                        key={lang.key}
+                                        type="button"
+                                        className={`lang-pill-btn ${isActive ? 'active-edit' : ''}`}
+                                        onClick={() => setActiveEditLangTab(lang.key)}
+                                    >
+                                        <span>{lang.icon} {lang.label}</span>
+                                        {hasCode ? (
+                                            <span className="ready-badge">✓ Ready</span>
+                                        ) : (
+                                            <span className="empty-badge">—</span>
+                                        )}
+                                    </button>
+                                );
+                            })}
+                        </div>
+
+                        <div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#090d16', padding: '8px 14px', borderTopLeftRadius: '8px', borderTopRightRadius: '8px', border: '1px solid rgba(255, 255, 255, 0.1)', borderBottom: 'none' }}>
+                                <span style={{ fontSize: '12px', fontWeight: 600, color: '#e2e8f0', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                    {LAB_LANGUAGES.find(l => l.key === activeEditLangTab)?.icon} Reference Solution for {LAB_LANGUAGES.find(l => l.key === activeEditLangTab)?.label}
+                                </span>
+                                <span style={{ fontSize: '11px', color: '#94a3b8' }}>
+                                    {Boolean(editLabTaskForm.referenceSolutions?.[activeEditLangTab]?.trim()) ? 'Code saved in form buffer' : 'Optional: Leave empty if not applicable'}
+                                </span>
+                            </div>
+                            <textarea
+                                className="form-control"
+                                rows="12"
+                                style={{
+                                    fontFamily: 'Consolas, Monaco, "Courier New", monospace',
+                                    fontSize: '13.5px',
+                                    background: '#060a12',
+                                    color: '#fef08a',
+                                    borderTopLeftRadius: 0,
+                                    borderTopRightRadius: 0,
+                                    minHeight: '280px',
+                                    lineHeight: '1.6',
+                                    border: '1px solid rgba(255, 255, 255, 0.1)'
+                                }}
+                                placeholder={`// Enter reference solution for ${LAB_LANGUAGES.find(l => l.key === activeEditLangTab)?.label}...\n// Variable names, table/column identifiers will be normalized automatically during evaluation.`}
+                                value={editLabTaskForm.referenceSolutions?.[activeEditLangTab] || ''}
+                                onChange={e => {
+                                    const newCode = e.target.value;
+                                    setEditLabTaskForm({
+                                        ...editLabTaskForm,
+                                        referenceSolutions: {
+                                            ...editLabTaskForm.referenceSolutions,
+                                            [activeEditLangTab]: newCode
+                                        }
+                                    });
+                                }}
+                            />
+                        </div>
+                    </div>
+
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '12px', paddingTop: '16px', borderTop: '1px solid rgba(255, 255, 255, 0.08)' }}>
+                        <button
+                            type="button"
+                            className="btn-secondary-action"
+                            onClick={backAction || (() => setEditingLabTask(null))}
+                            style={{ padding: '8px 20px', fontSize: '13px' }}
+                        >
+                            ← Cancel & Return
+                        </button>
+                        <button
+                            type="submit"
+                            className="btn-primary-action"
+                            disabled={savingEditLab}
+                            style={{ padding: '8px 24px', fontSize: '13px' }}
+                        >
+                            {savingEditLab ? 'Saving Changes...' : '💾 Save Changes'}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        );
+    };
+
+    // Render Inline Solution Viewer Panel (Fits inside Tab Space without popup cutoffs)
+    const renderSolutionViewerPanel = (backAction) => {
+        if (!previewSolutionsTask) return null;
+        const currentCode = previewSolutionsTask.referenceSolutions?.[previewLangTab] ||
+            (previewSolutionsTask.solutionLanguage === previewLangTab ? previewSolutionsTask.referenceSolution : '') || '';
+        const hasCurrentCode = Boolean(currentCode.trim());
+
+        return (
+            <div className="faculty-inline-tab-panel animate-fade">
+                <div className="inline-panel-header">
+                    <div>
+                        <h3 className="inline-panel-title">
+                            <span>🎯 Reference Solutions:</span>
+                            <span style={{ color: '#fbbf24' }}>{previewSolutionsTask.title}</span>
+                        </h3>
+                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginTop: '6px', flexWrap: 'wrap' }}>
+                            <span className="code-pill">{previewSolutionsTask.subject?.code || 'Subject'}</span>
+                            <span style={{ fontSize: '12.5px', color: '#cbd5e1' }}>{previewSolutionsTask.subject?.name}</span>
+                            <span style={{ fontSize: '12.5px', color: '#94a3b8' }}>· {previewSolutionsTask.academicYear}</span>
+                            <span style={{ fontSize: '12.5px', color: '#94a3b8' }}>· {previewSolutionsTask.branch || 'All Branches'}</span>
+                            <span className="repo-badge repo-badge-warning" style={{ marginLeft: '4px' }}>
+                                Max: {previewSolutionsTask.maxScore || 100} pts
+                            </span>
+                        </div>
+                    </div>
+                    <div className="inline-panel-actions">
+                        <button
+                            type="button"
+                            className="btn-secondary-action"
+                            onClick={backAction || (() => setPreviewSolutionsTask(null))}
+                            style={{ padding: '8px 16px', fontSize: '13px' }}
+                        >
+                            ← Back to List
+                        </button>
+                        <button
+                            type="button"
+                            className="btn-primary-action"
+                            style={{ background: 'linear-gradient(135deg, #4f46e5, #6366f1)', borderColor: '#818cf8', padding: '8px 18px', fontSize: '13px' }}
+                            onClick={() => {
+                                const taskToEdit = previewSolutionsTask;
+                                setPreviewSolutionsTask(null);
+                                handleStartEditLab(taskToEdit);
+                            }}
+                        >
+                            ✏️ Edit This Lab Task
+                        </button>
+                    </div>
+                </div>
+
+                <div style={{ marginTop: '14px' }}>
+                    {/* Language Switch Tabs */}
+                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '14px' }}>
+                        {LAB_LANGUAGES.map(lang => {
+                            const code = previewSolutionsTask.referenceSolutions?.[lang.key] || (previewSolutionsTask.solutionLanguage === lang.key ? previewSolutionsTask.referenceSolution : '');
+                            const hasCode = Boolean(code?.trim());
+                            const isActive = previewLangTab === lang.key;
+                            return (
+                                <button
+                                    key={lang.key}
+                                    type="button"
+                                    className={`lang-pill-btn ${isActive ? 'active-preview' : ''}`}
+                                    onClick={() => setPreviewLangTab(lang.key)}
+                                >
+                                    <span>{lang.icon} {lang.label}</span>
+                                    {hasCode ? (
+                                        <span className="ready-badge">✓ Ready</span>
+                                    ) : (
+                                        <span className="empty-badge">—</span>
+                                    )}
+                                </button>
+                            );
+                        })}
+                    </div>
+
+                    {/* Code Viewer Box */}
+                    <div style={{ borderRadius: '8px', overflow: 'hidden', border: '1px solid rgba(251, 191, 36, 0.25)' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#090d16', padding: '10px 16px', borderBottom: '1px solid rgba(255, 255, 255, 0.08)' }}>
+                            <span style={{ fontSize: '13px', fontWeight: 600, color: '#fef08a', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                {LAB_LANGUAGES.find(l => l.key === previewLangTab)?.icon} Reference Code ({(LAB_LANGUAGES.find(l => l.key === previewLangTab)?.label || previewLangTab)})
+                            </span>
+                            {hasCurrentCode && (
+                                <button
+                                    type="button"
+                                    className="btn-secondary-action"
+                                    onClick={() => handleCopyReferenceCode(currentCode)}
+                                    style={{ padding: '4px 12px', fontSize: '12px', display: 'inline-flex', alignItems: 'center', gap: '5px' }}
+                                >
+                                    {copiedLang ? '✓ Copied!' : '📋 Copy Code'}
+                                </button>
+                            )}
+                        </div>
+
+                        <pre style={{
+                            background: '#060a12',
+                            color: hasCurrentCode ? '#fef08a' : '#64748b',
+                            padding: '20px',
+                            margin: 0,
+                            fontSize: '13.5px',
+                            fontFamily: 'Consolas, Monaco, "Courier New", monospace',
+                            minHeight: '280px',
+                            maxHeight: '460px',
+                            overflowY: 'auto',
+                            whiteSpace: 'pre-wrap',
+                            lineHeight: '1.6'
+                        }}>
+                            {hasCurrentCode ? currentCode : '// No reference solution code added for this language.'}
+                        </pre>
+
+                        <div style={{ padding: '10px 16px', background: '#090d16', fontSize: '12px', color: '#94a3b8', borderTop: '1px solid rgba(255, 255, 255, 0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                            <span>⚡ Student submissions in this language will be evaluated against this reference logic using normalized AST matching.</span>
+                            <span style={{ color: '#fbbf24', fontWeight: 600 }}>Language: {previewLangTab.toUpperCase()}</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '20px', paddingTop: '16px', borderTop: '1px solid rgba(255, 255, 255, 0.08)' }}>
+                    <button
+                        type="button"
+                        className="btn-secondary-action"
+                        onClick={backAction || (() => setPreviewSolutionsTask(null))}
+                        style={{ padding: '8px 20px', fontSize: '13px' }}
+                    >
+                        ← Back to List
+                    </button>
+                    <button
+                        type="button"
+                        className="btn-primary-action"
+                        style={{ background: 'linear-gradient(135deg, #4f46e5, #6366f1)', borderColor: '#818cf8', padding: '8px 20px', fontSize: '13px' }}
+                        onClick={() => {
+                            const taskToEdit = previewSolutionsTask;
+                            setPreviewSolutionsTask(null);
+                            handleStartEditLab(taskToEdit);
+                        }}
+                    >
+                        ✏️ Edit Task & Reference Solutions
+                    </button>
+                </div>
+            </div>
+        );
+    };
+
     // Filter students
     const filteredStudents = students.filter(student => {
         const matchesSearch = !studentSearch ||
@@ -652,8 +1023,14 @@ const FacultyDashboard = () => {
             <div className="content-wrapper faculty-dashboard-content animate-fade">
                 <div className="faculty-content">
 
-                    {/* Navigation Tabs */}
-                    <div className="faculty-tabs-nav">
+                    <div
+                        className="faculty-tabs-nav"
+                        onWheel={(e) => {
+                            if (e.deltaY !== 0) {
+                                e.currentTarget.scrollLeft += e.deltaY;
+                            }
+                        }}
+                    >
                         <button
                             className={`faculty-tab-btn ${activeTab === 'students' ? 'active' : ''}`}
                             onClick={() => { setActiveTab('students'); setError(null); setSuccessMsg(''); }}
@@ -1554,60 +1931,81 @@ const FacultyDashboard = () => {
 
                             {/* 3. Active Lab Tasks Overview */}
                             <div className="faculty-card">
-                                <h3>🔬 Active Lab Tasks ({labTasks.length})</h3>
-                                <p className="card-desc">Hands-on lab experiments currently assigned for practice.</p>
-
-                                {loading ? (
-                                    <p className="loading-text mt-20">Loading lab tasks...</p>
+                                {editingLabTask ? (
+                                    renderEditLabPanel(() => setEditingLabTask(null))
+                                ) : previewSolutionsTask ? (
+                                    renderSolutionViewerPanel(() => setPreviewSolutionsTask(null))
                                 ) : (
-                                    <div className="students-table-scroll mt-20">
-                                        <table className="students-table">
-                                            <thead>
-                                                <tr>
-                                                    <th>Task</th>
-                                                    <th>Subject</th>
-                                                    <th>Year</th>
-                                                    <th>Branch / Sec</th>
-                                                    <th>Max Score</th>
-                                                    <th>Status</th>
-                                                    <th style={{ textAlign: 'right' }}>Actions</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {labTasks.map(task => (
-                                                    <tr key={task._id}>
-                                                        <td><strong>{task.title}</strong></td>
-                                                        <td><span className="code-pill">{task.subject?.code || 'Subject'}</span></td>
-                                                        <td>{task.academicYear}</td>
-                                                        <td>{task.branch || 'All'} {task.section ? `· Sec ${task.section}` : ''}</td>
-                                                        <td>{task.maxScore || 100}</td>
-                                                        <td><span className="status-badge-active">Active</span></td>
-                                                        <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
-                                                            <button
-                                                                type="button"
-                                                                className="btn-secondary-action"
-                                                                style={{ padding: '4px 10px', fontSize: '12px', marginRight: '6px' }}
-                                                                onClick={() => handleStartEditLab(task)}
-                                                            >
-                                                                ✏️ Edit
-                                                            </button>
-                                                            <button
-                                                                type="button"
-                                                                className="btn-secondary-action"
-                                                                style={{ padding: '4px 10px', fontSize: '12px', background: 'rgba(239, 68, 68, 0.15)', borderColor: 'rgba(239, 68, 68, 0.3)', color: '#f87171' }}
-                                                                onClick={() => handleDeleteLabTask(task._id, task.title)}
-                                                            >
-                                                                🗑️ Remove
-                                                            </button>
-                                                        </td>
-                                                    </tr>
-                                                ))}
-                                                {!labTasks.length && (
-                                                    <tr><td colSpan="7" style={{ textAlign: 'center', padding: '24px', color: '#94a3b8' }}>No lab tasks assigned yet.</td></tr>
-                                                )}
-                                            </tbody>
-                                        </table>
-                                    </div>
+                                    <>
+                                        <h3>🔬 Active Lab Tasks ({labTasks.length})</h3>
+                                        <p className="card-desc">Hands-on lab experiments currently assigned for practice.</p>
+
+                                        {loading ? (
+                                            <p className="loading-text mt-20">Loading lab tasks...</p>
+                                        ) : (
+                                            <div className="students-table-scroll mt-20">
+                                                <table className="students-table">
+                                                    <thead>
+                                                        <tr>
+                                                            <th>Task</th>
+                                                            <th>Subject</th>
+                                                            <th>Year</th>
+                                                            <th>Branch / Sec</th>
+                                                            <th>Max Score</th>
+                                                            <th>Status</th>
+                                                            <th style={{ textAlign: 'right' }}>Actions</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        {labTasks.map(task => (
+                                                            <tr key={task._id}>
+                                                                <td><strong>{task.title}</strong></td>
+                                                                <td><span className="code-pill">{task.subject?.code || 'Subject'}</span></td>
+                                                                <td>{task.academicYear}</td>
+                                                                <td>{task.branch || 'All'} {task.section ? `· Sec ${task.section}` : ''}</td>
+                                                                <td>{task.maxScore || 100}</td>
+                                                                <td><span className="status-badge-active">Active</span></td>
+                                                                <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
+                                                                    <button
+                                                                        type="button"
+                                                                        className="btn-secondary-action"
+                                                                        style={{ padding: '4px 10px', fontSize: '12px', marginRight: '6px' }}
+                                                                        onClick={() => {
+                                                                            setEditingLabTask(null);
+                                                                            setPreviewSolutionsTask(task);
+                                                                            const firstKey = Object.keys(task.referenceSolutions || {}).find(k => task.referenceSolutions?.[k]?.trim());
+                                                                            setPreviewLangTab(firstKey || task.solutionLanguage || 'cpp');
+                                                                        }}
+                                                                    >
+                                                                        👁️ Solutions
+                                                                    </button>
+                                                                    <button
+                                                                        type="button"
+                                                                        className="btn-secondary-action"
+                                                                        style={{ padding: '4px 10px', fontSize: '12px', marginRight: '6px' }}
+                                                                        onClick={() => handleStartEditLab(task)}
+                                                                    >
+                                                                        ✏️ Edit
+                                                                    </button>
+                                                                    <button
+                                                                        type="button"
+                                                                        className="btn-secondary-action"
+                                                                        style={{ padding: '4px 10px', fontSize: '12px', background: 'rgba(239, 68, 68, 0.15)', borderColor: 'rgba(239, 68, 68, 0.3)', color: '#f87171' }}
+                                                                        onClick={() => handleDeleteLabTask(task._id, task.title)}
+                                                                    >
+                                                                        🗑️ Remove
+                                                                    </button>
+                                                                </td>
+                                                            </tr>
+                                                        ))}
+                                                        {!labTasks.length && (
+                                                            <tr><td colSpan="7" style={{ textAlign: 'center', padding: '24px', color: '#94a3b8' }}>No lab tasks assigned yet.</td></tr>
+                                                        )}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        )}
+                                    </>
                                 )}
                             </div>
                         </div>
@@ -1634,12 +2032,71 @@ const FacultyDashboard = () => {
                             t.academicYear?.toLowerCase().includes(repoSearch.toLowerCase())
                         );
 
-                        // Filter tests by search
-                        const filteredRepoTests = repoTests.filter(t => !repoSearch ||
-                            t.title?.toLowerCase().includes(repoSearch.toLowerCase()) ||
-                            t.category?.toLowerCase().includes(repoSearch.toLowerCase()) ||
-                            t.academicYear?.toLowerCase().includes(repoSearch.toLowerCase())
-                        );
+                        // Helper to find matching subject for a test
+                        const getTestSubject = (test) => {
+                            if (test.subject) {
+                                if (typeof test.subject === 'object' && test.subject._id) {
+                                    return subjects.find(s => s._id === test.subject._id) || test.subject;
+                                }
+                                const found = subjects.find(s => s._id === test.subject);
+                                if (found) return found;
+                            }
+                            // Match by title or category against subjects
+                            const testTitleLower = (test.title || '').toLowerCase();
+                            const testCatLower = (test.category || '').toLowerCase();
+                            return subjects.find(s => {
+                                const sName = (s.name || '').toLowerCase();
+                                const sCode = (s.code || '').toLowerCase();
+                                return testTitleLower.includes(sName) ||
+                                       testTitleLower.includes(sCode) ||
+                                       (testCatLower && !['general', 'numerical', 'quantitative', 'verbal'].includes(testCatLower) && (sName.includes(testCatLower) || sCode.includes(testCatLower)));
+                            }) || null;
+                        };
+
+                        // Only showcase tests based on specific academic subjects (excluding general platform aptitude tests)
+                        const generalAptitudeKeywords = ['numerical', 'quantitative', 'verbal', 'general', 'logical', 'reasoning', 'aptitude'];
+                        const academicSubjectTests = repoTests.filter(t => {
+                            const cat = (t.category || '').toLowerCase().trim();
+                            const title = (t.title || '').toLowerCase().trim();
+                            const isGeneralAptitude = generalAptitudeKeywords.some(kw =>
+                                cat === kw ||
+                                (cat.includes(kw) && !cat.includes('academic') && !cat.includes('subject')) ||
+                                (title.includes(kw) && !title.includes('academic') && !title.includes('subject'))
+                            );
+                            if (isGeneralAptitude) return false;
+
+                            const sub = getTestSubject(t);
+                            if (sub || t.subject) return true;
+
+                            const academicKeywords = ['dbms', 'os', 'oop', 'cn', 'se', 'dsa', 'core-cse', 'network', 'database', 'operating', 'software', 'programming', 'java', 'python', 'c++', 'compiler', 'cloud', 'ai', 'data'];
+                            return academicKeywords.some(kw => cat.includes(kw) || title.includes(kw));
+                        });
+
+                        // Filter tests by specific subject selection and search
+                        const filteredRepoTests = academicSubjectTests.filter(t => {
+                            const sub = getTestSubject(t);
+                            const matchesSubject = repoSubjectFilter === 'all' ||
+                                (sub && (sub._id === repoSubjectFilter || sub.code?.toLowerCase() === repoSubjectFilter.toLowerCase())) ||
+                                (t.subject?._id === repoSubjectFilter || t.subject === repoSubjectFilter) ||
+                                (() => {
+                                    const sel = subjects.find(s => s._id === repoSubjectFilter);
+                                    if (!sel) return false;
+                                    const sName = (sel.name || '').toLowerCase();
+                                    const sCode = (sel.code || '').toLowerCase();
+                                    const titleLower = (t.title || '').toLowerCase();
+                                    const catLower = (t.category || '').toLowerCase();
+                                    return titleLower.includes(sName) || titleLower.includes(sCode) || (catLower && (sName.includes(catLower) || sCode.includes(catLower)));
+                                })();
+                            if (!matchesSubject) return false;
+
+                            if (!repoSearch) return true;
+                            const q = repoSearch.toLowerCase();
+                            return t.title?.toLowerCase().includes(q) ||
+                                   t.category?.toLowerCase().includes(q) ||
+                                   t.academicYear?.toLowerCase().includes(q) ||
+                                   (sub?.name && sub.name.toLowerCase().includes(q)) ||
+                                   (sub?.code && sub.code.toLowerCase().includes(q));
+                        });
 
                         // Filter notes by search
                         const filteredRepoNotes = allStoredNotes.filter(n => !repoSearch ||
@@ -1712,8 +2169,8 @@ const FacultyDashboard = () => {
                                             }}
                                         >
                                             <span style={{ fontSize: '12px', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>📝 Practice Tests Records</span>
-                                            <div style={{ fontSize: '26px', fontWeight: 800, color: '#f8fafc', marginTop: '4px' }}>{repoTests.length}</div>
-                                            <span style={{ fontSize: '11px', color: '#38bdf8' }}>Timed MCQ practice assessments</span>
+                                            <div style={{ fontSize: '26px', fontWeight: 800, color: '#f8fafc', marginTop: '4px' }}>{academicSubjectTests.length}</div>
+                                            <span style={{ fontSize: '11px', color: '#38bdf8' }}>Subject-specific MCQ assessments</span>
                                         </div>
 
                                         <div
@@ -1741,44 +2198,100 @@ const FacultyDashboard = () => {
                                         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                                             <button
                                                 type="button"
-                                                className={`faculty-tab-btn ${repoSubTab === 'labs' ? 'active' : ''}`}
-                                                onClick={() => setRepoSubTab('labs')}
+                                                className={`faculty-tab-btn ${!editingLabTask && !previewSolutionsTask && repoSubTab === 'labs' ? 'active' : ''}`}
+                                                onClick={() => { setEditingLabTask(null); setPreviewSolutionsTask(null); setRepoSubTab('labs'); }}
                                                 style={{ padding: '8px 16px', fontSize: '13px' }}
                                             >
                                                 🔬 Lab Tasks Storage ({filteredRepoTasks.length})
                                             </button>
                                             <button
                                                 type="button"
-                                                className={`faculty-tab-btn ${repoSubTab === 'tests' ? 'active' : ''}`}
-                                                onClick={() => setRepoSubTab('tests')}
+                                                className={`faculty-tab-btn ${!editingLabTask && !previewSolutionsTask && repoSubTab === 'tests' ? 'active' : ''}`}
+                                                onClick={() => { setEditingLabTask(null); setPreviewSolutionsTask(null); setRepoSubTab('tests'); }}
                                                 style={{ padding: '8px 16px', fontSize: '13px' }}
                                             >
                                                 📝 Practice Tests Storage ({filteredRepoTests.length})
                                             </button>
                                             <button
                                                 type="button"
-                                                className={`faculty-tab-btn ${repoSubTab === 'notes' ? 'active' : ''}`}
-                                                onClick={() => setRepoSubTab('notes')}
+                                                className={`faculty-tab-btn ${!editingLabTask && !previewSolutionsTask && repoSubTab === 'notes' ? 'active' : ''}`}
+                                                onClick={() => { setEditingLabTask(null); setPreviewSolutionsTask(null); setRepoSubTab('notes'); }}
                                                 style={{ padding: '8px 16px', fontSize: '13px' }}
                                             >
                                                 📚 Study Notes Storage ({filteredRepoNotes.length})
                                             </button>
+
+                                            {editingLabTask && (
+                                                <button
+                                                    type="button"
+                                                    className="faculty-tab-btn active"
+                                                    style={{ padding: '8px 16px', fontSize: '13px', background: '#4f46e5', borderColor: '#818cf8', color: '#ffffff', display: 'inline-flex', alignItems: 'center', gap: '8px' }}
+                                                >
+                                                    ✏️ Edit Lab: {editingLabTask.title?.slice(0, 20)}...
+                                                    <span
+                                                        style={{ cursor: 'pointer', opacity: 0.8, fontSize: '14px' }}
+                                                        onClick={(e) => { e.stopPropagation(); setEditingLabTask(null); }}
+                                                    >✕</span>
+                                                </button>
+                                            )}
+
+                                            {previewSolutionsTask && (
+                                                <button
+                                                    type="button"
+                                                    className="faculty-tab-btn active"
+                                                    style={{ padding: '8px 16px', fontSize: '13px', background: '#d97706', borderColor: '#fbbf24', color: '#000000', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '8px' }}
+                                                >
+                                                    🎯 Solutions: {previewSolutionsTask.title?.slice(0, 20)}...
+                                                    <span
+                                                        style={{ cursor: 'pointer', opacity: 0.8, fontSize: '14px' }}
+                                                        onClick={(e) => { e.stopPropagation(); setPreviewSolutionsTask(null); }}
+                                                    >✕</span>
+                                                </button>
+                                            )}
                                         </div>
 
-                                        {/* Search Filter */}
-                                        <div style={{ minWidth: '260px' }}>
-                                            <input
-                                                className="form-control"
-                                                placeholder="🔍 Search records by title, subject, or year..."
-                                                value={repoSearch}
-                                                onChange={e => setRepoSearch(e.target.value)}
-                                                style={{ fontSize: '13px', padding: '8px 14px' }}
-                                            />
-                                        </div>
+                                        {/* Filters (Subject Dropdown & Search) */}
+                                        {!editingLabTask && !previewSolutionsTask && (
+                                            <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+                                                {repoSubTab === 'tests' && (
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                        <select
+                                                            className="form-control"
+                                                            value={repoSubjectFilter}
+                                                            onChange={e => setRepoSubjectFilter(e.target.value)}
+                                                            style={{ fontSize: '13px', padding: '7px 12px', minWidth: '220px', background: 'rgba(15, 23, 42, 0.9)', borderColor: '#334155' }}
+                                                        >
+                                                            <option value="all">📚 All Academic Subjects</option>
+                                                            {subjects.map(s => (
+                                                                <option key={s._id} value={s._id}>
+                                                                    {s.code} - {s.name} ({s.academicYear})
+                                                                </option>
+                                                            ))}
+                                                        </select>
+                                                    </div>
+                                                )}
+                                                <div style={{ minWidth: '240px' }}>
+                                                    <input
+                                                        className="form-control"
+                                                        placeholder="🔍 Search records by title, subject, or year..."
+                                                        value={repoSearch}
+                                                        onChange={e => setRepoSearch(e.target.value)}
+                                                        style={{ fontSize: '13px', padding: '8px 14px' }}
+                                                    />
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
 
-                                    {/* 1. Lab Tasks Records */}
-                                    {repoSubTab === 'labs' && (
+                                    {/* Inline Edit Panel, Solution Viewer, or Normal Storage Lists */}
+                                    {editingLabTask ? (
+                                        renderEditLabPanel(() => setEditingLabTask(null))
+                                    ) : previewSolutionsTask ? (
+                                        renderSolutionViewerPanel(() => setPreviewSolutionsTask(null))
+                                    ) : (
+                                        <>
+                                            {/* 1. Lab Tasks Records */}
+                                            {repoSubTab === 'labs' && (
                                         <div className="students-table-scroll">
                                             <table className="students-table">
                                                 <thead>
@@ -1877,7 +2390,7 @@ const FacultyDashboard = () => {
                                                     <thead>
                                                         <tr>
                                                             <th>Test Title</th>
-                                                            <th>Category & Subject</th>
+                                                            <th>Academic Subject</th>
                                                             <th>Target Year / Scope</th>
                                                             <th>Duration</th>
                                                             <th>Question Limit</th>
@@ -1897,14 +2410,31 @@ const FacultyDashboard = () => {
                                                                     )}
                                                                 </td>
                                                                 <td>
-                                                                    <span className="repo-badge repo-badge-purple" style={{ textTransform: 'capitalize' }}>
-                                                                        {test.category || 'core-cse'}
-                                                                    </span>
-                                                                    {test.subject && (
-                                                                        <div style={{ fontSize: '11.5px', color: '#cbd5e1', marginTop: '3px' }}>
-                                                                            {test.subject.name || test.subject}
-                                                                        </div>
-                                                                    )}
+                                                                    {(() => {
+                                                                        const matchedSubject = getTestSubject(test);
+                                                                        if (matchedSubject) {
+                                                                            return (
+                                                                                <div>
+                                                                                    <span className="code-pill">{matchedSubject.code || 'SUBJECT'}</span>
+                                                                                    <div style={{ fontSize: '11.5px', color: '#cbd5e1', marginTop: '3px' }}>
+                                                                                        {matchedSubject.name}
+                                                                                    </div>
+                                                                                </div>
+                                                                            );
+                                                                        }
+                                                                        return (
+                                                                            <div>
+                                                                                <span className="repo-badge repo-badge-purple" style={{ textTransform: 'capitalize' }}>
+                                                                                    {test.category || 'core-cse'}
+                                                                                </span>
+                                                                                {test.subject && (
+                                                                                    <div style={{ fontSize: '11.5px', color: '#cbd5e1', marginTop: '3px' }}>
+                                                                                        {test.subject.name || test.subject}
+                                                                                    </div>
+                                                                                )}
+                                                                            </div>
+                                                                        );
+                                                                    })()}
                                                                 </td>
                                                                 <td>
                                                                     <span style={{ fontSize: '12px', color: '#e2e8f0' }}>{test.academicYear || 'All Years'}</span>
@@ -1942,7 +2472,7 @@ const FacultyDashboard = () => {
                                                         {!filteredRepoTests.length && (
                                                             <tr>
                                                                 <td colSpan="7" style={{ textAlign: 'center', padding: '36px', color: '#94a3b8' }}>
-                                                                    No practice test records found matching your search.
+                                                                    No practice tests found for the selected academic subject.
                                                                 </td>
                                                             </tr>
                                                         )}
@@ -2013,6 +2543,8 @@ const FacultyDashboard = () => {
                                                 </tbody>
                                             </table>
                                         </div>
+                                    )}
+                                        </>
                                     )}
                                 </div>
                             </div>
@@ -2583,249 +3115,6 @@ const FacultyDashboard = () => {
                                             <p style={{ margin: '8px 0 0 0', fontSize: '13px', color: '#64748b' }}>When students in this academic year take the practice tests, their live performance will appear here.</p>
                                         </div>
                                     )}
-                                </div>
-                            </section>
-                        </div>
-                    )}
-
-                    {/* EDIT LAB TASK MODAL */}
-                    {editingLabTask && (
-                        <div className="progress-modal-overlay" onClick={() => setEditingLabTask(null)}>
-                            <section className="progress-modal modal-wide" style={{ width: 'min(920px, 95vw)', maxHeight: '90vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
-                                <div className="progress-modal-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                    <div>
-                                        <h2 style={{ margin: 0, fontSize: '1.25rem' }}>✏️ Edit Lab Practice Task</h2>
-                                        <p style={{ margin: '4px 0 0', color: '#94a3b8', fontSize: '13px' }}>
-                                            Modify task details, instructions, score, and default multi-language reference solutions.
-                                        </p>
-                                    </div>
-                                    <button className="progress-close" type="button" onClick={() => setEditingLabTask(null)}>×</button>
-                                </div>
-
-                                <form onSubmit={handleSaveEditLab} style={{ marginTop: '20px' }}>
-                                    <div className="form-group">
-                                        <label className="form-label">Task Title *</label>
-                                        <input
-                                            className="form-control"
-                                            value={editLabTaskForm.title}
-                                            onChange={e => setEditLabTaskForm({ ...editLabTaskForm, title: e.target.value })}
-                                            required
-                                        />
-                                    </div>
-
-                                    <div className="form-grid-2">
-                                        <div className="form-group">
-                                            <label className="form-label">Subject *</label>
-                                            <select
-                                                className="form-control"
-                                                value={editLabTaskForm.subject}
-                                                onChange={e => setEditLabTaskForm({ ...editLabTaskForm, subject: e.target.value })}
-                                                required
-                                            >
-                                                <option value="">Select Academic Subject</option>
-                                                {subjects.map(s => (
-                                                    <option key={s._id} value={s._id}>{s.code} - {s.name} ({s.academicYear})</option>
-                                                ))}
-                                            </select>
-                                        </div>
-                                        <div className="form-group">
-                                            <label className="form-label">Academic Year *</label>
-                                            <input
-                                                className="form-control"
-                                                value={editLabTaskForm.academicYear}
-                                                onChange={e => setEditLabTaskForm({ ...editLabTaskForm, academicYear: e.target.value })}
-                                                required
-                                            />
-                                        </div>
-                                    </div>
-
-                                    <div className="form-grid-3-col">
-                                        <div className="form-group">
-                                            <label className="form-label">Branch</label>
-                                            <input
-                                                className="form-control"
-                                                value={editLabTaskForm.branch}
-                                                onChange={e => setEditLabTaskForm({ ...editLabTaskForm, branch: e.target.value })}
-                                            />
-                                        </div>
-                                        <div className="form-group">
-                                            <label className="form-label">Section</label>
-                                            <input
-                                                className="form-control"
-                                                value={editLabTaskForm.section}
-                                                onChange={e => setEditLabTaskForm({ ...editLabTaskForm, section: e.target.value })}
-                                            />
-                                        </div>
-                                        <div className="form-group">
-                                            <label className="form-label">Max Score</label>
-                                            <input
-                                                type="number"
-                                                className="form-control"
-                                                min="1"
-                                                max="1000"
-                                                value={editLabTaskForm.maxScore}
-                                                onChange={e => setEditLabTaskForm({ ...editLabTaskForm, maxScore: Number(e.target.value) || 100 })}
-                                            />
-                                        </div>
-                                    </div>
-
-                                    <div className="form-group">
-                                        <label className="form-label">Task Instructions & Criteria *</label>
-                                        <textarea
-                                            className="form-control"
-                                            rows="4"
-                                            value={editLabTaskForm.instructions}
-                                            onChange={e => setEditLabTaskForm({ ...editLabTaskForm, instructions: e.target.value })}
-                                            required
-                                        />
-                                    </div>
-
-                                    {/* Multi-Language Solution Tabs */}
-                                    <div className="form-group" style={{ marginTop: '14px' }}>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', flexWrap: 'wrap', gap: '8px' }}>
-                                            <label className="form-label" style={{ margin: 0, fontWeight: 700, fontSize: '13.5px', color: '#f8fafc' }}>
-                                                Default Reference Solutions (Multi-Language)
-                                            </label>
-                                            <span style={{ fontSize: '11px', color: '#38bdf8', background: 'rgba(56, 189, 248, 0.12)', padding: '2px 8px', borderRadius: '4px' }}>
-                                                ⚡ AST Normalized • Auto-matches student language
-                                            </span>
-                                        </div>
-
-                                        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '10px' }}>
-                                            {LAB_LANGUAGES.map(lang => {
-                                                const hasCode = Boolean(editLabTaskForm.referenceSolutions?.[lang.key]?.trim());
-                                                const isActive = activeEditLangTab === lang.key;
-                                                return (
-                                                    <button
-                                                        key={lang.key}
-                                                        type="button"
-                                                        onClick={() => setActiveEditLangTab(lang.key)}
-                                                        style={{
-                                                            display: 'inline-flex',
-                                                            alignItems: 'center',
-                                                            gap: '6px',
-                                                            padding: '6px 12px',
-                                                            borderRadius: '8px',
-                                                            fontSize: '12.5px',
-                                                            fontWeight: 600,
-                                                            cursor: 'pointer',
-                                                            border: isActive ? '1px solid #6366f1' : '1px solid #334155',
-                                                            background: isActive ? '#4f46e5' : '#1e293b',
-                                                            color: isActive ? '#ffffff' : '#94a3b8'
-                                                        }}
-                                                    >
-                                                        <span>{lang.icon} {lang.label}</span>
-                                                        {hasCode ? (
-                                                            <span style={{ fontSize: '10px', background: '#10b981', color: '#ffffff', padding: '1px 5px', borderRadius: '8px' }}>✓</span>
-                                                        ) : (
-                                                            <span style={{ fontSize: '10px', opacity: 0.5 }}>—</span>
-                                                        )}
-                                                    </button>
-                                                );
-                                            })}
-                                        </div>
-
-                                        <textarea
-                                            className="form-control"
-                                            rows="7"
-                                            style={{
-                                                fontFamily: 'Consolas, Monaco, monospace',
-                                                fontSize: '13px',
-                                                background: 'rgba(15, 23, 42, 0.8)',
-                                                lineHeight: '1.5'
-                                            }}
-                                            placeholder={`Reference solution for ${LAB_LANGUAGES.find(l => l.key === activeEditLangTab)?.label}...`}
-                                            value={editLabTaskForm.referenceSolutions?.[activeEditLangTab] || ''}
-                                            onChange={e => {
-                                                const newCode = e.target.value;
-                                                setEditLabTaskForm({
-                                                    ...editLabTaskForm,
-                                                    referenceSolutions: {
-                                                        ...editLabTaskForm.referenceSolutions,
-                                                        [activeEditLangTab]: newCode
-                                                    }
-                                                });
-                                            }}
-                                        />
-                                    </div>
-
-                                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '20px', paddingTop: '16px', borderTop: '1px solid #334155' }}>
-                                        <button type="button" className="btn-secondary-action" onClick={() => setEditingLabTask(null)}>
-                                            Cancel
-                                        </button>
-                                        <button type="submit" className="btn-primary-action" disabled={savingEditLab}>
-                                            {savingEditLab ? 'Saving Changes...' : '💾 Save Changes'}
-                                        </button>
-                                    </div>
-                                </form>
-                            </section>
-                        </div>
-                    )}
-
-                    {/* PREVIEW SOLUTIONS MODAL */}
-                    {previewSolutionsTask && (
-                        <div className="progress-modal-overlay" onClick={() => setPreviewSolutionsTask(null)}>
-                            <section className="progress-modal" style={{ width: 'min(820px, 95vw)', maxHeight: '85vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
-                                <div className="progress-modal-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                    <div>
-                                        <h2 style={{ margin: 0, fontSize: '1.25rem' }}>🎯 Reference Solutions: {previewSolutionsTask.title}</h2>
-                                        <p style={{ margin: '4px 0 0', color: '#94a3b8', fontSize: '13px' }}>
-                                            {previewSolutionsTask.subject?.name} · {previewSolutionsTask.academicYear} · Max Score: {previewSolutionsTask.maxScore || 100} pts
-                                        </p>
-                                    </div>
-                                    <button className="progress-close" type="button" onClick={() => setPreviewSolutionsTask(null)}>×</button>
-                                </div>
-
-                                <div style={{ marginTop: '18px' }}>
-                                    {/* Language Switch Tabs */}
-                                    <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '12px' }}>
-                                        {LAB_LANGUAGES.map(lang => {
-                                            const code = previewSolutionsTask.referenceSolutions?.[lang.key] || (previewSolutionsTask.solutionLanguage === lang.key ? previewSolutionsTask.referenceSolution : '');
-                                            const hasCode = Boolean(code?.trim());
-                                            const isActive = previewLangTab === lang.key;
-                                            return (
-                                                <button
-                                                    key={lang.key}
-                                                    type="button"
-                                                    onClick={() => setPreviewLangTab(lang.key)}
-                                                    style={{
-                                                        padding: '6px 12px',
-                                                        borderRadius: '6px',
-                                                        fontSize: '12px',
-                                                        fontWeight: 600,
-                                                        cursor: 'pointer',
-                                                        border: isActive ? '1px solid #fbbf24' : '1px solid #334155',
-                                                        background: isActive ? '#fbbf24' : '#1e293b',
-                                                        color: isActive ? '#000000' : hasCode ? '#e2e8f0' : '#64748b'
-                                                    }}
-                                                >
-                                                    {lang.icon} {lang.label} {hasCode ? '✓' : ''}
-                                                </button>
-                                            );
-                                        })}
-                                    </div>
-
-                                    <pre style={{
-                                        background: '#090d16',
-                                        color: '#fef08a',
-                                        padding: '16px',
-                                        borderRadius: '8px',
-                                        fontSize: '13px',
-                                        fontFamily: 'Consolas, Monaco, monospace',
-                                        maxHeight: '400px',
-                                        overflowY: 'auto',
-                                        whiteSpace: 'pre-wrap',
-                                        border: '1px solid rgba(251, 191, 36, 0.25)',
-                                        lineHeight: '1.6'
-                                    }}>
-                                        {previewSolutionsTask.referenceSolutions?.[previewLangTab] ||
-                                         (previewSolutionsTask.solutionLanguage === previewLangTab ? previewSolutionsTask.referenceSolution : '') ||
-                                         '// No reference solution code added for this language.'}
-                                    </pre>
-                                </div>
-
-                                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '16px', paddingTop: '12px', borderTop: '1px solid #334155' }}>
-                                    <button className="btn-secondary-action" type="button" onClick={() => setPreviewSolutionsTask(null)}>Close</button>
                                 </div>
                             </section>
                         </div>

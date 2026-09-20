@@ -165,7 +165,7 @@ exports.getTests = async (req, res, next) => {
     if (req.query.company) {
       query.company = req.query.company;
     }
-    const tests = await AptitudeTest.find(query).select('-questions');
+    const tests = await AptitudeTest.find(query).select('-questions').populate('subject', 'name code academicYear branch section');
 
     // Enrich with question count and completion status
     const enrichedTests = await Promise.all(
