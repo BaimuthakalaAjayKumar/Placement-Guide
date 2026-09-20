@@ -28,12 +28,20 @@ const Login = () => {
     if (result.success) {
       if (result.user && result.user.role === 'admin') {
         navigate('/admin');
+      } else if (result.user && result.user.role === 'faculty') {
+        navigate('/faculty');
       } else {
         navigate('/dashboard');
       }
     } else {
       setError(result.error || 'Invalid credentials. Please try again.');
     }
+  };
+
+  const handleQuickFill = (demoEmail, demoPassword) => {
+    setEmail(demoEmail);
+    setPassword(demoPassword);
+    setError('');
   };
 
   return (
@@ -98,6 +106,33 @@ const Login = () => {
             )}
           </button>
         </form>
+
+        <div className="demo-accounts-box">
+          <div className="demo-accounts-label">
+            <span>⚡ Quick Login Credentials</span>
+            <small style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Click to autofill</small>
+          </div>
+          <div className="demo-accounts-grid">
+            <button
+              type="button"
+              className="demo-account-pill"
+              onClick={() => handleQuickFill('vpraveen88105@gmail.com', 'Praveen@1234')}
+              title="Click to autofill Administrator credentials"
+            >
+              <span className="demo-pill-badge admin-badge">Admin</span>
+              <span className="demo-pill-text">vpraveen88105@gmail.com</span>
+            </button>
+            <button
+              type="button"
+              className="demo-account-pill"
+              onClick={() => handleQuickFill('theaibulletin.media@gmail.com', 'Ajay@1234')}
+              title="Click to autofill Faculty credentials"
+            >
+              <span className="demo-pill-badge faculty-badge">Faculty</span>
+              <span className="demo-pill-text">theaibulletin.media@gmail.com</span>
+            </button>
+          </div>
+        </div>
 
         <div className="auth-footer">
           <span>New to GRIET Placement? </span>

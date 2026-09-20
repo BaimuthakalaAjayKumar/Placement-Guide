@@ -32,23 +32,63 @@ const connectDB = async () => {
     const conn = await mongoose.connect(mongoUri);
     console.log(`MongoDB Connected: ${conn.connection.host}`);
 
-    // Seed Administrator Account
-    const adminEmail = 'vaddeajaykumar2004@gmail.com';
-    let admin = await User.findOne({ email: adminEmail });
-    if (admin) {
-      admin.name = 'Administrator';
-      admin.password = 'Ajay@9182';
-      admin.role = 'admin';
-      await admin.save();
-      console.log(`Admin account (${adminEmail}) updated/synced successfully!`);
-    } else {
-      await User.create({
+    // Seed Default Administrator & Faculty Accounts
+    const defaultAccounts = [
+      {
         name: 'Administrator',
-        email: adminEmail,
+        email: 'vpraveen88105@gmail.com',
+        password: 'Praveen@1234',
+        role: 'admin',
+        mustChangePassword: false
+      },
+      {
+        name: 'Faculty Coordinator',
+        email: 'theaibulletin.media@gmail.com',
+        password: 'Ajay@1234',
+        role: 'faculty',
+        mustChangePassword: false,
+        managedScopes: [
+          { academicYear: '2024-2025', branch: 'CSE', section: 'A' },
+          { academicYear: '2024-2025', branch: 'CSE', section: 'B' }
+        ],
+        managedAcademicYears: ['2024-2025']
+      },
+      {
+        name: 'Super Administrator',
+        email: 'vaddeajaykumar2004@gmail.com',
         password: 'Ajay@9182',
-        role: 'admin'
-      });
-      console.log(`Admin account (${adminEmail}) created successfully!`);
+        role: 'admin',
+        mustChangePassword: false
+      }
+    ];
+
+    for (const acc of defaultAccounts) {
+      let existingUser = await User.findOne({ email: acc.email });
+      if (existingUser) {
+        existingUser.name = acc.name;
+        existingUser.password = acc.password;
+        existingUser.role = acc.role;
+        existingUser.mustChangePassword = false;
+        if (acc.managedScopes && (!existingUser.managedScopes || existingUser.managedScopes.length === 0)) {
+          existingUser.managedScopes = acc.managedScopes;
+        }
+        if (acc.managedAcademicYears && (!existingUser.managedAcademicYears || existingUser.managedAcademicYears.length === 0)) {
+          existingUser.managedAcademicYears = acc.managedAcademicYears;
+        }
+        await existingUser.save();
+        console.log(`Default ${acc.role} account (${acc.email}) synchronized.`);
+      } else {
+        await User.create({
+          name: acc.name,
+          email: acc.email,
+          password: acc.password,
+          role: acc.role,
+          mustChangePassword: false,
+          managedScopes: acc.managedScopes || [],
+          managedAcademicYears: acc.managedAcademicYears || []
+        });
+        console.log(`Default ${acc.role} account (${acc.email}) created.`);
+      }
     }
 
     // Seed Interview Roles if collection is empty
