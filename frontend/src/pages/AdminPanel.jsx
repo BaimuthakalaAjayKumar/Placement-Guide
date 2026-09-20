@@ -172,6 +172,34 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
   const [editPqYear, setEditPqYear] = useState(new Date().getFullYear());
   const [submittingPracticeEdit, setSubmittingPracticeEdit] = useState(false);
 
+  // Core CSE Subjects & Practice tab states
+  const [coreSubjectSearch, setCoreSubjectSearch] = useState('');
+  const [coreSubjectYearFilter, setCoreSubjectYearFilter] = useState('');
+  const [coreSubjectBranchFilter, setCoreSubjectBranchFilter] = useState('');
+
+  // Core Subject Notes states
+  const [selectedAdminSubjectForNotes, setSelectedAdminSubjectForNotes] = useState(null);
+  const [showAdminNotesModal, setShowAdminNotesModal] = useState(false);
+  const [adminNotesList, setAdminNotesList] = useState([]);
+  const [loadingAdminNotes, setLoadingAdminNotes] = useState(false);
+  const [adminNoteForm, setAdminNoteForm] = useState({ title: '', description: '', content: '', fileUrl: '' });
+  const [submittingAdminNote, setSubmittingAdminNote] = useState(false);
+
+  // Core Subject Practice Tests states
+  const [selectedAdminSubjectForTests, setSelectedAdminSubjectForTests] = useState(null);
+  const [showAdminSubjectTestsModal, setShowAdminSubjectTestsModal] = useState(false);
+  const [adminSubjectTestsList, setAdminSubjectTestsList] = useState([]);
+  const [loadingAdminSubjectTests, setLoadingAdminSubjectTests] = useState(false);
+  const [showAdminCreateSubjectTest, setShowAdminCreateSubjectTest] = useState(false);
+  const [adminSubjectTestForm, setAdminSubjectTestForm] = useState({ title: '', description: '', duration: 20, questionLimit: 20, difficulty: 'medium' });
+  const [creatingAdminSubjectTest, setCreatingAdminSubjectTest] = useState(false);
+
+  // Core Subject Student Reports states
+  const [selectedAdminSubjectForReports, setSelectedAdminSubjectForReports] = useState(null);
+  const [showAdminSubjectReportsModal, setShowAdminSubjectReportsModal] = useState(false);
+  const [adminSubjectReportsList, setAdminSubjectReportsList] = useState([]);
+  const [loadingAdminSubjectReports, setLoadingAdminSubjectReports] = useState(false);
+
   // Student Academics Modal states
   const [showAcademicsModal, setShowAcademicsModal] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState(null);
@@ -532,6 +560,9 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
         fetchQuestionBankReports();
       } else if (activeTab === 'lab-reports') {
         fetchAdminLabReports();
+      } else if (activeTab === 'core-subjects') {
+        fetchAcademicContent();
+        fetchAptitudeTests();
       } else if (activeTab === 'academic-content') {
         fetchAcademicContent();
       } else if (activeTab === 'aptitude') {
@@ -552,6 +583,142 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
       }
     }
   }, [token, activeTab]);
+
+  // Core CSE Subjects Handlers
+  const openAdminNotesModal = async (subject) => {
+    setSelectedAdminSubjectForNotes(subject);
+    setShowAdminNotesModal(true);
+    setAdminNoteForm({ title: '', description: '', content: '', fileUrl: '' });
+    try {
+      setLoadingAdminNotes(true);
+      const res = await fetch(`${API_URL}/academic/subjects/${subject._id}/notes`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      setAdminNotesList(data.success ? data.data : (subject.notes || []));
+    } catch {
+      setAdminNotesList(subject.notes || []);
+    } finally {
+      setLoadingAdminNotes(false);
+    }
+  };
+
+  const handleAddAdminNote = async (e) => {
+    e.preventDefault();
+    if (!adminNoteForm.title.trim()) return;
+    try {
+      setSubmittingAdminNote(true);
+      const res = await fetch(`${API_URL}/academic/subjects/${selectedAdminSubjectForNotes._id}/notes`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify(adminNoteForm)
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error || 'Failed to add study note.');
+      setAdminNotesList(prev => [data.data, ...prev]);
+      setAcademicSubjects(prev => prev.map(s => s._id === selectedAdminSubjectForNotes._id ? { ...s, notes: [data.data, ...(s.notes || [])] } : s));
+      setAdminNoteForm({ title: '', description: '', content: '', fileUrl: '' });
+      setSuccess('Study material posted successfully.');
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSubmittingAdminNote(false);
+    }
+  };
+
+  const handleDeleteAdminNote = async (noteId) => {
+    if (!window.confirm('Delete this study note?')) return;
+    try {
+      const res = await fetch(`${API_URL}/academic/subjects/${selectedAdminSubjectForNotes._id}/notes/${noteId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error || 'Failed to delete note.');
+      setAdminNotesList(prev => prev.filter(n => n._id !== noteId));
+      setAcademicSubjects(prev => prev.map(s => s._id === selectedAdminSubjectForNotes._id ? { ...s, notes: (s.notes || []).filter(n => n._id !== noteId) } : s));
+      setSuccess('Study note deleted.');
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  const openAdminSubjectTestsModal = (subject) => {
+    setSelectedAdminSubjectForTests(subject);
+    setShowAdminSubjectTestsModal(true);
+    setShowAdminCreateSubjectTest(false);
+    setAdminSubjectTestForm({ title: `${subject.code} Practice Test`, description: `Curriculum practice test for ${subject.name}`, duration: 20, questionLimit: 20, difficulty: 'medium' });
+    const matched = (aptitudeTests || []).filter(t => t.subject === subject._id || t.subject?._id === subject._id || (t.title && t.title.toLowerCase().includes(subject.code.toLowerCase())));
+    setAdminSubjectTestsList(matched);
+  };
+
+  const handleCreateAdminSubjectTest = async (e) => {
+    e.preventDefault();
+    try {
+      setCreatingAdminSubjectTest(true);
+      const payload = {
+        ...adminSubjectTestForm,
+        category: 'core-cse',
+        subject: selectedAdminSubjectForTests._id,
+        academicYear: selectedAdminSubjectForTests.academicYear,
+        branch: selectedAdminSubjectForTests.branch,
+        section: selectedAdminSubjectForTests.section
+      };
+      const res = await fetch(`${API_URL}/tests`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error || 'Failed to create test.');
+      setAdminSubjectTestsList(prev => [data.data, ...prev]);
+      setAptitudeTests(prev => [data.data, ...prev]);
+      setShowAdminCreateSubjectTest(false);
+      setSuccess('Practice test created! Click "Manage Questions" to configure questions.');
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setCreatingAdminSubjectTest(false);
+    }
+  };
+
+  const openAdminSubjectReportsModal = async (subject) => {
+    setSelectedAdminSubjectForReports(subject);
+    setShowAdminSubjectReportsModal(true);
+    try {
+      setLoadingAdminSubjectReports(true);
+      const res = await fetch(`${API_URL}/tests/subject/${subject._id}/reports`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      setAdminSubjectReportsList(data.success ? data.data : []);
+    } catch (err) {
+      setError('Failed to fetch subject test reports.');
+    } finally {
+      setLoadingAdminSubjectReports(false);
+    }
+  };
+
+  const downloadAdminSubjectReportsCSV = () => {
+    if (!adminSubjectReportsList.length) return;
+    const headers = ['Student Name', 'Roll Number', 'Email', 'Branch', 'Section', 'Academic Year', 'Test Title', 'Score', 'Total Questions', 'Percentage (%)', 'Status', 'Completed Date'];
+    const rows = adminSubjectReportsList.map(r => [
+      r.student?.name || '',
+      r.student?.rollNumber || '',
+      r.student?.email || '',
+      r.student?.branch || '',
+      r.student?.section || '',
+      r.student?.academicYear || '',
+      r.test?.title || '',
+      r.score,
+      r.totalQuestions,
+      `${r.percentage}%`,
+      r.passed ? 'PASSED' : 'NEEDS PRACTICE',
+      r.completedAt ? new Date(r.completedAt).toLocaleString() : ''
+    ]);
+    const filename = `${(selectedAdminSubjectForReports?.code || 'Subject').replace(/[^a-zA-Z0-9]/g, '_')}_Student_Reports`;
+    downloadAcademicCsv(filename, headers, rows);
+  };
 
   const handlePostJob = async (e) => {
     e.preventDefault();
@@ -2070,6 +2237,16 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
             🔬 Lab Practice Reports
           </button>
           <button
+            className={`admin-tab-btn ${activeTab === 'core-subjects' ? 'active' : ''}`}
+            onClick={() => {
+              setActiveTab('core-subjects');
+              fetchAcademicContent();
+              fetchAptitudeTests();
+            }}
+          >
+            💻 Core CSE Subjects & Tests
+          </button>
+          <button
             className={`admin-tab-btn ${activeTab === 'academic-content' ? 'active' : ''}`}
             onClick={() => setActiveTab('academic-content')}
           >
@@ -2597,6 +2774,551 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
               ) : (
                 <div className="empty-history-placeholder glass-card">
                   <p>No mock interview attempts recorded yet.</p>
+                </div>
+              )}
+            </div>
+          )
+        }
+
+        {
+          activeTab === 'core-subjects' && (
+            <div className="admin-view-content animate-fade" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+              {/* Summary Stats Grid */}
+              <div className="admin-stats-summary-grid">
+                <div className="glass-card admin-summary-card">
+                  <h4>Core CSE Subjects</h4>
+                  <span className="admin-stat-number">{academicSubjects.length}</span>
+                  <p className="admin-stat-sub">Registered across all batches</p>
+                </div>
+                <div className="glass-card admin-summary-card">
+                  <h4>Uploaded Study Notes</h4>
+                  <span className="admin-stat-number">
+                    {academicSubjects.reduce((acc, s) => acc + (s.notes ? s.notes.length : 0), 0)}
+                  </span>
+                  <p className="admin-stat-sub">Materials and revision guides</p>
+                </div>
+                <div className="glass-card admin-summary-card">
+                  <h4>Core Subject Tests</h4>
+                  <span className="admin-stat-number">
+                    {(aptitudeTests || []).filter(t => t.subject || (academicSubjects.some(s => t.title?.toLowerCase().includes(s.code.toLowerCase())))).length}
+                  </span>
+                  <p className="admin-stat-sub">Assessments & MCQ modules</p>
+                </div>
+                <div className="glass-card admin-summary-card">
+                  <h4>Active Faculty Scopes</h4>
+                  <span className="admin-stat-number">
+                    {staffMembers.filter(m => m.role === 'faculty' && m.managedScopes?.length > 0).length}
+                  </span>
+                  <p className="admin-stat-sub">Instructors with assigned subjects</p>
+                </div>
+              </div>
+
+              {/* Main Subject Directory */}
+              <div className="glass-card" style={{ padding: '24px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px', marginBottom: '20px' }}>
+                  <div>
+                    <h3 style={{ margin: 0, fontSize: '1.25rem', color: '#f8fafc' }}>💻 Core Computer Science Curriculum Subjects</h3>
+                    <p style={{ margin: '6px 0 0', color: '#94a3b8', fontSize: '0.9rem' }}>
+                      Oversee all subjects, add or review study notes/materials, create practice tests, and download student exam reports.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-sm"
+                    onClick={() => {
+                      const headers = ['Subject Name', 'Subject Code', 'Academic Year', 'Branch', 'Section', 'Study Notes Count', 'Description'];
+                      const rows = academicSubjects.map(s => [
+                        s.name, s.code, s.academicYear, s.branch || 'All', s.section || 'All', s.notes?.length || 0, s.description || ''
+                      ]);
+                      downloadAcademicCsv('Core_CSE_Subjects_Master', headers, rows);
+                    }}
+                    disabled={!academicSubjects.length}
+                  >
+                    📥 Export Subjects Master (CSV)
+                  </button>
+                </div>
+
+                {/* Filters */}
+                <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginBottom: '20px' }}>
+                  <input
+                    type="text"
+                    className="form-control"
+                    placeholder="Search by subject name or code..."
+                    value={coreSubjectSearch}
+                    onChange={e => setCoreSubjectSearch(e.target.value)}
+                    style={{ flex: '1', minWidth: '220px' }}
+                  />
+                  <select
+                    className="form-control"
+                    value={coreSubjectYearFilter}
+                    onChange={e => setCoreSubjectYearFilter(e.target.value)}
+                    style={{ minWidth: '160px' }}
+                  >
+                    <option value="">All Academic Years</option>
+                    {[...new Set(academicSubjects.map(s => s.academicYear).filter(Boolean))].map(y => (
+                      <option key={y} value={y}>{y}</option>
+                    ))}
+                  </select>
+                  <select
+                    className="form-control"
+                    value={coreSubjectBranchFilter}
+                    onChange={e => setCoreSubjectBranchFilter(e.target.value)}
+                    style={{ minWidth: '160px' }}
+                  >
+                    <option value="">All Branches</option>
+                    {[...new Set(academicSubjects.map(s => s.branch).filter(Boolean))].map(b => (
+                      <option key={b} value={b}>{b}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Subjects Table */}
+                <div className="students-table-scroll">
+                  <table className="students-table">
+                    <thead>
+                      <tr>
+                        <th>Code</th>
+                        <th>Subject Name</th>
+                        <th>Academic Year</th>
+                        <th>Branch & Section</th>
+                        <th>Study Notes</th>
+                        <th>Practice Tests</th>
+                        <th>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {academicSubjects
+                        .filter(s => {
+                          const matchesSearch = !coreSubjectSearch ||
+                            s.name.toLowerCase().includes(coreSubjectSearch.toLowerCase()) ||
+                            s.code.toLowerCase().includes(coreSubjectSearch.toLowerCase());
+                          const matchesYear = !coreSubjectYearFilter || s.academicYear === coreSubjectYearFilter;
+                          const matchesBranch = !coreSubjectBranchFilter || (s.branch && s.branch.toLowerCase() === coreSubjectBranchFilter.toLowerCase());
+                          return matchesSearch && matchesYear && matchesBranch;
+                        })
+                        .map(subject => {
+                          const matchedTestsCount = (aptitudeTests || []).filter(t => t.subject === subject._id || t.subject?._id === subject._id || (t.title && t.title.toLowerCase().includes(subject.code.toLowerCase()))).length;
+                          return (
+                            <tr key={subject._id}>
+                              <td><span className="code-pill">{subject.code}</span></td>
+                              <td>
+                                <strong>{subject.name}</strong>
+                                {subject.description && <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '2px' }}>{subject.description}</div>}
+                              </td>
+                              <td>{subject.academicYear}</td>
+                              <td>{subject.branch || 'All'} {subject.section ? `· Sec ${subject.section}` : ''}</td>
+                              <td>
+                                <span style={{ fontSize: '12px', color: '#93c5fd', background: 'rgba(59, 130, 246, 0.1)', padding: '4px 8px', borderRadius: '4px', border: '1px solid rgba(59, 130, 246, 0.25)' }}>
+                                  📄 {subject.notes?.length || 0} Notes
+                                </span>
+                              </td>
+                              <td>
+                                <span style={{ fontSize: '12px', color: '#c084fc', background: 'rgba(168, 85, 247, 0.1)', padding: '4px 8px', borderRadius: '4px', border: '1px solid rgba(168, 85, 247, 0.25)' }}>
+                                  🧪 {matchedTestsCount} Tests
+                                </span>
+                              </td>
+                              <td>
+                                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+                                  <button
+                                    type="button"
+                                    className="btn btn-secondary btn-sm"
+                                    style={{ color: '#60a5fa', borderColor: 'rgba(59, 130, 246, 0.4)' }}
+                                    onClick={() => openAdminNotesModal(subject)}
+                                    title="View and upload study notes for this subject"
+                                  >
+                                    📝 Notes ({subject.notes?.length || 0})
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="btn btn-secondary btn-sm"
+                                    style={{ color: '#c084fc', borderColor: 'rgba(168, 85, 247, 0.4)' }}
+                                    onClick={() => openAdminSubjectTestsModal(subject)}
+                                    title="Create practice tests and manage questions"
+                                  >
+                                    🧪 Tests ({matchedTestsCount})
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="btn btn-secondary btn-sm"
+                                    style={{ color: '#34d399', borderColor: 'rgba(16, 185, 129, 0.4)' }}
+                                    onClick={() => openAdminSubjectReportsModal(subject)}
+                                    title="View student attempts and download CSV report"
+                                  >
+                                    📥 Reports
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      {academicSubjects.length === 0 && (
+                        <tr>
+                          <td colSpan="7" style={{ textAlign: 'center', padding: '36px', color: '#94a3b8' }}>
+                            No Core CSE subjects registered yet. Switch to "Academic Subjects & Projects" tab to register new curriculum subjects.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* ADMIN MODAL 1: STUDY NOTES & MATERIALS */}
+              {showAdminNotesModal && selectedAdminSubjectForNotes && (
+                <div className="progress-modal-overlay" onClick={() => setShowAdminNotesModal(false)}>
+                  <section className="progress-modal modal-wide" onClick={e => e.stopPropagation()}>
+                    <div className="progress-modal-header">
+                      <div>
+                        <h2>📝 Study Materials: {selectedAdminSubjectForNotes.name} ({selectedAdminSubjectForNotes.code})</h2>
+                        <p>{selectedAdminSubjectForNotes.academicYear} · {selectedAdminSubjectForNotes.branch || 'All Branches'} {selectedAdminSubjectForNotes.section ? `(Sec ${selectedAdminSubjectForNotes.section})` : ''}</p>
+                      </div>
+                      <button className="progress-close" type="button" onClick={() => setShowAdminNotesModal(false)}>×</button>
+                    </div>
+
+                    <div style={{ marginTop: '20px' }}>
+                      {/* Add Note Form */}
+                      <div style={{ background: '#0f172a', border: '1px solid #334155', borderRadius: '8px', padding: '18px', marginBottom: '24px' }}>
+                        <h4 style={{ margin: '0 0 12px 0', color: '#60a5fa', fontSize: '15px' }}>➕ Add Study Material / Revision Notes as Administrator</h4>
+                        <form onSubmit={handleAddAdminNote}>
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '12px', marginBottom: '12px' }}>
+                            <div>
+                              <label style={{ display: 'block', fontSize: '12px', color: '#94a3b8', marginBottom: '4px' }}>Note / Chapter Title *</label>
+                              <input
+                                type="text"
+                                className="form-control"
+                                placeholder="e.g. Unit 2: Process Scheduling & Deadlocks"
+                                value={adminNoteForm.title}
+                                onChange={e => setAdminNoteForm({ ...adminNoteForm, title: e.target.value })}
+                                required
+                              />
+                            </div>
+                            <div>
+                              <label style={{ display: 'block', fontSize: '12px', color: '#94a3b8', marginBottom: '4px' }}>Short Description / Topics</label>
+                              <input
+                                type="text"
+                                className="form-control"
+                                placeholder="e.g. FCFS, SJF, Round Robin, Banker's Algorithm"
+                                value={adminNoteForm.description}
+                                onChange={e => setAdminNoteForm({ ...adminNoteForm, description: e.target.value })}
+                              />
+                            </div>
+                            <div style={{ gridColumn: '1 / -1' }}>
+                              <label style={{ display: 'block', fontSize: '12px', color: '#94a3b8', marginBottom: '4px' }}>Reference File / Document Link (Google Drive, PDF, GitHub URL)</label>
+                              <input
+                                type="url"
+                                className="form-control"
+                                placeholder="https://drive.google.com/... or https://..."
+                                value={adminNoteForm.fileUrl}
+                                onChange={e => setAdminNoteForm({ ...adminNoteForm, fileUrl: e.target.value })}
+                              />
+                            </div>
+                            <div style={{ gridColumn: '1 / -1' }}>
+                              <label style={{ display: 'block', fontSize: '12px', color: '#94a3b8', marginBottom: '4px' }}>Detailed Revision Notes / Key Points (Optional Text / Markdown)</label>
+                              <textarea
+                                className="form-control"
+                                rows={4}
+                                placeholder="Add comprehensive revision guide, formulas, interview Q&A..."
+                                value={adminNoteForm.content}
+                                onChange={e => setAdminNoteForm({ ...adminNoteForm, content: e.target.value })}
+                              />
+                            </div>
+                          </div>
+                          <button
+                            type="submit"
+                            className="btn btn-primary"
+                            disabled={submittingAdminNote || !adminNoteForm.title.trim()}
+                          >
+                            {submittingAdminNote ? 'Uploading Note...' : '📤 Post Study Material'}
+                          </button>
+                        </form>
+                      </div>
+
+                      {/* Current Notes */}
+                      <h4 style={{ margin: '0 0 14px 0', fontSize: '15px' }}>Subject Study Materials ({adminNotesList.length})</h4>
+                      {loadingAdminNotes ? (
+                        <p className="loading-text">Loading notes...</p>
+                      ) : adminNotesList.length > 0 ? (
+                        <div>
+                          {adminNotesList.map(note => (
+                            <div key={note._id} className="note-card-item">
+                              <div className="note-card-header">
+                                <div>
+                                  <h5 className="note-card-title">{note.title}</h5>
+                                  <div className="note-meta-line">
+                                    Uploaded by <strong>{note.uploaderName || 'Administrator'}</strong> ({note.uploaderRole || 'admin'}) · {new Date(note.createdAt).toLocaleDateString()}
+                                  </div>
+                                </div>
+                                <button
+                                  type="button"
+                                  className="btn btn-secondary btn-sm"
+                                  style={{ color: '#ef4444', borderColor: 'rgba(239,68,68,0.3)', padding: '4px 8px', fontSize: '12px' }}
+                                  onClick={() => handleDeleteAdminNote(note._id)}
+                                >
+                                  🗑️ Delete
+                                </button>
+                              </div>
+                              {note.description && (
+                                <p style={{ margin: '0 0 8px 0', fontSize: '13px', color: '#cbd5e1' }}>{note.description}</p>
+                              )}
+                              {note.content && (
+                                <div className="note-content-box">{note.content}</div>
+                              )}
+                              {note.fileUrl && (
+                                <div style={{ marginTop: '8px' }}>
+                                  <a href={note.fileUrl} target="_blank" rel="noopener noreferrer" className="note-file-link">
+                                    🔗 Open Study Resource / Attachment ↗
+                                  </a>
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p style={{ textAlign: 'center', padding: '24px', color: '#94a3b8', background: '#0f172a', borderRadius: '8px' }}>
+                          No study materials uploaded for this subject yet.
+                        </p>
+                      )}
+                    </div>
+                  </section>
+                </div>
+              )}
+
+              {/* ADMIN MODAL 2: PRACTICE TESTS */}
+              {showAdminSubjectTestsModal && selectedAdminSubjectForTests && (
+                <div className="progress-modal-overlay" onClick={() => setShowAdminSubjectTestsModal(false)}>
+                  <section className="progress-modal modal-wide" onClick={e => e.stopPropagation()}>
+                    <div className="progress-modal-header">
+                      <div>
+                        <h2>🧪 Practice Tests: {selectedAdminSubjectForTests.name} ({selectedAdminSubjectForTests.code})</h2>
+                        <p>{selectedAdminSubjectForTests.academicYear} · {selectedAdminSubjectForTests.branch || 'All Branches'}</p>
+                      </div>
+                      <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                        <button
+                          type="button"
+                          className="btn btn-primary btn-sm"
+                          onClick={() => setShowAdminCreateSubjectTest(!showAdminCreateSubjectTest)}
+                        >
+                          {showAdminCreateSubjectTest ? 'Cancel' : '➕ Create Practice Test'}
+                        </button>
+                        <button className="progress-close" type="button" onClick={() => setShowAdminSubjectTestsModal(false)}>×</button>
+                      </div>
+                    </div>
+
+                    <div style={{ marginTop: '20px' }}>
+                      {showAdminCreateSubjectTest && (
+                        <div style={{ background: '#0f172a', border: '1px solid #334155', borderRadius: '8px', padding: '18px', marginBottom: '20px' }}>
+                          <h4 style={{ margin: '0 0 12px 0', color: '#c084fc', fontSize: '15px' }}>Create New Practice Test for {selectedAdminSubjectForTests.code}</h4>
+                          <form onSubmit={handleCreateAdminSubjectTest}>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px', marginBottom: '12px' }}>
+                              <div>
+                                <label style={{ display: 'block', fontSize: '12px', color: '#94a3b8', marginBottom: '4px' }}>Test Title *</label>
+                                <input
+                                  type="text"
+                                  className="form-control"
+                                  value={adminSubjectTestForm.title}
+                                  onChange={e => setAdminSubjectTestForm({ ...adminSubjectTestForm, title: e.target.value })}
+                                  required
+                                />
+                              </div>
+                              <div>
+                                <label style={{ display: 'block', fontSize: '12px', color: '#94a3b8', marginBottom: '4px' }}>Duration (Minutes) *</label>
+                                <input
+                                  type="number"
+                                  min={5}
+                                  max={180}
+                                  className="form-control"
+                                  value={adminSubjectTestForm.duration}
+                                  onChange={e => setAdminSubjectTestForm({ ...adminSubjectTestForm, duration: Number(e.target.value) })}
+                                  required
+                                />
+                              </div>
+                              <div>
+                                <label style={{ display: 'block', fontSize: '12px', color: '#94a3b8', marginBottom: '4px' }}>Difficulty</label>
+                                <select
+                                  className="form-control"
+                                  value={adminSubjectTestForm.difficulty}
+                                  onChange={e => setAdminSubjectTestForm({ ...adminSubjectTestForm, difficulty: e.target.value })}
+                                >
+                                  <option value="easy">Easy</option>
+                                  <option value="medium">Medium</option>
+                                  <option value="hard">Hard</option>
+                                </select>
+                              </div>
+                              <div>
+                                <label style={{ display: 'block', fontSize: '12px', color: '#94a3b8', marginBottom: '4px' }}>Question Limit</label>
+                                <input
+                                  type="number"
+                                  min={1}
+                                  max={100}
+                                  className="form-control"
+                                  value={adminSubjectTestForm.questionLimit}
+                                  onChange={e => setAdminSubjectTestForm({ ...adminSubjectTestForm, questionLimit: Number(e.target.value) })}
+                                />
+                              </div>
+                              <div style={{ gridColumn: '1 / -1' }}>
+                                <label style={{ display: 'block', fontSize: '12px', color: '#94a3b8', marginBottom: '4px' }}>Test Description / Syllabus</label>
+                                <input
+                                  type="text"
+                                  className="form-control"
+                                  value={adminSubjectTestForm.description}
+                                  onChange={e => setAdminSubjectTestForm({ ...adminSubjectTestForm, description: e.target.value })}
+                                />
+                              </div>
+                            </div>
+                            <button
+                              type="submit"
+                              className="btn btn-primary"
+                              disabled={creatingAdminSubjectTest || !adminSubjectTestForm.title.trim()}
+                            >
+                              {creatingAdminSubjectTest ? 'Creating Test...' : 'Save Practice Test'}
+                            </button>
+                          </form>
+                        </div>
+                      )}
+
+                      {/* Subject Tests List */}
+                      <h4 style={{ margin: '0 0 14px 0', fontSize: '15px' }}>Configured Practice Tests ({adminSubjectTestsList.length})</h4>
+                      {adminSubjectTestsList.length > 0 ? (
+                        <div className="students-table-scroll">
+                          <table className="students-table">
+                            <thead>
+                              <tr>
+                                <th>Test Title</th>
+                                <th>Questions</th>
+                                <th>Duration</th>
+                                <th>Difficulty</th>
+                                <th>Action</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {adminSubjectTestsList.map(t => (
+                                <tr key={t._id}>
+                                  <td>
+                                    <strong>{t.title}</strong>
+                                    {t.description && <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '2px' }}>{t.description}</div>}
+                                  </td>
+                                  <td><span className="code-pill">{t.questionCount || t.questions?.length || 0} Qs</span></td>
+                                  <td>{t.duration} mins</td>
+                                  <td><span style={{ textTransform: 'capitalize', color: t.difficulty === 'hard' ? '#ef4444' : t.difficulty === 'medium' ? '#f59e0b' : '#10b981' }}>{t.difficulty || 'medium'}</span></td>
+                                  <td>
+                                    <button
+                                      type="button"
+                                      className="btn btn-secondary btn-sm"
+                                      style={{ color: '#c084fc', borderColor: 'rgba(168, 85, 247, 0.4)' }}
+                                      onClick={() => {
+                                        setShowAdminSubjectTestsModal(false);
+                                        openQuestionsModal(t);
+                                      }}
+                                    >
+                                      ❓ Manage Questions ({t.questionCount || t.questions?.length || 0})
+                                    </button>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      ) : (
+                        <p style={{ textAlign: 'center', padding: '24px', color: '#94a3b8', background: '#0f172a', borderRadius: '8px' }}>
+                          No practice tests set up for this subject yet. Click "+ Create Practice Test" above to configure one!
+                        </p>
+                      )}
+                    </div>
+                  </section>
+                </div>
+              )}
+
+              {/* ADMIN MODAL 3: STUDENT TEST REPORTS & CSV */}
+              {showAdminSubjectReportsModal && selectedAdminSubjectForReports && (
+                <div className="progress-modal-overlay" onClick={() => setShowAdminSubjectReportsModal(false)}>
+                  <section className="progress-modal modal-wide" onClick={e => e.stopPropagation()}>
+                    <div className="progress-modal-header">
+                      <div>
+                        <h2>📊 Student Test Reports: {selectedAdminSubjectForReports.name} ({selectedAdminSubjectForReports.code})</h2>
+                        <p>{selectedAdminSubjectForReports.academicYear} · {selectedAdminSubjectForReports.branch || 'All Branches'}</p>
+                      </div>
+                      <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                        <button
+                          type="button"
+                          className="btn btn-primary btn-sm"
+                          style={{ background: '#10b981', borderColor: '#059669', color: '#ffffff' }}
+                          onClick={downloadAdminSubjectReportsCSV}
+                          disabled={!adminSubjectReportsList.length}
+                        >
+                          📥 Download Subject Report (CSV)
+                        </button>
+                        <button className="progress-close" type="button" onClick={() => setShowAdminSubjectReportsModal(false)}>×</button>
+                      </div>
+                    </div>
+
+                    <div style={{ marginTop: '20px' }}>
+                      <div className="progress-summary-grid">
+                        <div><span>Total Attempts</span><strong>{adminSubjectReportsList.length}</strong></div>
+                        <div><span>Unique Students</span><strong>{new Set(adminSubjectReportsList.map(r => r.student?.id || r.student?.email)).size}</strong></div>
+                        <div><span>Passed (&gt;=50%)</span><strong style={{ color: '#10b981' }}>{adminSubjectReportsList.filter(r => r.passed).length}</strong></div>
+                        <div><span>Needs Practice</span><strong style={{ color: '#ef4444' }}>{adminSubjectReportsList.filter(r => !r.passed).length}</strong></div>
+                        <div>
+                          <span>Average Score</span>
+                          <strong>{adminSubjectReportsList.length ? Math.round(adminSubjectReportsList.reduce((acc, r) => acc + (r.percentage || 0), 0) / adminSubjectReportsList.length) : 0}%</strong>
+                        </div>
+                      </div>
+
+                      {loadingAdminSubjectReports ? (
+                        <p className="loading-text">Loading student test records...</p>
+                      ) : adminSubjectReportsList.length > 0 ? (
+                        <div className="students-table-scroll">
+                          <table className="students-table">
+                            <thead>
+                              <tr>
+                                <th>Student</th>
+                                <th>Roll Number</th>
+                                <th>Branch / Sec</th>
+                                <th>Test Title</th>
+                                <th>Score</th>
+                                <th>Percentage</th>
+                                <th>Status</th>
+                                <th>Attempted On</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {adminSubjectReportsList.map(report => (
+                                <tr key={report._id}>
+                                  <td>
+                                    <strong>{report.student?.name}</strong>
+                                    <div style={{ fontSize: '12px', color: '#94a3b8' }}>{report.student?.email}</div>
+                                  </td>
+                                  <td><span className="code-pill">{report.student?.rollNumber || 'N/A'}</span></td>
+                                  <td>{report.student?.branch || 'N/A'} {report.student?.section ? `· Sec ${report.student?.section}` : ''}</td>
+                                  <td>{report.test?.title || 'Practice Test'}</td>
+                                  <td><strong>{report.score}</strong> / {report.totalQuestions}</td>
+                                  <td>
+                                    <span className={`score-badge ${report.percentage >= 70 ? 'high' : report.percentage >= 50 ? 'medium' : 'low'}`}>
+                                      {report.percentage}%
+                                    </span>
+                                  </td>
+                                  <td>
+                                    {report.passed ? (
+                                      <span style={{ color: '#10b981', fontWeight: 600, fontSize: '12px' }}>PASSED</span>
+                                    ) : (
+                                      <span style={{ color: '#ef4444', fontWeight: 600, fontSize: '12px' }}>RETAKE NEEDED</span>
+                                    )}
+                                  </td>
+                                  <td style={{ fontSize: '12px', color: '#94a3b8' }}>
+                                    {report.completedAt ? new Date(report.completedAt).toLocaleDateString() : 'N/A'}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      ) : (
+                        <div style={{ textAlign: 'center', padding: '36px', color: '#94a3b8', background: '#0f172a', borderRadius: '8px' }}>
+                          <p style={{ margin: 0, fontSize: '15px' }}>No students have attempted practice tests for this subject yet.</p>
+                          <p style={{ margin: '8px 0 0', fontSize: '13px', color: '#64748b' }}>When students in this academic year take tests, their performance will appear here.</p>
+                        </div>
+                      )}
+                    </div>
+                  </section>
                 </div>
               )}
             </div>

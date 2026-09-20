@@ -367,11 +367,40 @@ exports.getAttemptsHistory = async (req, res, next) => {
   }
 };
 
-// @desc    Create a new aptitude test (Admin only)
+// @desc    Create a new aptitude test (Admin and Faculty)
 // @route   POST /api/tests
-// @access  Private/Admin
+// @access  Private (Admin, Faculty)
 exports.createTest = async (req, res, next) => {
   try {
+    if (req.user.role === 'faculty' && req.body.subject) {
+      const Subject = require('../models/Subject');
+      const subject = await Subject.findById(req.body.subject);
+      if (!subject) {
+        return res.status(404).json({ success: false, error: 'Subject not found' });
+      }
+      if (req.user.managedScopes && req.user.managedScopes.length > 0) {
+        const canManage = req.user.managedScopes.some(scope => {
+          const sYear = (scope.academicYear || '').trim().toLowerCase();
+          const sBranch = (scope.branch || '').trim().toLowerCase();
+          const sSection = (scope.section || '').trim().toLowerCase();
+          const reqYear = (subject.academicYear || '').trim().toLowerCase();
+          const reqBranch = (subject.branch || '').trim().toLowerCase();
+          const reqSection = (subject.section || '').trim().toLowerCase();
+          const yearMatch = !sYear || sYear === 'all' || !reqYear || sYear === reqYear || reqYear.includes(sYear) || sYear.includes(reqYear);
+          const branchMatch = !sBranch || sBranch === 'all' || !reqBranch || sBranch === reqBranch;
+          const sectionMatch = !sSection || sSection === 'all' || !reqSection || sSection === reqSection;
+          return yearMatch && branchMatch && sectionMatch;
+        });
+        if (!canManage) {
+          return res.status(403).json({ success: false, error: 'You are not assigned to manage this subject.' });
+        }
+      }
+      // Inherit subject's academic metadata if not explicitly provided
+      if (!req.body.academicYear) req.body.academicYear = subject.academicYear;
+      if (!req.body.branch) req.body.branch = subject.branch;
+      if (!req.body.section) req.body.section = subject.section;
+    }
+
     const test = await AptitudeTest.create(req.body);
     res.status(201).json({
       success: true,
@@ -478,6 +507,97 @@ exports.getAdminAttempts = async (req, res, next) => {
       .sort({ completedAt: -1 });
 
     res.status(200).json({ success: true, data: attempts });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// @desc    Get student test reports for a specific subject (Admin and Faculty)
+// @route   GET /api/tests/subject/:subjectId/reports
+// @access  Private (Admin, Faculty)
+exports.getSubjectTestReports = async (req, res, next) => {
+  try {
+    const { subjectId } = req.params;
+    const Subject = require('../models/Subject');
+    const subject = await Subject.findById(subjectId);
+    if (!subject) {
+      return res.status(404).json({ success: false, error: 'Subject not found' });
+    }
+
+    // Check faculty scope permission if faculty
+    if (req.user.role === 'faculty') {
+      const canManage = !req.user.managedScopes || req.user.managedScopes.length === 0 || req.user.managedScopes.some(scope => {
+        const sYear = (scope.academicYear || '').trim().toLowerCase();
+        const sBranch = (scope.branch || '').trim().toLowerCase();
+        const sSection = (scope.section || '').trim().toLowerCase();
+        const reqYear = (subject.academicYear || '').trim().toLowerCase();
+        const reqBranch = (subject.branch || '').trim().toLowerCase();
+        const reqSection = (subject.section || '').trim().toLowerCase();
+        const yearMatch = !sYear || sYear === 'all' || !reqYear || sYear === reqYear || reqYear.includes(sYear) || sYear.includes(reqYear);
+        const branchMatch = !sBranch || sBranch === 'all' || !reqBranch || sBranch === reqBranch;
+        const sectionMatch = !sSection || sSection === 'all' || !reqSection || sSection === reqSection;
+        return yearMatch && branchMatch && sectionMatch;
+      });
+      if (!canManage) {
+        return res.status(403).json({ success: false, error: 'You are not assigned to manage this subject.' });
+      }
+    }
+
+    // Find all tests linked to this subject
+    const tests = await AptitudeTest.find({ subject: subjectId });
+    const testIds = tests.map(t => t._id);
+
+    // Find all attempts on these tests
+    const attempts = await TestAttempt.find({ test: { $in: testIds } })
+      .populate('user', 'name email rollNumber branch section academicYear year')
+      .populate('test', 'title duration category difficulty questionLimit')
+      .sort({ completedAt: -1 });
+
+    const formattedReports = attempts.map(attempt => {
+      const totalQ = attempt.totalQuestions || 1;
+      const score = attempt.score || 0;
+      const percentage = Math.round((score / totalQ) * 100);
+      return {
+        _id: attempt._id,
+        student: {
+          id: attempt.user?._id,
+          name: attempt.user?.name || 'Unknown Student',
+          email: attempt.user?.email || 'N/A',
+          rollNumber: attempt.user?.rollNumber || 'N/A',
+          branch: attempt.user?.branch || 'N/A',
+          section: attempt.user?.section || 'N/A',
+          academicYear: attempt.user?.academicYear || attempt.user?.year || 'N/A'
+        },
+        test: {
+          id: attempt.test?._id,
+          title: attempt.test?.title || 'Practice Test',
+          duration: attempt.test?.duration,
+          difficulty: attempt.test?.difficulty
+        },
+        score,
+        totalQuestions: totalQ,
+        correctAnswers: attempt.correctAnswers || score,
+        percentage,
+        passed: percentage >= 50,
+        completedAt: attempt.completedAt
+      };
+    });
+
+    res.status(200).json({
+      success: true,
+      subject: {
+        id: subject._id,
+        name: subject.name,
+        code: subject.code,
+        academicYear: subject.academicYear,
+        branch: subject.branch,
+        section: subject.section,
+        notesCount: subject.notes ? subject.notes.length : 0
+      },
+      testsCount: tests.length,
+      totalAttempts: formattedReports.length,
+      data: formattedReports
+    });
   } catch (err) {
     next(err);
   }

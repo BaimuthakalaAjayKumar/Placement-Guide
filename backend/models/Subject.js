@@ -1,5 +1,41 @@
 const mongoose = require('mongoose');
 
+const NoteSchema = new mongoose.Schema({
+  title: {
+    type: String,
+    required: true,
+    trim: true
+  },
+  description: {
+    type: String,
+    default: ''
+  },
+  content: {
+    type: String,
+    default: ''
+  },
+  fileUrl: {
+    type: String,
+    default: ''
+  },
+  uploadedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
+  },
+  uploaderName: {
+    type: String,
+    default: ''
+  },
+  uploaderRole: {
+    type: String,
+    default: ''
+  },
+  createdAt: {
+    type: Date,
+    default: Date.now
+  }
+});
+
 const SubjectSchema = new mongoose.Schema({
   name: {
     type: String,
@@ -27,6 +63,7 @@ const SubjectSchema = new mongoose.Schema({
     ref: 'User',
     required: true
   },
+  notes: [NoteSchema],
   isActive: {
     type: Boolean,
     default: true

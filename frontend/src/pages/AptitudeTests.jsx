@@ -163,6 +163,7 @@ const isCoreCseTest = (test) => {
   const cat = (test?.category || '').toLowerCase();
   const title = (test?.title || '').toLowerCase();
   return (
+    !!test?.subject ||
     ['dbms', 'os', 'oop', 'networks', 'cn', 'core-cse', 'dsa'].includes(cat) ||
     title.includes('dbms') ||
     title.includes('database') ||
@@ -179,10 +180,14 @@ const AptitudeTests = () => {
   const queryParams = new URLSearchParams(window.location.search);
   const companyFilter = queryParams.get('company') || '';
   const initialCategory = (queryParams.get('category') || '').toLowerCase();
-  const isInitialCoreCategory = ['dbms', 'os', 'oop', 'networks', 'cn', 'core-cse', 'dsa'].includes(initialCategory);
+  const subjectFilter = queryParams.get('subject') || '';
+  const isInitialCoreCategory = ['dbms', 'os', 'oop', 'networks', 'cn', 'core-cse', 'dsa'].includes(initialCategory) || !!subjectFilter;
 
   // States
   const [tests, setTests] = useState([]);
+  const [academicSubjects, setAcademicSubjects] = useState([]);
+  const [selectedSubjectNotes, setSelectedSubjectNotes] = useState(null);
+  const [showNotesModal, setShowNotesModal] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -498,21 +503,28 @@ const AptitudeTests = () => {
       const categoryFilter = queryParams.get('category');
       if (categoryFilter) queryParamsList.push(`category=${categoryFilter}`);
       if (companyFilter) queryParamsList.push(`company=${companyFilter}`);
+      if (subjectFilter) queryParamsList.push(`subject=${subjectFilter}`);
       
       if (queryParamsList.length > 0) {
         endpoint += `?${queryParamsList.join('&')}`;
       }
 
-      const res = await fetch(endpoint, {
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
-      });
+      const [res, subjRes] = await Promise.all([
+        fetch(endpoint, { headers: { Authorization: `Bearer ${token}` } }),
+        fetch(`${API_URL}/academic/subjects`, { headers: { Authorization: `Bearer ${token}` } }).catch(() => null)
+      ]);
       const data = await res.json();
       if (data.success) {
         setTests(data.data);
       } else {
         setError(data.error || 'Failed to retrieve test sheets.');
+      }
+
+      if (subjRes) {
+        const subjData = await subjRes.json();
+        if (subjData.success) {
+          setAcademicSubjects(subjData.data || []);
+        }
       }
     } catch (err) {
       setError('Could not connect to test servers.');
@@ -816,53 +828,122 @@ const AptitudeTests = () => {
           <div className="test-selector-view">
             <h3 className="selector-section-title">Ace Your Interviews — Core CSE</h3>
             <div className="progress-modules-list">
-              {tests.filter(test => isCoreCseTest(test)).map((test) => (
-                <div className="progress-module-row glass-card animate-fade" key={test._id}>
-                  <div className="module-left-icon">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="module-brain-icon">
-                      <rect x="4" y="4" width="16" height="16" rx="2" ry="2"></rect>
-                      <rect x="9" y="9" width="6" height="6"></rect>
-                      <line x1="9" y1="1" x2="9" y2="4"></line>
-                      <line x1="15" y1="1" x2="15" y2="4"></line>
-                      <line x1="9" y1="20" x2="9" y2="23"></line>
-                      <line x1="15" y1="20" x2="15" y2="23"></line>
-                      <line x1="20" y1="9" x2="23" y2="9"></line>
-                      <line x1="20" y1="14" x2="23" y2="14"></line>
-                      <line x1="1" y1="9" x2="4" y2="9"></line>
-                      <line x1="1" y1="14" x2="4" y2="14"></line>
-                    </svg>
-                  </div>
-                  <div className="module-content">
-                    <h4 className="module-title">{test.title}</h4>
-                    <p className="module-desc">{test.description}</p>
-                    <div className="module-meta">
-                      <span className="meta-badge">{test.questionCount} Questions</span>
-                      <span className="meta-divider">•</span>
-                      <span className="meta-badge">{test.duration} Mins</span>
+              {tests.filter(test => isCoreCseTest(test)).map((test) => {
+                const matchedSubject = academicSubjects.find(s => s._id === test.subject || s._id === test.subject?._id || (s.code && test.title?.toLowerCase().includes(s.code.toLowerCase())));
+                return (
+                  <div className="progress-module-row glass-card animate-fade" key={test._id}>
+                    <div className="module-left-icon">
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="module-brain-icon">
+                        <rect x="4" y="4" width="16" height="16" rx="2" ry="2"></rect>
+                        <rect x="9" y="9" width="6" height="6"></rect>
+                        <line x1="9" y1="1" x2="9" y2="4"></line>
+                        <line x1="15" y1="1" x2="15" y2="4"></line>
+                        <line x1="9" y1="20" x2="9" y2="23"></line>
+                        <line x1="15" y1="20" x2="15" y2="23"></line>
+                        <line x1="20" y1="9" x2="23" y2="9"></line>
+                        <line x1="20" y1="14" x2="23" y2="14"></line>
+                        <line x1="1" y1="9" x2="4" y2="9"></line>
+                        <line x1="1" y1="14" x2="4" y2="14"></line>
+                      </svg>
+                    </div>
+                    <div className="module-content">
+                      {matchedSubject && (
+                        <div style={{ marginBottom: '6px' }}>
+                          <span style={{ fontSize: '11px', fontWeight: '700', color: '#818cf8', background: 'rgba(99,102,241,0.15)', border: '1px solid rgba(99,102,241,0.3)', padding: '2px 8px', borderRadius: '4px' }}>
+                            🏛️ {matchedSubject.code} · {matchedSubject.name}
+                          </span>
+                        </div>
+                      )}
+                      <h4 className="module-title">{test.title}</h4>
+                      <p className="module-desc">{test.description}</p>
+                      <div className="module-meta">
+                        <span className="meta-badge">{test.questionCount} Questions</span>
+                        <span className="meta-divider">•</span>
+                        <span className="meta-badge">{test.duration} Mins</span>
+                        {matchedSubject?.notes && matchedSubject.notes.length > 0 && (
+                          <>
+                            <span className="meta-divider">•</span>
+                            <span className="meta-badge" style={{ color: '#60a5fa' }}>📄 {matchedSubject.notes.length} Study Notes</span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                    <div className="module-action" style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                      {matchedSubject?.notes && matchedSubject.notes.length > 0 && (
+                        <button
+                          type="button"
+                          className="btn btn-secondary btn-sm"
+                          onClick={() => {
+                            setSelectedSubjectNotes(matchedSubject);
+                            setShowNotesModal(true);
+                          }}
+                          title="View revision notes before taking test"
+                        >
+                          📖 View Notes
+                        </button>
+                      )}
+                      {test.completed ? (
+                        <div className="completed-action-wrapper">
+                          <span className="module-score-mark">Scored {Math.round((test.score / test.questionCount) * 100)}%</span>
+                          <button className="btn btn-secondary btn-sm" onClick={() => handleStartExam(test._id)}>
+                            Retake Test
+                          </button>
+                        </div>
+                      ) : (
+                        <button className="btn btn-primary" onClick={() => handleStartExam(test._id)}>
+                          Start Test
+                        </button>
+                      )}
                     </div>
                   </div>
-                  <div className="module-action">
-                    {test.completed ? (
-                      <div className="completed-action-wrapper">
-                        <span className="module-score-mark">Scored {Math.round((test.score / test.questionCount) * 100)}%</span>
-                        <button className="btn btn-secondary btn-sm" onClick={() => handleStartExam(test._id)}>
-                          Retake Test
-                        </button>
-                      </div>
-                    ) : (
-                      <button className="btn btn-primary" onClick={() => handleStartExam(test._id)}>
-                        Start Test
-                      </button>
-                    )}
-                  </div>
-                </div>
-              ))}
+                );
+              })}
               {tests.filter(test => isCoreCseTest(test)).length === 0 && (
                 <div className="glass-card" style={{ padding: '30px', textAlign: 'center', color: '#94a3b8' }}>
                   <p>No Core CSE modules found matching current criteria.</p>
                 </div>
               )}
             </div>
+          </div>
+        )}
+
+        {/* REVISION NOTES MODAL IN PRACTICE MODULES */}
+        {showNotesModal && selectedSubjectNotes && (
+          <div className="progress-modal-overlay" onClick={() => setShowNotesModal(false)}>
+            <section className="progress-modal modal-wide" onClick={e => e.stopPropagation()}>
+              <div className="progress-modal-header">
+                <div>
+                  <h2>📖 Revision Notes: {selectedSubjectNotes.name} ({selectedSubjectNotes.code})</h2>
+                  <p>Study materials and reference links provided by faculty</p>
+                </div>
+                <button className="progress-close" type="button" onClick={() => setShowNotesModal(false)}>×</button>
+              </div>
+              <div style={{ marginTop: '20px' }}>
+                {selectedSubjectNotes.notes && selectedSubjectNotes.notes.length > 0 ? (
+                  selectedSubjectNotes.notes.map((note, idx) => (
+                    <div key={note._id || idx} style={{ background: '#1e293b', border: '1px solid #334155', borderRadius: '8px', padding: '16px', marginBottom: '12px' }}>
+                      <h4 style={{ margin: '0 0 6px', color: '#f8fafc', fontSize: '15px' }}>{note.title}</h4>
+                      <div style={{ fontSize: '12px', color: '#94a3b8', marginBottom: '8px' }}>
+                        Posted by {note.uploaderName || 'Instructor'} · {new Date(note.createdAt).toLocaleDateString()}
+                      </div>
+                      {note.description && <p style={{ margin: '0 0 8px', fontSize: '13px', color: '#cbd5e1' }}>{note.description}</p>}
+                      {note.content && (
+                        <div style={{ background: '#0f172a', border: '1px solid #334155', borderRadius: '6px', padding: '12px', fontSize: '13px', lineHeight: '1.6', color: '#e2e8f0', whiteSpace: 'pre-wrap', marginBottom: '8px' }}>
+                          {note.content}
+                        </div>
+                      )}
+                      {note.fileUrl && (
+                        <a href={note.fileUrl} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: 'rgba(59,130,246,0.15)', border: '1px solid rgba(59,130,246,0.3)', color: '#93c5fd', padding: '6px 12px', borderRadius: '6px', fontSize: '12px', textDecoration: 'none' }}>
+                          🔗 Open Attached Study Resource ↗
+                        </a>
+                      )}
+                    </div>
+                  ))
+                ) : (
+                  <p style={{ textAlign: 'center', padding: '24px', color: '#94a3b8' }}>No revision notes uploaded for this subject yet.</p>
+                )}
+              </div>
+            </section>
           </div>
         )}
 

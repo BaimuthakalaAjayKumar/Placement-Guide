@@ -3,6 +3,9 @@ const {
   getSubjects,
   createSubject,
   deleteSubject,
+  getSubjectNotes,
+  addSubjectNote,
+  deleteSubjectNote,
   getProjects,
   createProject,
   updateProject,
@@ -16,6 +19,9 @@ router.use(protect);
 router.get('/subjects', getSubjects);
 router.post('/subjects', authorize('admin'), createSubject);
 router.delete('/subjects/:id', authorize('admin'), deleteSubject);
+router.get('/subjects/:id/notes', getSubjectNotes);
+router.post('/subjects/:id/notes', authorize('admin', 'faculty'), addSubjectNote);
+router.delete('/subjects/:id/notes/:noteId', authorize('admin', 'faculty'), deleteSubjectNote);
 router.get('/projects', getProjects);
 router.post('/projects', authorize('student'), createProject);
 router.put('/projects/:id', updateProject);

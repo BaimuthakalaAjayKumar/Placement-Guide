@@ -10,6 +10,7 @@ const {
   editQuestion,
   deleteQuestion,
   getAdminAttempts,
+  getSubjectTestReports,
   uploadQuestionImage,
   uploadImage,
   getPracticeQuestions,
@@ -34,16 +35,19 @@ router.post('/:id/submit', submitTestAttempt);
 // Practice questions route for students & admins
 router.get('/practice-questions/:platform', getPracticeQuestions);
 
-// Admin only routes
+// Subject Test Reports (Admin & Faculty)
+router.get('/subject/:subjectId/reports', authorize('admin', 'faculty'), getSubjectTestReports);
+
+// Admin and Faculty Test & Question Management
 router.get('/admin/attempts', authorize('admin'), getAdminAttempts);
-router.post('/', authorize('admin'), createTest);
-router.get('/:id/questions', authorize('admin'), getTestQuestionsAdmin);
-router.post('/:id/questions', authorize('admin'), addQuestion);
-router.put('/:id/questions/:qId', authorize('admin'), editQuestion);
-router.delete('/:id/questions/:qId', authorize('admin'), deleteQuestion);
+router.post('/', authorize('admin', 'faculty'), createTest);
+router.get('/:id/questions', authorize('admin', 'faculty'), getTestQuestionsAdmin);
+router.post('/:id/questions', authorize('admin', 'faculty'), addQuestion);
+router.put('/:id/questions/:qId', authorize('admin', 'faculty'), editQuestion);
+router.delete('/:id/questions/:qId', authorize('admin', 'faculty'), deleteQuestion);
 
 // Image Upload
-router.post('/upload-image', authorize('admin'), uploadQuestionImage, uploadImage);
+router.post('/upload-image', authorize('admin', 'faculty'), uploadQuestionImage, uploadImage);
 
 // Practice Platform Coordinator
 router.post('/practice-questions/:platform', authorize('admin'), addPracticeQuestion);

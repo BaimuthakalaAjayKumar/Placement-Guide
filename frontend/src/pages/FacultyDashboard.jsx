@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 import { API_URL } from '../config/api';
 import Header from '../components/Header';
 import './FacultyDashboard.css';
 
 const FacultyDashboard = () => {
+    const { user } = useAuth();
     const [activeTab, setActiveTab] = useState('students'); // 'students' | 'subjects' | 'projects' | 'labs'
     const [students, setStudents] = useState([]);
     const [subjects, setSubjects] = useState([]);
@@ -15,6 +17,43 @@ const FacultyDashboard = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [successMsg, setSuccessMsg] = useState('');
+
+    // Notes management states
+    const [selectedSubjectForNotes, setSelectedSubjectForNotes] = useState(null);
+    const [showNotesModal, setShowNotesModal] = useState(false);
+    const [notesList, setNotesList] = useState([]);
+    const [loadingNotes, setLoadingNotes] = useState(false);
+    const [noteForm, setNoteForm] = useState({ title: '', description: '', content: '', fileUrl: '' });
+    const [submittingNote, setSubmittingNote] = useState(false);
+
+    // Subject Practice Tests states
+    const [selectedSubjectForTests, setSelectedSubjectForTests] = useState(null);
+    const [showTestsModal, setShowTestsModal] = useState(false);
+    const [subjectTests, setSubjectTests] = useState([]);
+    const [loadingSubjectTests, setLoadingSubjectTests] = useState(false);
+    const [showCreateTestForm, setShowCreateTestForm] = useState(false);
+    const [testForm, setTestForm] = useState({ title: '', description: '', duration: 20, questionLimit: 20, difficulty: 'medium' });
+    const [creatingTest, setCreatingTest] = useState(false);
+
+    // Test Questions manager states
+    const [selectedTestForQuestions, setSelectedTestForQuestions] = useState(null);
+    const [showQuestionsModal, setShowQuestionsModal] = useState(false);
+    const [testQuestions, setTestQuestions] = useState([]);
+    const [loadingQuestions, setLoadingQuestions] = useState(false);
+    const [questionForm, setQuestionForm] = useState({
+        questionText: '',
+        options: ['', '', '', ''],
+        correctOptionIndex: 0,
+        difficulty: 'medium',
+        explanation: ''
+    });
+    const [submittingQuestion, setSubmittingQuestion] = useState(false);
+
+    // Subject Student Reports states
+    const [selectedSubjectForReports, setSelectedSubjectForReports] = useState(null);
+    const [showReportsModal, setShowReportsModal] = useState(false);
+    const [subjectReports, setSubjectReports] = useState([]);
+    const [loadingSubjectReports, setLoadingSubjectReports] = useState(false);
 
     // Student Progress Modal state
     const [selectedStudent, setSelectedStudent] = useState(null);
@@ -159,6 +198,195 @@ const FacultyDashboard = () => {
         const link = document.createElement('a');
         link.setAttribute('href', encodedUri);
         link.setAttribute('download', `Lab_Practice_Reports_${new Date().toISOString().split('T')[0]}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
+    // Notes Modal and Handlers
+    const openNotesModal = async (subject) => {
+        setSelectedSubjectForNotes(subject);
+        setShowNotesModal(true);
+        setNoteForm({ title: '', description: '', content: '', fileUrl: '' });
+        try {
+            setLoadingNotes(true);
+            const res = await axios.get(`${API_URL}/academic/subjects/${subject._id}/notes`, getAuthHeaders());
+            setNotesList(res.data?.data || subject.notes || []);
+        } catch (err) {
+            setNotesList(subject.notes || []);
+        } finally {
+            setLoadingNotes(false);
+        }
+    };
+
+    const handleAddNote = async (e) => {
+        e.preventDefault();
+        if (!noteForm.title.trim()) return;
+        try {
+            setSubmittingNote(true);
+            const res = await axios.post(`${API_URL}/academic/subjects/${selectedSubjectForNotes._id}/notes`, noteForm, getAuthHeaders());
+            setNotesList(prev => [res.data.data, ...prev]);
+            setSubjects(prev => prev.map(s => s._id === selectedSubjectForNotes._id ? { ...s, notes: [res.data.data, ...(s.notes || [])] } : s));
+            setNoteForm({ title: '', description: '', content: '', fileUrl: '' });
+            setSuccessMsg('Study note added successfully!');
+        } catch (err) {
+            setError(err.response?.data?.error || 'Failed to add study note.');
+        } finally {
+            setSubmittingNote(false);
+        }
+    };
+
+    const handleDeleteNote = async (noteId) => {
+        if (!window.confirm('Are you sure you want to delete this study note?')) return;
+        try {
+            await axios.delete(`${API_URL}/academic/subjects/${selectedSubjectForNotes._id}/notes/${noteId}`, getAuthHeaders());
+            setNotesList(prev => prev.filter(n => n._id !== noteId));
+            setSubjects(prev => prev.map(s => s._id === selectedSubjectForNotes._id ? { ...s, notes: (s.notes || []).filter(n => n._id !== noteId) } : s));
+            setSuccessMsg('Note deleted.');
+        } catch (err) {
+            setError(err.response?.data?.error || 'Failed to delete note.');
+        }
+    };
+
+    // Practice Tests Modal and Handlers
+    const openTestsModal = async (subject) => {
+        setSelectedSubjectForTests(subject);
+        setShowTestsModal(true);
+        setShowCreateTestForm(false);
+        try {
+            setLoadingSubjectTests(true);
+            const res = await axios.get(`${API_URL}/tests`, getAuthHeaders());
+            const allTests = res.data?.data || [];
+            const matched = allTests.filter(t => t.subject === subject._id || (t.subject?._id === subject._id) || (t.title?.toLowerCase().includes(subject.code.toLowerCase())) || (t.title?.toLowerCase().includes(subject.name.toLowerCase())));
+            setSubjectTests(matched);
+        } catch (err) {
+            setError('Failed to fetch tests for this subject.');
+        } finally {
+            setLoadingSubjectTests(false);
+        }
+    };
+
+    const handleCreateSubjectTest = async (e) => {
+        e.preventDefault();
+        try {
+            setCreatingTest(true);
+            const payload = {
+                ...testForm,
+                category: 'core-cse',
+                subject: selectedSubjectForTests._id,
+                academicYear: selectedSubjectForTests.academicYear,
+                branch: selectedSubjectForTests.branch,
+                section: selectedSubjectForTests.section
+            };
+            const res = await axios.post(`${API_URL}/tests`, payload, getAuthHeaders());
+            setSubjectTests(prev => [res.data.data, ...prev]);
+            setShowCreateTestForm(false);
+            setTestForm({ title: '', description: '', duration: 20, questionLimit: 20, difficulty: 'medium' });
+            setSuccessMsg('Practice test created successfully! Click "Manage Questions" to add questions.');
+        } catch (err) {
+            setError(err.response?.data?.error || 'Failed to create practice test.');
+        } finally {
+            setCreatingTest(false);
+        }
+    };
+
+    // Questions Manager Handlers
+    const openQuestionsModal = async (test) => {
+        setSelectedTestForQuestions(test);
+        setShowQuestionsModal(true);
+        setQuestionForm({
+            questionText: '',
+            options: ['', '', '', ''],
+            correctOptionIndex: 0,
+            difficulty: 'medium',
+            explanation: ''
+        });
+        try {
+            setLoadingQuestions(true);
+            const res = await axios.get(`${API_URL}/tests/${test._id}/questions`, getAuthHeaders());
+            setTestQuestions(res.data?.data || []);
+        } catch (err) {
+            setError('Failed to load questions.');
+        } finally {
+            setLoadingQuestions(false);
+        }
+    };
+
+    const handleAddQuestion = async (e) => {
+        e.preventDefault();
+        if (!questionForm.questionText.trim() || questionForm.options.some(opt => !opt.trim())) {
+            setError('Please provide question text and all 4 options.');
+            return;
+        }
+        try {
+            setSubmittingQuestion(true);
+            const res = await axios.post(`${API_URL}/tests/${selectedTestForQuestions._id}/questions`, questionForm, getAuthHeaders());
+            setTestQuestions(prev => [...prev, res.data.data]);
+            setQuestionForm({
+                questionText: '',
+                options: ['', '', '', ''],
+                correctOptionIndex: 0,
+                difficulty: 'medium',
+                explanation: ''
+            });
+            setSuccessMsg('Question added successfully.');
+        } catch (err) {
+            setError(err.response?.data?.error || 'Failed to add question.');
+        } finally {
+            setSubmittingQuestion(false);
+        }
+    };
+
+    const handleDeleteQuestion = async (qId) => {
+        if (!window.confirm('Delete this question?')) return;
+        try {
+            await axios.delete(`${API_URL}/tests/${selectedTestForQuestions._id}/questions/${qId}`, getAuthHeaders());
+            setTestQuestions(prev => prev.filter(q => q._id !== qId));
+            setSuccessMsg('Question removed.');
+        } catch (err) {
+            setError('Failed to delete question.');
+        }
+    };
+
+    // Student Reports Modal and Handlers
+    const openReportsModal = async (subject) => {
+        setSelectedSubjectForReports(subject);
+        setShowReportsModal(true);
+        try {
+            setLoadingSubjectReports(true);
+            const res = await axios.get(`${API_URL}/tests/subject/${subject._id}/reports`, getAuthHeaders());
+            setSubjectReports(res.data?.data || []);
+        } catch (err) {
+            setError(err.response?.data?.error || 'Failed to load subject test reports.');
+        } finally {
+            setLoadingSubjectReports(false);
+        }
+    };
+
+    const downloadSubjectReportsCSV = () => {
+        if (!subjectReports.length) return;
+        const headers = ['Student Name', 'Roll Number', 'Email', 'Branch', 'Section', 'Academic Year', 'Test Title', 'Score', 'Total Questions', 'Percentage (%)', 'Status', 'Completed Date'];
+        const rows = subjectReports.map(r => [
+            `"${(r.student?.name || '').replace(/"/g, '""')}"`,
+            `"${(r.student?.rollNumber || '').replace(/"/g, '""')}"`,
+            `"${(r.student?.email || '').replace(/"/g, '""')}"`,
+            `"${(r.student?.branch || '').replace(/"/g, '""')}"`,
+            `"${(r.student?.section || '').replace(/"/g, '""')}"`,
+            `"${(r.student?.academicYear || '').replace(/"/g, '""')}"`,
+            `"${(r.test?.title || '').replace(/"/g, '""')}"`,
+            r.score,
+            r.totalQuestions,
+            `${r.percentage}%`,
+            r.passed ? 'PASSED' : 'NEEDS PRACTICE',
+            `"${r.completedAt ? new Date(r.completedAt).toLocaleString() : ''}"`
+        ]);
+
+        const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement('a');
+        link.setAttribute('href', encodedUri);
+        const subjCode = (selectedSubjectForReports?.code || 'Subject').replace(/[^a-zA-Z0-9]/g, '_');
+        link.setAttribute('download', `${subjCode}_Student_Test_Reports_${new Date().toISOString().split('T')[0]}.csv`);
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
@@ -380,13 +608,13 @@ const FacultyDashboard = () => {
                         </div>
                     )}
 
-                    {/* TAB 2: ACADEMIC SUBJECTS (VIEW ONLY FOR FACULTY) */}
+                    {/* TAB 2: ACADEMIC SUBJECTS */}
                     {activeTab === 'subjects' && (
                         <div className="faculty-card">
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
                                 <div>
                                     <h3>📚 Registered Academic Preparation Subjects ({subjects.length})</h3>
-                                    <p className="card-desc">Curriculum preparation subjects registered by administrators and available for student practice.</p>
+                                    <p className="card-desc">Curriculum preparation subjects assigned to your academic scope. Add notes, create subject practice tests, and download student reports.</p>
                                 </div>
                             </div>
 
@@ -401,8 +629,8 @@ const FacultyDashboard = () => {
                                                 <th>Subject Name</th>
                                                 <th>Academic Year</th>
                                                 <th>Branch / Section</th>
-                                                <th>Description</th>
-                                                <th>Status</th>
+                                                <th>Study Notes</th>
+                                                <th>Subject Actions</th>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -412,12 +640,43 @@ const FacultyDashboard = () => {
                                                     <td><strong>{s.name}</strong></td>
                                                     <td>{s.academicYear}</td>
                                                     <td>{s.branch || 'All'} {s.section ? `· Sec ${s.section}` : ''}</td>
-                                                    <td style={{ fontSize: '13px', color: '#94a3b8', maxWidth: '300px' }}>{s.description || '—'}</td>
-                                                    <td><span className="status-badge-active">Active</span></td>
+                                                    <td>
+                                                        <span style={{ fontSize: '12px', color: '#93c5fd', background: 'rgba(59, 130, 246, 0.1)', padding: '4px 8px', borderRadius: '4px', border: '1px solid rgba(59, 130, 246, 0.25)' }}>
+                                                            📄 {s.notes?.length || 0} Notes
+                                                        </span>
+                                                    </td>
+                                                    <td>
+                                                        <div className="subject-actions-cell">
+                                                            <button
+                                                                type="button"
+                                                                className="btn-subject-action btn-action-notes"
+                                                                onClick={() => openNotesModal(s)}
+                                                                title="Add and view study notes for this subject"
+                                                            >
+                                                                📝 Notes & Materials
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                className="btn-subject-action btn-action-tests"
+                                                                onClick={() => openTestsModal(s)}
+                                                                title="Create practice tests and manage questions"
+                                                            >
+                                                                🧪 Practice Tests
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                className="btn-subject-action btn-action-reports"
+                                                                onClick={() => openReportsModal(s)}
+                                                                title="View and download student test reports"
+                                                            >
+                                                                📥 Student Reports
+                                                            </button>
+                                                        </div>
+                                                    </td>
                                                 </tr>
                                             ))}
                                             {!subjects.length && (
-                                                <tr><td colSpan="6" style={{ textAlign: 'center', padding: '30px', color: '#94a3b8' }}>No academic subjects registered yet.</td></tr>
+                                                <tr><td colSpan="6" style={{ textAlign: 'center', padding: '30px', color: '#94a3b8' }}>No academic subjects registered in your scope yet.</td></tr>
                                             )}
                                         </tbody>
                                     </table>
@@ -785,6 +1044,521 @@ const FacultyDashboard = () => {
                                             </div>
                                         )) : <p className="text-muted">No lab attempts.</p>}
                                     </div>
+                                </div>
+                            </section>
+                        </div>
+                    )}
+
+                    {/* 1. STUDY NOTES & MATERIALS MODAL */}
+                    {showNotesModal && selectedSubjectForNotes && (
+                        <div className="progress-modal-overlay" onClick={() => setShowNotesModal(false)}>
+                            <section className="progress-modal modal-wide" onClick={e => e.stopPropagation()}>
+                                <div className="progress-modal-header">
+                                    <div>
+                                        <h2>📝 Study Notes & Materials: {selectedSubjectForNotes.name}</h2>
+                                        <p><span className="code-pill">{selectedSubjectForNotes.code}</span> · {selectedSubjectForNotes.academicYear} · {selectedSubjectForNotes.branch || 'All Branches'} {selectedSubjectForNotes.section ? `(Sec ${selectedSubjectForNotes.section})` : ''}</p>
+                                    </div>
+                                    <button className="progress-close" type="button" onClick={() => setShowNotesModal(false)}>×</button>
+                                </div>
+
+                                <div style={{ marginTop: '20px' }}>
+                                    {/* Add Note Form */}
+                                    <div style={{ background: '#0f172a', border: '1px solid #334155', borderRadius: '8px', padding: '18px', marginBottom: '24px' }}>
+                                        <h4 style={{ margin: '0 0 12px 0', color: '#60a5fa', fontSize: '15px' }}>➕ Upload New Study Material / Revision Notes</h4>
+                                        <form onSubmit={handleAddNote}>
+                                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '12px', marginBottom: '12px' }}>
+                                                <div>
+                                                    <label style={{ display: 'block', fontSize: '12px', color: '#94a3b8', marginBottom: '4px' }}>Note / Chapter Title *</label>
+                                                    <input
+                                                        type="text"
+                                                        className="form-control"
+                                                        placeholder="e.g. Unit 3: Normalization & BCNF Notes"
+                                                        value={noteForm.title}
+                                                        onChange={e => setNoteForm({ ...noteForm, title: e.target.value })}
+                                                        required
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label style={{ display: 'block', fontSize: '12px', color: '#94a3b8', marginBottom: '4px' }}>Short Description / Topics</label>
+                                                    <input
+                                                        type="text"
+                                                        className="form-control"
+                                                        placeholder="e.g. 1NF, 2NF, 3NF, BCNF, Dependency Preservation"
+                                                        value={noteForm.description}
+                                                        onChange={e => setNoteForm({ ...noteForm, description: e.target.value })}
+                                                    />
+                                                </div>
+                                                <div style={{ gridColumn: '1 / -1' }}>
+                                                    <label style={{ display: 'block', fontSize: '12px', color: '#94a3b8', marginBottom: '4px' }}>Reference File / Document Link (Google Drive, PDF, GitHub URL)</label>
+                                                    <input
+                                                        type="url"
+                                                        className="form-control"
+                                                        placeholder="https://drive.google.com/... or https://github.com/..."
+                                                        value={noteForm.fileUrl}
+                                                        onChange={e => setNoteForm({ ...noteForm, fileUrl: e.target.value })}
+                                                    />
+                                                </div>
+                                                <div style={{ gridColumn: '1 / -1' }}>
+                                                    <label style={{ display: 'block', fontSize: '12px', color: '#94a3b8', marginBottom: '4px' }}>Detailed Revision Notes / Key Points (Optional Text / Markdown)</label>
+                                                    <textarea
+                                                        className="form-control"
+                                                        rows={4}
+                                                        placeholder="Type or paste comprehensive study notes, key formulas, interview cheat sheets..."
+                                                        value={noteForm.content}
+                                                        onChange={e => setNoteForm({ ...noteForm, content: e.target.value })}
+                                                    />
+                                                </div>
+                                            </div>
+                                            <button
+                                                type="submit"
+                                                className="btn btn-primary"
+                                                disabled={submittingNote || !noteForm.title.trim()}
+                                                style={{ minWidth: '160px' }}
+                                            >
+                                                {submittingNote ? 'Uploading Note...' : '📤 Post Study Material'}
+                                            </button>
+                                        </form>
+                                    </div>
+
+                                    {/* Existing Notes List */}
+                                    <h4 style={{ margin: '0 0 14px 0', fontSize: '15px' }}>Available Subject Study Materials ({notesList.length})</h4>
+                                    {loadingNotes ? (
+                                        <p className="loading-text">Loading notes...</p>
+                                    ) : notesList.length > 0 ? (
+                                        <div>
+                                            {notesList.map((note) => (
+                                                <div key={note._id} className="note-card-item">
+                                                    <div className="note-card-header">
+                                                        <div>
+                                                            <h5 className="note-card-title">{note.title}</h5>
+                                                            <div className="note-meta-line">
+                                                                Uploaded by <strong>{note.uploaderName || 'Faculty'}</strong> ({note.uploaderRole || 'instructor'}) · {new Date(note.createdAt).toLocaleDateString()}
+                                                            </div>
+                                                        </div>
+                                                        <button
+                                                            type="button"
+                                                            className="btn btn-secondary btn-sm"
+                                                            style={{ color: '#ef4444', borderColor: 'rgba(239,68,68,0.3)', padding: '4px 8px', fontSize: '12px' }}
+                                                            onClick={() => handleDeleteNote(note._id)}
+                                                            title="Delete this note"
+                                                        >
+                                                            🗑️ Delete
+                                                        </button>
+                                                    </div>
+                                                    {note.description && (
+                                                        <p style={{ margin: '0 0 8px 0', fontSize: '13px', color: '#cbd5e1' }}>{note.description}</p>
+                                                    )}
+                                                    {note.content && (
+                                                        <div className="note-content-box">{note.content}</div>
+                                                    )}
+                                                    {note.fileUrl && (
+                                                        <div style={{ marginTop: '8px' }}>
+                                                            <a href={note.fileUrl} target="_blank" rel="noopener noreferrer" className="note-file-link">
+                                                                🔗 Open Study Resource / Attachment ↗
+                                                            </a>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <p style={{ textAlign: 'center', padding: '24px', color: '#94a3b8', background: '#0f172a', borderRadius: '8px' }}>
+                                            No study notes uploaded for this subject yet. Be the first to share revision materials!
+                                        </p>
+                                    )}
+                                </div>
+                            </section>
+                        </div>
+                    )}
+
+                    {/* 2. PRACTICE TESTS MODAL */}
+                    {showTestsModal && selectedSubjectForTests && (
+                        <div className="progress-modal-overlay" onClick={() => setShowTestsModal(false)}>
+                            <section className="progress-modal modal-wide" onClick={e => e.stopPropagation()}>
+                                <div className="progress-modal-header">
+                                    <div>
+                                        <h2>🧪 Practice Tests: {selectedSubjectForTests.name}</h2>
+                                        <p><span className="code-pill">{selectedSubjectForTests.code}</span> · {selectedSubjectForTests.academicYear} · {selectedSubjectForTests.branch || 'All'}</p>
+                                    </div>
+                                    <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                                        <button
+                                            type="button"
+                                            className="btn btn-primary btn-sm"
+                                            onClick={() => setShowCreateTestForm(!showCreateTestForm)}
+                                        >
+                                            {showCreateTestForm ? 'Cancel' : '➕ Create Practice Test'}
+                                        </button>
+                                        <button className="progress-close" type="button" onClick={() => setShowTestsModal(false)}>×</button>
+                                    </div>
+                                </div>
+
+                                <div style={{ marginTop: '20px' }}>
+                                    {/* Create Test Inline Form */}
+                                    {showCreateTestForm && (
+                                        <div style={{ background: '#0f172a', border: '1px solid #334155', borderRadius: '8px', padding: '18px', marginBottom: '20px' }}>
+                                            <h4 style={{ margin: '0 0 12px 0', color: '#c084fc', fontSize: '15px' }}>Create New Subject Practice Test</h4>
+                                            <form onSubmit={handleCreateSubjectTest}>
+                                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px', marginBottom: '12px' }}>
+                                                    <div>
+                                                        <label style={{ display: 'block', fontSize: '12px', color: '#94a3b8', marginBottom: '4px' }}>Test Title *</label>
+                                                        <input
+                                                            type="text"
+                                                            className="form-control"
+                                                            placeholder={`e.g. ${selectedSubjectForTests.code} Unit 1 Assessment`}
+                                                            value={testForm.title}
+                                                            onChange={e => setTestForm({ ...testForm, title: e.target.value })}
+                                                            required
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <label style={{ display: 'block', fontSize: '12px', color: '#94a3b8', marginBottom: '4px' }}>Duration (Minutes) *</label>
+                                                        <input
+                                                            type="number"
+                                                            min={5}
+                                                            max={180}
+                                                            className="form-control"
+                                                            value={testForm.duration}
+                                                            onChange={e => setTestForm({ ...testForm, duration: Number(e.target.value) })}
+                                                            required
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <label style={{ display: 'block', fontSize: '12px', color: '#94a3b8', marginBottom: '4px' }}>Difficulty</label>
+                                                        <select
+                                                            className="form-control"
+                                                            value={testForm.difficulty}
+                                                            onChange={e => setTestForm({ ...testForm, difficulty: e.target.value })}
+                                                        >
+                                                            <option value="easy">Easy</option>
+                                                            <option value="medium">Medium</option>
+                                                            <option value="hard">Hard</option>
+                                                        </select>
+                                                    </div>
+                                                    <div>
+                                                        <label style={{ display: 'block', fontSize: '12px', color: '#94a3b8', marginBottom: '4px' }}>Question Limit</label>
+                                                        <input
+                                                            type="number"
+                                                            min={1}
+                                                            max={100}
+                                                            className="form-control"
+                                                            value={testForm.questionLimit}
+                                                            onChange={e => setTestForm({ ...testForm, questionLimit: Number(e.target.value) })}
+                                                        />
+                                                    </div>
+                                                    <div style={{ gridColumn: '1 / -1' }}>
+                                                        <label style={{ display: 'block', fontSize: '12px', color: '#94a3b8', marginBottom: '4px' }}>Test Description / Syllabus</label>
+                                                        <input
+                                                            type="text"
+                                                            className="form-control"
+                                                            placeholder="Topics covered in this test..."
+                                                            value={testForm.description}
+                                                            onChange={e => setTestForm({ ...testForm, description: e.target.value })}
+                                                        />
+                                                    </div>
+                                                </div>
+                                                <button
+                                                    type="submit"
+                                                    className="btn btn-primary"
+                                                    disabled={creatingTest || !testForm.title.trim()}
+                                                >
+                                                    {creatingTest ? 'Creating Test...' : 'Save & Proceed to Questions'}
+                                                </button>
+                                            </form>
+                                        </div>
+                                    )}
+
+                                    {/* Test List */}
+                                    <h4 style={{ margin: '0 0 14px 0', fontSize: '15px' }}>Subject Tests ({subjectTests.length})</h4>
+                                    {loadingSubjectTests ? (
+                                        <p className="loading-text">Loading tests...</p>
+                                    ) : subjectTests.length > 0 ? (
+                                        <div className="students-table-scroll">
+                                            <table className="students-table">
+                                                <thead>
+                                                    <tr>
+                                                        <th>Test Title</th>
+                                                        <th>Questions</th>
+                                                        <th>Duration</th>
+                                                        <th>Difficulty</th>
+                                                        <th>Action</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {subjectTests.map(t => (
+                                                        <tr key={t._id}>
+                                                            <td>
+                                                                <strong>{t.title}</strong>
+                                                                {t.description && <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '2px' }}>{t.description}</div>}
+                                                            </td>
+                                                            <td><span className="code-pill">{t.questionCount || t.questions?.length || 0} Qs</span></td>
+                                                            <td>{t.duration} mins</td>
+                                                            <td><span style={{ textTransform: 'capitalize', color: t.difficulty === 'hard' ? '#ef4444' : t.difficulty === 'medium' ? '#f59e0b' : '#10b981' }}>{t.difficulty || 'medium'}</span></td>
+                                                            <td>
+                                                                <button
+                                                                    type="button"
+                                                                    className="btn-subject-action btn-action-tests"
+                                                                    onClick={() => openQuestionsModal(t)}
+                                                                >
+                                                                    ❓ Manage Questions ({t.questionCount || t.questions?.length || 0})
+                                                                </button>
+                                                            </td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    ) : (
+                                        <p style={{ textAlign: 'center', padding: '24px', color: '#94a3b8', background: '#0f172a', borderRadius: '8px' }}>
+                                            No practice tests created for this subject yet. Click "+ Create Practice Test" above to set one up!
+                                        </p>
+                                    )}
+                                </div>
+                            </section>
+                        </div>
+                    )}
+
+                    {/* 3. TEST QUESTIONS MANAGER MODAL */}
+                    {showQuestionsModal && selectedTestForQuestions && (
+                        <div className="progress-modal-overlay" onClick={() => setShowQuestionsModal(false)}>
+                            <section className="progress-modal modal-wide" onClick={e => e.stopPropagation()}>
+                                <div className="progress-modal-header">
+                                    <div>
+                                        <h2>❓ Test Questions: {selectedTestForQuestions.title}</h2>
+                                        <p>Add and configure multiple-choice questions (MCQs), options, correct answers, and explanations.</p>
+                                    </div>
+                                    <button className="progress-close" type="button" onClick={() => setShowQuestionsModal(false)}>×</button>
+                                </div>
+
+                                <div style={{ marginTop: '20px' }}>
+                                    {/* Add Question Form */}
+                                    <div style={{ background: '#0f172a', border: '1px solid #334155', borderRadius: '8px', padding: '18px', marginBottom: '24px' }}>
+                                        <h4 style={{ margin: '0 0 12px 0', color: '#c084fc', fontSize: '15px' }}>➕ Add MCQ Question</h4>
+                                        <form onSubmit={handleAddQuestion}>
+                                            <div style={{ marginBottom: '12px' }}>
+                                                <label style={{ display: 'block', fontSize: '12px', color: '#94a3b8', marginBottom: '4px' }}>Question Text *</label>
+                                                <textarea
+                                                    className="form-control"
+                                                    rows={3}
+                                                    placeholder="Type the question prompt..."
+                                                    value={questionForm.questionText}
+                                                    onChange={e => setQuestionForm({ ...questionForm, questionText: e.target.value })}
+                                                    required
+                                                />
+                                            </div>
+
+                                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
+                                                {[0, 1, 2, 3].map(idx => (
+                                                    <div key={idx}>
+                                                        <label style={{ display: 'block', fontSize: '12px', color: '#94a3b8', marginBottom: '4px' }}>
+                                                            Option {String.fromCharCode(65 + idx)} * {questionForm.correctOptionIndex === idx ? '✅ (Correct Choice)' : ''}
+                                                        </label>
+                                                        <input
+                                                            type="text"
+                                                            className="form-control"
+                                                            placeholder={`Option ${String.fromCharCode(65 + idx)} text`}
+                                                            value={questionForm.options[idx] || ''}
+                                                            onChange={e => {
+                                                                const opts = [...questionForm.options];
+                                                                opts[idx] = e.target.value;
+                                                                setQuestionForm({ ...questionForm, options: opts });
+                                                            }}
+                                                            required
+                                                        />
+                                                    </div>
+                                                ))}
+                                            </div>
+
+                                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px', marginBottom: '12px' }}>
+                                                <div>
+                                                    <label style={{ display: 'block', fontSize: '12px', color: '#94a3b8', marginBottom: '4px' }}>Correct Option *</label>
+                                                    <select
+                                                        className="form-control"
+                                                        value={questionForm.correctOptionIndex}
+                                                        onChange={e => setQuestionForm({ ...questionForm, correctOptionIndex: Number(e.target.value) })}
+                                                    >
+                                                        <option value={0}>Option A</option>
+                                                        <option value={1}>Option B</option>
+                                                        <option value={2}>Option C</option>
+                                                        <option value={3}>Option D</option>
+                                                    </select>
+                                                </div>
+                                                <div>
+                                                    <label style={{ display: 'block', fontSize: '12px', color: '#94a3b8', marginBottom: '4px' }}>Difficulty</label>
+                                                    <select
+                                                        className="form-control"
+                                                        value={questionForm.difficulty}
+                                                        onChange={e => setQuestionForm({ ...questionForm, difficulty: e.target.value })}
+                                                    >
+                                                        <option value="easy">Easy</option>
+                                                        <option value="medium">Medium</option>
+                                                        <option value="hard">Hard</option>
+                                                    </select>
+                                                </div>
+                                                <div style={{ gridColumn: '1 / -1' }}>
+                                                    <label style={{ display: 'block', fontSize: '12px', color: '#94a3b8', marginBottom: '4px' }}>Explanation / Solution Step (Optional)</label>
+                                                    <input
+                                                        type="text"
+                                                        className="form-control"
+                                                        placeholder="Explain why this option is correct to help students learn..."
+                                                        value={questionForm.explanation}
+                                                        onChange={e => setQuestionForm({ ...questionForm, explanation: e.target.value })}
+                                                    />
+                                                </div>
+                                            </div>
+
+                                            <button
+                                                type="submit"
+                                                className="btn btn-primary"
+                                                disabled={submittingQuestion}
+                                            >
+                                                {submittingQuestion ? 'Saving Question...' : '💾 Save Question'}
+                                            </button>
+                                        </form>
+                                    </div>
+
+                                    {/* Questions List */}
+                                    <h4 style={{ margin: '0 0 14px 0', fontSize: '15px' }}>Current Questions ({testQuestions.length})</h4>
+                                    {loadingQuestions ? (
+                                        <p className="loading-text">Loading questions...</p>
+                                    ) : testQuestions.length > 0 ? (
+                                        <div>
+                                            {testQuestions.map((q, qIndex) => (
+                                                <div key={q._id || qIndex} style={{ background: '#1e293b', border: '1px solid #334155', borderRadius: '8px', padding: '16px', marginBottom: '14px' }}>
+                                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px' }}>
+                                                        <strong style={{ color: '#f8fafc', fontSize: '14px' }}>Q{qIndex + 1}. {q.questionText}</strong>
+                                                        <button
+                                                            type="button"
+                                                            className="btn btn-secondary btn-sm"
+                                                            style={{ color: '#ef4444', borderColor: 'rgba(239,68,68,0.3)', padding: '2px 8px', fontSize: '12px' }}
+                                                            onClick={() => handleDeleteQuestion(q._id)}
+                                                        >
+                                                            🗑️ Delete
+                                                        </button>
+                                                    </div>
+                                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '10px' }}>
+                                                        {q.options?.map((opt, oIdx) => (
+                                                            <div
+                                                                key={oIdx}
+                                                                style={{
+                                                                    padding: '8px 12px',
+                                                                    borderRadius: '6px',
+                                                                    fontSize: '13px',
+                                                                    background: oIdx === q.correctOptionIndex ? 'rgba(16, 185, 129, 0.15)' : '#0f172a',
+                                                                    border: oIdx === q.correctOptionIndex ? '1px solid #10b981' : '1px solid #334155',
+                                                                    color: oIdx === q.correctOptionIndex ? '#34d399' : '#cbd5e1'
+                                                                }}
+                                                            >
+                                                                <strong>{String.fromCharCode(65 + oIdx)}.</strong> {opt} {oIdx === q.correctOptionIndex ? ' ✓' : ''}
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                    {q.explanation && (
+                                                        <div style={{ fontSize: '12px', color: '#94a3b8', background: '#0f172a', padding: '8px', borderRadius: '6px' }}>
+                                                            💡 <strong>Explanation:</strong> {q.explanation}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <p style={{ textAlign: 'center', padding: '24px', color: '#94a3b8', background: '#0f172a', borderRadius: '8px' }}>
+                                            No questions added yet. Use the form above to add questions to this test.
+                                        </p>
+                                    )}
+                                </div>
+                            </section>
+                        </div>
+                    )}
+
+                    {/* 4. STUDENT TEST REPORTS & CSV MODAL */}
+                    {showReportsModal && selectedSubjectForReports && (
+                        <div className="progress-modal-overlay" onClick={() => setShowReportsModal(false)}>
+                            <section className="progress-modal modal-wide" onClick={e => e.stopPropagation()}>
+                                <div className="progress-modal-header">
+                                    <div>
+                                        <h2>📊 Student Test Reports: {selectedSubjectForReports.name}</h2>
+                                        <p><span className="code-pill">{selectedSubjectForReports.code}</span> · {selectedSubjectForReports.academicYear} · {selectedSubjectForReports.branch || 'All'}</p>
+                                    </div>
+                                    <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                                        <button
+                                            type="button"
+                                            className="btn btn-primary btn-sm"
+                                            style={{ background: '#10b981', borderColor: '#059669', color: '#ffffff' }}
+                                            onClick={downloadSubjectReportsCSV}
+                                            disabled={!subjectReports.length}
+                                        >
+                                            📥 Download Report (CSV)
+                                        </button>
+                                        <button className="progress-close" type="button" onClick={() => setShowReportsModal(false)}>×</button>
+                                    </div>
+                                </div>
+
+                                <div style={{ marginTop: '20px' }}>
+                                    <div className="progress-summary-grid">
+                                        <div><span>Total Attempts</span><strong>{subjectReports.length}</strong></div>
+                                        <div><span>Unique Students</span><strong>{new Set(subjectReports.map(r => r.student?.id || r.student?.email)).size}</strong></div>
+                                        <div><span>Passed (&gt;=50%)</span><strong style={{ color: '#10b981' }}>{subjectReports.filter(r => r.passed).length}</strong></div>
+                                        <div><span>Needs Practice</span><strong style={{ color: '#ef4444' }}>{subjectReports.filter(r => !r.passed).length}</strong></div>
+                                        <div>
+                                            <span>Average Score</span>
+                                            <strong>{subjectReports.length ? Math.round(subjectReports.reduce((acc, r) => acc + (r.percentage || 0), 0) / subjectReports.length) : 0}%</strong>
+                                        </div>
+                                    </div>
+
+                                    {loadingSubjectReports ? (
+                                        <p className="loading-text">Loading student test records...</p>
+                                    ) : subjectReports.length > 0 ? (
+                                        <div className="students-table-scroll">
+                                            <table className="students-table">
+                                                <thead>
+                                                    <tr>
+                                                        <th>Student</th>
+                                                        <th>Roll Number</th>
+                                                        <th>Branch / Sec</th>
+                                                        <th>Test Title</th>
+                                                        <th>Score</th>
+                                                        <th>Percentage</th>
+                                                        <th>Status</th>
+                                                        <th>Attempted On</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {subjectReports.map((report) => (
+                                                        <tr key={report._id}>
+                                                            <td>
+                                                                <strong>{report.student?.name}</strong>
+                                                                <div style={{ fontSize: '12px', color: '#94a3b8' }}>{report.student?.email}</div>
+                                                            </td>
+                                                            <td><span className="code-pill">{report.student?.rollNumber || 'N/A'}</span></td>
+                                                            <td>{report.student?.branch || 'N/A'} {report.student?.section ? `· Sec ${report.student?.section}` : ''}</td>
+                                                            <td>{report.test?.title || 'Practice Test'}</td>
+                                                            <td><strong>{report.score}</strong> / {report.totalQuestions}</td>
+                                                            <td>
+                                                                <span className={`score-badge ${report.percentage >= 70 ? 'high' : report.percentage >= 50 ? 'medium' : 'low'}`}>
+                                                                    {report.percentage}%
+                                                                </span>
+                                                            </td>
+                                                            <td>
+                                                                {report.passed ? (
+                                                                    <span style={{ color: '#10b981', fontWeight: 600, fontSize: '12px' }}>PASSED</span>
+                                                                ) : (
+                                                                    <span style={{ color: '#ef4444', fontWeight: 600, fontSize: '12px' }}>RETAKE NEEDED</span>
+                                                                )}
+                                                            </td>
+                                                            <td style={{ fontSize: '12px', color: '#94a3b8' }}>
+                                                                {report.completedAt ? new Date(report.completedAt).toLocaleDateString() : 'N/A'}
+                                                            </td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    ) : (
+                                        <div style={{ textAlign: 'center', padding: '36px', color: '#94a3b8', background: '#0f172a', borderRadius: '8px' }}>
+                                            <p style={{ margin: 0, fontSize: '15px' }}>No students have attempted tests for this subject yet.</p>
+                                            <p style={{ margin: '8px 0 0 0', fontSize: '13px', color: '#64748b' }}>When students in this academic year take the practice tests, their live performance will appear here.</p>
+                                        </div>
+                                    )}
                                 </div>
                             </section>
                         </div>

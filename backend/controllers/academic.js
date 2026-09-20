@@ -90,6 +90,76 @@ exports.deleteSubject = async (req, res, next) => {
   }
 };
 
+exports.getSubjectNotes = async (req, res, next) => {
+  try {
+    const subject = await Subject.findById(req.params.id);
+    if (!subject) return res.status(404).json({ success: false, error: 'Subject not found.' });
+
+    res.status(200).json({ success: true, count: subject.notes.length, data: subject.notes });
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.addSubjectNote = async (req, res, next) => {
+  try {
+    const { title, description = '', content = '', fileUrl = '' } = req.body;
+    if (!title) {
+      return res.status(400).json({ success: false, error: 'Note title is required.' });
+    }
+
+    const subject = await Subject.findById(req.params.id);
+    if (!subject) return res.status(404).json({ success: false, error: 'Subject not found.' });
+
+    if (req.user.role === 'faculty' && !canManageScope(req.user, subject.academicYear, subject.branch, subject.section)) {
+      return res.status(403).json({ success: false, error: 'You are not assigned to manage this subject.' });
+    }
+
+    const newNote = {
+      title,
+      description,
+      content,
+      fileUrl,
+      uploadedBy: req.user.id,
+      uploaderName: req.user.name || 'Instructor',
+      uploaderRole: req.user.role,
+      createdAt: new Date()
+    };
+
+    subject.notes.push(newNote);
+    await subject.save();
+
+    const createdNote = subject.notes[subject.notes.length - 1];
+    res.status(201).json({ success: true, data: createdNote });
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.deleteSubjectNote = async (req, res, next) => {
+  try {
+    const subject = await Subject.findById(req.params.id);
+    if (!subject) return res.status(404).json({ success: false, error: 'Subject not found.' });
+
+    const note = subject.notes.id(req.params.noteId);
+    if (!note) return res.status(404).json({ success: false, error: 'Note not found.' });
+
+    const isAuthor = note.uploadedBy && note.uploadedBy.toString() === req.user.id;
+    const canManage = req.user.role === 'admin' || (req.user.role === 'faculty' && canManageScope(req.user, subject.academicYear, subject.branch, subject.section));
+
+    if (!isAuthor && !canManage) {
+      return res.status(403).json({ success: false, error: 'Not authorized to delete this study note.' });
+    }
+
+    subject.notes.pull(req.params.noteId);
+    await subject.save();
+
+    res.status(200).json({ success: true, message: 'Note deleted successfully.' });
+  } catch (err) {
+    next(err);
+  }
+};
+
 exports.getProjects = async (req, res, next) => {
   try {
     const query = {};
