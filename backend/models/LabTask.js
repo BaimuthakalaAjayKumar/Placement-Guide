@@ -11,6 +11,14 @@ const LabTaskSchema = new mongoose.Schema({
   dueDate: { type: Date },
   referenceSolution: { type: String, default: '' },
   solutionLanguage: { type: String, default: 'cpp' },
+  referenceSolutions: {
+    cpp: { type: String, default: '' },
+    java: { type: String, default: '' },
+    python: { type: String, default: '' },
+    c: { type: String, default: '' },
+    javascript: { type: String, default: '' },
+    sql: { type: String, default: '' }
+  },
   allowedLanguages: { type: [String], default: ['cpp', 'java', 'python', 'c', 'javascript', 'sql'] },
   isActive: { type: Boolean, default: true },
   createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true }

@@ -6,6 +6,15 @@ import { API_URL } from '../config/api';
 import Header from '../components/Header';
 import './FacultyDashboard.css';
 
+const LAB_LANGUAGES = [
+    { key: 'cpp', label: 'C++', icon: '💻', ext: '.cpp', placeholder: '// C++ Reference Solution\n#include <iostream>\nusing namespace std;\n\nint main() {\n    // Code here\n    return 0;\n}' },
+    { key: 'java', label: 'Java', icon: '☕', ext: '.java', placeholder: '// Java Reference Solution\nimport java.util.*;\n\npublic class Solution {\n    public static void main(String[] args) {\n        // Code here\n    }\n}' },
+    { key: 'python', label: 'Python 3', icon: '🐍', ext: '.py', placeholder: '# Python 3 Reference Solution\ndef solve():\n    pass\n\nif __name__ == "__main__":\n    solve()' },
+    { key: 'c', label: 'C', icon: '⚙️', ext: '.c', placeholder: '// C Reference Solution\n#include <stdio.h>\n\nint main() {\n    // Code here\n    return 0;\n}' },
+    { key: 'javascript', label: 'JavaScript', icon: '🟨', ext: '.js', placeholder: '// JavaScript Reference Solution\nfunction solve() {\n    // Code here\n}\nsolve();' },
+    { key: 'sql', label: 'SQL', icon: '🗄️', ext: '.sql', placeholder: '-- SQL Reference Schema & Queries\nCREATE DATABASE IF NOT EXISTS StudentManagement;\nUSE StudentManagement;\n\nCREATE TABLE Students (\n    student_id INT PRIMARY KEY,\n    name VARCHAR(100) NOT NULL\n);' },
+];
+
 const FacultyDashboard = () => {
     const { user } = useAuth();
     const [activeTab, setActiveTab] = useState('students'); // 'students' | 'subjects' | 'projects' | 'labs'
@@ -84,8 +93,18 @@ const FacultyDashboard = () => {
         maxScore: 100,
         dueDate: '',
         referenceSolution: '',
-        solutionLanguage: 'cpp'
+        solutionLanguage: 'cpp',
+        referenceSolutions: {
+            cpp: '',
+            java: '',
+            python: '',
+            c: '',
+            javascript: '',
+            sql: ''
+        }
     });
+    const [activeSolutionLangTab, setActiveSolutionLangTab] = useState('cpp');
+    const [reviewRefLangTab, setReviewRefLangTab] = useState('cpp');
     const [submittingLab, setSubmittingLab] = useState(false);
     const [selectedLabReviewAttempt, setSelectedLabReviewAttempt] = useState(null);
 
@@ -449,9 +468,21 @@ const FacultyDashboard = () => {
             return;
         }
 
+        const hasAnyRef = Object.values(labTaskForm.referenceSolutions || {}).some(code => (code || '').trim().length > 0) || (labTaskForm.referenceSolution || '').trim().length > 0;
+        if (!hasAnyRef) {
+            setError('Please enter at least one default reference solution (in C++, Java, Python, SQL, etc.) so student code can be evaluated.');
+            return;
+        }
+
         try {
             setSubmittingLab(true);
-            const res = await axios.post(`${API_URL}/labs/tasks`, labTaskForm, getAuthHeaders());
+            const primaryRef = labTaskForm.referenceSolutions?.[activeSolutionLangTab] || Object.values(labTaskForm.referenceSolutions || {}).find(v => (v || '').trim()) || labTaskForm.referenceSolution || '';
+            const payload = {
+                ...labTaskForm,
+                referenceSolution: primaryRef,
+                solutionLanguage: activeSolutionLangTab
+            };
+            const res = await axios.post(`${API_URL}/labs/tasks`, payload, getAuthHeaders());
             if (res.data?.success) {
                 setSuccessMsg(`Lab Task "${res.data.data.title}" created successfully!`);
                 setLabTaskForm({
@@ -464,8 +495,17 @@ const FacultyDashboard = () => {
                     maxScore: 100,
                     dueDate: '',
                     referenceSolution: '',
-                    solutionLanguage: 'cpp'
+                    solutionLanguage: 'cpp',
+                    referenceSolutions: {
+                        cpp: '',
+                        java: '',
+                        python: '',
+                        c: '',
+                        javascript: '',
+                        sql: ''
+                    }
                 });
+                setActiveSolutionLangTab('cpp');
                 fetchLabTasks();
             }
         } catch (err) {
@@ -887,184 +927,504 @@ const FacultyDashboard = () => {
                                             required
                                         />
                                     </div>
-                                    <div className="form-grid-2">
-                                        <div className="form-group">
-                                            <label className="form-label">Reference Solution Language *</label>
-                                            <select
-                                                className="form-control"
-                                                value={labTaskForm.solutionLanguage}
-                                                onChange={e => setLabTaskForm({ ...labTaskForm, solutionLanguage: e.target.value })}
-                                                required
-                                            >
-                                                <option value="cpp">C++ (Standard STL & Systems)</option>
-                                                <option value="java">Java (OOP & Collections)</option>
-                                                <option value="python">Python 3 (Scripting & Algorithms)</option>
-                                                <option value="c">C (Procedural & Systems)</option>
-                                                <option value="javascript">JavaScript (Node.js)</option>
-                                                <option value="sql">SQL (Relational Schema & Queries)</option>
-                                            </select>
+                                    {/* Multi-Language Default Reference Solutions */}
+                                    <div className="form-group" style={{ marginTop: '12px' }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', flexWrap: 'wrap', gap: '8px' }}>
+                                            <div>
+                                                <label className="form-label" style={{ margin: 0, fontWeight: 700, fontSize: '13.5px', color: '#f8fafc' }}>
+                                                    Default Faculty Reference Solutions (Multi-Language) *
+                                                </label>
+                                                <p style={{ margin: '2px 0 0', fontSize: '12px', color: '#94a3b8' }}>
+                                                    Add default solutions in different languages at the same time. Student submissions in any language will automatically match and evaluate against that language!
+                                                </p>
+                                            </div>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                                <span style={{ fontSize: '11px', color: '#38bdf8', background: 'rgba(56, 189, 248, 0.12)', padding: '3px 10px', borderRadius: '6px', border: '1px solid rgba(56, 189, 248, 0.25)' }}>
+                                                    ⚡ AST Normalized • Variable names can differ
+                                                </span>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                    <span style={{ fontSize: '12px', color: '#94a3b8', fontWeight: 600 }}>Max Score:</span>
+                                                    <input
+                                                        type="number"
+                                                        className="form-control"
+                                                        min="1"
+                                                        max="1000"
+                                                        style={{ width: '80px', padding: '4px 8px', height: '32px' }}
+                                                        value={labTaskForm.maxScore}
+                                                        onChange={e => setLabTaskForm({ ...labTaskForm, maxScore: Number(e.target.value) || 100 })}
+                                                    />
+                                                </div>
+                                            </div>
                                         </div>
-                                        <div className="form-group">
-                                            <label className="form-label">Max Score</label>
-                                            <input
-                                                type="number"
+
+                                        {/* Language Navigation Pill Bar */}
+                                        <div className="ref-solutions-lang-tabs" style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '10px' }}>
+                                            {LAB_LANGUAGES.map(lang => {
+                                                const hasCode = Boolean(labTaskForm.referenceSolutions?.[lang.key]?.trim());
+                                                const isActive = activeSolutionLangTab === lang.key;
+                                                return (
+                                                    <button
+                                                        key={lang.key}
+                                                        type="button"
+                                                        onClick={() => setActiveSolutionLangTab(lang.key)}
+                                                        style={{
+                                                            display: 'inline-flex',
+                                                            alignItems: 'center',
+                                                            gap: '8px',
+                                                            padding: '7px 14px',
+                                                            borderRadius: '8px',
+                                                            fontSize: '13px',
+                                                            fontWeight: 600,
+                                                            cursor: 'pointer',
+                                                            transition: 'all 0.2s ease',
+                                                            border: isActive ? '1px solid #6366f1' : '1px solid #334155',
+                                                            background: isActive ? 'linear-gradient(135deg, #4f46e5 0%, #6366f1 100%)' : '#1e293b',
+                                                            color: isActive ? '#ffffff' : '#94a3b8',
+                                                            boxShadow: isActive ? '0 4px 12px rgba(99, 102, 241, 0.35)' : 'none'
+                                                        }}
+                                                    >
+                                                        <span>{lang.icon} {lang.label}</span>
+                                                        {hasCode ? (
+                                                            <span style={{
+                                                                fontSize: '10px',
+                                                                background: '#10b981',
+                                                                color: '#ffffff',
+                                                                padding: '1px 6px',
+                                                                borderRadius: '10px',
+                                                                fontWeight: 700
+                                                            }}>
+                                                                ✓ Ready
+                                                            </span>
+                                                        ) : (
+                                                            <span style={{
+                                                                fontSize: '10px',
+                                                                background: 'rgba(255,255,255,0.08)',
+                                                                color: '#64748b',
+                                                                padding: '1px 6px',
+                                                                borderRadius: '10px'
+                                                            }}>
+                                                                Optional
+                                                            </span>
+                                                        )}
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+
+                                        {/* Textarea for currently active language */}
+                                        <div style={{ position: 'relative' }}>
+                                            <div style={{
+                                                display: 'flex',
+                                                justifyContent: 'space-between',
+                                                alignItems: 'center',
+                                                background: '#0f172a',
+                                                padding: '8px 14px',
+                                                borderTopLeftRadius: '8px',
+                                                borderTopRightRadius: '8px',
+                                                border: '1px solid #334155',
+                                                borderBottom: 'none'
+                                            }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12.5px', color: '#e2e8f0', fontWeight: 600 }}>
+                                                    <span>{LAB_LANGUAGES.find(l => l.key === activeSolutionLangTab)?.icon}</span>
+                                                    <span>{LAB_LANGUAGES.find(l => l.key === activeSolutionLangTab)?.label} Reference Solution</span>
+                                                    {labTaskForm.referenceSolutions?.[activeSolutionLangTab]?.trim() && (
+                                                        <span style={{ color: '#10b981', fontSize: '11px' }}>● Configured</span>
+                                                    )}
+                                                </div>
+                                                <div style={{ fontSize: '11px', color: '#64748b' }}>
+                                                    Students writing {LAB_LANGUAGES.find(l => l.key === activeSolutionLangTab)?.label} will be matched against this code
+                                                </div>
+                                            </div>
+                                            <textarea
                                                 className="form-control"
-                                                min="1"
-                                                max="1000"
-                                                value={labTaskForm.maxScore}
-                                                onChange={e => setLabTaskForm({ ...labTaskForm, maxScore: Number(e.target.value) || 100 })}
+                                                rows="7"
+                                                style={{
+                                                    fontFamily: 'Consolas, Monaco, "Courier New", monospace',
+                                                    fontSize: '13px',
+                                                    background: 'rgba(15, 23, 42, 0.75)',
+                                                    borderTopLeftRadius: 0,
+                                                    borderTopRightRadius: 0,
+                                                    border: '1px solid #334155',
+                                                    lineHeight: '1.5'
+                                                }}
+                                                placeholder={LAB_LANGUAGES.find(l => l.key === activeSolutionLangTab)?.placeholder || 'Enter reference solution code...'}
+                                                value={labTaskForm.referenceSolutions?.[activeSolutionLangTab] || ''}
+                                                onChange={e => {
+                                                    const newCode = e.target.value;
+                                                    const updatedSolutions = {
+                                                        ...labTaskForm.referenceSolutions,
+                                                        [activeSolutionLangTab]: newCode
+                                                    };
+                                                    setLabTaskForm({
+                                                        ...labTaskForm,
+                                                        referenceSolutions: updatedSolutions,
+                                                        referenceSolution: newCode || Object.values(updatedSolutions).find(v => (v || '').trim()) || '',
+                                                        solutionLanguage: activeSolutionLangTab
+                                                    });
+                                                }}
                                             />
                                         </div>
-                                    </div>
-                                    <div className="form-group">
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                                            <label className="form-label" style={{ margin: 0 }}>Default Faculty Solution / Reference Answer *</label>
-                                            <span style={{ fontSize: '11px', color: '#38bdf8', background: 'rgba(56, 189, 248, 0.12)', padding: '2px 8px', borderRadius: '4px' }}>
-                                                ⚡ AST Normalized • Variable names can differ
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '6px', flexWrap: 'wrap', gap: '6px' }}>
+                                            <small style={{ color: '#94a3b8', fontSize: '12px' }}>
+                                                💡 Switch tabs to configure reference solutions for multiple languages at once. Variable names are normalized during scoring.
+                                            </small>
+                                            <span style={{ fontSize: '11.5px', color: '#818cf8' }}>
+                                                Solutions set: <strong>{Object.values(labTaskForm.referenceSolutions || {}).filter(s => s?.trim()).length} / 6</strong> languages
                                             </span>
                                         </div>
-                                        <textarea
-                                            className="form-control"
-                                            rows="7"
-                                            style={{ fontFamily: 'Consolas, Monaco, monospace', fontSize: '13px', background: 'rgba(15, 23, 42, 0.6)' }}
-                                            placeholder="Enter the reference answer code here. Student submissions in the IDE will be matched against this solution, automatically normalizing variable names and control-flow..."
-                                            value={labTaskForm.referenceSolution}
-                                            onChange={e => setLabTaskForm({ ...labTaskForm, referenceSolution: e.target.value })}
-                                            required
-                                        />
-                                        <small style={{ color: '#94a3b8', fontSize: '12px', marginTop: '5px', display: 'block' }}>
-                                            💡 Students write their code in an interactive IDE in their choice of language. Variable names are automatically normalized during evaluation so different naming does not affect their score.
-                                        </small>
                                     </div>
-                                    <button className="btn-primary-action" type="submit" disabled={submittingLab}>
+                                    <button className="btn-primary-action" type="submit" disabled={submittingLab} style={{ marginTop: '10px' }}>
                                         {submittingLab ? 'Creating...' : '+ Create Lab Task'}
                                     </button>
                                 </form>
                             </div>
 
-                            {/* 2. BELOW: Space followed by Reports of the Students and Faculty with CSV Download */}
-                            <div className="faculty-card" style={{ marginBottom: '36px' }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
-                                    <div>
-                                        <h3>📊 Lab Practice Reports & Student Submissions ({labReports.length})</h3>
-                                        <p className="card-desc">Review lab experiment attempts, student code submissions, scores, and download performance spreadsheets.</p>
-                                    </div>
-                                    <button
-                                        type="button"
-                                        className="btn-primary-action"
-                                        onClick={downloadLabReportsCSV}
-                                        disabled={!labReports.length}
-                                        style={{ padding: '8px 16px', fontSize: '13px' }}
-                                    >
-                                        📥 Download Lab Reports (CSV)
-                                    </button>
-                                </div>
+                            {/* 2. BELOW: Space for Lab Reports & Answer Review in the Tab Space */}
+                            {selectedLabReviewAttempt ? (
+                                <div className="faculty-card answer-review-tab-panel animate-fade" style={{ marginBottom: '36px', border: '1px solid rgba(99, 102, 241, 0.3)', background: 'linear-gradient(180deg, rgba(30, 41, 59, 0.7) 0%, rgba(15, 23, 42, 0.9) 100%)', borderRadius: '12px', padding: '24px' }}>
+                                    {/* Top Header & Back Button */}
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '14px', marginBottom: '20px', paddingBottom: '16px', borderBottom: '1px solid rgba(255, 255, 255, 0.08)' }}>
+                                        <div>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setSelectedLabReviewAttempt(null)}
+                                                    className="btn-secondary-action"
+                                                    style={{ padding: '6px 14px', fontSize: '12.5px', display: 'inline-flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}
+                                                >
+                                                    ← Back to Submissions List
+                                                </button>
+                                                <span style={{ fontSize: '12px', color: '#94a3b8' }}>Reviewing submission</span>
+                                            </div>
+                                            <h2 style={{ margin: '12px 0 4px', fontSize: '1.4rem', color: '#f8fafc' }}>
+                                                🔬 Lab Submission Review & Plagiarism Audit
+                                            </h2>
+                                            <div style={{ fontSize: '13px', color: '#cbd5e1' }}>
+                                                <strong style={{ color: '#ffffff' }}>{selectedLabReviewAttempt.student?.name || 'Student'}</strong>
+                                                {selectedLabReviewAttempt.student?.rollNumber && <span style={{ color: '#818cf8' }}> ({selectedLabReviewAttempt.student.rollNumber})</span>}
+                                                {' · '}
+                                                <span style={{ color: '#94a3b8' }}>Task:</span> <strong style={{ color: '#38bdf8' }}>{selectedLabReviewAttempt.task?.title || 'Lab Task'}</strong>
+                                                {' · '}
+                                                <span style={{ color: '#94a3b8' }}>Submitted:</span> {selectedLabReviewAttempt.updatedAt ? new Date(selectedLabReviewAttempt.updatedAt).toLocaleString() : 'N/A'}
+                                            </div>
+                                        </div>
 
-                                {loadingReports ? (
-                                    <p className="loading-text mt-20">Loading student lab reports...</p>
-                                ) : (
-                                    <div className="students-table-scroll mt-20">
-                                        <table className="students-table">
-                                            <thead>
-                                                <tr>
-                                                    <th>Student</th>
-                                                    <th>Branch / Section</th>
-                                                    <th>Lab Task</th>
-                                                    <th>Assigned Faculty</th>
-                                                    <th>Language</th>
-                                                    <th>Score & Match</th>
-                                                    <th>Plagiarism Check</th>
-                                                    <th>Status</th>
-                                                    <th>Submitted Date</th>
-                                                    <th style={{ textAlign: 'right' }}>Review</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {labReports.map(report => (
-                                                    <tr key={report._id}>
-                                                        <td>
-                                                            <strong>{report.student?.name || 'Student'}</strong>
-                                                            <div style={{ fontSize: '12px', color: '#94a3b8' }}>{report.student?.email}</div>
-                                                            {report.student?.rollNumber && (
-                                                                <div style={{ fontSize: '11px', color: '#818cf8' }}>Roll: {report.student.rollNumber}</div>
-                                                            )}
-                                                        </td>
-                                                        <td>{report.student?.branch || 'N/A'} {report.student?.section ? `(Sec ${report.student.section})` : ''}</td>
-                                                        <td><strong>{report.task?.title || 'Lab Task'}</strong></td>
-                                                        <td>
-                                                            <strong>{report.task?.createdBy?.name || report.reviewedBy?.name || 'Faculty'}</strong>
-                                                            <div style={{ fontSize: '11px', color: '#94a3b8' }}>{report.task?.createdBy?.email || report.reviewedBy?.email || ''}</div>
-                                                        </td>
-                                                        <td>
-                                                            <span className="status-pill submitted" style={{ textTransform: 'uppercase', fontSize: '11px' }}>
-                                                                {report.language || report.task?.solutionLanguage || 'cpp'}
-                                                            </span>
-                                                        </td>
-                                                        <td>
-                                                            <span style={{ fontWeight: 'bold', color: report.score !== undefined && report.score !== null ? '#10b981' : '#f59e0b' }}>
-                                                                {report.score !== undefined && report.score !== null ? `${report.score}/${report.task?.maxScore || 100}` : 'Pending'}
-                                                            </span>
-                                                            {report.evaluationDetails?.logicMatchPercentage !== undefined && (
-                                                                <div style={{ fontSize: '11px', color: '#38bdf8' }}>Match: {report.evaluationDetails.logicMatchPercentage}%</div>
-                                                            )}
-                                                        </td>
-                                                        <td>
-                                                            {report.plagiarismPercentage > 40 ? (
-                                                                <div>
-                                                                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '3px 8px', borderRadius: '6px', background: 'rgba(239, 68, 68, 0.2)', color: '#f87171', border: '1px solid rgba(239, 68, 68, 0.4)', fontWeight: 700, fontSize: '11px' }}>
-                                                                        🚨 {report.plagiarismPercentage}% Flagged
-                                                                    </span>
-                                                                    {report.plagiarizedWith?.studentName && (
-                                                                        <div style={{ fontSize: '10.5px', color: '#fca5a5', marginTop: '2px' }}>Peer: {report.plagiarizedWith.studentName}</div>
-                                                                    )}
-                                                                </div>
-                                                            ) : report.plagiarismPercentage > 15 ? (
-                                                                <div>
-                                                                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '3px 8px', borderRadius: '6px', background: 'rgba(245, 158, 11, 0.2)', color: '#fbbf24', border: '1px solid rgba(245, 158, 11, 0.4)', fontWeight: 600, fontSize: '11px' }}>
-                                                                        ⚠️ {report.plagiarismPercentage}% Moderate
-                                                                    </span>
-                                                                    {report.plagiarizedWith?.studentName && (
-                                                                        <div style={{ fontSize: '10.5px', color: '#fde047', marginTop: '2px' }}>Peer: {report.plagiarizedWith.studentName}</div>
-                                                                    )}
-                                                                </div>
-                                                            ) : (
-                                                                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '3px 8px', borderRadius: '6px', background: 'rgba(16, 185, 129, 0.15)', color: '#34d399', border: '1px solid rgba(16, 185, 129, 0.3)', fontSize: '11px' }}>
-                                                                    ✅ {report.plagiarismPercentage || 0}% Original
-                                                                </span>
-                                                            )}
-                                                        </td>
-                                                        <td>
-                                                            <span className={`status-pill ${report.status || 'submitted'}`}>
-                                                                {report.status || 'Submitted'}
-                                                            </span>
-                                                        </td>
-                                                        <td style={{ fontSize: '12px', color: '#94a3b8' }}>
-                                                            {report.updatedAt ? new Date(report.updatedAt).toLocaleDateString() : 'N/A'}
-                                                        </td>
-                                                        <td style={{ textAlign: 'right' }}>
-                                                            <button
-                                                                type="button"
-                                                                className="btn-secondary-action"
-                                                                style={{ padding: '6px 12px', fontSize: '12px' }}
-                                                                onClick={() => setSelectedLabReviewAttempt(report)}
-                                                            >
-                                                                👁️ Review
-                                                            </button>
-                                                        </td>
-                                                    </tr>
-                                                ))}
-                                                {!labReports.length && (
-                                                    <tr>
-                                                        <td colSpan="10" style={{ textAlign: 'center', padding: '30px', color: '#94a3b8' }}>
-                                                            No student lab submissions recorded yet.
-                                                        </td>
-                                                    </tr>
-                                                )}
-                                            </tbody>
-                                        </table>
+                                        <button
+                                            type="button"
+                                            className="btn-secondary-action"
+                                            style={{ padding: '6px 14px', fontSize: '12px' }}
+                                            onClick={() => setSelectedLabReviewAttempt(null)}
+                                        >
+                                            ✕ Close Review
+                                        </button>
                                     </div>
-                                )}
-                            </div>
+
+                                    {/* Plagiarism Alert Banner */}
+                                    {selectedLabReviewAttempt.plagiarismPercentage > 40 ? (
+                                        <div style={{ background: 'rgba(239, 68, 68, 0.15)', border: '1px solid rgba(239, 68, 68, 0.4)', borderRadius: '10px', padding: '16px 20px', display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '20px' }}>
+                                            <span style={{ fontSize: '28px' }}>🚨</span>
+                                            <div>
+                                                <strong style={{ color: '#f87171', fontSize: '15px' }}>High Plagiarism Detected: {selectedLabReviewAttempt.plagiarismPercentage}% Similarity</strong>
+                                                <p style={{ margin: '4px 0 0', color: '#e2e8f0', fontSize: '13px' }}>
+                                                    This submission matched structural and AST patterns with peer student <strong>{selectedLabReviewAttempt.plagiarizedWith?.studentName || 'a registered student'}</strong>.
+                                                </p>
+                                            </div>
+                                        </div>
+                                    ) : selectedLabReviewAttempt.plagiarismPercentage > 15 ? (
+                                        <div style={{ background: 'rgba(245, 158, 11, 0.15)', border: '1px solid rgba(245, 158, 11, 0.4)', borderRadius: '10px', padding: '14px 18px', marginBottom: '20px' }}>
+                                            <strong style={{ color: '#fbbf24', fontSize: '14px' }}>⚠️ Moderate Structural Similarity: {selectedLabReviewAttempt.plagiarismPercentage}%</strong>
+                                            <span style={{ fontSize: '13px', color: '#cbd5e1', marginLeft: '8px' }}>
+                                                Matched logic with peer {selectedLabReviewAttempt.plagiarizedWith?.studentName || 'student'}.
+                                            </span>
+                                        </div>
+                                    ) : (
+                                        <div style={{ background: 'rgba(16, 185, 129, 0.15)', border: '1px solid rgba(16, 185, 129, 0.3)', borderRadius: '10px', padding: '14px 18px', color: '#34d399', fontSize: '13.5px', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                            <span style={{ fontSize: '18px' }}>✅</span>
+                                            <span><strong>Verified Original Submission</strong> ({selectedLabReviewAttempt.plagiarismPercentage || 0}% peer similarity).</span>
+                                        </div>
+                                    )}
+
+                                    {/* Evaluation Summary Stats Cards */}
+                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '14px', marginBottom: '22px' }}>
+                                        <div style={{ background: '#0f172a', padding: '14px 18px', borderRadius: '10px', border: '1px solid #334155' }}>
+                                            <span style={{ fontSize: '12px', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Evaluation Score</span>
+                                            <div style={{ fontSize: '22px', fontWeight: 800, color: selectedLabReviewAttempt.score ? '#10b981' : '#f87171', marginTop: '4px' }}>
+                                                {selectedLabReviewAttempt.score ?? 0} <span style={{ fontSize: '14px', color: '#64748b' }}>/ {selectedLabReviewAttempt.task?.maxScore || 100}</span>
+                                            </div>
+                                        </div>
+                                        <div style={{ background: '#0f172a', padding: '14px 18px', borderRadius: '10px', border: '1px solid #334155' }}>
+                                            <span style={{ fontSize: '12px', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Logic Match</span>
+                                            <div style={{ fontSize: '22px', fontWeight: 800, color: '#38bdf8', marginTop: '4px' }}>
+                                                {selectedLabReviewAttempt.evaluationDetails?.logicMatchPercentage ?? 100}%
+                                            </div>
+                                        </div>
+                                        <div style={{ background: '#0f172a', padding: '14px 18px', borderRadius: '10px', border: '1px solid #334155' }}>
+                                            <span style={{ fontSize: '12px', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Student Language</span>
+                                            <div style={{ fontSize: '18px', fontWeight: 700, color: '#e2e8f0', marginTop: '6px', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#6366f1', display: 'inline-block' }}></span>
+                                                {selectedLabReviewAttempt.language || 'cpp'}
+                                            </div>
+                                        </div>
+                                        <div style={{ background: '#0f172a', padding: '14px 18px', borderRadius: '10px', border: '1px solid #334155' }}>
+                                            <span style={{ fontSize: '12px', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Plagiarism Audit</span>
+                                            <div style={{ fontSize: '18px', fontWeight: 700, color: selectedLabReviewAttempt.plagiarismPercentage > 40 ? '#f87171' : selectedLabReviewAttempt.plagiarismPercentage > 15 ? '#fbbf24' : '#34d399', marginTop: '6px' }}>
+                                                {selectedLabReviewAttempt.plagiarismPercentage || 0}% Similarity
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {selectedLabReviewAttempt.feedback && (
+                                        <div style={{ fontSize: '13px', color: '#cbd5e1', background: 'rgba(99, 102, 241, 0.08)', border: '1px solid rgba(99, 102, 241, 0.2)', padding: '12px 16px', borderRadius: '8px', marginBottom: '22px' }}>
+                                            <strong style={{ color: '#818cf8' }}>Evaluation Remarks:</strong> {selectedLabReviewAttempt.feedback}
+                                        </div>
+                                    )}
+
+                                    {/* Side-by-Side / Dual Code Comparison Space */}
+                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(420px, 1fr))', gap: '18px', marginBottom: '20px' }}>
+                                        {/* Left: Student Submitted Code */}
+                                        <div style={{ background: '#090d16', border: '1px solid #334155', borderRadius: '10px', overflow: 'hidden' }}>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#1e293b', padding: '10px 16px', borderBottom: '1px solid #334155' }}>
+                                                <label style={{ fontWeight: 700, fontSize: '13px', color: '#e2e8f0', margin: 0 }}>
+                                                    💻 Student Submitted Code ({(selectedLabReviewAttempt.language || 'cpp').toUpperCase()})
+                                                </label>
+                                                <span style={{ fontSize: '11px', color: '#94a3b8' }}>
+                                                    {selectedLabReviewAttempt.student?.name || 'Student'}
+                                                </span>
+                                            </div>
+                                            <pre style={{
+                                                background: '#090d16',
+                                                color: '#e2e8f0',
+                                                padding: '16px',
+                                                margin: 0,
+                                                fontSize: '13px',
+                                                fontFamily: 'Consolas, Monaco, "Courier New", monospace',
+                                                minHeight: '360px',
+                                                maxHeight: '520px',
+                                                overflowY: 'auto',
+                                                whiteSpace: 'pre-wrap',
+                                                lineHeight: '1.6'
+                                            }}>
+                                                {selectedLabReviewAttempt.code || selectedLabReviewAttempt.submission || '// No code content recorded'}
+                                            </pre>
+                                        </div>
+
+                                        {/* Right: Faculty Reference Solution with Language Tabs */}
+                                        <div style={{ background: '#0f172a', border: '1px solid rgba(251, 191, 36, 0.3)', borderRadius: '10px', overflow: 'hidden' }}>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(251, 191, 36, 0.08)', padding: '10px 16px', borderBottom: '1px solid rgba(251, 191, 36, 0.2)', flexWrap: 'wrap', gap: '8px' }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                    <span style={{ fontSize: '14px' }}>🎯</span>
+                                                    <strong style={{ fontSize: '13px', color: '#fbbf24' }}>
+                                                        Faculty Reference Solution
+                                                    </strong>
+                                                </div>
+                                                {/* If multiple reference solutions exist, render tabs */}
+                                                {selectedLabReviewAttempt.task?.referenceSolutions && (
+                                                    <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                                                        {LAB_LANGUAGES.map(l => {
+                                                            const code = selectedLabReviewAttempt.task?.referenceSolutions?.[l.key];
+                                                            if (!code?.trim()) return null;
+                                                            const isCurActive = (reviewRefLangTab || (selectedLabReviewAttempt.language || 'cpp').toLowerCase()) === l.key;
+                                                            return (
+                                                                <button
+                                                                    key={l.key}
+                                                                    type="button"
+                                                                    onClick={() => setReviewRefLangTab(l.key)}
+                                                                    style={{
+                                                                        padding: '3px 8px',
+                                                                        fontSize: '11px',
+                                                                        borderRadius: '5px',
+                                                                        fontWeight: 600,
+                                                                        cursor: 'pointer',
+                                                                        border: isCurActive ? '1px solid #fbbf24' : '1px solid rgba(255,255,255,0.1)',
+                                                                        background: isCurActive ? '#fbbf24' : 'rgba(15, 23, 42, 0.6)',
+                                                                        color: isCurActive ? '#000000' : '#cbd5e1'
+                                                                    }}
+                                                                >
+                                                                    {l.icon} {l.label}
+                                                                </button>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                )}
+                                            </div>
+                                            <pre style={{
+                                                background: '#0a0f1d',
+                                                color: '#fef08a',
+                                                padding: '16px',
+                                                margin: 0,
+                                                fontSize: '13px',
+                                                fontFamily: 'Consolas, Monaco, "Courier New", monospace',
+                                                minHeight: '360px',
+                                                maxHeight: '520px',
+                                                overflowY: 'auto',
+                                                whiteSpace: 'pre-wrap',
+                                                lineHeight: '1.6'
+                                            }}>
+                                                {(() => {
+                                                    const taskRef = selectedLabReviewAttempt.task;
+                                                    const langKey = (reviewRefLangTab || (selectedLabReviewAttempt.language || 'cpp').toLowerCase());
+                                                    const solFromMulti = taskRef?.referenceSolutions?.[langKey];
+                                                    if (solFromMulti) return solFromMulti;
+                                                    // Fallback to any non-empty referenceSolutions entry or referenceSolution
+                                                    if (taskRef?.referenceSolutions) {
+                                                        const found = Object.entries(taskRef.referenceSolutions).find(([_, val]) => val?.trim());
+                                                        if (found) return found[1];
+                                                    }
+                                                    return taskRef?.referenceSolution || '// No reference solution provided for this task';
+                                                })()}
+                                            </pre>
+                                            <div style={{ padding: '8px 14px', background: 'rgba(0, 0, 0, 0.4)', fontSize: '11px', color: '#94a3b8', borderTop: '1px solid rgba(255, 255, 255, 0.05)' }}>
+                                                ⚡ Variables, table names, and column identifiers are normalized by the AST engine during automated scoring.
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Bottom Actions */}
+                                    <div style={{ display: 'flex', justifyContent: 'flex-start', paddingTop: '14px', borderTop: '1px solid rgba(255, 255, 255, 0.08)' }}>
+                                        <button
+                                            type="button"
+                                            className="btn-secondary-action"
+                                            onClick={() => setSelectedLabReviewAttempt(null)}
+                                            style={{ padding: '8px 20px', fontSize: '13px', cursor: 'pointer' }}
+                                        >
+                                            ← Back to Submissions List
+                                        </button>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="faculty-card" style={{ marginBottom: '36px' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+                                        <div>
+                                            <h3>📊 Lab Practice Reports & Student Submissions ({labReports.length})</h3>
+                                            <p className="card-desc">Review lab experiment attempts, student code submissions, scores, and download performance spreadsheets.</p>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            className="btn-primary-action"
+                                            onClick={downloadLabReportsCSV}
+                                            disabled={!labReports.length}
+                                            style={{ padding: '8px 16px', fontSize: '13px' }}
+                                        >
+                                            📥 Download Lab Reports (CSV)
+                                        </button>
+                                    </div>
+
+                                    {loadingReports ? (
+                                        <p className="loading-text mt-20">Loading student lab reports...</p>
+                                    ) : (
+                                        <div className="students-table-scroll mt-20">
+                                            <table className="students-table">
+                                                <thead>
+                                                    <tr>
+                                                        <th>Student</th>
+                                                        <th>Branch / Section</th>
+                                                        <th>Lab Task</th>
+                                                        <th>Assigned Faculty</th>
+                                                        <th>Language</th>
+                                                        <th>Score & Match</th>
+                                                        <th>Plagiarism Check</th>
+                                                        <th>Status</th>
+                                                        <th>Submitted Date</th>
+                                                        <th style={{ textAlign: 'right' }}>Review</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {labReports.map(report => (
+                                                        <tr key={report._id}>
+                                                            <td>
+                                                                <strong>{report.student?.name || 'Student'}</strong>
+                                                                <div style={{ fontSize: '12px', color: '#94a3b8' }}>{report.student?.email}</div>
+                                                                {report.student?.rollNumber && (
+                                                                    <div style={{ fontSize: '11px', color: '#818cf8' }}>Roll: {report.student.rollNumber}</div>
+                                                                )}
+                                                            </td>
+                                                            <td>{report.student?.branch || 'N/A'} {report.student?.section ? `(Sec ${report.student.section})` : ''}</td>
+                                                            <td><strong>{report.task?.title || 'Lab Task'}</strong></td>
+                                                            <td>
+                                                                <strong>{report.task?.createdBy?.name || report.reviewedBy?.name || 'Faculty'}</strong>
+                                                                <div style={{ fontSize: '11px', color: '#94a3b8' }}>{report.task?.createdBy?.email || report.reviewedBy?.email || ''}</div>
+                                                            </td>
+                                                            <td>
+                                                                <span className="status-pill submitted" style={{ textTransform: 'uppercase', fontSize: '11px' }}>
+                                                                    {report.language || report.task?.solutionLanguage || 'cpp'}
+                                                                </span>
+                                                            </td>
+                                                            <td>
+                                                                <span style={{ fontWeight: 'bold', color: report.score !== undefined && report.score !== null ? '#10b981' : '#f59e0b' }}>
+                                                                    {report.score !== undefined && report.score !== null ? `${report.score}/${report.task?.maxScore || 100}` : 'Pending'}
+                                                                </span>
+                                                                {report.evaluationDetails?.logicMatchPercentage !== undefined && (
+                                                                    <div style={{ fontSize: '11px', color: '#38bdf8' }}>Match: {report.evaluationDetails.logicMatchPercentage}%</div>
+                                                                )}
+                                                            </td>
+                                                            <td>
+                                                                {report.plagiarismPercentage > 40 ? (
+                                                                    <div>
+                                                                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '3px 8px', borderRadius: '6px', background: 'rgba(239, 68, 68, 0.2)', color: '#f87171', border: '1px solid rgba(239, 68, 68, 0.4)', fontWeight: 700, fontSize: '11px' }}>
+                                                                            🚨 {report.plagiarismPercentage}% Flagged
+                                                                        </span>
+                                                                        {report.plagiarizedWith?.studentName && (
+                                                                            <div style={{ fontSize: '10.5px', color: '#fca5a5', marginTop: '2px' }}>Peer: {report.plagiarizedWith.studentName}</div>
+                                                                        )}
+                                                                    </div>
+                                                                ) : report.plagiarismPercentage > 15 ? (
+                                                                    <div>
+                                                                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '3px 8px', borderRadius: '6px', background: 'rgba(245, 158, 11, 0.2)', color: '#fbbf24', border: '1px solid rgba(245, 158, 11, 0.4)', fontWeight: 600, fontSize: '11px' }}>
+                                                                            ⚠️ {report.plagiarismPercentage}% Moderate
+                                                                        </span>
+                                                                        {report.plagiarizedWith?.studentName && (
+                                                                            <div style={{ fontSize: '10.5px', color: '#fde047', marginTop: '2px' }}>Peer: {report.plagiarizedWith.studentName}</div>
+                                                                        )}
+                                                                    </div>
+                                                                ) : (
+                                                                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '3px 8px', borderRadius: '6px', background: 'rgba(16, 185, 129, 0.15)', color: '#34d399', border: '1px solid rgba(16, 185, 129, 0.3)', fontSize: '11px' }}>
+                                                                        ✅ {report.plagiarismPercentage || 0}% Original
+                                                                    </span>
+                                                                )}
+                                                            </td>
+                                                            <td>
+                                                                <span className={`status-pill ${report.status || 'submitted'}`}>
+                                                                    {report.status || 'Submitted'}
+                                                                </span>
+                                                            </td>
+                                                            <td style={{ fontSize: '12px', color: '#94a3b8' }}>
+                                                                {report.updatedAt ? new Date(report.updatedAt).toLocaleDateString() : 'N/A'}
+                                                            </td>
+                                                            <td style={{ textAlign: 'right' }}>
+                                                                <button
+                                                                    type="button"
+                                                                    className="btn-secondary-action"
+                                                                    style={{ padding: '6px 12px', fontSize: '12px' }}
+                                                                    onClick={() => {
+                                                                        setSelectedLabReviewAttempt(report);
+                                                                        const studLang = (report.language || 'cpp').toLowerCase();
+                                                                        const taskRefs = report.task?.referenceSolutions || {};
+                                                                        if (taskRefs[studLang]?.trim()) {
+                                                                            setReviewRefLangTab(studLang);
+                                                                        } else {
+                                                                            const firstFilled = Object.keys(taskRefs).find(k => taskRefs[k]?.trim());
+                                                                            setReviewRefLangTab(firstFilled || report.task?.solutionLanguage || 'cpp');
+                                                                        }
+                                                                    }}
+                                                                >
+                                                                    👁️ Review
+                                                                </button>
+                                                            </td>
+                                                        </tr>
+                                                    ))}
+                                                    {!labReports.length && (
+                                                        <tr>
+                                                            <td colSpan="10" style={{ textAlign: 'center', padding: '30px', color: '#94a3b8' }}>
+                                                                No student lab submissions recorded yet.
+                                                            </td>
+                                                        </tr>
+                                                    )}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
 
                             {/* 3. Active Lab Tasks Overview */}
                             <div className="faculty-card">
@@ -1676,117 +2036,7 @@ const FacultyDashboard = () => {
                             </section>
                         </div>
                     )}
-            {/* LAB REPORT & PLAGIARISM REVIEW MODAL */}
-            {selectedLabReviewAttempt && (
-                <div className="progress-modal-overlay" onClick={() => setSelectedLabReviewAttempt(null)}>
-                    <div className="progress-modal" style={{ width: 'min(960px, 95vw)', maxHeight: '90vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
-                        <div className="progress-modal-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <div>
-                                <h2 style={{ margin: 0, fontSize: '1.25rem' }}>🔬 Lab Submission Review & Plagiarism Audit</h2>
-                                <p style={{ margin: '4px 0 0', color: '#94a3b8', fontSize: '13px' }}>
-                                    {selectedLabReviewAttempt.student?.name} ({selectedLabReviewAttempt.student?.rollNumber || 'N/A'}) · {selectedLabReviewAttempt.task?.title}
-                                </p>
-                            </div>
-                            <button className="progress-close" type="button" onClick={() => setSelectedLabReviewAttempt(null)}>×</button>
-                        </div>
-                        <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '18px', padding: '20px 0 10px' }}>
-                            {/* Plagiarism Alert Banner */}
-                            {selectedLabReviewAttempt.plagiarismPercentage > 40 ? (
-                                <div style={{ background: 'rgba(239, 68, 68, 0.15)', border: '1px solid rgba(239, 68, 68, 0.4)', borderRadius: '8px', padding: '14px 18px', display: 'flex', alignItems: 'center', gap: '14px' }}>
-                                    <span style={{ fontSize: '24px' }}>🚨</span>
-                                    <div>
-                                        <strong style={{ color: '#f87171' }}>High Plagiarism Detected: {selectedLabReviewAttempt.plagiarismPercentage}% Similarity</strong>
-                                        <p style={{ margin: '4px 0 0', color: '#e2e8f0', fontSize: '13px' }}>
-                                            This submission matched significantly with peer student <strong>{selectedLabReviewAttempt.plagiarizedWith?.studentName || 'a registered student'}</strong>.
-                                        </p>
-                                    </div>
-                                </div>
-                            ) : selectedLabReviewAttempt.plagiarismPercentage > 15 ? (
-                                <div style={{ background: 'rgba(245, 158, 11, 0.15)', border: '1px solid rgba(245, 158, 11, 0.4)', borderRadius: '8px', padding: '12px 16px' }}>
-                                    <strong style={{ color: '#fbbf24' }}>⚠️ Moderate Structural Similarity: {selectedLabReviewAttempt.plagiarismPercentage}%</strong>
-                                    <span style={{ fontSize: '13px', color: '#cbd5e1', marginLeft: '8px' }}>Matched logic with peer {selectedLabReviewAttempt.plagiarizedWith?.studentName || ''}.</span>
-                                </div>
-                            ) : (
-                                <div style={{ background: 'rgba(16, 185, 129, 0.15)', border: '1px solid rgba(16, 185, 129, 0.3)', borderRadius: '8px', padding: '12px 16px', color: '#34d399', fontSize: '13px' }}>
-                                    ✅ <strong>Verified Original Submission</strong> ({selectedLabReviewAttempt.plagiarismPercentage || 0}% peer similarity).
-                                </div>
-                            )}
-
-                            {/* Evaluation Summary */}
-                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px', background: 'rgba(255, 255, 255, 0.03)', padding: '14px', borderRadius: '8px', border: '1px solid rgba(255, 255, 255, 0.08)' }}>
-                                <div>
-                                    <span style={{ fontSize: '12px', color: '#94a3b8' }}>Evaluation Score:</span>
-                                    <div style={{ fontSize: '18px', fontWeight: 700, color: '#10b981' }}>{selectedLabReviewAttempt.score ?? 0} / {selectedLabReviewAttempt.task?.maxScore || 100}</div>
-                                </div>
-                                <div>
-                                    <span style={{ fontSize: '12px', color: '#94a3b8' }}>Logic Match %:</span>
-                                    <div style={{ fontSize: '18px', fontWeight: 700, color: '#38bdf8' }}>{selectedLabReviewAttempt.evaluationDetails?.logicMatchPercentage ?? 100}%</div>
-                                </div>
-                                <div>
-                                    <span style={{ fontSize: '12px', color: '#94a3b8' }}>Student Language:</span>
-                                    <div style={{ fontSize: '16px', fontWeight: 600, color: '#e2e8f0', textTransform: 'uppercase' }}>{selectedLabReviewAttempt.language || 'cpp'}</div>
-                                </div>
-                            </div>
-
-                            {selectedLabReviewAttempt.feedback && (
-                                <div style={{ fontSize: '13px', color: '#cbd5e1', background: 'rgba(255, 255, 255, 0.02)', padding: '10px 14px', borderRadius: '6px' }}>
-                                    <strong>Evaluation Remarks:</strong> {selectedLabReviewAttempt.feedback}
-                                </div>
-                            )}
-
-                            {/* Code Viewer */}
-                            <div>
-                                <label style={{ display: 'block', fontWeight: 600, marginBottom: '6px', fontSize: '13px' }}>
-                                    💻 Student Submitted Code ({(selectedLabReviewAttempt.language || 'cpp').toUpperCase()})
-                                </label>
-                                <pre style={{
-                                    background: '#090d16',
-                                    color: '#e2e8f0',
-                                    padding: '16px',
-                                    borderRadius: '8px',
-                                    fontSize: '13px',
-                                    fontFamily: 'Consolas, Monaco, monospace',
-                                    maxHeight: '280px',
-                                    overflowY: 'auto',
-                                    whiteSpace: 'pre-wrap',
-                                    border: '1px solid rgba(255, 255, 255, 0.1)'
-                                }}>
-                                    {selectedLabReviewAttempt.code || selectedLabReviewAttempt.submission || '// No code content recorded'}
-                                </pre>
-                            </div>
-
-                            {selectedLabReviewAttempt.task?.referenceSolution && (
-                                <div>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                                        <label style={{ fontWeight: 600, fontSize: '13px', color: '#fbbf24' }}>
-                                            🎯 Faculty Reference Solution ({(selectedLabReviewAttempt.task?.solutionLanguage || 'cpp').toUpperCase()})
-                                        </label>
-                                        <span style={{ fontSize: '11px', color: '#94a3b8' }}>Variables normalized during evaluation</span>
-                                    </div>
-                                    <pre style={{
-                                        background: '#0f172a',
-                                        color: '#cbd5e1',
-                                        padding: '16px',
-                                        borderRadius: '8px',
-                                        fontSize: '13px',
-                                        fontFamily: 'Consolas, Monaco, monospace',
-                                        maxHeight: '220px',
-                                        overflowY: 'auto',
-                                        whiteSpace: 'pre-wrap',
-                                        border: '1px solid rgba(251, 191, 36, 0.2)'
-                                    }}>
-                                        {selectedLabReviewAttempt.task.referenceSolution}
-                                    </pre>
-                                </div>
-                            )}
-                        </div>
-                        <div className="modal-footer" style={{ display: 'flex', justifyContent: 'flex-end', padding: '14px 0 0', borderTop: '1px solid rgba(255, 255, 255, 0.08)' }}>
-                            <button className="btn btn-secondary" onClick={() => setSelectedLabReviewAttempt(null)}>Close</button>
-                        </div>
-                    </div>
                 </div>
-            )}
-            </div>
             </div>
         </>
     );

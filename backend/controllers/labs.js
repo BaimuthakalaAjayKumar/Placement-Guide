@@ -77,6 +77,7 @@ exports.getTasks = async (req, res, next) => {
       const obj = t.toObject();
       if (req.user.role === 'student') {
         delete obj.referenceSolution;
+        delete obj.referenceSolutions;
       }
       obj.myAttempt = attemptMap.get(t._id.toString()) || null;
       return obj;
@@ -101,6 +102,7 @@ exports.createTask = async (req, res, next) => {
       dueDate,
       referenceSolution = '',
       solutionLanguage = 'cpp',
+      referenceSolutions = {},
       allowedLanguages
     } = req.body;
 
@@ -113,6 +115,11 @@ exports.createTask = async (req, res, next) => {
       return res.status(403).json({ success: false, error: 'You are not assigned to this lab scope.' });
     }
 
+    let primaryRef = referenceSolution;
+    if (!primaryRef && referenceSolutions) {
+      primaryRef = referenceSolutions[solutionLanguage] || Object.values(referenceSolutions).find(v => (v || '').trim()) || '';
+    }
+
     const task = await LabTask.create({
       title,
       instructions,
@@ -122,8 +129,9 @@ exports.createTask = async (req, res, next) => {
       section,
       maxScore: maxScore || 100,
       dueDate,
-      referenceSolution,
+      referenceSolution: primaryRef,
       solutionLanguage,
+      referenceSolutions,
       allowedLanguages: allowedLanguages || ['cpp', 'java', 'python', 'c', 'javascript', 'sql'],
       createdBy: req.user.id
     });
@@ -166,11 +174,11 @@ exports.submitAttempt = async (req, res, next) => {
       submittedLang = 'python';
     }
 
-    // 1. Evaluate student's code against the faculty reference solution
+    // 1. Evaluate student's code against the faculty reference solution(s)
     const evalResult = evaluateLabSubmission(
       submittedCode,
       submittedLang,
-      task.referenceSolution || '',
+      task.referenceSolutions || task.referenceSolution || '',
       task.solutionLanguage || 'cpp',
       task.maxScore || 100
     );
@@ -318,7 +326,7 @@ exports.getAllLabReports = async (req, res, next) => {
     const reports = await LabPracticeAttempt.find({ task: { $in: taskIds } })
       .populate({
         path: 'task',
-        select: 'title maxScore academicYear branch section referenceSolution solutionLanguage createdBy',
+        select: 'title maxScore academicYear branch section referenceSolution referenceSolutions solutionLanguage createdBy',
         populate: { path: 'createdBy', select: 'name email' }
       })
       .populate('student', 'name email rollNumber branch section academicYear year')

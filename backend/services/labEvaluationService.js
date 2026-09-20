@@ -83,25 +83,9 @@ function detectLanguage(code, declaredLang) {
 }
 
 /**
- * Evaluates student's code against the faculty reference solution.
- * Handles different variable names via AST/identifier tokenization.
- * Supports cross-language evaluations (e.g. Python vs C++).
+ * Evaluates a single pair of student code and reference code.
  */
-function evaluateLabSubmission(studentCode, studentLanguage, referenceSolution, referenceLanguage, maxScore = 100) {
-  const cleanStudentCode = (studentCode || '').trim();
-  const cleanRefCode = (referenceSolution || '').trim();
-
-  // If student submitted no code
-  if (!cleanStudentCode) {
-    return {
-      score: 0,
-      logicMatchPercentage: 0,
-      structuralMatch: 0,
-      isCorrect: false,
-      remarks: 'No code submitted for evaluation.'
-    };
-  }
-
+function evaluateSinglePair(cleanStudentCode, studentLanguage, cleanRefCode, referenceLanguage, maxScore = 100) {
   // If faculty did not provide a reference solution, grade based on non-empty execution & syntax presence
   if (!cleanRefCode) {
     const lines = cleanStudentCode.split('\n').filter(l => l.trim().length > 0).length;
@@ -207,12 +191,12 @@ function evaluateLabSubmission(studentCode, studentLanguage, referenceSolution, 
   let remarks = '';
   if (isCorrect) {
     if (sLang === rLang) {
-      remarks = `Logic matches faculty solution (${logicMatch}% structural match, variable names normalized). High conformance to reference criteria.`;
+      remarks = `Logic matches faculty solution (${logicMatch}% structural match, variable names normalized in ${sLang.toUpperCase()}). High conformance to reference criteria.`;
     } else {
-      remarks = `Algorithmic logic verified across languages (${studentLanguage.toUpperCase()} vs ${referenceLanguage.toUpperCase()} reference, ${logicMatch}% logic match).`;
+      remarks = `Algorithmic logic verified across languages (${sLang.toUpperCase()} vs ${rLang.toUpperCase()} reference, ${logicMatch}% logic match).`;
     }
   } else {
-    remarks = `Partial logic match (${logicMatch}% match with faculty reference solution). Review control structures and algorithm requirements.`;
+    remarks = `Partial logic match (${logicMatch}% match with faculty reference solution). Review algorithm criteria and control structures.`;
   }
 
   return {
@@ -220,8 +204,60 @@ function evaluateLabSubmission(studentCode, studentLanguage, referenceSolution, 
     logicMatchPercentage: logicMatch,
     structuralMatch,
     isCorrect,
+    matchedLanguage: rLang,
     remarks
   };
+}
+
+/**
+ * Evaluates student's code against the faculty reference solution(s).
+ * Supports both multi-language reference solution maps and single reference solutions.
+ * Handles different variable names via AST/identifier tokenization.
+ */
+function evaluateLabSubmission(studentCode, studentLanguage, referenceInput, fallbackReferenceLanguage = 'cpp', maxScore = 100) {
+  const cleanStudentCode = (studentCode || '').trim();
+
+  // If student submitted no code
+  if (!cleanStudentCode) {
+    return {
+      score: 0,
+      logicMatchPercentage: 0,
+      structuralMatch: 0,
+      isCorrect: false,
+      remarks: 'No code submitted for evaluation.'
+    };
+  }
+
+  const sLang = detectLanguage(cleanStudentCode, studentLanguage);
+
+  // If referenceInput is an object containing multi-language solutions:
+  if (referenceInput && typeof referenceInput === 'object' && !Array.isArray(referenceInput)) {
+    // 1. Exact language match: Check if faculty provided solution for student's exact language
+    if (referenceInput[sLang] && referenceInput[sLang].trim()) {
+      return evaluateSinglePair(cleanStudentCode, sLang, referenceInput[sLang].trim(), sLang, maxScore);
+    }
+
+    // 2. Otherwise, check across all non-empty language solutions provided by faculty and pick the best result
+    const availableLangs = Object.keys(referenceInput).filter(lang => (referenceInput[lang] || '').trim());
+    if (availableLangs.length > 0) {
+      let bestResult = null;
+      for (const lang of availableLangs) {
+        const result = evaluateSinglePair(cleanStudentCode, sLang, referenceInput[lang].trim(), lang, maxScore);
+        if (!bestResult || result.logicMatchPercentage > bestResult.logicMatchPercentage) {
+          bestResult = result;
+        }
+      }
+      return bestResult;
+    }
+
+    // If all solutions in the object are empty
+    return evaluateSinglePair(cleanStudentCode, sLang, '', fallbackReferenceLanguage, maxScore);
+  }
+
+  // Single string reference solution fallback
+  const cleanRefCode = (referenceInput || '').trim();
+  const rLang = detectLanguage(cleanRefCode, fallbackReferenceLanguage);
+  return evaluateSinglePair(cleanStudentCode, sLang, cleanRefCode, rLang, maxScore);
 }
 
 module.exports = {

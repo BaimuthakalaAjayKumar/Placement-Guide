@@ -70,8 +70,17 @@ const LabPractice = () => {
     section: '',
     maxScore: 100,
     referenceSolution: '',
-    solutionLanguage: 'cpp'
+    solutionLanguage: 'cpp',
+    referenceSolutions: {
+      cpp: '',
+      java: '',
+      python: '',
+      c: '',
+      javascript: '',
+      sql: ''
+    }
   });
+  const [activeTaskFormLang, setActiveTaskFormLang] = useState('cpp');
 
   // IDE Workspace state
   const [selectedTask, setSelectedTask] = useState(null);
@@ -125,9 +134,15 @@ const LabPractice = () => {
   const createTask = async (event) => {
     event.preventDefault();
     try {
+      const primaryRef = taskForm.referenceSolutions?.[activeTaskFormLang] || Object.values(taskForm.referenceSolutions || {}).find(v => (v || '').trim()) || taskForm.referenceSolution || '';
+      const payload = {
+        ...taskForm,
+        referenceSolution: primaryRef,
+        solutionLanguage: activeTaskFormLang
+      };
       await request(`${API_URL}/labs/tasks`, {
         method: 'POST',
-        body: JSON.stringify(taskForm)
+        body: JSON.stringify(payload)
       });
       setTaskForm({
         title: '',
@@ -138,10 +153,19 @@ const LabPractice = () => {
         section: '',
         maxScore: 100,
         referenceSolution: '',
-        solutionLanguage: 'cpp'
+        solutionLanguage: 'cpp',
+        referenceSolutions: {
+          cpp: '',
+          java: '',
+          python: '',
+          c: '',
+          javascript: '',
+          sql: ''
+        }
       });
+      setActiveTaskFormLang('cpp');
       setTaskFormOpen(false);
-      setMessage('✅ Lab task successfully created with reference solution.');
+      setMessage('✅ Lab task successfully created with multi-language reference solutions.');
       load();
     } catch (error) {
       setMessage(error.message);
@@ -875,41 +899,58 @@ const LabPractice = () => {
                       required
                     />
 
-                    <div className="form-row-2" style={{ alignItems: 'flex-start' }}>
-                      <div>
-                        <label style={{ display: 'block', fontSize: '0.85rem', marginBottom: '6px', fontWeight: 600 }}>
-                          Reference Solution Language:
+                    <div style={{ marginTop: '10px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', flexWrap: 'wrap', gap: '8px' }}>
+                        <label style={{ display: 'block', fontSize: '0.85rem', margin: 0, fontWeight: 600 }}>
+                          Default Faculty Reference Solutions (Multi-Language):
                         </label>
-                        <select
-                          className="form-control"
-                          value={taskForm.solutionLanguage}
-                          onChange={(e) => setTaskForm({ ...taskForm, solutionLanguage: e.target.value })}
-                        >
-                          <option value="cpp">C++</option>
-                          <option value="java">Java</option>
-                          <option value="python">Python</option>
-                          <option value="c">C</option>
-                          <option value="javascript">JavaScript</option>
-                          <option value="sql">SQL</option>
-                        </select>
+                        <span style={{ fontSize: '11px', color: '#38bdf8' }}>
+                          ⚡ AST Normalized • Student submissions auto-match corresponding language
+                        </span>
                       </div>
-                    </div>
 
-                    <div>
-                      <label style={{ display: 'block', fontSize: '0.85rem', marginBottom: '6px', fontWeight: 600 }}>
-                        Faculty Reference Solution (Hidden from students; used for automated logic evaluation):
-                      </label>
+                      <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '8px' }}>
+                        {LANGUAGES.map(lang => {
+                          const hasCode = Boolean(taskForm.referenceSolutions?.[lang.value]?.trim());
+                          const isActive = activeTaskFormLang === lang.value;
+                          return (
+                            <button
+                              key={lang.value}
+                              type="button"
+                              onClick={() => setActiveTaskFormLang(lang.value)}
+                              className={`btn btn-sm ${isActive ? 'btn-primary' : 'btn-secondary'}`}
+                              style={{ fontSize: '12px', padding: '4px 10px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                            >
+                              <span>{lang.label}</span>
+                              {hasCode && <span style={{ fontSize: '10px', background: '#10b981', color: '#fff', borderRadius: '8px', padding: '0 5px' }}>✓</span>}
+                            </button>
+                          );
+                        })}
+                      </div>
+
                       <textarea
                         className="form-control"
-                        placeholder="Paste standard reference solution code here..."
-                        value={taskForm.referenceSolution}
-                        onChange={(e) => setTaskForm({ ...taskForm, referenceSolution: e.target.value })}
+                        placeholder={`Paste reference solution code for ${LANGUAGES.find(l => l.value === activeTaskFormLang)?.label || 'chosen language'} here...`}
+                        value={taskForm.referenceSolutions?.[activeTaskFormLang] || ''}
+                        onChange={(e) => {
+                          const newCode = e.target.value;
+                          const updated = {
+                            ...taskForm.referenceSolutions,
+                            [activeTaskFormLang]: newCode
+                          };
+                          setTaskForm({
+                            ...taskForm,
+                            referenceSolutions: updated,
+                            referenceSolution: newCode || Object.values(updated).find(v => (v || '').trim()) || '',
+                            solutionLanguage: activeTaskFormLang
+                          });
+                        }}
                         rows={6}
                         style={{ fontFamily: 'monospace', fontSize: '0.85rem' }}
                       />
                     </div>
 
-                    <button className="btn btn-primary" type="submit" style={{ justifySelf: 'start' }}>
+                    <button className="btn btn-primary" type="submit" style={{ justifySelf: 'start', marginTop: '10px' }}>
                       Create Lab Task
                     </button>
                   </form>
