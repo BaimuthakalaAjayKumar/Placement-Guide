@@ -1,20 +1,86 @@
-.faculty-layout {
-  display: flex;
-  min-height: 100vh;
-  background-color: #0f172a;
-  color: #f1f5f9;
+.faculty-content {
+  flex: 1;
+  overflow-y: auto;
 }
 
-.faculty-main {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
+.faculty-dashboard-content {
+  overflow-x: hidden;
 }
 
 .faculty-content {
-  padding: 2rem;
-  flex: 1;
+  min-width: 0;
+}
+
+.progress-loading {
+  color: #94a3b8;
+  padding: 16px 0;
+}
+
+.progress-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(2, 6, 23, 0.78);
+  backdrop-filter: blur(8px);
+}
+
+.progress-modal {
+  width: min(900px, 100%);
+  max-height: 85vh;
   overflow-y: auto;
+  padding: 24px;
+  border: 1px solid #334155;
+  border-radius: 12px;
+  background: #172237;
+  color: #f1f5f9;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.4);
+}
+
+.progress-modal-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  border-bottom: 1px solid #334155;
+  padding-bottom: 16px;
+}
+
+.progress-modal-header h2 { margin: 0; }
+.progress-modal-header p { color: #94a3b8; margin: 6px 0 0; }
+.progress-close { border: 0; background: transparent; color: #cbd5e1; font-size: 28px; cursor: pointer; }
+
+.progress-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 12px;
+  margin: 18px 0;
+}
+
+.progress-summary-grid div {
+  padding: 14px;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  background: #1e293b;
+}
+
+.progress-summary-grid span,
+.progress-summary-grid strong { display: block; }
+.progress-summary-grid span { color: #94a3b8; font-size: 12px; }
+.progress-summary-grid strong { margin-top: 5px; font-size: 22px; }
+
+.progress-columns { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+.progress-columns h3 { font-size: 15px; }
+.progress-columns p { color: #cbd5e1; font-size: 13px; }
+
+@media (max-width: 800px) {
+  .progress-summary-grid, .progress-columns { grid-template-columns: 1fr 1fr; }
+}
+
+@media (max-width: 520px) {
+  .progress-summary-grid, .progress-columns { grid-template-columns: 1fr; }
 }
 
 .stats-cards {
@@ -53,6 +119,7 @@
   padding: 1.5rem;
   border-radius: 0.5rem;
   border: 1px solid #334155;
+  min-width: 0;
 }
 
 .students-section h2 {
@@ -73,6 +140,12 @@
 .students-table {
   width: 100%;
   border-collapse: collapse;
+  min-width: 720px;
+}
+
+.students-table-scroll {
+  width: 100%;
+  overflow-x: auto;
 }
 
 .students-table th,
@@ -129,3 +202,235 @@
 .btn-view:hover {
   background-color: #2563eb;
 }
+
+/* Tab Navigation */
+.faculty-tabs-nav {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 24px;
+  border-bottom: 1px solid #334155;
+  padding-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.faculty-tab-btn {
+  background: rgba(30, 41, 59, 0.6);
+  border: 1px solid #334155;
+  color: #94a3b8;
+  padding: 10px 18px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.faculty-tab-btn:hover {
+  background: rgba(51, 65, 85, 0.8);
+  color: #f1f5f9;
+  border-color: #475569;
+}
+
+.faculty-tab-btn.active {
+  background: linear-gradient(135deg, #4f46e5 0%, #6366f1 100%);
+  color: #ffffff;
+  border-color: #818cf8;
+  box-shadow: 0 4px 12px rgba(79, 70, 229, 0.35);
+}
+
+/* Split Layouts & Cards */
+.faculty-split-layout {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+}
+
+@media (max-width: 1024px) {
+  .faculty-split-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+.faculty-card {
+  background: #1e293b;
+  border: 1px solid #334155;
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.faculty-card h3 {
+  margin: 0 0 6px 0;
+  font-size: 18px;
+  color: #f8fafc;
+}
+
+.card-desc {
+  color: #94a3b8;
+  font-size: 13px;
+  margin: 0;
+}
+
+/* Forms & Inputs */
+.faculty-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.form-grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.form-grid-3 {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 12px;
+}
+
+@media (max-width: 640px) {
+  .form-grid-2, .form-grid-3 {
+    grid-template-columns: 1fr;
+  }
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.form-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.form-control {
+  background: #0f172a;
+  border: 1px solid #334155;
+  border-radius: 6px;
+  padding: 10px 14px;
+  color: #f8fafc;
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.form-control:focus {
+  border-color: #6366f1;
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.25);
+}
+
+.btn-primary-action {
+  background: linear-gradient(135deg, #4f46e5 0%, #6366f1 100%);
+  color: white;
+  border: none;
+  padding: 11px 20px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-primary-action:hover {
+  filter: brightness(1.1);
+  transform: translateY(-1px);
+}
+
+.btn-primary-action:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Badges and Pills */
+.code-pill {
+  background: rgba(99, 102, 241, 0.15);
+  color: #818cf8;
+  border: 1px solid rgba(99, 102, 241, 0.3);
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-family: monospace;
+}
+
+.status-badge-active {
+  background: rgba(16, 185, 129, 0.15);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+.status-pill {
+  display: inline-block;
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  text-transform: capitalize;
+}
+
+.status-pill.approved {
+  background: rgba(16, 185, 129, 0.15);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.status-pill.under_review {
+  background: rgba(234, 179, 8, 0.15);
+  color: #facc15;
+  border: 1px solid rgba(234, 179, 8, 0.3);
+}
+
+.status-pill.rejected {
+  background: rgba(239, 68, 68, 0.15);
+  color: #f87171;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+/* Search Filters */
+.search-filters-bar {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.filter-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+  min-width: 200px;
+}
+
+.success-alert {
+  background: rgba(16, 185, 129, 0.1);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  color: #34d399;
+  padding: 12px 16px;
+  border-radius: 8px;
+  margin-bottom: 16px;
+}
+
+.attempt-item {
+  background: #0f172a;
+  border: 1px solid #334155;
+  border-radius: 6px;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+}
+
+.attempt-item p {
+  margin: 0 0 4px 0;
+  font-size: 13px;
+  color: #f1f5f9;
+}
+

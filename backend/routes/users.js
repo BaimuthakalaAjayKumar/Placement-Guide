@@ -2,6 +2,7 @@ const express = require('express');
 const {
   getDashboardStats,
   getAllStudents,
+  getStudentProgress,
   createAdmin,
   createFaculty,
   getStaff,
@@ -36,6 +37,7 @@ router.put('/hackerrank', protect, updateHackerrankProfile);
 router.get('/solutions/:platform/:problemId', protect, getUserSolution);
 router.post('/solutions', protect, saveUserSolution);
 router.get('/students', protect, authorize('admin', 'faculty'), getAllStudents);
+router.get('/students/:id/progress', protect, authorize('admin', 'faculty'), getStudentProgress);
 router.get('/students/export', protect, authorize('admin'), exportStudentReport);
 router.post('/students/bulk-delete', protect, authorize('admin'), bulkDeleteStudents);
 router.put('/students/:id/academics', protect, authorize('admin'), updateStudentAcademics);

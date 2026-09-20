@@ -4,17 +4,28 @@ const getStudentAcademicYear = (user) => user.academicYear || user.year || '';
 
 const canManageYear = (user, academicYear) => {
   if (user.role === 'admin') return true;
-  return user.role === 'faculty' && user.managedAcademicYears.includes(academicYear);
+  if (user.role !== 'faculty') return false;
+  if (!user.managedAcademicYears || user.managedAcademicYears.length === 0) return true;
+  const targetYear = (academicYear || '').trim().toLowerCase();
+  return user.managedAcademicYears.some(y => !y || y.trim().toLowerCase() === 'all' || y.trim().toLowerCase() === targetYear || targetYear.includes(y.trim().toLowerCase()) || y.trim().toLowerCase().includes(targetYear));
 };
 
 const canManageScope = (user, academicYear, branch = '', section = '') => {
   if (user.role === 'admin') return true;
   if (user.role !== 'faculty') return false;
-  return user.managedScopes.some(scope =>
-    scope.academicYear === academicYear &&
-    (!scope.branch || scope.branch === branch) &&
-    (!scope.section || scope.section === section)
-  );
+  if (!user.managedScopes || user.managedScopes.length === 0) return true;
+  return user.managedScopes.some(scope => {
+    const sYear = (scope.academicYear || '').trim().toLowerCase();
+    const sBranch = (scope.branch || '').trim().toLowerCase();
+    const sSection = (scope.section || '').trim().toLowerCase();
+    const reqYear = (academicYear || '').trim().toLowerCase();
+    const reqBranch = (branch || '').trim().toLowerCase();
+    const reqSection = (section || '').trim().toLowerCase();
+    const yearMatch = !sYear || sYear === 'all' || !reqYear || sYear === reqYear || reqYear.includes(sYear) || sYear.includes(reqYear);
+    const branchMatch = !sBranch || sBranch === 'all' || !reqBranch || sBranch === reqBranch;
+    const sectionMatch = !sSection || sSection === 'all' || !reqSection || sSection === reqSection;
+    return yearMatch && branchMatch && sectionMatch;
+  });
 };
 
 exports.getSubjects = async (req, res, next) => {
@@ -23,14 +34,17 @@ exports.getSubjects = async (req, res, next) => {
     const branch = req.query.branch || (req.user.role === 'student' ? req.user.branch : '');
     const section = req.query.section || (req.user.role === 'student' ? req.user.section : '');
     const query = { isActive: true };
+
     if (req.user.role === 'student' && req.query.academicYear && req.query.academicYear !== getStudentAcademicYear(req.user)) {
       return res.status(403).json({ success: false, error: 'You can only view subjects for your academic year.' });
     } else if (req.user.role === 'faculty' && !req.query.academicYear) {
-      query.$or = req.user.managedScopes.map(scope => ({
-        academicYear: scope.academicYear,
-        ...(scope.branch ? { branch: scope.branch } : {}),
-        ...(scope.section ? { section: scope.section } : {})
-      }));
+      if (req.user.managedScopes && req.user.managedScopes.length > 0) {
+        query.$or = req.user.managedScopes.map(scope => ({
+          academicYear: new RegExp(`^${scope.academicYear}$`, 'i'),
+          ...(scope.branch ? { branch: new RegExp(`^${scope.branch}$`, 'i') } : {}),
+          ...(scope.section ? { section: new RegExp(`^${scope.section}$`, 'i') } : {})
+        }));
+      }
     } else if (academicYear) {
       if (req.user.role === 'faculty' && !canManageScope(req.user, academicYear, branch, section)) {
         return res.status(403).json({ success: false, error: 'You are not assigned to manage this academic year.' });

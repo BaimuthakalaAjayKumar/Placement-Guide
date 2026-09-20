@@ -38,14 +38,12 @@ const AdminPanel = () => {
   // Admin creation form states
   const [adminName, setAdminName] = useState('');
   const [adminEmail, setAdminEmail] = useState('');
-  const [adminPassword, setAdminPassword] = useState('');
   const [adminAcademicYear, setAdminAcademicYear] = useState('');
   const [adminBranch, setAdminBranch] = useState('');
   const [adminSection, setAdminSection] = useState('');
   const [submittingAdmin, setSubmittingAdmin] = useState(false);
   const [facultyName, setFacultyName] = useState('');
   const [facultyEmail, setFacultyEmail] = useState('');
-  const [facultyPassword, setFacultyPassword] = useState('');
   const [facultyAcademicYear, setFacultyAcademicYear] = useState('');
   const [facultyBranch, setFacultyBranch] = useState('');
   const [facultySection, setFacultySection] = useState('');
@@ -509,6 +507,9 @@ const AdminPanel = () => {
 
   useEffect(() => {
     if (token) {
+      // Always pre-load staff records so staff dropdowns & counts are always available
+      fetchStaff();
+
       if (activeTab === 'analytics') {
         fetchStudents();
         fetchJobs();
@@ -524,8 +525,12 @@ const AdminPanel = () => {
           .then(response => response.json())
           .then(data => { if (data.success) setAcademicSubjects(data.data); })
           .catch(() => {});
+      } else if (activeTab === 'interview-settings') {
+        fetchStaff();
+        fetchAcademicContent();
       } else if (activeTab === 'settings') {
         fetchStaff();
+        fetchAcademicContent();
       }
     }
   }, [token, activeTab]);
@@ -595,13 +600,8 @@ const AdminPanel = () => {
     setError('');
     setSuccess('');
 
-    if (!adminName || !adminEmail || !adminPassword || !adminAcademicYear || !adminBranch || !adminSection) {
+    if (!adminName || !adminEmail || !adminAcademicYear || !adminBranch || !adminSection) {
       setError('Please fill in administrator credentials and academic assignment fields.');
-      return;
-    }
-
-    if (adminPassword.length < 6) {
-      setError('Admin password must be at least 6 characters.');
       return;
     }
 
@@ -617,20 +617,19 @@ const AdminPanel = () => {
         body: JSON.stringify({
           name: adminName,
           email: adminEmail,
-          password: adminPassword,
           managedScopes: [{ academicYear: adminAcademicYear, branch: adminBranch, section: adminSection }]
         })
       });
 
       const data = await res.json();
       if (data.success) {
-        setSuccess(`Successfully created new Administrator account for ${adminName}!`);
+        setSuccess(`Successfully created new Administrator account for ${adminName}! A password setup link was emailed.`);
         setAdminName('');
         setAdminEmail('');
-        setAdminPassword('');
         setAdminAcademicYear('');
         setAdminBranch('');
         setAdminSection('');
+        fetchStaff();
       } else {
         setError(data.error || 'Failed to create Administrator.');
       }
@@ -675,11 +674,6 @@ const AdminPanel = () => {
       setError('Faculty name, email, academic year, branch, and section are required.');
       return;
     }
-    if (facultyPassword && facultyPassword.length < 6) {
-      setError('Temporary password must be at least 6 characters.');
-      return;
-    }
-
     try {
       setSubmittingFaculty(true);
       const res = await fetch(`${API_URL}/users/faculty`, {
@@ -688,16 +682,14 @@ const AdminPanel = () => {
         body: JSON.stringify({
           name: facultyName,
           email: facultyEmail,
-          password: facultyPassword || undefined,
           managedScopes: [{ academicYear: facultyAcademicYear, branch: facultyBranch, section: facultySection }]
         })
       });
       const data = await res.json();
       if (!data.success) throw new Error(data.error || 'Failed to create faculty account.');
-      setSuccess(`Faculty account created for ${facultyName}. Credentials were emailed and a password change is required.`);
+      setSuccess(`Faculty account created for ${facultyName}. A password setup link was emailed.`);
       setFacultyName('');
       setFacultyEmail('');
-      setFacultyPassword('');
       setFacultyAcademicYear('');
       setFacultyBranch('');
       setFacultySection('');
@@ -710,7 +702,7 @@ const AdminPanel = () => {
   };
 
   const resetStaffPassword = async (staff) => {
-    if (!window.confirm(`Reset the password for ${staff.name}? A temporary password will be emailed to them.`)) return;
+    if (!window.confirm(`Send a new password setup link to ${staff.name}?`)) return;
     try {
       const res = await fetch(`${API_URL}/users/staff/${staff._id}/reset-password`, {
         method: 'PUT',
@@ -1919,7 +1911,7 @@ const AdminPanel = () => {
             className={`admin-tab-btn ${activeTab === 'academic-content' ? 'active' : ''}`}
             onClick={() => setActiveTab('academic-content')}
           >
-            🎓 Academic Content & Projects
+            📚 Academic Subjects & Projects
           </button>
           <button
             className={`admin-tab-btn ${activeTab === 'aptitude' ? 'active' : ''}`}
@@ -2416,19 +2408,6 @@ const AdminPanel = () => {
                           placeholder="name@university.edu"
                           value={adminEmail}
                           onChange={(e) => setAdminEmail(e.target.value)}
-                          required
-                        />
-                      </div>
-
-                      <div className="form-group">
-                        <label className="form-label" htmlFor="adminPassword">Login Password</label>
-                        <input
-                          type="password"
-                          id="adminPassword"
-                          className="form-control"
-                          placeholder="At least 6 characters"
-                          value={adminPassword}
-                          onChange={(e) => setAdminPassword(e.target.value)}
                           required
                         />
                       </div>
@@ -2942,18 +2921,50 @@ const AdminPanel = () => {
                   )}
                 </div>
                 <form className="admin-job-form mt-20" onSubmit={saveStaffScope}>
-                  <h4>Assign Academic Scope</h4>
-                  <select className="form-control" value={scopeStaffId} onChange={event => setScopeStaffId(event.target.value)} required>
-                    <option value="">Select Faculty or Administrator</option>
-                    {staffMembers.filter(member => member.role === 'faculty').map(member => <option key={member._id} value={member._id}>{member.name} ({member.email})</option>)}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                    <h4 style={{ margin: 0 }}>Assign Academic Scope</h4>
+                    <button type="button" className="btn btn-secondary btn-sm" onClick={fetchStaff} title="Refresh Staff List">
+                      🔄 Refresh Staff ({staffMembers.length})
+                    </button>
+                  </div>
+                  <p className="card-desc" style={{ marginBottom: '12px' }}>
+                    Assign academic year, branch, section, or subject to faculty members or administrators.
+                  </p>
+                  <select
+                    className="form-control"
+                    value={scopeStaffId}
+                    onChange={event => setScopeStaffId(event.target.value)}
+                    onFocus={() => { if (!staffMembers.length) fetchStaff(); }}
+                    required
+                  >
+                    <option value="">
+                      {loadingStaff ? 'Loading staff records...' : (staffMembers.length === 0 ? 'No staff found — click "Refresh Staff"' : `Select Faculty or Administrator (${staffMembers.length} available)`)}
+                    </option>
+                    {staffMembers.map(member => (
+                      <option key={member._id} value={member._id}>
+                        {member.name} — {member.email} ({member.role === 'admin' ? 'Administrator' : 'Faculty'})
+                      </option>
+                    ))}
                   </select>
+                  {scopeStaffId && (() => {
+                    const selected = staffMembers.find(m => m._id === scopeStaffId);
+                    if (!selected) return null;
+                    return (
+                      <div style={{ padding: '8px 12px', background: 'rgba(99, 102, 241, 0.1)', border: '1px solid rgba(99, 102, 241, 0.25)', borderRadius: '6px', fontSize: '12px', color: '#c7d2fe', marginTop: '6px' }}>
+                        <strong>{selected.name}</strong> ({selected.email}) · Role: <strong>{selected.role === 'admin' ? 'Administrator' : 'Faculty'}</strong>
+                        <div style={{ marginTop: '4px' }}>
+                          Current Scopes: {selected.managedScopes?.length > 0 ? selected.managedScopes.map((s, i) => `${s.academicYear}${s.branch ? ` (${s.branch})` : ''}${s.section ? ` Sec ${s.section}` : ''}`).join(', ') : 'None (General Access)'}
+                        </div>
+                      </div>
+                    );
+                  })()}
                   <input className="form-control" placeholder="Academic year, e.g. 4th Year" value={scopeForm.academicYear} onChange={event => setScopeForm({ ...scopeForm, academicYear: event.target.value })} required />
                   <div className="form-grid-3-col">
                     <input className="form-control" placeholder="Branch, e.g. CSE" value={scopeForm.branch} onChange={event => setScopeForm({ ...scopeForm, branch: event.target.value })} />
                     <input className="form-control" placeholder="Section, e.g. C" value={scopeForm.section} onChange={event => setScopeForm({ ...scopeForm, section: event.target.value })} />
                     <select className="form-control" value={scopeForm.subject} onChange={event => setScopeForm({ ...scopeForm, subject: event.target.value })}>
                       <option value="">All Subjects</option>
-                      {academicSubjects.map(subject => <option key={subject._id} value={subject._id}>{subject.code}</option>)}
+                      {academicSubjects.map(subject => <option key={subject._id} value={subject._id}>{subject.code} - {subject.name}</option>)}
                     </select>
                   </div>
                   <button className="btn btn-secondary" type="submit" disabled={savingScope}>{savingScope ? 'Assigning...' : 'Assign Scope'}</button>
@@ -3038,7 +3049,7 @@ const AdminPanel = () => {
 
               <div className="glass-card data-management-section">
                 <h3>👥 Administrator & Faculty Accounts</h3>
-                <p className="card-desc">Create faculty accounts, send login credentials, force password changes, and manage staff records.</p>
+                <p className="card-desc">Create faculty accounts, send password setup links, and manage staff records.</p>
 
                 <form className="admin-job-form mt-20" onSubmit={handleCreateFaculty}>
                   <div className="form-group">
@@ -3049,35 +3060,67 @@ const AdminPanel = () => {
                     <label className="form-label" htmlFor="facultyEmail">Faculty Login Email</label>
                     <input id="facultyEmail" type="email" className="form-control" value={facultyEmail} onChange={event => setFacultyEmail(event.target.value)} required />
                   </div>
-                  <div className="form-group">
-                    <label className="form-label" htmlFor="facultyPassword">Temporary Password (optional)</label>
-                    <input id="facultyPassword" type="password" className="form-control" placeholder="Auto-generated if empty" value={facultyPassword} onChange={event => setFacultyPassword(event.target.value)} minLength="6" />
-                  </div>
                   <div className="form-grid-3-col">
                     <input className="form-control" placeholder="Academic Year" value={facultyAcademicYear} onChange={event => setFacultyAcademicYear(event.target.value)} required />
                     <input className="form-control" placeholder="Branch" value={facultyBranch} onChange={event => setFacultyBranch(event.target.value)} required />
                     <input className="form-control" placeholder="Section" value={facultySection} onChange={event => setFacultySection(event.target.value)} required />
                   </div>
                   <button className="btn btn-primary" type="submit" disabled={submittingFaculty}>
-                    {submittingFaculty ? 'Creating...' : 'Create Faculty & Email Credentials'}
+                    {submittingFaculty ? 'Creating...' : 'Create Faculty & Email Setup Link'}
                   </button>
                 </form>
 
                 <div className="table-responsive-wrapper mt-20">
                   {loadingStaff ? <p className="text-secondary">Loading staff records...</p> : (
                     <table className="student-roster-table">
-                      <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Password State</th><th>Actions</th></tr></thead>
+                      <thead>
+                        <tr>
+                          <th>Name</th>
+                          <th>Email</th>
+                          <th>Role</th>
+                          <th>Assigned Scopes</th>
+                          <th>Actions</th>
+                        </tr>
+                      </thead>
                       <tbody>
                         {staffMembers.map(staff => (
                           <tr key={staff._id}>
-                            <td>{staff.name}</td>
+                            <td><strong>{staff.name}</strong></td>
                             <td>{staff.email}</td>
-                            <td style={{ textTransform: 'capitalize' }}>{staff.role}</td>
-                            <td>{staff.mustChangePassword ? 'Change required' : 'Active'}</td>
+                            <td>
+                              <span style={{
+                                textTransform: 'capitalize',
+                                padding: '3px 8px',
+                                borderRadius: '4px',
+                                fontSize: '12px',
+                                background: staff.role === 'admin' ? 'rgba(99, 102, 241, 0.2)' : 'rgba(16, 185, 129, 0.2)',
+                                color: staff.role === 'admin' ? '#818cf8' : '#34d399',
+                                border: `1px solid ${staff.role === 'admin' ? 'rgba(99, 102, 241, 0.4)' : 'rgba(16, 185, 129, 0.4)'}`
+                              }}>
+                                {staff.role === 'admin' ? 'Administrator' : 'Faculty'}
+                              </span>
+                            </td>
+                            <td>
+                              {staff.managedScopes && staff.managedScopes.length > 0 ? (
+                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                                  {staff.managedScopes.map((s, idx) => (
+                                    <span key={idx} className="meta-chip isection-chip-tech" style={{ fontSize: '11px', padding: '2px 6px' }}>
+                                      {s.academicYear}{s.branch ? ` · ${s.branch}` : ''}{s.section ? ` · Sec ${s.section}` : ''}
+                                    </span>
+                                  ))}
+                                </div>
+                              ) : (
+                                <span style={{ color: '#94a3b8', fontSize: '12px' }}>General / All Scopes</span>
+                              )}
+                            </td>
                             <td>
                               <div style={{ display: 'flex', gap: '8px' }}>
-                                <button className="btn btn-secondary btn-sm" type="button" onClick={() => resetStaffPassword(staff)}>Reset & Email</button>
-                                <button className="btn btn-danger btn-sm" type="button" onClick={() => deleteStaff(staff)}>Remove</button>
+                                <button className="btn btn-secondary btn-sm" type="button" onClick={() => resetStaffPassword(staff)} title="Send a secure password setup link to this email without temporary password">
+                                  Send Password Link
+                                </button>
+                                <button className="btn btn-danger btn-sm" type="button" onClick={() => deleteStaff(staff)}>
+                                  Remove
+                                </button>
                               </div>
                             </td>
                           </tr>
@@ -3087,6 +3130,54 @@ const AdminPanel = () => {
                     </table>
                   )}
                 </div>
+
+                <form className="admin-job-form mt-20" onSubmit={saveStaffScope}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                    <h4 style={{ margin: 0 }}>🎯 Assign Academic Scope to Staff</h4>
+                    <button type="button" className="btn btn-secondary btn-sm" onClick={fetchStaff} title="Refresh Staff List">
+                      🔄 Refresh Staff ({staffMembers.length})
+                    </button>
+                  </div>
+                  <p className="card-desc" style={{ marginBottom: '12px' }}>Assign specific academic years, branches, sections, or subjects to faculty members and administrators.</p>
+                  <select
+                    className="form-control"
+                    value={scopeStaffId}
+                    onChange={event => setScopeStaffId(event.target.value)}
+                    onFocus={() => { if (!staffMembers.length) fetchStaff(); }}
+                    required
+                  >
+                    <option value="">
+                      {loadingStaff ? 'Loading staff records...' : (staffMembers.length === 0 ? 'No staff found — click "Refresh Staff"' : `Select Faculty or Administrator (${staffMembers.length} available)`)}
+                    </option>
+                    {staffMembers.map(member => (
+                      <option key={member._id} value={member._id}>
+                        {member.name} — {member.email} ({member.role === 'admin' ? 'Administrator' : 'Faculty'})
+                      </option>
+                    ))}
+                  </select>
+                  {scopeStaffId && (() => {
+                    const selected = staffMembers.find(m => m._id === scopeStaffId);
+                    if (!selected) return null;
+                    return (
+                      <div style={{ padding: '8px 12px', background: 'rgba(99, 102, 241, 0.1)', border: '1px solid rgba(99, 102, 241, 0.25)', borderRadius: '6px', fontSize: '12px', color: '#c7d2fe', marginTop: '6px' }}>
+                        <strong>{selected.name}</strong> ({selected.email}) · Role: <strong>{selected.role === 'admin' ? 'Administrator' : 'Faculty'}</strong>
+                        <div style={{ marginTop: '4px' }}>
+                          Current Scopes: {selected.managedScopes?.length > 0 ? selected.managedScopes.map((s, i) => `${s.academicYear}${s.branch ? ` (${s.branch})` : ''}${s.section ? ` Sec ${s.section}` : ''}`).join(', ') : 'None (General Access)'}
+                        </div>
+                      </div>
+                    );
+                  })()}
+                  <input className="form-control" placeholder="Academic year, e.g. 4th Year" value={scopeForm.academicYear} onChange={event => setScopeForm({ ...scopeForm, academicYear: event.target.value })} required />
+                  <div className="form-grid-3-col">
+                    <input className="form-control" placeholder="Branch, e.g. CSE" value={scopeForm.branch} onChange={event => setScopeForm({ ...scopeForm, branch: event.target.value })} />
+                    <input className="form-control" placeholder="Section, e.g. C" value={scopeForm.section} onChange={event => setScopeForm({ ...scopeForm, section: event.target.value })} />
+                    <select className="form-control" value={scopeForm.subject} onChange={event => setScopeForm({ ...scopeForm, subject: event.target.value })}>
+                      <option value="">All Subjects</option>
+                      {academicSubjects.map(subject => <option key={subject._id} value={subject._id}>{subject.code} - {subject.name}</option>)}
+                    </select>
+                  </div>
+                  <button className="btn btn-secondary" type="submit" disabled={savingScope}>{savingScope ? 'Assigning...' : 'Assign Scope'}</button>
+                </form>
               </div>
             </div>
           </div>

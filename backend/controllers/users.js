@@ -5,8 +5,43 @@ const MockInterview = require('../models/MockInterview');
 const UserSolution = require('../models/UserSolution');
 const Submission = require('../models/Submission');
 const ContestAttempt = require('../models/ContestAttempt');
+const Project = require('../models/Project');
+const LabPracticeAttempt = require('../models/LabPracticeAttempt');
 const crypto = require('crypto');
 const sendEmail = require('../utils/sendEmail');
+
+const sendStaffPasswordResetLink = async (user, req) => {
+  const resetToken = crypto.randomBytes(20).toString('hex');
+  user.resetPasswordToken = crypto.createHash('sha256').update(resetToken).digest('hex');
+  user.resetPasswordExpire = Date.now() + 24 * 60 * 60 * 1000; // 24 hours
+  await user.save({ validateBeforeSave: false });
+
+  const clientOrigin = req?.headers?.origin || process.env.CLIENT_URL || process.env.FRONTEND_URL || 'https://placement-guide-nu.vercel.app';
+  const resetUrl = `${clientOrigin.replace(/\/+$/, '')}/reset-password/${resetToken}`;
+  const roleName = user.role === 'admin' ? 'Administrator' : 'Faculty';
+
+  await sendEmail({
+    to: user.email,
+    subject: `PrepPortal - Set Up Your ${roleName} Account Password`,
+    text: `Hello ${user.name},\n\nYour PrepPortal ${roleName} account has been configured. Please use the following link to create your password:\n\n${resetUrl}\n\nThis setup link is valid for 24 hours. No temporary password has been sent for your security.\n\nPrepPortal Team`,
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px;">
+        <h2 style="color: #4f46e5; margin-bottom: 20px;">Welcome to PrepPortal</h2>
+        <p style="font-size: 16px; color: #333;">Hello <strong>${user.name}</strong>,</p>
+        <p style="font-size: 14px; color: #555;">Your PrepPortal <strong>${roleName}</strong> account has been configured. To get started, please set your new private password:</p>
+        
+        <div style="text-align: center; margin: 30px 0;">
+          <a href="${resetUrl}" style="background-color: #4f46e5; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 14px; display: inline-block;">Set Your Password</a>
+        </div>
+        
+        <p style="font-size: 14px; color: #555;">Or copy and paste this link into your browser:</p>
+        <p style="font-size: 12px; background-color: #f3f4f6; padding: 10px; border-radius: 4px; word-break: break-all; color: #4b5563;">${resetUrl}</p>
+        
+        <p style="font-size: 12px; color: #9ca3af; margin-top: 25px;">Note: This link will expire in 24 hours. No temporary password is sent for your security.</p>
+      </div>
+    `
+  });
+};
 
 // Helper to fetch statistics & recent submissions directly from LeetCode GraphQL
 const fetchLeetcodeData = async (username) => {
@@ -487,6 +522,56 @@ exports.getAllStudents = async (req, res, next) => {
   }
 };
 
+exports.getStudentProgress = async (req, res, next) => {
+  try {
+    const student = await User.findOne({ _id: req.params.id, role: 'student' }).select('-password');
+    if (!student) return res.status(404).json({ success: false, error: 'Student not found.' });
+
+    if (req.user.role === 'faculty' && req.user.managedScopes && req.user.managedScopes.length > 0) {
+      const studentYear = (student.academicYear || student.year || '').trim().toLowerCase();
+      const studentBranch = (student.branch || '').trim().toLowerCase();
+      const studentSection = (student.section || '').trim().toLowerCase();
+
+      const assigned = req.user.managedScopes.some(scope => {
+        const scopeYear = (scope.academicYear || '').trim().toLowerCase();
+        const scopeBranch = (scope.branch || '').trim().toLowerCase();
+        const scopeSection = (scope.section || '').trim().toLowerCase();
+
+        const yearMatch = !scopeYear || scopeYear === 'all' || !studentYear || scopeYear === studentYear || studentYear.includes(scopeYear) || scopeYear.includes(studentYear);
+        const branchMatch = !scopeBranch || scopeBranch === 'all' || !studentBranch || scopeBranch === studentBranch;
+        const sectionMatch = !scopeSection || scopeSection === 'all' || !studentSection || scopeSection === studentSection;
+        return yearMatch && branchMatch && sectionMatch;
+      });
+
+      if (!assigned) {
+        return res.status(403).json({ success: false, error: 'This student is outside your assigned academic scope.' });
+      }
+    }
+
+    const [attempts, interviews, submissions, projects, labAttempts] = await Promise.all([
+      TestAttempt.find({ user: student._id }).populate('test', 'title category').sort({ completedAt: -1 }).limit(10),
+      MockInterview.find({ user: student._id }).sort({ createdAt: -1 }).limit(10),
+      Submission.find({ user: student._id }).populate('question', 'title').sort({ createdAt: -1 }).limit(10),
+      Project.find({ student: student._id }).select('title status grade feedback updatedAt').sort({ updatedAt: -1 }),
+      LabPracticeAttempt.find({ student: student._id }).populate('task', 'title').sort({ updatedAt: -1 }).limit(10)
+    ]);
+
+    res.status(200).json({
+      success: true,
+      data: {
+        student,
+        attempts,
+        interviews,
+        submissions,
+        projects,
+        labAttempts
+      }
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
 // @desc    Delete a student (Admin only)
 // @route   DELETE /api/users/students/:id
 // @access  Private/Admin
@@ -528,15 +613,15 @@ exports.deleteStudent = async (req, res, next) => {
   }
 };
 
-
 // @desc    Create a new administrator (Admin only)
 // @route   POST /api/users/admins
 // @access  Private/Admin
 exports.createAdmin = async (req, res, next) => {
   try {
-    const { name, email, password, managedScopes = [] } = req.body;
+    const { name, email, managedScopes = [] } = req.body;
+    const internalPassword = crypto.randomBytes(32).toString('hex');
 
-    if (!name || !email || !password) {
+    if (!name || !email) {
       return res.status(400).json({
         success: false,
         error: 'Please fill in name and email.'
@@ -554,18 +639,26 @@ exports.createAdmin = async (req, res, next) => {
     const admin = await User.create({
       name,
       email,
-      password,
+      password: internalPassword,
       role: 'admin',
+      mustChangePassword: true,
       managedScopes,
       managedAcademicYears: [...new Set(managedScopes.map(scope => scope.academicYear).filter(Boolean))]
     });
+
+    try {
+      await sendStaffPasswordResetLink(admin, req);
+    } catch (emailError) {
+      await User.findByIdAndDelete(admin._id);
+      throw emailError;
+    }
 
     const adminObj = admin.toObject();
     delete adminObj.password;
 
     res.status(201).json({
       success: true,
-      message: 'New administrator created successfully.',
+      message: 'New administrator created successfully. A password setup link was emailed to the account.',
       data: adminObj
     });
   } catch (err) {
@@ -578,13 +671,13 @@ exports.createAdmin = async (req, res, next) => {
 // @access  Private/Admin
 exports.createFaculty = async (req, res, next) => {
   try {
-    const { name, email, password, managedScopes = [] } = req.body;
-    const temporaryPassword = password || crypto.randomBytes(9).toString('base64url');
+    const { name, email, managedScopes = [] } = req.body;
+    const internalPassword = crypto.randomBytes(32).toString('hex');
 
     if (!name || !email || !managedScopes.length) {
       return res.status(400).json({
         success: false,
-        error: 'Please fill in name, email, and password.'
+        error: 'Please fill in name, email, and academic assignment.'
       });
     }
 
@@ -599,27 +692,27 @@ exports.createFaculty = async (req, res, next) => {
     const faculty = await User.create({
       name,
       email,
-      password: temporaryPassword,
+      password: internalPassword,
       role: 'faculty',
       mustChangePassword: true,
       managedScopes,
       managedAcademicYears: [...new Set(managedScopes.map(scope => scope.academicYear).filter(Boolean))]
     });
 
-    sendEmail({
-      to: email,
-      subject: 'PrepPortal Faculty Account Credentials',
-      text: `Hello ${name},\n\nYour PrepPortal faculty account has been created.\nLogin email: ${email}\nTemporary password: ${temporaryPassword}\n\nPlease log in and change this password immediately.\n\nPrepPortal Team`,
-      html: `<p>Hello <strong>${name}</strong>,</p><p>Your PrepPortal faculty account has been created.</p><p><strong>Login email:</strong> ${email}<br /><strong>Temporary password:</strong> ${temporaryPassword}</p><p>Please log in and change this password immediately.</p>`
-    }).catch(err => console.error(`Faculty credential email failed for ${email}:`, err.message));
+    try {
+      await sendStaffPasswordResetLink(faculty, req);
+    } catch (emailError) {
+      await User.findByIdAndDelete(faculty._id);
+      throw emailError;
+    }
 
     const facultyObj = faculty.toObject();
     delete facultyObj.password;
 
     res.status(201).json({
       success: true,
-      message: 'New faculty account created successfully.',
-      data: { ...facultyObj, credentialsSent: true }
+      message: 'New faculty account created successfully. A password setup link was emailed to the account.',
+      data: { ...facultyObj, resetLinkSent: true }
     });
   } catch (err) {
     next(err);
@@ -664,19 +757,10 @@ exports.resetStaffPassword = async (req, res, next) => {
     const staff = await User.findOne({ _id: req.params.id, role: { $in: ['admin', 'faculty'] } });
     if (!staff) return res.status(404).json({ success: false, error: 'Administrator or faculty member not found.' });
 
-    const temporaryPassword = crypto.randomBytes(9).toString('base64url');
-    staff.password = temporaryPassword;
     staff.mustChangePassword = true;
-    await staff.save();
+    await sendStaffPasswordResetLink(staff, req);
 
-    await sendEmail({
-      to: staff.email,
-      subject: 'PrepPortal Password Reset',
-      text: `Hello ${staff.name},\n\nYour PrepPortal password was reset by an administrator.\nTemporary password: ${temporaryPassword}\n\nPlease log in and change it immediately.`,
-      html: `<p>Hello <strong>${staff.name}</strong>,</p><p>Your PrepPortal password was reset by an administrator.</p><p><strong>Temporary password:</strong> ${temporaryPassword}</p><p>Please log in and change it immediately.</p>`
-    });
-
-    res.status(200).json({ success: true, message: 'A temporary password was emailed to the staff member. They must change it after login.' });
+    res.status(200).json({ success: true, message: 'A password setup link was emailed to the staff member.' });
   } catch (err) {
     next(err);
   }
