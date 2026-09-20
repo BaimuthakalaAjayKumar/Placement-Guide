@@ -5,6 +5,8 @@ const MockInterview = require('../models/MockInterview');
 const UserSolution = require('../models/UserSolution');
 const Submission = require('../models/Submission');
 const ContestAttempt = require('../models/ContestAttempt');
+const crypto = require('crypto');
+const sendEmail = require('../utils/sendEmail');
 
 // Helper to fetch statistics & recent submissions directly from LeetCode GraphQL
 const fetchLeetcodeData = async (username) => {
@@ -532,12 +534,12 @@ exports.deleteStudent = async (req, res, next) => {
 // @access  Private/Admin
 exports.createAdmin = async (req, res, next) => {
   try {
-    const { name, email, password } = req.body;
+    const { name, email, password, managedScopes = [] } = req.body;
 
     if (!name || !email || !password) {
       return res.status(400).json({
         success: false,
-        error: 'Please fill in name, email, and password.'
+        error: 'Please fill in name and email.'
       });
     }
 
@@ -553,7 +555,9 @@ exports.createAdmin = async (req, res, next) => {
       name,
       email,
       password,
-      role: 'admin'
+      role: 'admin',
+      managedScopes,
+      managedAcademicYears: [...new Set(managedScopes.map(scope => scope.academicYear).filter(Boolean))]
     });
 
     const adminObj = admin.toObject();
@@ -574,9 +578,10 @@ exports.createAdmin = async (req, res, next) => {
 // @access  Private/Admin
 exports.createFaculty = async (req, res, next) => {
   try {
-    const { name, email, password } = req.body;
+    const { name, email, password, managedScopes = [] } = req.body;
+    const temporaryPassword = password || crypto.randomBytes(9).toString('base64url');
 
-    if (!name || !email || !password) {
+    if (!name || !email || !managedScopes.length) {
       return res.status(400).json({
         success: false,
         error: 'Please fill in name, email, and password.'
@@ -594,9 +599,19 @@ exports.createFaculty = async (req, res, next) => {
     const faculty = await User.create({
       name,
       email,
-      password,
-      role: 'faculty'
+      password: temporaryPassword,
+      role: 'faculty',
+      mustChangePassword: true,
+      managedScopes,
+      managedAcademicYears: [...new Set(managedScopes.map(scope => scope.academicYear).filter(Boolean))]
     });
+
+    sendEmail({
+      to: email,
+      subject: 'PrepPortal Faculty Account Credentials',
+      text: `Hello ${name},\n\nYour PrepPortal faculty account has been created.\nLogin email: ${email}\nTemporary password: ${temporaryPassword}\n\nPlease log in and change this password immediately.\n\nPrepPortal Team`,
+      html: `<p>Hello <strong>${name}</strong>,</p><p>Your PrepPortal faculty account has been created.</p><p><strong>Login email:</strong> ${email}<br /><strong>Temporary password:</strong> ${temporaryPassword}</p><p>Please log in and change this password immediately.</p>`
+    }).catch(err => console.error(`Faculty credential email failed for ${email}:`, err.message));
 
     const facultyObj = faculty.toObject();
     delete facultyObj.password;
@@ -604,8 +619,78 @@ exports.createFaculty = async (req, res, next) => {
     res.status(201).json({
       success: true,
       message: 'New faculty account created successfully.',
-      data: facultyObj
+      data: { ...facultyObj, credentialsSent: true }
     });
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.getStaff = async (req, res, next) => {
+  try {
+    const staff = await User.find({ role: { $in: ['admin', 'faculty'] } })
+      .select('name email role managedAcademicYears managedScopes mustChangePassword createdAt')
+      .sort({ role: 1, name: 1 });
+    res.status(200).json({ success: true, count: staff.length, data: staff });
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.updateStaffScopes = async (req, res, next) => {
+  try {
+    const staff = await User.findOne({ _id: req.params.id, role: { $in: ['admin', 'faculty'] } });
+    if (!staff) return res.status(404).json({ success: false, error: 'Administrator or faculty member not found.' });
+    if (!Array.isArray(req.body.managedScopes)) {
+      return res.status(400).json({ success: false, error: 'managedScopes must be an array.' });
+    }
+
+    staff.managedScopes = req.body.managedScopes.map(scope => ({
+      academicYear: String(scope.academicYear || '').trim(),
+      branch: String(scope.branch || '').trim(),
+      section: String(scope.section || '').trim(),
+      subject: scope.subject || undefined
+    })).filter(scope => scope.academicYear);
+    staff.managedAcademicYears = [...new Set(staff.managedScopes.map(scope => scope.academicYear))];
+    await staff.save();
+    res.status(200).json({ success: true, data: staff });
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.resetStaffPassword = async (req, res, next) => {
+  try {
+    const staff = await User.findOne({ _id: req.params.id, role: { $in: ['admin', 'faculty'] } });
+    if (!staff) return res.status(404).json({ success: false, error: 'Administrator or faculty member not found.' });
+
+    const temporaryPassword = crypto.randomBytes(9).toString('base64url');
+    staff.password = temporaryPassword;
+    staff.mustChangePassword = true;
+    await staff.save();
+
+    await sendEmail({
+      to: staff.email,
+      subject: 'PrepPortal Password Reset',
+      text: `Hello ${staff.name},\n\nYour PrepPortal password was reset by an administrator.\nTemporary password: ${temporaryPassword}\n\nPlease log in and change it immediately.`,
+      html: `<p>Hello <strong>${staff.name}</strong>,</p><p>Your PrepPortal password was reset by an administrator.</p><p><strong>Temporary password:</strong> ${temporaryPassword}</p><p>Please log in and change it immediately.</p>`
+    });
+
+    res.status(200).json({ success: true, message: 'A temporary password was emailed to the staff member. They must change it after login.' });
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.deleteStaff = async (req, res, next) => {
+  try {
+    if (req.params.id === req.user.id) {
+      return res.status(400).json({ success: false, error: 'You cannot remove your own administrator account.' });
+    }
+    const staff = await User.findOne({ _id: req.params.id, role: { $in: ['admin', 'faculty'] } });
+    if (!staff) return res.status(404).json({ success: false, error: 'Administrator or faculty member not found.' });
+    await staff.deleteOne();
+    res.status(200).json({ success: true, message: `${staff.role} account removed successfully.` });
   } catch (err) {
     next(err);
   }

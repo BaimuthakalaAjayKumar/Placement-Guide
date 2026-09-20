@@ -167,22 +167,35 @@
 
 .admin-tab-btn {
   background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   color: var(--text-secondary);
   padding: 10px 20px;
   border-radius: var(--border-radius-sm);
   cursor: pointer;
   font-weight: 600;
   font-size: 14px;
-  transition: all 0.2s ease;
+  transition: transform 0.2s ease, background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, color 0.2s ease;
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
 .admin-tab-btn:hover {
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(99, 102, 241, 0.16);
+  border-color: rgba(129, 140, 248, 0.75);
+  box-shadow: 0 10px 24px rgba(99, 102, 241, 0.2), 0 0 0 1px rgba(165, 180, 252, 0.12) inset;
+  transform: translateY(-4px);
   color: white;
+}
+
+.admin-tab-btn:focus-visible {
+  outline: 3px solid rgba(251, 191, 36, 0.75);
+  outline-offset: 3px;
+}
+
+.admin-tab-btn.active:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 28px rgba(108, 99, 255, 0.35), 0 0 0 1px rgba(255, 255, 255, 0.18) inset;
 }
 
 .admin-tab-btn.active {
@@ -193,9 +206,10 @@
 }
 
 [data-theme="light"] .admin-tab-btn:hover {
-  background: #f1f5f9;
-  border-color: #cbd5e1;
-  color: #0f172a;
+  background: #eef2ff;
+  border-color: #818cf8;
+  box-shadow: 0 10px 22px rgba(79, 70, 229, 0.16);
+  color: #312e81;
 }
 
 /* Modal Windows styling */

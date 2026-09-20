@@ -4,6 +4,10 @@ const {
   getAllStudents,
   createAdmin,
   createFaculty,
+  getStaff,
+  updateStaffScopes,
+  resetStaffPassword,
+  deleteStaff,
   updateLeetcodeProfile,
   updateCodeforcesProfile,
   updateCodechefProfile,
@@ -37,6 +41,10 @@ router.post('/students/bulk-delete', protect, authorize('admin'), bulkDeleteStud
 router.put('/students/:id/academics', protect, authorize('admin'), updateStudentAcademics);
 router.delete('/students/:id', protect, authorize('admin'), deleteStudent);
 router.post('/admins', protect, authorize('admin'), createAdmin);
-router.post('/faculty', protect, authorize('admin', 'faculty'), createFaculty);
+router.post('/faculty', protect, authorize('admin'), createFaculty);
+router.get('/staff', protect, authorize('admin'), getStaff);
+router.put('/staff/:id/scopes', protect, authorize('admin'), updateStaffScopes);
+router.put('/staff/:id/reset-password', protect, authorize('admin'), resetStaffPassword);
+router.delete('/staff/:id', protect, authorize('admin'), deleteStaff);
 
 module.exports = router;

@@ -39,11 +39,28 @@ const AdminPanel = () => {
   const [adminName, setAdminName] = useState('');
   const [adminEmail, setAdminEmail] = useState('');
   const [adminPassword, setAdminPassword] = useState('');
+  const [adminAcademicYear, setAdminAcademicYear] = useState('');
+  const [adminBranch, setAdminBranch] = useState('');
+  const [adminSection, setAdminSection] = useState('');
   const [submittingAdmin, setSubmittingAdmin] = useState(false);
+  const [facultyName, setFacultyName] = useState('');
+  const [facultyEmail, setFacultyEmail] = useState('');
+  const [facultyPassword, setFacultyPassword] = useState('');
+  const [facultyAcademicYear, setFacultyAcademicYear] = useState('');
+  const [facultyBranch, setFacultyBranch] = useState('');
+  const [facultySection, setFacultySection] = useState('');
+  const [submittingFaculty, setSubmittingFaculty] = useState(false);
+  const [staffMembers, setStaffMembers] = useState([]);
+  const [loadingStaff, setLoadingStaff] = useState(false);
+  const [scopeStaffId, setScopeStaffId] = useState('');
+  const [scopeForm, setScopeForm] = useState({ academicYear: '', branch: '', section: '', subject: '' });
+  const [savingScope, setSavingScope] = useState(false);
 
   // Aptitude Tests Manager States
   const [aptitudeTests, setAptitudeTests] = useState([]);
   const [selectedTest, setSelectedTest] = useState(null);
+  const [examForm, setExamForm] = useState({ title: '', description: '', category: 'subject', duration: 30, academicYear: '', branch: '', section: '', subject: '', questionLimit: 20 });
+  const [creatingExam, setCreatingExam] = useState(false);
 
   // Modals visibility
   const [showQuestionsModal, setShowQuestionsModal] = useState(false);
@@ -92,6 +109,15 @@ const AdminPanel = () => {
   const [mockInterviewReports, setMockInterviewReports] = useState([]);
   const [loadingMockReports, setLoadingMockReports] = useState(false);
   const [selectedMockReport, setSelectedMockReport] = useState(null);
+
+  const [questionBankReports, setQuestionBankReports] = useState([]);
+  const [loadingQuestionBankReports, setLoadingQuestionBankReports] = useState(false);
+  const [academicSubjects, setAcademicSubjects] = useState([]);
+  const [academicProjects, setAcademicProjects] = useState([]);
+  const [loadingAcademicContent, setLoadingAcademicContent] = useState(false);
+  const [subjectForm, setSubjectForm] = useState({ name: '', code: '', academicYear: '', branch: '', section: '', description: '' });
+  const [selectedAcademicProject, setSelectedAcademicProject] = useState(null);
+  const [projectReview, setProjectReview] = useState({ status: 'under_review', feedback: '', grade: '' });
 
   // Interview Settings state
   const [interviewRoles, setInterviewRoles] = useState([]);
@@ -171,6 +197,20 @@ const AdminPanel = () => {
     }
   };
 
+  const fetchStaff = async () => {
+    try {
+      setLoadingStaff(true);
+      const res = await fetch(`${API_URL}/users/staff`, { headers: { Authorization: `Bearer ${token}` } });
+      const data = await res.json();
+      if (data.success) setStaffMembers(data.data);
+      else setError(data.error || 'Failed to fetch staff records.');
+    } catch (err) {
+      setError('Could not connect to staff management service.');
+    } finally {
+      setLoadingStaff(false);
+    }
+  };
+
   const fetchAptitudeTests = async () => {
     try {
       setLoading(true);
@@ -190,6 +230,24 @@ const AdminPanel = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const createAcademicExam = async (event) => {
+    event.preventDefault();
+    try {
+      setCreatingExam(true);
+      const res = await fetch(`${API_URL}/tests`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ ...examForm, duration: Number(examForm.duration), questionLimit: Number(examForm.questionLimit) })
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error || 'Failed to create exam.');
+      setAptitudeTests(previous => [data.data, ...previous]);
+      setExamForm({ title: '', description: '', category: 'subject', duration: 30, academicYear: '', branch: '', section: '', subject: '', questionLimit: 20 });
+      setSuccess('Exam created. Open Manage Questions to add the question set.');
+    } catch (err) { setError(err.message); }
+    finally { setCreatingExam(false); }
   };
 
   const fetchMockInterviewReports = async () => {
@@ -212,6 +270,156 @@ const AdminPanel = () => {
       setLoadingMockReports(false);
     }
   };
+
+  const fetchQuestionBankReports = async () => {
+    try {
+      setLoadingQuestionBankReports(true);
+      const res = await fetch(`${API_URL}/questions/submissions/report?sort=Highest%20Plagiarism`, {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      const data = await res.json();
+      if (data.success) {
+        setQuestionBankReports(data.data);
+      } else {
+        setError(data.error || 'Failed to retrieve Question Bank reports.');
+      }
+    } catch (err) {
+      setError('Could not connect to Question Bank report service.');
+    } finally {
+      setLoadingQuestionBankReports(false);
+    }
+  };
+
+  const downloadQuestionBankReport = () => {
+    if (questionBankReports.length === 0) return;
+
+    const escapeCsvValue = (value) => `"${String(value ?? '').replace(/"/g, '""')}"`;
+    const headers = ['Student', 'Email', 'Question', 'Language', 'Submission Status', 'Plagiarism Percentage', 'Risk Level', 'Submitted At'];
+    const rows = questionBankReports.map((report) => {
+      const percentage = report.plagiarismPercentage || 0;
+      const risk = percentage > 60
+        ? 'High Plagiarism'
+        : percentage > 30
+          ? 'Moderate Similarity'
+          : percentage > 10
+            ? 'Low Similarity'
+            : 'Original';
+
+      return [
+        report.user?.name || 'Student',
+        report.user?.email || 'No email',
+        report.question?.title || 'Question unavailable',
+        report.language?.toUpperCase() || 'N/A',
+        report.status || 'N/A',
+        percentage,
+        risk,
+        report.createdAt ? new Date(report.createdAt).toLocaleString() : 'N/A'
+      ].map(escapeCsvValue).join(',');
+    });
+
+    const blob = new Blob([`\uFEFF${[headers.map(escapeCsvValue).join(','), ...rows].join('\n')}`], {
+      type: 'text/csv;charset=utf-8;'
+    });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `question_bank_plagiarism_report_${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  const fetchAcademicContent = async () => {
+    try {
+      setLoadingAcademicContent(true);
+      const [subjectsResponse, projectsResponse] = await Promise.all([
+        fetch(`${API_URL}/academic/subjects`, { headers: { Authorization: `Bearer ${token}` } }),
+        fetch(`${API_URL}/academic/projects`, { headers: { Authorization: `Bearer ${token}` } })
+      ]);
+      const subjectsData = await subjectsResponse.json();
+      const projectsData = await projectsResponse.json();
+      if (!subjectsData.success) throw new Error(subjectsData.error || 'Failed to load subjects.');
+      if (!projectsData.success) throw new Error(projectsData.error || 'Failed to load projects.');
+      setAcademicSubjects(subjectsData.data);
+      setAcademicProjects(projectsData.data);
+    } catch (err) {
+      setError(err.message || 'Could not load academic content.');
+    } finally {
+      setLoadingAcademicContent(false);
+    }
+  };
+
+  const createAcademicSubject = async (event) => {
+    event.preventDefault();
+    try {
+      const response = await fetch(`${API_URL}/academic/subjects`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify(subjectForm)
+      });
+      const data = await response.json();
+      if (!data.success) throw new Error(data.error || 'Failed to create subject.');
+      setAcademicSubjects(previous => [...previous, data.data].sort((a, b) => a.code.localeCompare(b.code)));
+      setSubjectForm({ name: '', code: '', academicYear: '', branch: '', section: '', description: '' });
+      setSuccess('Subject created successfully.');
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  const openProjectReview = (project) => {
+    setSelectedAcademicProject(project);
+    setProjectReview({
+      status: project.status === 'draft' ? 'under_review' : project.status,
+      feedback: project.feedback || '',
+      grade: project.grade ?? ''
+    });
+  };
+
+  const saveProjectReview = async (event) => {
+    event.preventDefault();
+    if (!selectedAcademicProject) return;
+    try {
+      const response = await fetch(`${API_URL}/academic/projects/${selectedAcademicProject._id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ ...projectReview, grade: projectReview.grade === '' ? null : Number(projectReview.grade) })
+      });
+      const data = await response.json();
+      if (!data.success) throw new Error(data.error || 'Failed to save project review.');
+      setAcademicProjects(previous => previous.map(project => project._id === data.data._id ? data.data : project));
+      setSelectedAcademicProject(null);
+      setSuccess('Project review saved.');
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  const downloadAcademicCsv = (filename, headers, rows) => {
+    const escape = value => `"${String(value ?? '').replace(/"/g, '""')}"`;
+    const csv = `\uFEFF${[headers, ...rows].map(row => row.map(escape).join(',')).join('\n')}`;
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${filename}_${new Date().toISOString().slice(0, 10)}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const downloadAcademicSubjects = () => downloadAcademicCsv(
+    'academic_subjects',
+    ['Subject', 'Code', 'Academic Year', 'Description', 'Active'],
+    academicSubjects.map(subject => [subject.name, subject.code, subject.academicYear, subject.description, subject.isActive ? 'Yes' : 'No'])
+  );
+
+  const downloadAcademicProjects = () => downloadAcademicCsv(
+    'student_projects',
+    ['Student', 'Email', 'Academic Year', 'Project', 'Status', 'Grade', 'Feedback', 'Updated'],
+    academicProjects.map(project => [project.student?.name, project.student?.email, project.academicYear, project.title, project.status, project.grade ?? '', project.feedback, project.updatedAt])
+  );
 
   const fetchJobs = async () => {
     try {
@@ -306,8 +514,18 @@ const AdminPanel = () => {
         fetchJobs();
       } else if (activeTab === 'interviews') {
         fetchMockInterviewReports();
+      } else if (activeTab === 'question-bank') {
+        fetchQuestionBankReports();
+      } else if (activeTab === 'academic-content') {
+        fetchAcademicContent();
       } else if (activeTab === 'aptitude') {
         fetchAptitudeTests();
+        fetch(`${API_URL}/academic/subjects`, { headers: { Authorization: `Bearer ${token}` } })
+          .then(response => response.json())
+          .then(data => { if (data.success) setAcademicSubjects(data.data); })
+          .catch(() => {});
+      } else if (activeTab === 'settings') {
+        fetchStaff();
       }
     }
   }, [token, activeTab]);
@@ -377,8 +595,8 @@ const AdminPanel = () => {
     setError('');
     setSuccess('');
 
-    if (!adminName || !adminEmail || !adminPassword) {
-      setError('Please fill in all admin credential fields.');
+    if (!adminName || !adminEmail || !adminPassword || !adminAcademicYear || !adminBranch || !adminSection) {
+      setError('Please fill in administrator credentials and academic assignment fields.');
       return;
     }
 
@@ -399,7 +617,8 @@ const AdminPanel = () => {
         body: JSON.stringify({
           name: adminName,
           email: adminEmail,
-          password: adminPassword
+          password: adminPassword,
+          managedScopes: [{ academicYear: adminAcademicYear, branch: adminBranch, section: adminSection }]
         })
       });
 
@@ -409,6 +628,9 @@ const AdminPanel = () => {
         setAdminName('');
         setAdminEmail('');
         setAdminPassword('');
+        setAdminAcademicYear('');
+        setAdminBranch('');
+        setAdminSection('');
       } else {
         setError(data.error || 'Failed to create Administrator.');
       }
@@ -443,6 +665,101 @@ const AdminPanel = () => {
     } catch (err) {
       setError('Could not connect to user management service.');
     }
+  };
+
+  const handleCreateFaculty = async (event) => {
+    event.preventDefault();
+    setError('');
+    setSuccess('');
+    if (!facultyName || !facultyEmail || !facultyAcademicYear || !facultyBranch || !facultySection) {
+      setError('Faculty name, email, academic year, branch, and section are required.');
+      return;
+    }
+    if (facultyPassword && facultyPassword.length < 6) {
+      setError('Temporary password must be at least 6 characters.');
+      return;
+    }
+
+    try {
+      setSubmittingFaculty(true);
+      const res = await fetch(`${API_URL}/users/faculty`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          name: facultyName,
+          email: facultyEmail,
+          password: facultyPassword || undefined,
+          managedScopes: [{ academicYear: facultyAcademicYear, branch: facultyBranch, section: facultySection }]
+        })
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error || 'Failed to create faculty account.');
+      setSuccess(`Faculty account created for ${facultyName}. Credentials were emailed and a password change is required.`);
+      setFacultyName('');
+      setFacultyEmail('');
+      setFacultyPassword('');
+      setFacultyAcademicYear('');
+      setFacultyBranch('');
+      setFacultySection('');
+      fetchStaff();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSubmittingFaculty(false);
+    }
+  };
+
+  const resetStaffPassword = async (staff) => {
+    if (!window.confirm(`Reset the password for ${staff.name}? A temporary password will be emailed to them.`)) return;
+    try {
+      const res = await fetch(`${API_URL}/users/staff/${staff._id}/reset-password`, {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error || 'Failed to reset password.');
+      setSuccess(data.message);
+      fetchStaff();
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  const deleteStaff = async (staff) => {
+    if (!window.confirm(`Remove ${staff.role} account for ${staff.name}? This cannot be undone.`)) return;
+    try {
+      const res = await fetch(`${API_URL}/users/staff/${staff._id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error || 'Failed to remove staff account.');
+      setSuccess(data.message);
+      setStaffMembers(previous => previous.filter(member => member._id !== staff._id));
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  const saveStaffScope = async (event) => {
+    event.preventDefault();
+    if (!scopeStaffId || !scopeForm.academicYear) return setError('Select a staff member and academic year.');
+    try {
+      setSavingScope(true);
+      const staff = staffMembers.find(member => member._id === scopeStaffId);
+      const scopes = [...(staff?.managedScopes || []), scopeForm];
+      const res = await fetch(`${API_URL}/users/staff/${scopeStaffId}/scopes`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ managedScopes: scopes })
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error || 'Failed to assign scope.');
+      setStaffMembers(previous => previous.map(member => member._id === data.data._id ? data.data : member));
+      setScopeForm({ academicYear: '', branch: '', section: '', subject: '' });
+      setSuccess('Academic scope assigned.');
+    } catch (err) { setError(err.message); }
+    finally { setSavingScope(false); }
   };
 
   // Aptitude Tests Operations
@@ -1463,6 +1780,51 @@ const AdminPanel = () => {
         </div>
       )}
 
+      {selectedAcademicProject && (
+        <div className="modal-overlay" onClick={() => setSelectedAcademicProject(null)}>
+          <div className="modal-content large-modal" onClick={event => event.stopPropagation()}>
+            <div className="modal-header">
+              <div>
+                <h3>{selectedAcademicProject.title}</h3>
+                <p className="modal-subtitle">{selectedAcademicProject.student?.name} · Academic Year {selectedAcademicProject.academicYear}</p>
+              </div>
+              <button className="close-btn" type="button" onClick={() => setSelectedAcademicProject(null)}>×</button>
+            </div>
+            <div className="modal-body">
+              <p>{selectedAcademicProject.description || 'No project description provided.'}</p>
+              <h4>Project Files</h4>
+              <div style={{ maxHeight: '280px', overflow: 'auto', background: 'rgba(0,0,0,0.25)', padding: '12px', borderRadius: '8px' }}>
+                {selectedAcademicProject.files?.map(file => (
+                  <details key={file.path} style={{ marginBottom: '8px' }}>
+                    <summary>{file.path}</summary>
+                    <pre style={{ whiteSpace: 'pre-wrap', fontSize: '12px', marginTop: '8px' }}>{file.content}</pre>
+                  </details>
+                ))}
+              </div>
+              <form className="admin-job-form mt-20" onSubmit={saveProjectReview}>
+                <div className="form-group">
+                  <label className="form-label" htmlFor="projectReviewStatus">Review Status</label>
+                  <select id="projectReviewStatus" className="form-control" value={projectReview.status} onChange={event => setProjectReview({ ...projectReview, status: event.target.value })}>
+                    <option value="under_review">Under Review</option>
+                    <option value="changes_requested">Changes Requested</option>
+                    <option value="approved">Approved</option>
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label className="form-label" htmlFor="projectReviewGrade">Grade</label>
+                  <input id="projectReviewGrade" className="form-control" type="number" min="0" max="100" value={projectReview.grade} onChange={event => setProjectReview({ ...projectReview, grade: event.target.value })} />
+                </div>
+                <div className="form-group">
+                  <label className="form-label" htmlFor="projectReviewFeedback">Feedback and Suggestions</label>
+                  <textarea id="projectReviewFeedback" className="form-control" rows="5" value={projectReview.feedback} onChange={event => setProjectReview({ ...projectReview, feedback: event.target.value })} placeholder="Suggest improvements or next steps..." />
+                </div>
+                <button className="btn btn-primary" type="submit">Save Review</button>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Mock Interview Report Modal — placed at fragment root so overlay is truly fullscreen */}
       {selectedMockReport && (
         <div className="modal-overlay" onClick={() => setSelectedMockReport(null)}>
@@ -1546,6 +1908,18 @@ const AdminPanel = () => {
             onClick={() => setActiveTab('interviews')}
           >
             🎤 Mock Interview Reports
+          </button>
+          <button
+            className={`admin-tab-btn ${activeTab === 'question-bank' ? 'active' : ''}`}
+            onClick={() => setActiveTab('question-bank')}
+          >
+            🛡️ Question Bank Reports
+          </button>
+          <button
+            className={`admin-tab-btn ${activeTab === 'academic-content' ? 'active' : ''}`}
+            onClick={() => setActiveTab('academic-content')}
+          >
+            🎓 Academic Content & Projects
           </button>
           <button
             className={`admin-tab-btn ${activeTab === 'aptitude' ? 'active' : ''}`}
@@ -2059,6 +2433,12 @@ const AdminPanel = () => {
                         />
                       </div>
 
+                      <div className="form-grid-3-col">
+                        <input className="form-control" placeholder="Academic Year" value={adminAcademicYear} onChange={e => setAdminAcademicYear(e.target.value)} required />
+                        <input className="form-control" placeholder="Branch" value={adminBranch} onChange={e => setAdminBranch(e.target.value)} required />
+                        <input className="form-control" placeholder="Section" value={adminSection} onChange={e => setAdminSection(e.target.value)} required />
+                      </div>
+
                       <button type="submit" className="btn btn-accent btn-block" disabled={submittingAdmin}>
                         {submittingAdmin ? 'Creating...' : 'Create Admin Account'}
                       </button>
@@ -2114,6 +2494,169 @@ const AdminPanel = () => {
         }
 
         {
+          activeTab === 'academic-content' && (
+            <div className="admin-split-layout animate-fade">
+              <div className="admin-left-column" style={{ display: 'flex', flexDirection: 'column', gap: '24px', minWidth: 0 }}>
+                <div className="glass-card">
+                  <div className="manager-header">
+                    <div>
+                      <h3>Academic Subjects</h3>
+                      <p className="card-desc">Create subject preparation areas for a specific academic year.</p>
+                    </div>
+                    <button className="btn btn-secondary btn-sm" type="button" onClick={downloadAcademicSubjects} disabled={!academicSubjects.length}>Download CSV</button>
+                  </div>
+                  <form className="admin-job-form mt-20" onSubmit={createAcademicSubject}>
+                    <div className="form-group">
+                      <label className="form-label" htmlFor="academicSubjectName">Subject Name</label>
+                      <input id="academicSubjectName" className="form-control" value={subjectForm.name} onChange={event => setSubjectForm({ ...subjectForm, name: event.target.value })} required />
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label" htmlFor="academicSubjectCode">Subject Code</label>
+                      <input id="academicSubjectCode" className="form-control" value={subjectForm.code} onChange={event => setSubjectForm({ ...subjectForm, code: event.target.value })} required />
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label" htmlFor="academicSubjectYear">Academic Year</label>
+                      <input id="academicSubjectYear" className="form-control" placeholder="e.g. 2026 or 3rd Year" value={subjectForm.academicYear} onChange={event => setSubjectForm({ ...subjectForm, academicYear: event.target.value })} required />
+                    </div>
+                    <div className="form-grid-2-col">
+                      <input className="form-control" placeholder="Branch, e.g. CSE" value={subjectForm.branch} onChange={event => setSubjectForm({ ...subjectForm, branch: event.target.value })} />
+                      <input className="form-control" placeholder="Section, e.g. C" value={subjectForm.section} onChange={event => setSubjectForm({ ...subjectForm, section: event.target.value })} />
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label" htmlFor="academicSubjectDescription">Description</label>
+                      <textarea id="academicSubjectDescription" className="form-control" value={subjectForm.description} onChange={event => setSubjectForm({ ...subjectForm, description: event.target.value })} />
+                    </div>
+                    <button className="btn btn-primary" type="submit">Add Subject</button>
+                  </form>
+                  <div className="table-responsive-wrapper mt-20">
+                    <table className="student-roster-table">
+                      <thead><tr><th>Subject</th><th>Code</th><th>Academic Year</th><th>Status</th></tr></thead>
+                      <tbody>
+                        {academicSubjects.map(subject => (
+                          <tr key={subject._id}><td>{subject.name}</td><td>{subject.code}</td><td>{subject.academicYear}</td><td>{subject.isActive ? 'Active' : 'Inactive'}</td></tr>
+                        ))}
+                        {!academicSubjects.length && <tr><td colSpan="4">No subjects found.</td></tr>}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+
+              <div className="admin-right-column" style={{ minWidth: 0 }}>
+                <div className="glass-card">
+                  <div className="manager-header">
+                    <div>
+                      <h3>Student Projects</h3>
+                      <p className="card-desc">Review complete project files, status, feedback, and grades across all academic years.</p>
+                    </div>
+                    <button className="btn btn-secondary btn-sm" type="button" onClick={downloadAcademicProjects} disabled={!academicProjects.length}>Download CSV</button>
+                  </div>
+                  {loadingAcademicContent ? (
+                    <div className="dashboard-loading-container"><div className="spinner-loader"></div><p>Loading academic content...</p></div>
+                  ) : (
+                    <div className="table-responsive-wrapper mt-20">
+                      <table className="student-roster-table">
+                        <thead><tr><th>Student</th><th>Project</th><th>Year</th><th>Status</th><th>Grade</th><th>Action</th></tr></thead>
+                        <tbody>
+                          {academicProjects.map(project => (
+                            <tr key={project._id}>
+                              <td><strong>{project.student?.name || 'Student'}</strong><div className="text-secondary">{project.student?.email || ''}</div></td>
+                              <td>{project.title}</td>
+                              <td>{project.academicYear}</td>
+                              <td>{project.status.replace('_', ' ')}</td>
+                              <td>{project.grade ?? 'Not graded'}</td>
+                              <td><button className="btn btn-primary btn-sm" type="button" onClick={() => openProjectReview(project)}>Review</button></td>
+                            </tr>
+                          ))}
+                          {!academicProjects.length && <tr><td colSpan="6">No student projects found.</td></tr>}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )
+        }
+
+        {
+          activeTab === 'question-bank' && (
+            <div className="glass-card animate-fade">
+              <div className="manager-header">
+                <div>
+                  <h3>Question Bank Submission Reports</h3>
+                  <p className="card-desc">Review submissions and plagiarism similarity against other users' submissions for the same question.</p>
+                </div>
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm"
+                  onClick={downloadQuestionBankReport}
+                  disabled={questionBankReports.length === 0}
+                  title="Download Question Bank report as CSV"
+                >
+                  Download CSV
+                </button>
+              </div>
+
+              {loadingQuestionBankReports ? (
+                <div className="dashboard-loading-container">
+                  <div className="spinner-loader"></div>
+                  <p>Loading Question Bank reports...</p>
+                </div>
+              ) : questionBankReports.length > 0 ? (
+                <div className="table-responsive-wrapper mt-20">
+                  <table className="student-roster-table">
+                    <thead>
+                      <tr>
+                        <th>Student</th>
+                        <th>Question</th>
+                        <th>Language</th>
+                        <th>Status</th>
+                        <th>Plagiarism</th>
+                        <th>Submitted</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {questionBankReports.map((report) => {
+                        const percentage = report.plagiarismPercentage || 0;
+                        const risk = percentage > 60
+                          ? 'High Plagiarism'
+                          : percentage > 30
+                            ? 'Moderate Similarity'
+                            : percentage > 10
+                              ? 'Low Similarity'
+                              : 'Original';
+
+                        return (
+                          <tr key={report._id}>
+                            <td>
+                              <strong>{report.user?.name || 'Student'}</strong>
+                              <div className="text-secondary">{report.user?.email || 'No email'}</div>
+                            </td>
+                            <td>{report.question?.title || 'Question unavailable'}</td>
+                            <td>{report.language?.toUpperCase() || 'N/A'}</td>
+                            <td>{report.status}</td>
+                            <td>
+                              <strong className="text-glow">{percentage}%</strong>
+                              <div className="text-secondary">{risk}</div>
+                            </td>
+                            <td>{report.createdAt ? new Date(report.createdAt).toLocaleString() : 'N/A'}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="empty-history-placeholder glass-card">
+                  <p>No Question Bank submissions recorded yet.</p>
+                </div>
+              )}
+            </div>
+          )
+        }
+
+        {
           activeTab === 'aptitude' && (
             /* Aptitude Tests Manager View */
             <div className="glass-card aptitude-tests-manager-card animate-fade">
@@ -2123,6 +2666,25 @@ const AdminPanel = () => {
                   <p className="card-desc">Add questions, edit question attributes, delete options, and export candidates' grading reports.</p>
                 </div>
               </div>
+
+              <form className="admin-job-form mt-20" onSubmit={createAcademicExam}>
+                <h4>Create Scoped MCQ Exam</h4>
+                <div className="form-grid-2-col">
+                  <input className="form-control" placeholder="Exam title" value={examForm.title} onChange={event => setExamForm({ ...examForm, title: event.target.value })} required />
+                  <select className="form-control" value={examForm.subject} onChange={event => setExamForm({ ...examForm, subject: event.target.value })}><option value="">General / No Subject</option>{academicSubjects.map(subject => <option key={subject._id} value={subject._id}>{subject.code} - {subject.name}</option>)}</select>
+                </div>
+                <textarea className="form-control" placeholder="Exam description" value={examForm.description} onChange={event => setExamForm({ ...examForm, description: event.target.value })} />
+                <div className="form-grid-3-col">
+                  <input className="form-control" placeholder="Academic year" value={examForm.academicYear} onChange={event => setExamForm({ ...examForm, academicYear: event.target.value })} required />
+                  <input className="form-control" placeholder="Branch" value={examForm.branch} onChange={event => setExamForm({ ...examForm, branch: event.target.value })} />
+                  <input className="form-control" placeholder="Section" value={examForm.section} onChange={event => setExamForm({ ...examForm, section: event.target.value })} />
+                </div>
+                <div className="form-grid-2-col">
+                  <input className="form-control" type="number" min="1" placeholder="Duration (minutes)" value={examForm.duration} onChange={event => setExamForm({ ...examForm, duration: event.target.value })} required />
+                  <input className="form-control" type="number" min="1" placeholder="Question limit" value={examForm.questionLimit} onChange={event => setExamForm({ ...examForm, questionLimit: event.target.value })} required />
+                </div>
+                <button className="btn btn-primary" type="submit" disabled={creatingExam}>{creatingExam ? 'Creating...' : 'Create Exam'}</button>
+              </form>
 
               <div className="table-responsive-wrapper mt-20">
                 <table className="student-roster-table">
@@ -2379,6 +2941,23 @@ const AdminPanel = () => {
                     <p className="isection-empty">No roles loaded. Click the tab again to refresh.</p>
                   )}
                 </div>
+                <form className="admin-job-form mt-20" onSubmit={saveStaffScope}>
+                  <h4>Assign Academic Scope</h4>
+                  <select className="form-control" value={scopeStaffId} onChange={event => setScopeStaffId(event.target.value)} required>
+                    <option value="">Select Faculty or Administrator</option>
+                    {staffMembers.filter(member => member.role === 'faculty').map(member => <option key={member._id} value={member._id}>{member.name} ({member.email})</option>)}
+                  </select>
+                  <input className="form-control" placeholder="Academic year, e.g. 4th Year" value={scopeForm.academicYear} onChange={event => setScopeForm({ ...scopeForm, academicYear: event.target.value })} required />
+                  <div className="form-grid-3-col">
+                    <input className="form-control" placeholder="Branch, e.g. CSE" value={scopeForm.branch} onChange={event => setScopeForm({ ...scopeForm, branch: event.target.value })} />
+                    <input className="form-control" placeholder="Section, e.g. C" value={scopeForm.section} onChange={event => setScopeForm({ ...scopeForm, section: event.target.value })} />
+                    <select className="form-control" value={scopeForm.subject} onChange={event => setScopeForm({ ...scopeForm, subject: event.target.value })}>
+                      <option value="">All Subjects</option>
+                      {academicSubjects.map(subject => <option key={subject._id} value={subject._id}>{subject.code}</option>)}
+                    </select>
+                  </div>
+                  <button className="btn btn-secondary" type="submit" disabled={savingScope}>{savingScope ? 'Assigning...' : 'Assign Scope'}</button>
+                </form>
               </div>
 
               {/* Technologies Section */}
@@ -2454,6 +3033,59 @@ const AdminPanel = () => {
                       {deletingBulk ? 'Decommissioning...' : 'Bulk Delete Candidates'}
                     </button>
                   </form>
+                </div>
+              </div>
+
+              <div className="glass-card data-management-section">
+                <h3>👥 Administrator & Faculty Accounts</h3>
+                <p className="card-desc">Create faculty accounts, send login credentials, force password changes, and manage staff records.</p>
+
+                <form className="admin-job-form mt-20" onSubmit={handleCreateFaculty}>
+                  <div className="form-group">
+                    <label className="form-label" htmlFor="facultyName">Faculty Name</label>
+                    <input id="facultyName" className="form-control" value={facultyName} onChange={event => setFacultyName(event.target.value)} required />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label" htmlFor="facultyEmail">Faculty Login Email</label>
+                    <input id="facultyEmail" type="email" className="form-control" value={facultyEmail} onChange={event => setFacultyEmail(event.target.value)} required />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label" htmlFor="facultyPassword">Temporary Password (optional)</label>
+                    <input id="facultyPassword" type="password" className="form-control" placeholder="Auto-generated if empty" value={facultyPassword} onChange={event => setFacultyPassword(event.target.value)} minLength="6" />
+                  </div>
+                  <div className="form-grid-3-col">
+                    <input className="form-control" placeholder="Academic Year" value={facultyAcademicYear} onChange={event => setFacultyAcademicYear(event.target.value)} required />
+                    <input className="form-control" placeholder="Branch" value={facultyBranch} onChange={event => setFacultyBranch(event.target.value)} required />
+                    <input className="form-control" placeholder="Section" value={facultySection} onChange={event => setFacultySection(event.target.value)} required />
+                  </div>
+                  <button className="btn btn-primary" type="submit" disabled={submittingFaculty}>
+                    {submittingFaculty ? 'Creating...' : 'Create Faculty & Email Credentials'}
+                  </button>
+                </form>
+
+                <div className="table-responsive-wrapper mt-20">
+                  {loadingStaff ? <p className="text-secondary">Loading staff records...</p> : (
+                    <table className="student-roster-table">
+                      <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Password State</th><th>Actions</th></tr></thead>
+                      <tbody>
+                        {staffMembers.map(staff => (
+                          <tr key={staff._id}>
+                            <td>{staff.name}</td>
+                            <td>{staff.email}</td>
+                            <td style={{ textTransform: 'capitalize' }}>{staff.role}</td>
+                            <td>{staff.mustChangePassword ? 'Change required' : 'Active'}</td>
+                            <td>
+                              <div style={{ display: 'flex', gap: '8px' }}>
+                                <button className="btn btn-secondary btn-sm" type="button" onClick={() => resetStaffPassword(staff)}>Reset & Email</button>
+                                <button className="btn btn-danger btn-sm" type="button" onClick={() => deleteStaff(staff)}>Remove</button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                        {!staffMembers.length && <tr><td colSpan="5">No administrator or faculty records found.</td></tr>}
+                      </tbody>
+                    </table>
+                  )}
                 </div>
               </div>
             </div>

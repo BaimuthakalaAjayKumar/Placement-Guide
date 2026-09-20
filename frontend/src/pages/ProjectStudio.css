@@ -1,0 +1,213 @@
+.project-studio-page {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.project-studio-toolbar,
+.project-details-row,
+.project-studio-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.project-studio-toolbar {
+  justify-content: space-between;
+}
+
+.project-details-row .form-control:first-child {
+  max-width: 280px;
+}
+
+.project-details-row .form-control:last-child {
+  flex: 1;
+}
+
+.project-studio-layout {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  gap: 18px;
+  min-height: 620px;
+}
+
+.project-list,
+.project-editor-shell {
+  padding: 16px;
+}
+
+.project-list {
+  align-self: start;
+}
+
+.project-list h3,
+.project-file-tree h4 {
+  margin: 0 0 12px;
+}
+
+.project-list-item,
+.project-file-item {
+  display: flex;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: var(--text-primary);
+  text-align: left;
+  cursor: pointer;
+}
+
+.project-list-item {
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px;
+  border-left: 3px solid transparent;
+}
+
+.project-list-item span {
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  text-transform: capitalize;
+}
+
+.project-list-item.active,
+.project-file-item.active {
+  border-left-color: var(--accent-color);
+  background: rgba(99, 102, 241, 0.12);
+}
+
+.project-editor-shell {
+  min-width: 0;
+}
+
+.project-editor-layout {
+  display: grid;
+  grid-template-columns: 180px minmax(0, 1fr);
+  margin-top: 14px;
+  min-height: 560px;
+  overflow: hidden;
+  border: 1px solid var(--border-color);
+}
+
+.project-file-tree {
+  padding: 14px 8px;
+  background: rgba(0, 0, 0, 0.16);
+}
+
+.project-file-tree-header,
+.project-editor-tabs {
+  display: flex;
+  align-items: center;
+}
+
+.project-file-tree-header {
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.editor-icon-button {
+  border: 0;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 1.1rem;
+  padding: 2px 5px;
+}
+
+.editor-icon-button:hover:not(:disabled) {
+  color: var(--text-primary);
+}
+
+.editor-icon-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+.project-file-item {
+  padding: 8px 10px;
+  font-size: 0.85rem;
+}
+
+.project-monaco-wrapper {
+  min-width: 0;
+}
+
+.project-editor-tabs {
+  min-height: 38px;
+  overflow-x: auto;
+  background: rgba(0, 0, 0, 0.22);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.project-editor-tab {
+  border: 0;
+  border-right: 1px solid var(--border-color);
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 10px 14px;
+  white-space: nowrap;
+}
+
+.project-editor-tab.active {
+  border-bottom-color: var(--accent-color);
+  background: rgba(99, 102, 241, 0.12);
+  color: var(--text-primary);
+}
+
+.project-output-panel {
+  min-height: 90px;
+  max-height: 150px;
+  overflow: auto;
+  margin: 0;
+  padding: 12px 14px;
+  background: #10131a;
+  border-top: 1px solid var(--border-color);
+  color: #b7f7c1;
+  font-family: monospace;
+  font-size: 0.8rem;
+  white-space: pre-wrap;
+}
+
+.project-empty-state {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  min-height: 300px;
+}
+
+@media (max-width: 900px) {
+  .project-studio-toolbar,
+  .project-details-row {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .project-studio-actions {
+    flex-wrap: wrap;
+  }
+
+  .project-details-row .form-control:first-child {
+    max-width: none;
+  }
+
+  .project-studio-layout,
+  .project-editor-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .project-file-tree {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .project-file-tree h4 {
+    width: 100%;
+  }
+
+  .project-file-item {
+    width: auto;
+  }
+}

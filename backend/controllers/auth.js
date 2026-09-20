@@ -255,7 +255,9 @@ exports.updateProfile = async (req, res, next) => {
       targetRole: req.body.targetRole,
       rollNumber: req.body.rollNumber,
       branch: req.body.branch,
+      section: req.body.section,
       year: req.body.year,
+      academicYear: req.body.academicYear,
       leetcodeUsername: req.body.leetcodeUsername,
       codeforcesUsername: req.body.codeforcesUsername,
       codechefUsername: req.body.codechefUsername,
@@ -360,6 +362,30 @@ exports.updateProfile = async (req, res, next) => {
       success: true,
       data: user
     });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// @desc    Change the authenticated user's password
+// @route   PUT /api/auth/change-password
+// @access  Private
+exports.changePassword = async (req, res, next) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    if (!currentPassword || !newPassword || newPassword.length < 6) {
+      return res.status(400).json({ success: false, error: 'Current password and a new password of at least 6 characters are required.' });
+    }
+
+    const user = await User.findById(req.user.id).select('+password');
+    if (!user || !(await user.matchPassword(currentPassword))) {
+      return res.status(401).json({ success: false, error: 'Current password is incorrect.' });
+    }
+
+    user.password = newPassword;
+    user.mustChangePassword = false;
+    await user.save();
+    res.status(200).json({ success: true, message: 'Password changed successfully.' });
   } catch (err) {
     next(err);
   }
@@ -477,6 +503,7 @@ exports.resetPassword = async (req, res, next) => {
 
     // Set new password
     user.password = password;
+    user.mustChangePassword = false;
     user.resetPasswordToken = undefined;
     user.resetPasswordExpire = undefined;
     await user.save();

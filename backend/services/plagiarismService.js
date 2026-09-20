@@ -151,10 +151,10 @@ function findMatchingFragments(codeA, codeB) {
 async function checkPlagiarism(submissionId, questionId, code, language, currentUserId) {
   const currentNormalized = normalizeCode(code, language);
   
-  // Fetch other submissions for this question, excluding current user's current submission
   const previousSubmissions = await Submission.find({
     question: questionId,
-    _id: { $ne: submissionId }
+    _id: { $ne: submissionId },
+    user: { $ne: currentUserId }
   }).populate('user', 'name email');
 
   let maxSimilarity = 0;
@@ -162,10 +162,6 @@ async function checkPlagiarism(submissionId, questionId, code, language, current
   let bestMatchSubmission = null;
 
   for (let sub of previousSubmissions) {
-    // Skip if same user to avoid self-plagiarism in report, unless checking previous self-submissions
-    // But standard policy compares against *other* candidates first
-    const isSameUser = sub.user && sub.user._id.toString() === currentUserId.toString();
-    
     const otherNormalized = normalizeCode(sub.code, sub.language);
 
     // 1. Calculate structural string similarity on normalized tokens

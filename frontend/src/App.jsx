@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
 
@@ -35,10 +35,14 @@ import CompanyPrep from './pages/CompanyPrep';
 import PersonalizedRoadmap from './pages/PersonalizedRoadmap';
 import DiscussionForum from './pages/DiscussionForum';
 import CodingPlayground from './pages/CodingPlayground';
+import ProjectStudio from './pages/ProjectStudio';
+import ChangePassword from './pages/ChangePassword';
+import LabPractice from './pages/LabPractice';
 
 // Private Route Wrapper
 const PrivateRoute = ({ children, allowedRoles }) => {
   const { user, token, loading } = useAuth();
+  const location = useLocation();
 
   if (loading) {
     return (
@@ -55,6 +59,10 @@ const PrivateRoute = ({ children, allowedRoles }) => {
 
   if (allowedRoles && !allowedRoles.includes(user.role)) {
     return <Navigate to={user.role === 'admin' ? '/admin' : user.role === 'faculty' ? '/faculty' : '/dashboard'} replace />;
+  }
+
+  if (user.mustChangePassword && location.pathname !== '/change-password') {
+    return <Navigate to="/change-password" replace />;
   }
 
   return (
@@ -91,6 +99,14 @@ const AppRoutes = () => {
       <Route
         path="/reset-password/:token"
         element={token && user ? <Navigate to={user.role === 'admin' ? '/admin' : user.role === 'faculty' ? '/faculty' : '/dashboard'} replace /> : <ResetPassword />}
+      />
+      <Route
+        path="/change-password"
+        element={
+          <PrivateRoute allowedRoles={['student', 'faculty', 'admin']}>
+            <ChangePassword />
+          </PrivateRoute>
+        }
       />
 
       {/* Private Student Routes */}
@@ -139,6 +155,22 @@ const AppRoutes = () => {
         element={
           <PrivateRoute allowedRoles={['student', 'faculty', 'admin']}>
             <CodingPlayground />
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/project-studio"
+        element={
+          <PrivateRoute allowedRoles={['student']}>
+            <ProjectStudio />
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/lab-practice"
+        element={
+          <PrivateRoute allowedRoles={['student', 'faculty', 'admin']}>
+            <LabPractice />
           </PrivateRoute>
         }
       />

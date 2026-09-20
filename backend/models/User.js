@@ -22,6 +22,10 @@ const UserSchema = new mongoose.Schema({
     minlength: 6,
     select: false
   },
+  mustChangePassword: {
+    type: Boolean,
+    default: false
+  },
   role: {
     type: String,
     enum: ['student', 'faculty', 'admin'],
@@ -47,10 +51,28 @@ const UserSchema = new mongoose.Schema({
     type: String,
     default: ''
   },
+  section: {
+    type: String,
+    default: ''
+  },
   year: {
     type: String,
     default: ''
   },
+  academicYear: {
+    type: String,
+    default: ''
+  },
+  managedAcademicYears: {
+    type: [String],
+    default: []
+  },
+  managedScopes: [{
+    academicYear: { type: String, required: true },
+    branch: { type: String, default: '' },
+    section: { type: String, default: '' },
+    subject: { type: mongoose.Schema.Types.ObjectId, ref: 'Subject' }
+  }],
   readinessScore: {
     type: Number,
     default: 0

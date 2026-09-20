@@ -13,6 +13,8 @@ const Profile = () => {
   const [rollNumber, setRollNumber] = useState(user?.rollNumber || '');
   const [branch, setBranch] = useState(user?.branch || '');
   const [year, setYear] = useState(user?.year || '');
+  const [academicYear, setAcademicYear] = useState(user?.academicYear || '');
+  const [section, setSection] = useState(user?.section || '');
 
   // Academics details state
   const [sgpaSem1, setSgpaSem1] = useState(user?.sgpaSem1 || 0);
@@ -44,6 +46,8 @@ const Profile = () => {
       setRollNumber(user.rollNumber || '');
       setBranch(user.branch || '');
       setYear(user.year || '');
+      setAcademicYear(user.academicYear || '');
+      setSection(user.section || '');
       setSgpaSem1(user.sgpaSem1 || 0);
       setSgpaSem2(user.sgpaSem2 || 0);
       setSgpaSem3(user.sgpaSem3 || 0);
@@ -78,6 +82,8 @@ const Profile = () => {
         rollNumber: rollNumber.trim(),
         branch: branch.trim(),
         year: year.trim(),
+        academicYear: academicYear.trim(),
+        section: section.trim(),
         sgpaSem1: sgpaSem1 || 0,
         sgpaSem2: sgpaSem2 || 0,
         sgpaSem3: sgpaSem3 || 0,
@@ -169,6 +175,18 @@ const Profile = () => {
                   <div className="meta-item animate-fade">
                     <span className="meta-label">Grad Year:</span>
                     <span className="meta-value">{user.year}</span>
+                  </div>
+                )}
+                {user?.academicYear && (
+                  <div className="meta-item animate-fade">
+                    <span className="meta-label">Academic Year:</span>
+                    <span className="meta-value">{user.academicYear}</span>
+                  </div>
+                )}
+                {user?.section && (
+                  <div className="meta-item animate-fade">
+                    <span className="meta-label">Section:</span>
+                    <span className="meta-value">{user.section}</span>
                   </div>
                 )}
                 {user?.role === 'student' && (
@@ -276,6 +294,28 @@ const Profile = () => {
                       value={year}
                       onChange={(e) => setYear(e.target.value)}
                       placeholder="e.g. 2026"
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label" htmlFor="academicYear">Academic Year</label>
+                    <input
+                      type="text"
+                      id="academicYear"
+                      className="form-control"
+                      value={academicYear}
+                      onChange={(e) => setAcademicYear(e.target.value)}
+                      placeholder="e.g. 4th Year"
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label" htmlFor="section">Section</label>
+                    <input
+                      type="text"
+                      id="section"
+                      className="form-control"
+                      value={section}
+                      onChange={(e) => setSection(e.target.value)}
+                      placeholder="e.g. C"
                     />
                   </div>
                 </div>

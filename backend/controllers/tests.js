@@ -102,6 +102,20 @@ seedDefaultTests();
 exports.getTests = async (req, res, next) => {
   try {
     const query = {};
+    if (req.user.role === 'student') {
+      const studentAcademicYear = req.user.academicYear || req.user.year;
+      const scopeFilters = [];
+      if (studentAcademicYear) {
+        scopeFilters.push({ $or: [
+          { academicYear: studentAcademicYear },
+          { academicYear: '' },
+          { year: Number(studentAcademicYear) || -1 }
+        ] });
+      }
+      if (req.user.branch) scopeFilters.push({ $or: [{ branch: req.user.branch }, { branch: '' }] });
+      if (req.user.section) scopeFilters.push({ $or: [{ section: req.user.section }, { section: '' }] });
+      if (scopeFilters.length) query.$and = scopeFilters;
+    }
     if (req.query.company) {
       query.company = req.query.company;
     }
@@ -119,7 +133,12 @@ exports.getTests = async (req, res, next) => {
           category: test.category,
           difficulty: test.difficulty || 'medium',
           duration: test.duration,
-          questionCount: Math.min(20, fullTest.questions.length),
+          questionCount: Math.min(test.questionLimit || 20, fullTest.questions.length),
+          questionLimit: test.questionLimit || 20,
+          academicYear: test.academicYear,
+          branch: test.branch,
+          section: test.section,
+          subject: test.subject,
           completed: !!attempt,
           score: attempt ? attempt.score : null
         };
@@ -159,23 +178,24 @@ exports.getTestById = async (req, res, next) => {
       });
     }
 
-    // Partition questions by difficulty
-    const easyQuestions = test.questions.filter(q => q.difficulty === 'easy');
-    const mediumQuestions = test.questions.filter(q => q.difficulty === 'medium');
-    const hardQuestions = test.questions.filter(q => q.difficulty === 'hard');
+    if (req.user.role === 'student') {
+      const studentAcademicYear = req.user.academicYear || req.user.year;
+      const testAcademicYear = test.academicYear || String(test.year || '');
+      const isUnscoped = !test.academicYear;
+      const isAllowed = !studentAcademicYear || isUnscoped || testAcademicYear === String(studentAcademicYear);
 
-    // Shuffle each partition randomly
-    const shuffledEasy = shuffleArray([...easyQuestions]);
-    const shuffledMedium = shuffleArray([...mediumQuestions]);
-    const shuffledHard = shuffleArray([...hardQuestions]);
+      const branchAllowed = !test.branch || !req.user.branch || test.branch === req.user.branch;
+      const sectionAllowed = !test.section || !req.user.section || test.section === req.user.section;
+      if (!isAllowed || !branchAllowed || !sectionAllowed) {
+        return res.status(403).json({
+          success: false,
+          error: 'This exam is not assigned to your academic year.'
+        });
+      }
+    }
 
-    // Select 7 easy, 7 medium, 6 hard questions to make exactly 20 questions
-    const selectedEasy = shuffledEasy.slice(0, 7);
-    const selectedMedium = shuffledMedium.slice(0, 7);
-    const selectedHard = shuffledHard.slice(0, 6);
-
-    // Combine them in progressive order: Easy -> Medium -> Hard
-    const selectedQuestions = [...selectedEasy, ...selectedMedium, ...selectedHard];
+    const questionLimit = Math.min(test.questionLimit || 20, test.questions.length);
+    const selectedQuestions = shuffleArray([...test.questions]).slice(0, questionLimit);
 
     const secureQuestions = selectedQuestions.map(q => ({
       _id: q._id,
@@ -192,6 +212,11 @@ exports.getTestById = async (req, res, next) => {
         category: test.category,
         difficulty: test.difficulty || 'general',
         duration: test.duration,
+        questionLimit,
+        academicYear: test.academicYear,
+        branch: test.branch,
+        section: test.section,
+        subject: test.subject,
         questions: secureQuestions
       }
     });

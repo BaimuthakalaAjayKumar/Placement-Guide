@@ -180,6 +180,8 @@ const notificationRoutes = require('./routes/notifications');
 const roadmapRoutes = require('./routes/roadmaps');
 const discussionRoutes = require('./routes/discussions');
 const aiChatRoutes = require('./routes/aiChat');
+const academicRoutes = require('./routes/academic');
+const labRoutes = require('./routes/labs');
 
 // ============================================================
 // MOUNT API ROUTES
@@ -199,6 +201,8 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/roadmaps', roadmapRoutes);
 app.use('/api/discussions', discussionRoutes);
 app.use('/api/ai', aiChatRoutes);
+app.use('/api/academic', academicRoutes);
+app.use('/api/labs', labRoutes);
 
 // ============================================================
 // HEALTH CHECK

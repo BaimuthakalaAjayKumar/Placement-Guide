@@ -64,6 +64,14 @@ const AptitudeTestSchema = new mongoose.Schema({
     type: Number,
     default: () => new Date().getFullYear()
   },
+  academicYear: {
+    type: String,
+    default: ''
+  },
+  branch: { type: String, default: '' },
+  section: { type: String, default: '' },
+  subject: { type: mongoose.Schema.Types.ObjectId, ref: 'Subject' },
+  questionLimit: { type: Number, default: 20, min: 1 },
   questions: [QuestionSchema],
   createdAt: {
     type: Date,
