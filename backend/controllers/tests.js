@@ -69,6 +69,20 @@ const seedDefaultTests = async () => {
     // Force duration of all existing tests to 20 minutes
     await AptitudeTest.updateMany({}, { duration: 20 });
 
+    // Ensure all tests have string defaults for scoping fields
+    await AptitudeTest.updateMany(
+      { $or: [{ academicYear: { $exists: false } }, { academicYear: null }] },
+      { $set: { academicYear: '' } }
+    );
+    await AptitudeTest.updateMany(
+      { $or: [{ branch: { $exists: false } }, { branch: null }] },
+      { $set: { branch: '' } }
+    );
+    await AptitudeTest.updateMany(
+      { $or: [{ section: { $exists: false } }, { section: null }] },
+      { $set: { section: '' } }
+    );
+
     const count = await AptitudeTest.countDocuments();
     if (count < 8) {
       console.log('Clearing old tests to seed comprehensive aptitude and core subject tests...');
@@ -81,6 +95,9 @@ const seedDefaultTests = async () => {
       const allTests = [...defaultTests, ...coreTests];
       allTests.forEach(t => {
         t.duration = 20;
+        t.academicYear = t.academicYear || '';
+        t.branch = t.branch || '';
+        t.section = t.section || '';
       });
       await AptitudeTest.create(allTests);
       console.log('All 8 comprehensive aptitude and core subject tests seeded successfully!');
@@ -105,17 +122,46 @@ exports.getTests = async (req, res, next) => {
     if (req.user.role === 'student') {
       const studentAcademicYear = req.user.academicYear || req.user.year;
       const scopeFilters = [];
+
+      // Academic year filter: matches student's year or general tests (empty, null, All, or non-existent)
       if (studentAcademicYear) {
-        scopeFilters.push({ $or: [
-          { academicYear: studentAcademicYear },
-          { academicYear: '' },
-          { year: Number(studentAcademicYear) || -1 }
-        ] });
+        scopeFilters.push({
+          $or: [
+            { academicYear: studentAcademicYear },
+            { academicYear: { $in: ['', null, 'All', 'all'] } },
+            { academicYear: { $exists: false } },
+            { year: Number(studentAcademicYear) || -1 }
+          ]
+        });
       }
-      if (req.user.branch) scopeFilters.push({ $or: [{ branch: req.user.branch }, { branch: '' }] });
-      if (req.user.section) scopeFilters.push({ $or: [{ section: req.user.section }, { section: '' }] });
-      if (scopeFilters.length) query.$and = scopeFilters;
+
+      // Branch filter: matches student's branch or general tests (empty, null, All, or non-existent)
+      if (req.user.branch) {
+        scopeFilters.push({
+          $or: [
+            { branch: new RegExp(`^${req.user.branch}$`, 'i') },
+            { branch: { $in: ['', null, 'All', 'all'] } },
+            { branch: { $exists: false } }
+          ]
+        });
+      }
+
+      // Section filter: matches student's section or general tests (empty, null, All, or non-existent)
+      if (req.user.section) {
+        scopeFilters.push({
+          $or: [
+            { section: new RegExp(`^${req.user.section}$`, 'i') },
+            { section: { $in: ['', null, 'All', 'all'] } },
+            { section: { $exists: false } }
+          ]
+        });
+      }
+
+      if (scopeFilters.length) {
+        query.$and = scopeFilters;
+      }
     }
+
     if (req.query.company) {
       query.company = req.query.company;
     }
@@ -133,7 +179,7 @@ exports.getTests = async (req, res, next) => {
           category: test.category,
           difficulty: test.difficulty || 'medium',
           duration: test.duration,
-          questionCount: Math.min(test.questionLimit || 20, fullTest.questions.length),
+          questionCount: Math.min(test.questionLimit || 20, fullTest?.questions?.length || 0),
           questionLimit: test.questionLimit || 20,
           academicYear: test.academicYear,
           branch: test.branch,
@@ -179,14 +225,20 @@ exports.getTestById = async (req, res, next) => {
     }
 
     if (req.user.role === 'student') {
-      const studentAcademicYear = req.user.academicYear || req.user.year;
-      const testAcademicYear = test.academicYear || String(test.year || '');
-      const isUnscoped = !test.academicYear;
-      const isAllowed = !studentAcademicYear || isUnscoped || testAcademicYear === String(studentAcademicYear);
+      const studentAcademicYear = (req.user.academicYear || req.user.year || '').toString().toLowerCase();
+      const testAcademicYear = (test.academicYear || String(test.year || '')).toLowerCase();
+      const isUnscopedYear = !test.academicYear || test.academicYear.toLowerCase() === 'all';
+      const isYearAllowed = !studentAcademicYear || isUnscopedYear || testAcademicYear === studentAcademicYear;
 
-      const branchAllowed = !test.branch || !req.user.branch || test.branch === req.user.branch;
-      const sectionAllowed = !test.section || !req.user.section || test.section === req.user.section;
-      if (!isAllowed || !branchAllowed || !sectionAllowed) {
+      const userBranch = (req.user.branch || '').toLowerCase();
+      const testBranch = (test.branch || '').toLowerCase();
+      const branchAllowed = !test.branch || testBranch === 'all' || !userBranch || testBranch === userBranch;
+
+      const userSection = (req.user.section || '').toLowerCase();
+      const testSection = (test.section || '').toLowerCase();
+      const sectionAllowed = !test.section || testSection === 'all' || !userSection || testSection === userSection;
+
+      if (!isYearAllowed || !branchAllowed || !sectionAllowed) {
         return res.status(403).json({
           success: false,
           error: 'This exam is not assigned to your academic year.'

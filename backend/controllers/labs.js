@@ -15,11 +15,42 @@ exports.getTasks = async (req, res, next) => {
   try {
     const query = { isActive: true };
     if (req.user.role === 'student') {
-      query.academicYear = studentYear(req.user);
-      query.$or = [
-        { branch: '' }, { branch: req.user.branch || '' }
-      ];
-      query.$and = [{ $or: [{ section: '' }, { section: req.user.section || '' }] }];
+      const year = studentYear(req.user);
+      const scopeFilters = [];
+
+      if (year) {
+        scopeFilters.push({
+          $or: [
+            { academicYear: year },
+            { academicYear: { $in: ['', null, 'All', 'all'] } },
+            { academicYear: { $exists: false } }
+          ]
+        });
+      }
+
+      if (req.user.branch) {
+        scopeFilters.push({
+          $or: [
+            { branch: new RegExp(`^${req.user.branch}$`, 'i') },
+            { branch: { $in: ['', null, 'All', 'all'] } },
+            { branch: { $exists: false } }
+          ]
+        });
+      }
+
+      if (req.user.section) {
+        scopeFilters.push({
+          $or: [
+            { section: new RegExp(`^${req.user.section}$`, 'i') },
+            { section: { $in: ['', null, 'All', 'all'] } },
+            { section: { $exists: false } }
+          ]
+        });
+      }
+
+      if (scopeFilters.length) {
+        query.$and = scopeFilters;
+      }
     } else if (req.query.subject) {
       query.subject = req.query.subject;
     }
@@ -54,7 +85,20 @@ exports.submitAttempt = async (req, res, next) => {
   try {
     const task = await LabTask.findById(req.params.id);
     if (!task) return res.status(404).json({ success: false, error: 'Lab task not found.' });
-    if (task.academicYear !== studentYear(req.user) || (task.branch && task.branch !== req.user.branch) || (task.section && task.section !== req.user.section)) {
+
+    const studentYr = (studentYear(req.user) || '').toLowerCase();
+    const taskYr = (task.academicYear || '').toLowerCase();
+    const isYearMatch = !task.academicYear || taskYr === 'all' || !studentYr || taskYr === studentYr;
+
+    const studentBr = (req.user.branch || '').toLowerCase();
+    const taskBr = (task.branch || '').toLowerCase();
+    const isBranchMatch = !task.branch || taskBr === 'all' || !studentBr || taskBr === studentBr;
+
+    const studentSec = (req.user.section || '').toLowerCase();
+    const taskSec = (task.section || '').toLowerCase();
+    const isSectionMatch = !task.section || taskSec === 'all' || !studentSec || taskSec === studentSec;
+
+    if (!isYearMatch || !isBranchMatch || !isSectionMatch) {
       return res.status(403).json({ success: false, error: 'This lab task is not assigned to you.' });
     }
 
