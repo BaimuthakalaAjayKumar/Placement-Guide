@@ -142,7 +142,7 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
   const [academicSubjects, setAcademicSubjects] = useState([]);
   const [academicProjects, setAcademicProjects] = useState([]);
   const [loadingAcademicContent, setLoadingAcademicContent] = useState(false);
-  const [subjectForm, setSubjectForm] = useState({ name: '', code: '', academicYear: '', branch: '', section: '', description: '' });
+  const [subjectForm, setSubjectForm] = useState({ name: '', code: '', academicYear: '', branch: '', description: '' });
   const [selectedAcademicProject, setSelectedAcademicProject] = useState(null);
   const [projectReview, setProjectReview] = useState({ status: 'under_review', feedback: '', grade: '' });
 
@@ -420,7 +420,7 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
       const data = await response.json();
       if (!data.success) throw new Error(data.error || 'Failed to create subject.');
       setAcademicSubjects(previous => [...previous, data.data].sort((a, b) => a.code.localeCompare(b.code)));
-      setSubjectForm({ name: '', code: '', academicYear: '', branch: '', section: '', description: '' });
+      setSubjectForm({ name: '', code: '', academicYear: '', branch: '', description: '' });
       setSuccess('Subject created successfully.');
     } catch (err) {
       setError(err.message);
@@ -3781,9 +3781,9 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
                       <label className="form-label" htmlFor="academicSubjectYear">Academic Year</label>
                       <input id="academicSubjectYear" className="form-control" placeholder="e.g. 2026 or 3rd Year" value={subjectForm.academicYear} onChange={event => setSubjectForm({ ...subjectForm, academicYear: event.target.value })} required />
                     </div>
-                    <div className="form-grid-2-col">
-                      <input className="form-control" placeholder="Branch, e.g. CSE" value={subjectForm.branch} onChange={event => setSubjectForm({ ...subjectForm, branch: event.target.value })} />
-                      <input className="form-control" placeholder="Section, e.g. C" value={subjectForm.section} onChange={event => setSubjectForm({ ...subjectForm, section: event.target.value })} />
+                    <div className="form-group">
+                      <label className="form-label" htmlFor="academicSubjectBranch">Branch</label>
+                      <input id="academicSubjectBranch" className="form-control" placeholder="Branch, e.g. CSE (or leave blank for all branches)" value={subjectForm.branch} onChange={event => setSubjectForm({ ...subjectForm, branch: event.target.value })} />
                     </div>
                     <div className="form-group">
                       <label className="form-label" htmlFor="academicSubjectDescription">Description</label>

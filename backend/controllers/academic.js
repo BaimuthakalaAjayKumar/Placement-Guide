@@ -30,30 +30,106 @@ const canManageScope = (user, academicYear, branch = '', section = '') => {
   });
 };
 
+const escapeRegex = (str) => (str || '').replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&');
+
 exports.getSubjects = async (req, res, next) => {
   try {
-    const academicYear = req.query.academicYear || (req.user.role === 'student' ? getStudentAcademicYear(req.user) : '');
-    const branch = req.query.branch || (req.user.role === 'student' ? req.user.branch : '');
-    const section = req.query.section || (req.user.role === 'student' ? req.user.section : '');
     const query = { isActive: true };
 
-    if (req.user.role === 'student' && req.query.academicYear && req.query.academicYear !== getStudentAcademicYear(req.user)) {
-      return res.status(403).json({ success: false, error: 'You can only view subjects for your academic year.' });
+    if (req.user.role === 'student') {
+      const studentYear = (getStudentAcademicYear(req.user) || '').trim();
+      const studentBranch = (req.user.branch || '').trim();
+
+      const yearConditions = [
+        { academicYear: { $regex: /^all$/i } },
+        { academicYear: '' },
+        { academicYear: null }
+      ];
+
+      if (studentYear) {
+        yearConditions.push({ academicYear: new RegExp(`^${escapeRegex(studentYear)}$`, 'i') });
+
+        // Match digit token e.g. "4th Year" -> "4", "2027" -> "2027"
+        const digits = studentYear.match(/\d+/);
+        if (digits) {
+          yearConditions.push({ academicYear: new RegExp(digits[0], 'i') });
+        }
+        if (/4th|final|IV|^4$/i.test(studentYear)) {
+          yearConditions.push({ academicYear: { $regex: /4th|final|IV|^4$/i } });
+        } else if (/3rd|III|^3$/i.test(studentYear)) {
+          yearConditions.push({ academicYear: { $regex: /3rd|III|^3$/i } });
+        } else if (/2nd|II|^2$/i.test(studentYear)) {
+          yearConditions.push({ academicYear: { $regex: /2nd|II|^2$/i } });
+        } else if (/1st|I|^1$/i.test(studentYear)) {
+          yearConditions.push({ academicYear: { $regex: /1st|I|^1$/i } });
+        }
+      }
+
+      const branchConditions = [
+        { branch: '' },
+        { branch: null },
+        { branch: { $regex: /^all$/i } }
+      ];
+
+      if (studentBranch) {
+        const cleanBranch = studentBranch.split('(')[0].trim();
+        branchConditions.push({ branch: new RegExp(`^${escapeRegex(studentBranch)}$`, 'i') });
+        if (cleanBranch && cleanBranch.toLowerCase() !== studentBranch.toLowerCase()) {
+          branchConditions.push({ branch: new RegExp(`^${escapeRegex(cleanBranch)}$`, 'i') });
+        }
+
+        const acronyms = ['CSE', 'IT', 'ECE', 'EEE', 'MECH', 'CIVIL', 'CSD', 'CSM', 'CSBS', 'AIDS'];
+        for (const acr of acronyms) {
+          if (new RegExp(`\\b${acr}\\b`, 'i').test(studentBranch)) {
+            branchConditions.push({ branch: new RegExp(`^${acr}$`, 'i') });
+          }
+        }
+      }
+
+      const andClauses = [];
+      if (studentYear) {
+        andClauses.push({ $or: yearConditions });
+      }
+      if (studentBranch) {
+        andClauses.push({ $or: branchConditions });
+      }
+      if (andClauses.length > 0) {
+        query.$and = andClauses;
+      }
+      // Note: NO SECTION RESTRICTION for students! All students in that year and branch can see all subjects!
+
     } else if (req.user.role === 'faculty' && !req.query.academicYear) {
       if (req.user.managedScopes && req.user.managedScopes.length > 0) {
-        query.$or = req.user.managedScopes.map(scope => ({
-          academicYear: new RegExp(`^${scope.academicYear}$`, 'i'),
-          ...(scope.branch ? { branch: new RegExp(`^${scope.branch}$`, 'i') } : {}),
-          ...(scope.section ? { section: new RegExp(`^${scope.section}$`, 'i') } : {})
-        }));
+        query.$or = req.user.managedScopes.map(scope => {
+          const scopeCond = {
+            academicYear: new RegExp(`^${escapeRegex(scope.academicYear)}$`, 'i')
+          };
+          if (scope.branch && scope.branch.toLowerCase() !== 'all') {
+            scopeCond.$or = [
+              { branch: new RegExp(`^${escapeRegex(scope.branch)}$`, 'i') },
+              { branch: '' },
+              { branch: null },
+              { branch: { $regex: /^all$/i } }
+            ];
+          }
+          return scopeCond;
+        });
       }
-    } else if (academicYear) {
-      if (req.user.role === 'faculty' && !canManageScope(req.user, academicYear, branch, section)) {
-        return res.status(403).json({ success: false, error: 'You are not assigned to manage this academic year.' });
+    } else {
+      const academicYear = req.query.academicYear || '';
+      const branch = req.query.branch || '';
+
+      if (academicYear) {
+        query.academicYear = new RegExp(`^${escapeRegex(academicYear)}$`, 'i');
       }
-      query.academicYear = academicYear;
-      if (branch) query.branch = branch;
-      if (section) query.section = section;
+      if (branch) {
+        query.$or = [
+          { branch: new RegExp(`^${escapeRegex(branch)}$`, 'i') },
+          { branch: '' },
+          { branch: null },
+          { branch: { $regex: /^all$/i } }
+        ];
+      }
     }
 
     const subjects = await Subject.find(query).sort({ code: 1, name: 1 });
@@ -73,7 +149,15 @@ exports.createSubject = async (req, res, next) => {
       return res.status(403).json({ success: false, error: 'You are not assigned to manage this academic year.' });
     }
 
-    const subject = await Subject.create({ name, code, description, academicYear, branch, section, createdBy: req.user.id });
+    const subject = await Subject.create({
+      name: name.trim(),
+      code: code.trim().toUpperCase(),
+      description: description ? description.trim() : '',
+      academicYear: academicYear.trim(),
+      branch: branch ? branch.trim() : '',
+      section: section ? section.trim() : '',
+      createdBy: req.user.id
+    });
     res.status(201).json({ success: true, data: subject });
   } catch (err) {
     next(err);

@@ -12,6 +12,7 @@ const Dashboard = () => {
   const [practiceStats, setPracticeStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [curriculumSubjects, setCurriculumSubjects] = useState([]);
 
   // History Modal states
   const [selectedHistoryCategory, setSelectedHistoryCategory] = useState(null);
@@ -366,12 +367,27 @@ const Dashboard = () => {
     }
   };
 
+  const fetchCurriculumSubjects = async () => {
+    try {
+      const res = await fetch(`${API_URL}/academic/subjects`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (data.success) {
+        setCurriculumSubjects(data.data || []);
+      }
+    } catch (err) {
+      console.error('Failed to fetch curriculum subjects:', err);
+    }
+  };
+
   useEffect(() => {
     if (token) {
       fetchDashboardStats();
       fetchHolidays();
       fetchLeaderboard();
       fetchPracticeStats();
+      fetchCurriculumSubjects();
     }
   }, [token]);
 
@@ -925,6 +941,52 @@ const Dashboard = () => {
                 </div>
               </div>
             </div>
+
+            {/* Academic Curriculum Subjects for Student's Year & Branch */}
+            {curriculumSubjects.length > 0 && (
+              <div className="glass-card mt-20 animate-fade" style={{ padding: '20px 24px', border: '1px solid rgba(99, 102, 241, 0.35)', background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.08), rgba(15, 23, 42, 0.85))' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', marginBottom: '16px' }}>
+                  <div>
+                    <h3 style={{ margin: 0, fontSize: '1.15rem', color: '#f8fafc', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      🏛️ Academic Curriculum Subjects ({curriculumSubjects.length})
+                    </h3>
+                    <p style={{ margin: '4px 0 0', fontSize: '13px', color: '#94a3b8' }}>
+                      Official subjects, lecture notes & practice tests for {user?.branch || 'Your Branch'} • {user?.academicYear || user?.year || 'Current Batch'}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-sm"
+                    onClick={() => navigate('/core-cse')}
+                  >
+                    View All in Core CSE Prep ↗
+                  </button>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '14px' }}>
+                  {curriculumSubjects.map(subj => (
+                    <div key={subj._id} style={{ background: 'rgba(255, 255, 255, 0.04)', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '10px', padding: '14px 16px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: '10px' }}>
+                      <div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                          <span className="code-pill" style={{ background: 'rgba(99, 102, 241, 0.2)', color: '#a5b4fc', border: '1px solid rgba(99, 102, 241, 0.3)', fontSize: '11px', padding: '2px 7px', borderRadius: '4px', fontWeight: 600 }}>{subj.code}</span>
+                          <span style={{ fontSize: '11.5px', color: '#34d399' }}>📄 {subj.notes?.length || 0} Notes</span>
+                        </div>
+                        <h4 style={{ margin: 0, fontSize: '0.98rem', color: '#f1f5f9' }}>{subj.name}</h4>
+                        <span style={{ fontSize: '12px', color: '#64748b' }}>{subj.academicYear} {subj.branch ? `• ${subj.branch}` : ''}</span>
+                      </div>
+                      <button
+                        type="button"
+                        className="btn btn-primary btn-sm"
+                        style={{ width: '100%', justifyContent: 'center', fontSize: '12px', padding: '6px 10px' }}
+                        onClick={() => navigate('/core-cse')}
+                      >
+                        Open Subject Notes & Tests →
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Row 3: Progress Modules & Recent Activities */}
             <div className="dashboard-row-bottom">
