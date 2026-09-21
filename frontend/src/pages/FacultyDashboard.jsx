@@ -83,6 +83,8 @@ const FacultyDashboard = () => {
     const [selectedProject, setSelectedProject] = useState(null);
     const [viewingCodeProject, setViewingCodeProject] = useState(null);
     const [viewingFileIdx, setViewingFileIdx] = useState(0);
+    const [codeWrap, setCodeWrap] = useState(true);
+    const [copiedFileCode, setCopiedFileCode] = useState(false);
     const [projectReviewForm, setProjectReviewForm] = useState({
         status: 'approved',
         grade: '',
@@ -611,6 +613,232 @@ const FacultyDashboard = () => {
         link.click();
         document.body.removeChild(link);
         URL.revokeObjectURL(url);
+    };
+
+    // Helper: Render Embedded In-Tab Code Viewer for Student Academic Projects
+    const renderInTabProjectCodeViewer = () => {
+        if (!viewingCodeProject) return null;
+
+        const files = viewingCodeProject.files || [];
+        const currentFile = files[viewingFileIdx] || (files.length > 0 ? files[0] : null);
+        const fileContent = currentFile?.content ?? '';
+        const fileLines = fileContent.length > 0 ? fileContent.split('\n') : ['// (Empty file content)'];
+        const liveUrl = viewingCodeProject.deploymentUrl || viewingCodeProject.previewUrl;
+        const repoUrl = viewingCodeProject.repositoryUrl;
+        const hasTeam = viewingCodeProject.teamMembers && viewingCodeProject.teamMembers.length > 0;
+
+        const getFileIcon = (filePath) => {
+            if (!filePath) return '📄';
+            const lower = filePath.toLowerCase();
+            if (lower.endsWith('.js') || lower.endsWith('.jsx')) return '⚡';
+            if (lower.endsWith('.ts') || lower.endsWith('.tsx')) return '🔷';
+            if (lower.endsWith('.html') || lower.endsWith('.htm')) return '🌐';
+            if (lower.endsWith('.css') || lower.endsWith('.scss')) return '🎨';
+            if (lower.endsWith('.py')) return '🐍';
+            if (lower.endsWith('.java')) return '☕';
+            if (lower.endsWith('.cpp') || lower.endsWith('.c') || lower.endsWith('.h')) return '⚙️';
+            if (lower.endsWith('.json')) return '📦';
+            if (lower.endsWith('.md')) return '📝';
+            if (lower.endsWith('.sql')) return '🗄️';
+            return '📄';
+        };
+
+        const handleCopyCurrentCode = () => {
+            if (!currentFile) return;
+            navigator.clipboard.writeText(currentFile.content || '');
+            setCopiedFileCode(true);
+            setTimeout(() => setCopiedFileCode(false), 2000);
+        };
+
+        return (
+            <section id="faculty-in-tab-code-viewer" className="faculty-in-tab-code-panel" aria-label="In-Tab Student Code Viewer">
+                {/* Panel Header */}
+                <div className="faculty-in-tab-header">
+                    <div>
+                        <h2>
+                            <span>💻 Student Project Code & Architecture:</span>
+                            <span style={{ color: '#38bdf8' }}>{viewingCodeProject.title}</span>
+                            <span className={`status-pill ${viewingCodeProject.status || 'draft'}`}>
+                                {(viewingCodeProject.status || 'draft').replace('_', ' ')}
+                            </span>
+                        </h2>
+                        <p>
+                            Submitted by <strong>{viewingCodeProject.student?.name || 'Student'}</strong>{' '}
+                            <span>({viewingCodeProject.student?.email || 'No email'} — Roll: {viewingCodeProject.student?.rollNumber || 'N/A'})</span>
+                        </p>
+                    </div>
+                    <button
+                        type="button"
+                        className="faculty-in-tab-close-btn"
+                        onClick={() => setViewingCodeProject(null)}
+                        title="Close in-tab code viewer"
+                    >
+                        ✕ Close Viewer
+                    </button>
+                </div>
+
+                {/* 4-Box Summary Grid */}
+                <div className="code-viewer-summary-grid mt-16">
+                    <div className="summary-box">
+                        <span className="summary-title">🚀 Deployment Link</span>
+                        {liveUrl ? (
+                            <a
+                                href={liveUrl.startsWith('http') ? liveUrl : `https://${liveUrl}`}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="summary-link"
+                            >
+                                {liveUrl} ↗
+                            </a>
+                        ) : (
+                            <span className="text-secondary">Not deployed</span>
+                        )}
+                    </div>
+                    <div className="summary-box">
+                        <span className="summary-title">💻 Code Repository</span>
+                        {repoUrl ? (
+                            <a
+                                href={repoUrl.startsWith('http') ? repoUrl : `https://${repoUrl}`}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="summary-link"
+                            >
+                                {repoUrl} ↗
+                            </a>
+                        ) : (
+                            <span className="text-secondary">No repository link provided</span>
+                        )}
+                    </div>
+                    <div className="summary-box">
+                        <span className="summary-title">👥 Team Members</span>
+                        {hasTeam ? (
+                            <span>{viewingCodeProject.teamMembers.map(m => `${m.name} (${m.role || 'Developer'})`).join(', ')}</span>
+                        ) : (
+                            <span className="text-secondary">Individual Project</span>
+                        )}
+                    </div>
+                    <div className="summary-box">
+                        <span className="summary-title">⚡ Technologies</span>
+                        <span>{(viewingCodeProject.technologies || []).join(', ') || 'General Web'}</span>
+                    </div>
+                </div>
+
+                {/* Project Goals Banner */}
+                {viewingCodeProject.goals && (
+                    <div className="project-goals-banner mt-14">
+                        <strong>🎯 Project Goals & Objectives:</strong>
+                        <p>{viewingCodeProject.goals}</p>
+                    </div>
+                )}
+
+                {/* Files Tabs and Code Viewer */}
+                <div className="faculty-file-tabs-container mt-16">
+                    <div className="faculty-file-tabs">
+                        {files.map((file, idx) => (
+                            <button
+                                key={file.path || idx}
+                                type="button"
+                                className={`faculty-file-tab ${viewingFileIdx === idx ? 'active' : ''}`}
+                                onClick={() => setViewingFileIdx(idx)}
+                            >
+                                <span>{getFileIcon(file.path)}</span>
+                                <span>{file.path || `file-${idx + 1}`}</span>
+                            </button>
+                        ))}
+                        {files.length === 0 && (
+                            <span className="text-secondary" style={{ padding: '10px 16px', fontSize: '0.85rem' }}>
+                                No code files attached to this project submission.
+                            </span>
+                        )}
+                    </div>
+
+                    {currentFile ? (
+                        <div className="faculty-code-box">
+                            <div className="code-box-header">
+                                <div>
+                                    <span>File: <strong style={{ color: '#f1f5f9' }}>{currentFile.path}</strong></span>
+                                    <span style={{ marginLeft: '10px', color: '#64748b' }}>
+                                        ({fileLines.length} {fileLines.length === 1 ? 'line' : 'lines'})
+                                    </span>
+                                </div>
+                                <div className="code-editor-controls">
+                                    <button
+                                        type="button"
+                                        className={`btn-editor-toggle ${codeWrap ? 'active' : ''}`}
+                                        onClick={() => setCodeWrap(!codeWrap)}
+                                        title="Toggle word wrap"
+                                    >
+                                        {codeWrap ? '↩ Wrap: ON' : '➡️ Wrap: OFF'}
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className={`btn-copy-code ${copiedFileCode ? 'copied' : ''}`}
+                                        onClick={handleCopyCurrentCode}
+                                        title="Copy file code to clipboard"
+                                    >
+                                        {copiedFileCode ? '✓ Copied!' : '📋 Copy Code'}
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div className="faculty-code-editor-layout">
+                                <div className={`code-lines-scroll ${codeWrap ? 'wrapped' : 'no-wrap'}`}>
+                                    {fileLines.map((line, idx) => (
+                                        <div className="code-editor-line-row" key={idx}>
+                                            <span className="code-line-number">{idx + 1}</span>
+                                            <span className="code-line-text">{line || ' '}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    ) : (
+                        <div style={{ padding: '36px', textAlign: 'center', color: '#94a3b8' }}>
+                            <p style={{ margin: 0, fontSize: '0.92rem' }}>No code files to display for this project.</p>
+                        </div>
+                    )}
+                </div>
+
+                {/* Footer Actions */}
+                <div className="faculty-in-tab-footer">
+                    <div className="faculty-in-tab-footer-meta">
+                        {files.length > 0 && (
+                            <span>
+                                Viewing file <strong>{viewingFileIdx + 1}</strong> of <strong>{files.length}</strong>
+                                <span className="dot-sep" style={{ margin: '0 8px' }}>•</span>
+                                Select any tab above to switch files
+                            </span>
+                        )}
+                    </div>
+                    <div className="faculty-in-tab-footer-actions">
+                        <button
+                            type="button"
+                            className="btn-secondary-action"
+                            onClick={() => setViewingCodeProject(null)}
+                        >
+                            ✕ Close Viewer
+                        </button>
+                        <button
+                            type="button"
+                            className="btn-primary-action"
+                            onClick={() => {
+                                const p = viewingCodeProject;
+                                setSelectedProject(p);
+                                setProjectReviewForm({
+                                    status: p.status || 'approved',
+                                    grade: p.grade ?? '',
+                                    feedback: p.feedback || '',
+                                    codeSuggestions: p.codeSuggestions || '',
+                                    techSuggestions: p.techSuggestions || ''
+                                });
+                            }}
+                        >
+                            📝 Proceed to Grade & Suggest
+                        </button>
+                    </div>
+                </div>
+            </section>
+        );
     };
 
     // Lab task creation handler
@@ -1821,6 +2049,9 @@ const FacultyDashboard = () => {
                                 </div>
                             </div>
 
+                            {/* IN-TAB STUDENT PROJECT CODE VIEWER */}
+                            {renderInTabProjectCodeViewer()}
+
                             {loading ? (
                                 <p className="loading-text">Loading projects...</p>
                             ) : (
@@ -1842,7 +2073,7 @@ const FacultyDashboard = () => {
                                                 const hasTeam = p.teamMembers && p.teamMembers.length > 0;
                                                 const liveUrl = p.deploymentUrl || p.previewUrl;
                                                 return (
-                                                    <tr key={p._id}>
+                                                    <tr key={p._id} className={viewingCodeProject?._id === p._id ? 'row-viewing-code' : ''}>
                                                         <td>
                                                             <div className="table-project-title">
                                                                 <strong>{p.title}</strong>
@@ -1932,15 +2163,25 @@ const FacultyDashboard = () => {
                                                         <td>
                                                             <div className="table-actions-cell">
                                                                 <button
-                                                                    className="btn-view"
+                                                                    className={`btn-view ${viewingCodeProject?._id === p._id ? 'active' : ''}`}
                                                                     type="button"
                                                                     onClick={() => {
-                                                                        setViewingCodeProject(p);
-                                                                        setViewingFileIdx(0);
+                                                                        if (viewingCodeProject?._id === p._id) {
+                                                                            setViewingCodeProject(null);
+                                                                        } else {
+                                                                            setViewingCodeProject(p);
+                                                                            setViewingFileIdx(0);
+                                                                            setTimeout(() => {
+                                                                                const el = document.getElementById('faculty-in-tab-code-viewer');
+                                                                                if (el) {
+                                                                                    el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                                                                                }
+                                                                            }, 80);
+                                                                        }
                                                                     }}
                                                                     title="View Code and Files written by student"
                                                                 >
-                                                                    👁️ View Code
+                                                                    {viewingCodeProject?._id === p._id ? '🔼 Hide Code' : '👁️ View Code'}
                                                                 </button>
                                                                 <button
                                                                     className="btn-primary-action btn-sm"
@@ -1973,137 +2214,6 @@ const FacultyDashboard = () => {
                                             )}
                                         </tbody>
                                     </table>
-                                </div>
-                            )}
-
-                            {/* CODE VIEWER MODAL FOR FACULTY */}
-                            {viewingCodeProject && (
-                                <div className="progress-modal-overlay" onClick={() => setViewingCodeProject(null)}>
-                                    <section className="progress-modal faculty-code-viewer-modal" onClick={e => e.stopPropagation()}>
-                                        <div className="progress-modal-header">
-                                            <div>
-                                                <h2>💻 Student Project Code & Architecture: {viewingCodeProject.title}</h2>
-                                                <p>Submitted by <strong>{viewingCodeProject.student?.name}</strong> ({viewingCodeProject.student?.email} - {viewingCodeProject.student?.rollNumber || 'No Roll Number'})</p>
-                                            </div>
-                                            <button className="progress-close" type="button" onClick={() => setViewingCodeProject(null)}>×</button>
-                                        </div>
-
-                                        {/* Project Meta Details */}
-                                        <div className="code-viewer-summary-grid mt-16">
-                                            <div className="summary-box">
-                                                <span className="summary-title">🚀 Deployment Link</span>
-                                                {(viewingCodeProject.deploymentUrl || viewingCodeProject.previewUrl) ? (
-                                                    <a
-                                                        href={viewingCodeProject.deploymentUrl || viewingCodeProject.previewUrl}
-                                                        target="_blank"
-                                                        rel="noreferrer"
-                                                        className="summary-link"
-                                                    >
-                                                        {viewingCodeProject.deploymentUrl || viewingCodeProject.previewUrl} ↗
-                                                    </a>
-                                                ) : (
-                                                    <span className="text-secondary">Not deployed</span>
-                                                )}
-                                            </div>
-                                            <div className="summary-box">
-                                                <span className="summary-title">💻 Code Repository</span>
-                                                {viewingCodeProject.repositoryUrl ? (
-                                                    <a href={viewingCodeProject.repositoryUrl} target="_blank" rel="noreferrer" className="summary-link">
-                                                        {viewingCodeProject.repositoryUrl} ↗
-                                                    </a>
-                                                ) : (
-                                                    <span className="text-secondary">No repository link provided</span>
-                                                )}
-                                            </div>
-                                            <div className="summary-box">
-                                                <span className="summary-title">👥 Team Members</span>
-                                                {viewingCodeProject.teamMembers && viewingCodeProject.teamMembers.length > 0 ? (
-                                                    <span>{viewingCodeProject.teamMembers.map(m => `${m.name} (${m.role})`).join(', ')}</span>
-                                                ) : (
-                                                    <span className="text-secondary">Individual Project</span>
-                                                )}
-                                            </div>
-                                            <div className="summary-box">
-                                                <span className="summary-title">⚡ Technologies</span>
-                                                <span>{(viewingCodeProject.technologies || []).join(', ') || 'General Web'}</span>
-                                            </div>
-                                        </div>
-
-                                        {viewingCodeProject.goals && (
-                                            <div className="project-goals-banner mt-14">
-                                                <strong>🎯 Project Goals & Objectives:</strong>
-                                                <p>{viewingCodeProject.goals}</p>
-                                            </div>
-                                        )}
-
-                                        {/* Files Inspector */}
-                                        <div className="faculty-file-tabs-container mt-16">
-                                            <div className="faculty-file-tabs">
-                                                {(viewingCodeProject.files || []).map((file, idx) => (
-                                                    <button
-                                                        key={file.path || idx}
-                                                        type="button"
-                                                        className={`faculty-file-tab ${viewingFileIdx === idx ? 'active' : ''}`}
-                                                        onClick={() => setViewingFileIdx(idx)}
-                                                    >
-                                                        📄 {file.path}
-                                                    </button>
-                                                ))}
-                                                {(!viewingCodeProject.files || viewingCodeProject.files.length === 0) && (
-                                                    <span className="text-secondary p-10">No code files committed to this project.</span>
-                                                )}
-                                            </div>
-
-                                            {viewingCodeProject.files?.[viewingFileIdx] && (
-                                                <div className="faculty-code-box">
-                                                    <div className="code-box-header">
-                                                        <span>File: <strong>{viewingCodeProject.files[viewingFileIdx].path}</strong></span>
-                                                        <button
-                                                            type="button"
-                                                            className="btn-copy-code"
-                                                            onClick={() => {
-                                                                navigator.clipboard.writeText(viewingCodeProject.files[viewingFileIdx].content || '');
-                                                                setSuccessMsg(`Copied ${viewingCodeProject.files[viewingFileIdx].path} code to clipboard!`);
-                                                            }}
-                                                        >
-                                                            📋 Copy Code
-                                                        </button>
-                                                    </div>
-                                                    <pre className="code-content-pre">
-                                                        {viewingCodeProject.files[viewingFileIdx].content || '(Empty file content)'}
-                                                    </pre>
-                                                </div>
-                                            )}
-                                        </div>
-
-                                        <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '20px' }}>
-                                            <button
-                                                type="button"
-                                                className="btn-secondary-action"
-                                                onClick={() => setViewingCodeProject(null)}
-                                            >
-                                                Close Viewer
-                                            </button>
-                                            <button
-                                                type="button"
-                                                className="btn-primary-action"
-                                                onClick={() => {
-                                                    const p = viewingCodeProject;
-                                                    setViewingCodeProject(null);
-                                                    setSelectedProject(p);
-                                                    setProjectReviewForm({
-                                                        status: p.status || 'approved',
-                                                        grade: p.grade ?? '',
-                                                        feedback: p.feedback || '',
-                                                        codeSuggestions: p.codeSuggestions || '',
-                                                        techSuggestions: p.techSuggestions || ''
-                                                    });
-                                                }}
-                                            >
-                                                📝 Proceed to Grade & Suggest
-                                            </button>
-                                        </div>
-                                    </section>
                                 </div>
                             )}
 
