@@ -13,6 +13,7 @@ const {
   getProjects,
   createProject,
   updateProject,
+  restoreProjectVersion,
   deleteProject
 } = require('../controllers/academic');
 const { protect, authorize } = require('../middleware/auth');
@@ -60,6 +61,7 @@ router.delete('/subjects/:id/notes/:noteId', authorize('admin', 'faculty'), dele
 router.get('/projects', getProjects);
 router.post('/projects', authorize('student'), createProject);
 router.put('/projects/:id', updateProject);
+router.post('/projects/:id/restore-version/:versionId', restoreProjectVersion);
 router.delete('/projects/:id', authorize('student'), deleteProject);
 
 module.exports = router;

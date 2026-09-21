@@ -20,7 +20,22 @@ const TeamMemberSchema = new mongoose.Schema({
   name: { type: String, required: true, trim: true },
   rollNumber: { type: String, default: '', trim: true },
   email: { type: String, default: '', trim: true },
-  role: { type: String, default: 'Developer', trim: true }
+  role: { type: String, default: 'Developer', trim: true },
+  contribution: { type: String, default: '', trim: true },
+  grade: { type: Number, min: 0, max: 100, default: null },
+  feedback: { type: String, default: '' }
+}, { _id: true });
+
+const ProjectVersionSchema = new mongoose.Schema({
+  versionNumber: { type: Number, required: true },
+  summary: { type: String, default: 'Code snapshot' },
+  author: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  authorName: { type: String, default: 'Student' },
+  authorEmail: { type: String, default: '' },
+  files: { type: [ProjectFileSchema], default: [] },
+  deploymentUrl: { type: String, default: '' },
+  previewUrl: { type: String, default: '' },
+  createdAt: { type: Date, default: Date.now }
 }, { _id: true });
 
 const FacultySuggestionSchema = new mongoose.Schema({
@@ -64,11 +79,19 @@ const ProjectSchema = new mongoose.Schema({
   techSuggestions: { type: String, default: '' },
   facultySuggestions: { type: [FacultySuggestionSchema], default: [] },
   grade: { type: Number, min: 0, max: 100, default: null },
+  leadStudentGrade: { type: Number, min: 0, max: 100, default: null },
+  leadStudentContribution: { type: String, default: '' },
+  leadStudentFeedback: { type: String, default: '' },
+  lastUpdatedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  lastUpdatedByName: { type: String, default: '' },
+  versionHistory: { type: [ProjectVersionSchema], default: [] },
   reviewedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   reviewedAt: { type: Date }
 }, { timestamps: true });
 
 ProjectSchema.index({ student: 1, academicYear: 1, updatedAt: -1 });
 ProjectSchema.index({ 'teamMembers.email': 1 });
+ProjectSchema.index({ 'teamMembers.rollNumber': 1 });
 
 module.exports = mongoose.model('Project', ProjectSchema);
+

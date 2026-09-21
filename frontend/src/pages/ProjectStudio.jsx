@@ -49,13 +49,21 @@ const ProjectStudio = () => {
   const [techInput, setTechInput] = useState('');
   const [teamMembers, setTeamMembers] = useState([]);
 
+  // Version History State
+  const [commitMessage, setCommitMessage] = useState('');
+  const [restoringVersion, setRestoringVersion] = useState(false);
+  const [previewingHistoryVersion, setPreviewingHistoryVersion] = useState(null);
+  const [previewingHistoryFileIdx, setPreviewingHistoryFileIdx] = useState(0);
+  const [copiedSnippet, setCopiedSnippet] = useState(false);
+
   // Add Member State
   const [showMemberModal, setShowMemberModal] = useState(false);
   const [memberForm, setMemberForm] = useState({
     name: '',
     rollNumber: '',
     email: '',
-    role: 'Developer'
+    role: 'Developer',
+    contribution: ''
   });
 
   const request = async (url, options = {}) => {
@@ -214,6 +222,7 @@ const ProjectStudio = () => {
         previewUrl: deploymentUrl.trim(),
         repositoryUrl: repositoryUrl.trim(),
         files: project.files,
+        commitMessage: commitMessage.trim() || undefined,
         submit
       };
 
@@ -223,11 +232,31 @@ const ProjectStudio = () => {
       });
       setProject(data.data);
       setProjects(previous => previous.map(item => item._id === data.data._id ? data.data : item));
-      setMessage(submit ? '🚀 Project submitted successfully for faculty and administrator review!' : '💾 Project changes saved successfully.');
+      setCommitMessage('');
+      setMessage(submit ? '🚀 Project submitted successfully for faculty and administrator review!' : '💾 Project changes saved successfully (new code snapshot recorded).');
     } catch (error) {
       setMessage(error.message);
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleRestoreVersion = async (versionNumber) => {
+    if (!window.confirm(`⚠️ Restore Project to Version #${versionNumber}?\n\nThis will safely roll back your code files to this snapshot. A new recovery snapshot will be recorded in history.`)) return;
+    try {
+      setRestoringVersion(true);
+      const data = await request(`${API_URL}/academic/projects/${project._id}/restore-version/${versionNumber}`, {
+        method: 'POST'
+      });
+      setProject(data.data);
+      setProjects(previous => previous.map(item => item._id === data.data._id ? data.data : item));
+      selectProject(data.data);
+      setMessage(`⏮️ Successfully restored project files to Version #${versionNumber}!`);
+      setActiveStudioTab('editor');
+    } catch (error) {
+      setMessage(error.message || 'Failed to restore version.');
+    } finally {
+      setRestoringVersion(false);
     }
   };
 
@@ -240,13 +269,14 @@ const ProjectStudio = () => {
       name: memberForm.name.trim(),
       rollNumber: memberForm.rollNumber.trim(),
       email: memberForm.email.trim(),
-      role: memberForm.role.trim() || 'Developer'
+      role: memberForm.role.trim() || 'Developer',
+      contribution: memberForm.contribution.trim()
     };
 
     const updatedMembers = [...teamMembers, newMemberItem];
     setTeamMembers(updatedMembers);
     setProject(prev => ({ ...prev, teamMembers: updatedMembers }));
-    setMemberForm({ name: '', rollNumber: '', email: '', role: 'Developer' });
+    setMemberForm({ name: '', rollNumber: '', email: '', role: 'Developer', contribution: '' });
     setShowMemberModal(false);
     setMessage(`Added team member: ${newMemberItem.name}`);
   };
@@ -293,6 +323,12 @@ const ProjectStudio = () => {
               )}
               {project?.grade !== null && project?.grade !== undefined && (
                 <span className="grade-badge">Grade: {project.grade}/100</span>
+              )}
+              {project && (
+                <span className="team-collab-badge" title="All changes replicate live to every team member's account">
+                  👥 {project.teamMembers?.length > 0 ? `${project.teamMembers.length + 1} Members (Team Project)` : 'Individual Project'}
+                  {project.lastUpdatedByName && ` • Last updated by ${project.lastUpdatedByName}`}
+                </span>
               )}
               {deploymentUrl && (
                 <a
@@ -414,6 +450,13 @@ const ProjectStudio = () => {
                     💡 Faculty & Admin Feedback
                     {hasFeedback && <span className="feedback-indicator-dot" title="Feedback available">•</span>}
                   </button>
+                  <button
+                    type="button"
+                    className={`studio-tab-btn ${activeStudioTab === 'history' ? 'active' : ''}`}
+                    onClick={() => setActiveStudioTab('history')}
+                  >
+                    📜 History & Restore ({project.versionHistory?.length || 0})
+                  </button>
                 </div>
 
                 {/* TAB 1: CODE EDITOR & SANDBOX */}
@@ -431,6 +474,12 @@ const ProjectStudio = () => {
                         value={description}
                         onChange={event => setDescription(event.target.value)}
                         placeholder="Short summary of project features"
+                      />
+                      <input
+                        className="form-control commit-note-input"
+                        value={commitMessage}
+                        onChange={event => setCommitMessage(event.target.value)}
+                        placeholder="📝 Snapshot note (e.g. Added auth, Fixed UI) - optional"
                       />
                     </div>
                     <div className="project-editor-layout">
@@ -654,12 +703,25 @@ const ProjectStudio = () => {
                       <div className="team-member-card lead-card">
                         <div className="member-avatar">👑</div>
                         <div className="member-info">
-                          <h4>{project.student?.name || user?.name || 'Project Creator'} <span className="lead-tag">Project Lead</span></h4>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                            <h4>{project.student?.name || user?.name || 'Project Creator'} <span className="lead-tag">Project Lead</span></h4>
+                            {project.leadStudentGrade !== null && project.leadStudentGrade !== undefined ? (
+                              <span className="member-grade-chip">★ Individual Grade: {project.leadStudentGrade}/100</span>
+                            ) : project.grade !== null && project.grade !== undefined ? (
+                              <span className="member-grade-chip">★ Grade: {project.grade}/100</span>
+                            ) : null}
+                          </div>
                           <p className="member-meta">
                             <span>📧 {project.student?.email || user?.email || 'N/A'}</span>
                             {project.student?.rollNumber && <span>🆔 {project.student.rollNumber}</span>}
                             <span>🎓 {project.academicYear || 'Final Year'}</span>
                           </p>
+                          {project.leadStudentContribution && (
+                            <p className="member-contribution-desc mt-6"><strong>Contribution:</strong> {project.leadStudentContribution}</p>
+                          )}
+                          {project.leadStudentFeedback && (
+                            <p className="member-eval-feedback mt-4"><strong>Evaluator Remarks:</strong> {project.leadStudentFeedback}</p>
+                          )}
                         </div>
                       </div>
 
@@ -668,11 +730,22 @@ const ProjectStudio = () => {
                         <div key={index} className="team-member-card">
                           <div className="member-avatar">👤</div>
                           <div className="member-info">
-                            <h4>{member.name} <span className="role-tag">{member.role || 'Developer'}</span></h4>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                              <h4>{member.name} <span className="role-tag">{member.role || 'Developer'}</span></h4>
+                              {member.grade !== null && member.grade !== undefined && (
+                                <span className="member-grade-chip">★ Individual Grade: {member.grade}/100</span>
+                              )}
+                            </div>
                             <p className="member-meta">
                               {member.email && <span>📧 {member.email}</span>}
                               {member.rollNumber && <span>🆔 {member.rollNumber}</span>}
                             </p>
+                            {member.contribution && (
+                              <p className="member-contribution-desc mt-6"><strong>Contribution:</strong> {member.contribution}</p>
+                            )}
+                            {member.feedback && (
+                              <p className="member-eval-feedback mt-4"><strong>Evaluator Remarks:</strong> {member.feedback}</p>
+                            )}
                           </div>
                           <button
                             type="button"
@@ -760,6 +833,15 @@ const ProjectStudio = () => {
                                 <option value="DevOps & Deployment">DevOps & Deployment</option>
                                 <option value="Documentation & Research">Documentation & Research</option>
                               </select>
+                            </div>
+                            <div className="form-group">
+                              <label className="form-label">Contribution / Key Responsibilities</label>
+                              <input
+                                className="form-control"
+                                value={memberForm.contribution}
+                                onChange={e => setMemberForm({ ...memberForm, contribution: e.target.value })}
+                                placeholder="e.g. Frontend React UI, API integration, testing"
+                              />
                             </div>
                             <div className="modal-actions mt-20">
                               <button type="button" className="btn btn-secondary" onClick={() => setShowMemberModal(false)}>Cancel</button>
@@ -849,6 +931,128 @@ const ProjectStudio = () => {
                             {project.feedback}
                           </div>
                         </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* TAB 5: CODE SNAPSHOT HISTORY & ROLLBACK */}
+                {activeStudioTab === 'history' && (
+                  <div className="tab-pane animate-fade history-pane">
+                    <div className="history-header-card">
+                      <div>
+                        <h3>📜 Code Snapshots & Deployment History</h3>
+                        <p className="card-desc">
+                          Every time you or your teammates save code or update deployment links, a recovery snapshot is created. If any mistake occurs, inspect previous code snippets or roll back your project with one click.
+                        </p>
+                      </div>
+                      <div className="history-counter-pill">
+                        <span>{(project.versionHistory || []).length} Snapshots Saved</span>
+                      </div>
+                    </div>
+
+                    {(!project.versionHistory || project.versionHistory.length === 0) ? (
+                      <div className="no-history-box mt-20">
+                        <p className="text-secondary">No previous code snapshots found. Click "💾 Save Project" in the editor to record your first snapshot.</p>
+                      </div>
+                    ) : (
+                      <div className="history-timeline mt-20">
+                        {[...(project.versionHistory || [])].reverse().map((version, vIdx) => {
+                          const isLatest = vIdx === 0;
+                          const isPreviewing = (previewingHistoryVersion?._id && previewingHistoryVersion?._id === version._id) || previewingHistoryVersion?.versionNumber === version.versionNumber;
+                          const previewFile = isPreviewing && version.files ? (version.files[previewingHistoryFileIdx] || version.files[0]) : null;
+
+                          return (
+                            <div key={version._id || version.versionNumber || vIdx} className={`history-version-card ${isLatest ? 'latest-version' : ''}`}>
+                              <div className="version-card-top">
+                                <div className="version-badge-col">
+                                  <span className="version-number-tag">
+                                    v{version.versionNumber}
+                                    {isLatest && <span className="current-pill">Current</span>}
+                                  </span>
+                                  <span className="version-date">
+                                    {new Date(version.createdAt).toLocaleString()}
+                                  </span>
+                                </div>
+
+                                <div className="version-summary-col">
+                                  <strong className="version-summary-text">{version.summary || 'Code snapshot'}</strong>
+                                  <div className="version-meta-tags">
+                                    <span className="author-tag">👤 {version.authorName || 'Team Member'}</span>
+                                    <span className="files-count-tag">📁 {version.files?.length || 0} Files</span>
+                                    {version.deploymentUrl && (
+                                      <span className="deploy-tag">🚀 {version.deploymentUrl}</span>
+                                    )}
+                                  </div>
+                                </div>
+
+                                <div className="version-action-col">
+                                  <button
+                                    type="button"
+                                    className={`btn btn-secondary btn-sm ${isPreviewing ? 'active' : ''}`}
+                                    onClick={() => {
+                                      if (isPreviewing) {
+                                        setPreviewingHistoryVersion(null);
+                                      } else {
+                                        setPreviewingHistoryVersion(version);
+                                        setPreviewingHistoryFileIdx(0);
+                                      }
+                                    }}
+                                  >
+                                    {isPreviewing ? '🔼 Hide Snippets' : '👁️ View Snippets'}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="btn btn-warning btn-sm"
+                                    onClick={() => handleRestoreVersion(version.versionNumber)}
+                                    disabled={restoringVersion}
+                                    title="Restore code files to this snapshot"
+                                  >
+                                    {restoringVersion ? 'Restoring...' : '⏮️ Restore This Version'}
+                                  </button>
+                                </div>
+                              </div>
+
+                              {/* Code Snippets Inspector for this version */}
+                              {isPreviewing && previewFile && (
+                                <div className="history-code-preview-drawer mt-14">
+                                  <div className="drawer-file-tabs">
+                                    {(version.files || []).map((f, fIdx) => (
+                                      <button
+                                        key={f.path || fIdx}
+                                        type="button"
+                                        className={`drawer-file-tab ${previewingHistoryFileIdx === fIdx ? 'active' : ''}`}
+                                        onClick={() => setPreviewingHistoryFileIdx(fIdx)}
+                                      >
+                                        📄 {f.path}
+                                      </button>
+                                    ))}
+                                  </div>
+
+                                  <div className="drawer-code-box">
+                                    <div className="drawer-code-header">
+                                      <span>Snapshot: <strong>{previewFile.path}</strong> (Version #{version.versionNumber})</span>
+                                      <button
+                                        type="button"
+                                        className="btn-copy-snippet"
+                                        onClick={() => {
+                                          navigator.clipboard.writeText(previewFile.content || '');
+                                          setCopiedSnippet(true);
+                                          setTimeout(() => setCopiedSnippet(false), 2000);
+                                        }}
+                                      >
+                                        {copiedSnippet ? '✓ Copied!' : '📋 Copy Code Snippet'}
+                                      </button>
+                                    </div>
+                                    <pre className="drawer-code-pre">
+                                      {previewFile.content || '(Empty file content)'}
+                                    </pre>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
                       </div>
                     )}
                   </div>

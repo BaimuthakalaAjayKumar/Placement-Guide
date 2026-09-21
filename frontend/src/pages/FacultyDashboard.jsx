@@ -90,7 +90,11 @@ const FacultyDashboard = () => {
         grade: '',
         feedback: '',
         codeSuggestions: '',
-        techSuggestions: ''
+        techSuggestions: '',
+        leadStudentGrade: '',
+        leadStudentContribution: '',
+        leadStudentFeedback: '',
+        teamMembers: []
     });
     const [savingReview, setSavingReview] = useState(false);
 
@@ -539,14 +543,27 @@ const FacultyDashboard = () => {
             setSavingReview(true);
             const payload = {
                 status: projectReviewForm.status,
-                grade: projectReviewForm.grade === '' ? null : Number(projectReviewForm.grade),
+                grade: projectReviewForm.grade === '' || projectReviewForm.grade === null ? null : Number(projectReviewForm.grade),
                 feedback: projectReviewForm.feedback,
                 codeSuggestions: projectReviewForm.codeSuggestions,
-                techSuggestions: projectReviewForm.techSuggestions
+                techSuggestions: projectReviewForm.techSuggestions,
+                leadStudentGrade: projectReviewForm.leadStudentGrade === '' || projectReviewForm.leadStudentGrade === null ? null : Number(projectReviewForm.leadStudentGrade),
+                leadStudentContribution: projectReviewForm.leadStudentContribution || '',
+                leadStudentFeedback: projectReviewForm.leadStudentFeedback || '',
+                teamMembers: (projectReviewForm.teamMembers || []).map(m => ({
+                    _id: m._id,
+                    name: m.name,
+                    rollNumber: m.rollNumber || '',
+                    email: m.email || '',
+                    role: m.role || 'Developer',
+                    contribution: m.contribution || '',
+                    grade: m.grade === '' || m.grade === null || m.grade === undefined ? null : Number(m.grade),
+                    feedback: m.feedback || ''
+                }))
             };
             const res = await axios.put(`${API_URL}/academic/projects/${selectedProject._id}`, payload, getAuthHeaders());
             if (res.data?.success) {
-                setSuccessMsg('Project review, code & technology suggestions submitted successfully!');
+                setSuccessMsg('Project evaluation and individual student grades saved successfully!');
                 setSelectedProject(null);
                 fetchProjects();
             }
@@ -567,13 +584,15 @@ const FacultyDashboard = () => {
             'Lead Student Email',
             'Roll Number',
             'Academic Year',
-            'Teammates',
+            'Lead Individual Grade',
+            'Lead Contribution',
+            'Teammates & Individual Grades',
             'Technologies Used',
             'Project Goals',
             'Deployment URL',
             'Repository URL',
             'Status',
-            'Grade',
+            'Overall Grade',
             'Faculty Code Suggestions',
             'Faculty Technology Suggestions',
             'Evaluator Feedback',
@@ -581,16 +600,17 @@ const FacultyDashboard = () => {
             'Last Updated'
         ];
         const rows = projects.map(p => {
-            const teamStr = (p.teamMembers || []).map(m => `${m.name} (${m.rollNumber || 'No RollNo'} - ${m.role || 'Member'})`).join('; ');
-            const techStr = (p.technologies || []).join(', ');
+            const teamDetails = (p.teamMembers || []).map(m => `${m.name} (${m.role || 'Dev'}): Grade ${m.grade ?? 'N/A'}`).join('; ');
             return [
-                p.title,
-                p.student?.name || 'Student',
-                p.student?.email || 'N/A',
+                p.title || 'Untitled Project',
+                p.student?.name || '',
+                p.student?.email || '',
                 p.student?.rollNumber || '',
                 p.academicYear || '',
-                teamStr || 'Individual Project',
-                techStr,
+                p.leadStudentGrade ?? p.grade ?? 'N/A',
+                p.leadStudentContribution || '',
+                teamDetails || 'Individual Project',
+                (p.technologies || []).join(', '),
                 p.goals || '',
                 p.deploymentUrl || p.previewUrl || '',
                 p.repositoryUrl || '',
@@ -823,20 +843,283 @@ const FacultyDashboard = () => {
                             className="btn-primary-action"
                             onClick={() => {
                                 const p = viewingCodeProject;
+                                setViewingCodeProject(null);
                                 setSelectedProject(p);
                                 setProjectReviewForm({
                                     status: p.status || 'approved',
                                     grade: p.grade ?? '',
                                     feedback: p.feedback || '',
                                     codeSuggestions: p.codeSuggestions || '',
-                                    techSuggestions: p.techSuggestions || ''
+                                    techSuggestions: p.techSuggestions || '',
+                                    leadStudentGrade: p.leadStudentGrade ?? p.grade ?? '',
+                                    leadStudentContribution: p.leadStudentContribution || '',
+                                    leadStudentFeedback: p.leadStudentFeedback || '',
+                                    teamMembers: (p.teamMembers || []).map(m => ({
+                                        ...m,
+                                        grade: m.grade ?? '',
+                                        contribution: m.contribution || '',
+                                        feedback: m.feedback || ''
+                                    }))
                                 });
+                                setTimeout(() => {
+                                    const el = document.getElementById('faculty-in-tab-review-panel');
+                                    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                                }, 80);
                             }}
                         >
                             📝 Proceed to Grade & Suggest
                         </button>
                     </div>
                 </div>
+            </section>
+        );
+    };
+
+    // Helper: Render Embedded In-Tab Review & Individual Grading Panel for Student Academic Projects
+    const renderInTabProjectReviewPanel = () => {
+        if (!selectedProject) return null;
+
+        const hasTeam = selectedProject.teamMembers && selectedProject.teamMembers.length > 0;
+
+        const handleTeammateChange = (index, field, value) => {
+            const updated = [...(projectReviewForm.teamMembers || [])];
+            if (updated[index]) {
+                updated[index] = { ...updated[index], [field]: value };
+                setProjectReviewForm({ ...projectReviewForm, teamMembers: updated });
+            }
+        };
+
+        return (
+            <section id="faculty-in-tab-review-panel" className="faculty-in-tab-review-panel" aria-label="In-Tab Student Project Evaluation Panel">
+                <div className="faculty-in-tab-header">
+                    <div>
+                        <h2>
+                            <span>📝 Grade & Suggest:</span>
+                            <span style={{ color: '#818cf8' }}>{selectedProject.title}</span>
+                            <span className={`status-pill ${selectedProject.status || 'draft'}`}>
+                                {(selectedProject.status || 'draft').replace('_', ' ')}
+                            </span>
+                        </h2>
+                        <p>
+                            Submitted by <strong>{selectedProject.student?.name || 'Student'}</strong>{' '}
+                            <span>({selectedProject.student?.email || 'No email'} — Roll: {selectedProject.student?.rollNumber || 'N/A'})</span>
+                            {hasTeam && <span style={{ marginLeft: '8px', color: '#38bdf8' }}>• 👥 Team Project ({selectedProject.teamMembers.length + 1} students)</span>}
+                        </p>
+                    </div>
+                    <button
+                        type="button"
+                        className="faculty-in-tab-close-btn"
+                        onClick={() => setSelectedProject(null)}
+                        title="Close evaluation panel"
+                    >
+                        ✕ Close Review
+                    </button>
+                </div>
+
+                <form className="faculty-review-form mt-18" onSubmit={handleSaveProjectReview}>
+                    {/* Overall Evaluation Row */}
+                    <div className="form-grid-2col review-status-row">
+                        <div className="form-group">
+                            <label className="form-label">Review Status</label>
+                            <select
+                                className="form-control"
+                                value={projectReviewForm.status}
+                                onChange={e => setProjectReviewForm({ ...projectReviewForm, status: e.target.value })}
+                            >
+                                <option value="approved">Approved</option>
+                                <option value="under_review">Under Review</option>
+                                <option value="changes_requested">Changes Requested</option>
+                            </select>
+                        </div>
+                        <div className="form-group">
+                            <label className="form-label">Overall Project Grade (0 - 100)</label>
+                            <input
+                                type="number"
+                                min="0"
+                                max="100"
+                                className="form-control"
+                                placeholder="e.g. 85"
+                                value={projectReviewForm.grade}
+                                onChange={e => setProjectReviewForm({ ...projectReviewForm, grade: e.target.value })}
+                            />
+                        </div>
+                    </div>
+
+                    {/* INDIVIDUAL STUDENT GRADES & CONTRIBUTIONS SECTION */}
+                    <div className="individual-grading-section mt-18">
+                        <div className="section-header-row">
+                            <div>
+                                <h4 className="section-subtitle">🎯 Individual Student Grades & Contributions</h4>
+                                <p className="section-desc">
+                                    Based on the contribution of each student, assign individual grades (0–100) and feedback for each member.
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="faculty-member-grade-cards mt-12">
+                            {/* Lead Student Card */}
+                            <div className="member-grade-card lead-student-card">
+                                <div className="member-card-header">
+                                    <div className="member-info">
+                                        <span className="member-role-badge lead">👑 Lead Student / Submitter</span>
+                                        <strong className="member-name">{selectedProject.student?.name || 'Lead Student'}</strong>
+                                        <span className="member-meta">
+                                            {selectedProject.student?.email} • Roll: {selectedProject.student?.rollNumber || 'N/A'}
+                                        </span>
+                                    </div>
+                                    <div className="member-grade-input-group">
+                                        <label className="grade-label">Individual Grade</label>
+                                        <div className="input-with-max">
+                                            <input
+                                                type="number"
+                                                min="0"
+                                                max="100"
+                                                className="form-control member-grade-input"
+                                                placeholder="Score"
+                                                value={projectReviewForm.leadStudentGrade}
+                                                onChange={e => setProjectReviewForm({ ...projectReviewForm, leadStudentGrade: e.target.value })}
+                                            />
+                                            <span className="max-score-tag">/100</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="member-card-body mt-10">
+                                    <div className="form-grid-2col">
+                                        <div className="form-group">
+                                            <label className="form-label-sm">Contribution & Key Tasks Worked On</label>
+                                            <input
+                                                type="text"
+                                                className="form-control form-control-sm"
+                                                placeholder="e.g. Architecture, core backend REST APIs, system coordination"
+                                                value={projectReviewForm.leadStudentContribution}
+                                                onChange={e => setProjectReviewForm({ ...projectReviewForm, leadStudentContribution: e.target.value })}
+                                            />
+                                        </div>
+                                        <div className="form-group">
+                                            <label className="form-label-sm">Specific Feedback for Lead Student</label>
+                                            <input
+                                                type="text"
+                                                className="form-control form-control-sm"
+                                                placeholder="e.g. Strong leadership, well-structured models and modular architecture"
+                                                value={projectReviewForm.leadStudentFeedback}
+                                                onChange={e => setProjectReviewForm({ ...projectReviewForm, leadStudentFeedback: e.target.value })}
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Teammates Cards */}
+                            {(projectReviewForm.teamMembers || []).map((m, idx) => (
+                                <div key={m._id || idx} className="member-grade-card teammate-card">
+                                    <div className="member-card-header">
+                                        <div className="member-info">
+                                            <span className="member-role-badge">👥 Teammate • {m.role || 'Developer'}</span>
+                                            <strong className="member-name">{m.name}</strong>
+                                            <span className="member-meta">
+                                                {m.email} {m.rollNumber ? `• Roll: ${m.rollNumber}` : ''}
+                                            </span>
+                                        </div>
+                                        <div className="member-grade-input-group">
+                                            <label className="grade-label">Individual Grade</label>
+                                            <div className="input-with-max">
+                                                <input
+                                                    type="number"
+                                                    min="0"
+                                                    max="100"
+                                                    className="form-control member-grade-input"
+                                                    placeholder="Score"
+                                                    value={m.grade ?? ''}
+                                                    onChange={e => handleTeammateChange(idx, 'grade', e.target.value)}
+                                                />
+                                                <span className="max-score-tag">/100</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="member-card-body mt-10">
+                                        <div className="form-grid-2col">
+                                            <div className="form-group">
+                                                <label className="form-label-sm">Contribution & Key Tasks Worked On</label>
+                                                <input
+                                                    type="text"
+                                                    className="form-control form-control-sm"
+                                                    placeholder="e.g. Frontend UI components, state management, unit tests"
+                                                    value={m.contribution || ''}
+                                                    onChange={e => handleTeammateChange(idx, 'contribution', e.target.value)}
+                                                />
+                                            </div>
+                                            <div className="form-group">
+                                                <label className="form-label-sm">Specific Feedback for This Student</label>
+                                                <input
+                                                    type="text"
+                                                    className="form-control form-control-sm"
+                                                    placeholder="e.g. Excellent UI design and responsive layouts"
+                                                    value={m.feedback || ''}
+                                                    onChange={e => handleTeammateChange(idx, 'feedback', e.target.value)}
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* CODE SUGGESTIONS */}
+                    <div className="form-group mt-18">
+                        <label className="form-label">
+                            💻 Code Review & Optimization Suggestions
+                        </label>
+                        <textarea
+                            className="form-control"
+                            rows="3"
+                            placeholder="Provide suggestions based on the student's code (e.g. code modularity, variable naming, error handling, algorithmic time complexity, security issues)..."
+                            value={projectReviewForm.codeSuggestions}
+                            onChange={e => setProjectReviewForm({ ...projectReviewForm, codeSuggestions: e.target.value })}
+                        />
+                    </div>
+
+                    {/* TECHNOLOGY SUGGESTIONS */}
+                    <div className="form-group mt-16">
+                        <label className="form-label">
+                            ⚡ Technology & Architecture Suggestions
+                        </label>
+                        <textarea
+                            className="form-control"
+                            rows="3"
+                            placeholder="Suggest relevant technologies, frameworks, libraries, or architectural upgrades (e.g. recommend Redis for caching, Docker containers, TailwindCSS, TypeScript)..."
+                            value={projectReviewForm.techSuggestions}
+                            onChange={e => setProjectReviewForm({ ...projectReviewForm, techSuggestions: e.target.value })}
+                        />
+                    </div>
+
+                    {/* GENERAL FEEDBACK */}
+                    <div className="form-group mt-16">
+                        <label className="form-label">General Evaluator Feedback</label>
+                        <textarea
+                            className="form-control"
+                            rows="3"
+                            placeholder="Overall performance evaluation, remarks, and next milestone instructions..."
+                            value={projectReviewForm.feedback}
+                            onChange={e => setProjectReviewForm({ ...projectReviewForm, feedback: e.target.value })}
+                        />
+                    </div>
+
+                    {/* Action Buttons */}
+                    <div className="faculty-in-tab-footer mt-20">
+                        <div className="faculty-in-tab-footer-meta">
+                            <span>Individual student grades and feedback will be visible in each student's account.</span>
+                        </div>
+                        <div className="faculty-in-tab-footer-actions">
+                            <button type="button" className="btn-secondary-action" onClick={() => setSelectedProject(null)}>
+                                ✕ Close Review
+                            </button>
+                            <button type="submit" className="btn-primary-action" disabled={savingReview}>
+                                {savingReview ? 'Saving Evaluation...' : '💾 Save Evaluation & Individual Grades'}
+                            </button>
+                        </div>
+                    </div>
+                </form>
             </section>
         );
     };
@@ -2052,6 +2335,9 @@ const FacultyDashboard = () => {
                             {/* IN-TAB STUDENT PROJECT CODE VIEWER */}
                             {renderInTabProjectCodeViewer()}
 
+                            {/* IN-TAB STUDENT PROJECT REVIEW & INDIVIDUAL GRADING PANEL */}
+                            {renderInTabProjectReviewPanel()}
+
                             {loading ? (
                                 <p className="loading-text">Loading projects...</p>
                             ) : (
@@ -2073,7 +2359,7 @@ const FacultyDashboard = () => {
                                                 const hasTeam = p.teamMembers && p.teamMembers.length > 0;
                                                 const liveUrl = p.deploymentUrl || p.previewUrl;
                                                 return (
-                                                    <tr key={p._id} className={viewingCodeProject?._id === p._id ? 'row-viewing-code' : ''}>
+                                                    <tr key={p._id} className={`${viewingCodeProject?._id === p._id ? 'row-viewing-code' : ''} ${selectedProject?._id === p._id ? 'row-reviewing-project' : ''}`}>
                                                         <td>
                                                             <div className="table-project-title">
                                                                 <strong>{p.title}</strong>
@@ -2105,7 +2391,12 @@ const FacultyDashboard = () => {
                                                         </td>
                                                         <td>
                                                             <div className="table-student-col">
-                                                                <strong>{p.student?.name || 'Student'}</strong>
+                                                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                                                                    <strong>{p.student?.name || 'Student'}</strong>
+                                                                    {p.leadStudentGrade !== null && p.leadStudentGrade !== undefined && (
+                                                                        <span className="member-grade-pill" title="Lead Student Grade">★ {p.leadStudentGrade}</span>
+                                                                    )}
+                                                                </div>
                                                                 <span className="text-secondary" style={{ fontSize: '11px' }}>
                                                                     {p.student?.email}
                                                                     {p.student?.rollNumber && ` · ${p.student.rollNumber}`}
@@ -2117,10 +2408,15 @@ const FacultyDashboard = () => {
                                                                         </summary>
                                                                         <ul className="teammates-dropdown">
                                                                             {p.teamMembers.map((m, idx) => (
-                                                                                <li key={idx}>
-                                                                                    <strong>{m.name}</strong>
-                                                                                    {m.rollNumber && <span> ({m.rollNumber})</span>}
-                                                                                    {m.role && <span className="teammate-role-tag"> - {m.role}</span>}
+                                                                                <li key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '6px' }}>
+                                                                                    <div>
+                                                                                        <strong>{m.name}</strong>
+                                                                                        {m.rollNumber && <span> ({m.rollNumber})</span>}
+                                                                                        {m.role && <span className="teammate-role-tag"> - {m.role}</span>}
+                                                                                    </div>
+                                                                                    {m.grade !== null && m.grade !== undefined && (
+                                                                                        <span className="member-grade-pill" title="Teammate Individual Grade">★ {m.grade}</span>
+                                                                                    )}
                                                                                 </li>
                                                                             ))}
                                                                         </ul>
@@ -2184,21 +2480,38 @@ const FacultyDashboard = () => {
                                                                     {viewingCodeProject?._id === p._id ? '🔼 Hide Code' : '👁️ View Code'}
                                                                 </button>
                                                                 <button
-                                                                    className="btn-primary-action btn-sm"
+                                                                    className={`btn-primary-action btn-sm ${selectedProject?._id === p._id ? 'active' : ''}`}
                                                                     type="button"
                                                                     onClick={() => {
-                                                                        setSelectedProject(p);
-                                                                        setProjectReviewForm({
-                                                                            status: p.status || 'approved',
-                                                                            grade: p.grade ?? '',
-                                                                            feedback: p.feedback || '',
-                                                                            codeSuggestions: p.codeSuggestions || '',
-                                                                            techSuggestions: p.techSuggestions || ''
-                                                                        });
+                                                                        if (selectedProject?._id === p._id) {
+                                                                            setSelectedProject(null);
+                                                                        } else {
+                                                                            setSelectedProject(p);
+                                                                            setProjectReviewForm({
+                                                                                status: p.status || 'approved',
+                                                                                grade: p.grade ?? '',
+                                                                                feedback: p.feedback || '',
+                                                                                codeSuggestions: p.codeSuggestions || '',
+                                                                                techSuggestions: p.techSuggestions || '',
+                                                                                leadStudentGrade: p.leadStudentGrade ?? p.grade ?? '',
+                                                                                leadStudentContribution: p.leadStudentContribution || '',
+                                                                                leadStudentFeedback: p.leadStudentFeedback || '',
+                                                                                teamMembers: (p.teamMembers || []).map(m => ({
+                                                                                    ...m,
+                                                                                    grade: m.grade ?? '',
+                                                                                    contribution: m.contribution || '',
+                                                                                    feedback: m.feedback || ''
+                                                                                }))
+                                                                            });
+                                                                            setTimeout(() => {
+                                                                                const el = document.getElementById('faculty-in-tab-review-panel');
+                                                                                if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                                                                            }, 80);
+                                                                        }
                                                                     }}
-                                                                    title="Grade and give suggestions on code & technology"
+                                                                    title="Grade individual students and give suggestions on code & technology"
                                                                 >
-                                                                    📝 Grade & Suggest
+                                                                    {selectedProject?._id === p._id ? '🔼 Hide Form' : '📝 Grade & Suggest'}
                                                                 </button>
                                                             </div>
                                                         </td>
@@ -2217,95 +2530,6 @@ const FacultyDashboard = () => {
                                 </div>
                             )}
 
-                            {/* PROJECT REVIEW & SUGGESTIONS MODAL */}
-                            {selectedProject && (
-                                <div className="progress-modal-overlay" onClick={() => setSelectedProject(null)}>
-                                    <section className="progress-modal faculty-review-modal" onClick={e => e.stopPropagation()}>
-                                        <div className="progress-modal-header">
-                                            <div>
-                                                <h2>Grade & Suggest: {selectedProject.title}</h2>
-                                                <p>Submitted by <strong>{selectedProject.student?.name}</strong> ({selectedProject.student?.email})</p>
-                                            </div>
-                                            <button className="progress-close" type="button" onClick={() => setSelectedProject(null)}>×</button>
-                                        </div>
-                                        <form className="faculty-form mt-20" onSubmit={handleSaveProjectReview}>
-                                            <div className="form-grid-2col">
-                                                <div className="form-group">
-                                                    <label className="form-label">Review Status</label>
-                                                    <select
-                                                        className="form-control"
-                                                        value={projectReviewForm.status}
-                                                        onChange={e => setProjectReviewForm({ ...projectReviewForm, status: e.target.value })}
-                                                    >
-                                                        <option value="approved">Approved</option>
-                                                        <option value="under_review">Under Review</option>
-                                                        <option value="changes_requested">Changes Requested</option>
-                                                    </select>
-                                                </div>
-                                                <div className="form-group">
-                                                    <label className="form-label">Grade (0 - 100)</label>
-                                                    <input
-                                                        type="number"
-                                                        min="0"
-                                                        max="100"
-                                                        className="form-control"
-                                                        placeholder="Enter numerical score (e.g. 85)"
-                                                        value={projectReviewForm.grade}
-                                                        onChange={e => setProjectReviewForm({ ...projectReviewForm, grade: e.target.value })}
-                                                    />
-                                                </div>
-                                            </div>
-
-                                            {/* CODE SUGGESTIONS */}
-                                            <div className="form-group mt-16">
-                                                <label className="form-label">
-                                                    💻 Code Review & Optimization Suggestions
-                                                </label>
-                                                <textarea
-                                                    className="form-control"
-                                                    rows="3"
-                                                    placeholder="Provide suggestions based on the student's code (e.g. code modularity, variable naming, error handling, algorithmic time complexity, security issues)..."
-                                                    value={projectReviewForm.codeSuggestions}
-                                                    onChange={e => setProjectReviewForm({ ...projectReviewForm, codeSuggestions: e.target.value })}
-                                                />
-                                            </div>
-
-                                            {/* TECHNOLOGY SUGGESTIONS */}
-                                            <div className="form-group mt-16">
-                                                <label className="form-label">
-                                                    ⚡ Technology & Architecture Suggestions
-                                                </label>
-                                                <textarea
-                                                    className="form-control"
-                                                    rows="3"
-                                                    placeholder="Suggest relevant technologies, frameworks, libraries, or architectural upgrades (e.g. recommend Redis for caching, Docker containers, TailwindCSS, TypeScript)..."
-                                                    value={projectReviewForm.techSuggestions}
-                                                    onChange={e => setProjectReviewForm({ ...projectReviewForm, techSuggestions: e.target.value })}
-                                                />
-                                            </div>
-
-                                            {/* GENERAL FEEDBACK */}
-                                            <div className="form-group mt-16">
-                                                <label className="form-label">General Evaluator Feedback</label>
-                                                <textarea
-                                                    className="form-control"
-                                                    rows="3"
-                                                    placeholder="Overall performance evaluation, remarks, and next milestone instructions..."
-                                                    value={projectReviewForm.feedback}
-                                                    onChange={e => setProjectReviewForm({ ...projectReviewForm, feedback: e.target.value })}
-                                                />
-                                            </div>
-
-                                            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '20px' }}>
-                                                <button type="button" className="btn-secondary-action" onClick={() => setSelectedProject(null)}>Cancel</button>
-                                                <button type="submit" className="btn-primary-action" disabled={savingReview}>
-                                                    {savingReview ? 'Saving Evaluation...' : 'Submit Evaluation & Suggestions'}
-                                                </button>
-                                            </div>
-                                        </form>
-                                    </section>
-                                </div>
-                            )}
                         </div>
                     )}
 

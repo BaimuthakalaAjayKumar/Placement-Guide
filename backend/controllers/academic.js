@@ -216,11 +216,13 @@ exports.getProjects = async (req, res, next) => {
   try {
     const query = {};
     if (req.user.role === 'student') {
-      // Students can view projects they created or where they are listed as a team member
+      // Students can view projects they created or where they are listed as a team member (by email or rollNumber)
       const userEmail = (req.user.email || '').trim().toLowerCase();
+      const userRoll = (req.user.rollNumber || '').trim().toLowerCase();
       query.$or = [
         { student: req.user.id },
-        { 'teamMembers.email': new RegExp(`^${userEmail}$`, 'i') }
+        { 'teamMembers.email': new RegExp(`^${userEmail}$`, 'i') },
+        ...(userRoll ? [{ 'teamMembers.rollNumber': new RegExp(`^${userRoll}$`, 'i') }] : [])
       ];
     } else if (req.user.role === 'faculty' && !req.query.academicYear) {
       if (req.user.managedAcademicYears && req.user.managedAcademicYears.length > 0 && !req.user.managedAcademicYears.includes('All')) {
@@ -250,6 +252,19 @@ exports.createProject = async (req, res, next) => {
 
     const deploymentUrl = req.body.deploymentUrl || req.body.previewUrl || '';
     const previewUrl = req.body.previewUrl || deploymentUrl;
+    const starterFiles = Array.isArray(req.body.files) ? req.body.files : [];
+
+    const starterVersion = {
+      versionNumber: 1,
+      summary: 'Initial project setup & starter files',
+      author: req.user.id,
+      authorName: req.user.name || 'Student',
+      authorEmail: req.user.email || '',
+      files: starterFiles,
+      deploymentUrl,
+      previewUrl,
+      createdAt: new Date()
+    };
 
     const project = await Project.create({
       title: req.body.title || 'Untitled Project',
@@ -257,14 +272,17 @@ exports.createProject = async (req, res, next) => {
       goals: req.body.goals || '',
       technologies: Array.isArray(req.body.technologies) ? req.body.technologies : [],
       teamMembers: Array.isArray(req.body.teamMembers) ? req.body.teamMembers : [],
-      files: Array.isArray(req.body.files) ? req.body.files : [],
+      files: starterFiles,
       repositoryUrl: req.body.repositoryUrl || '',
       previewUrl,
       deploymentUrl,
       milestones: Array.isArray(req.body.milestones) ? req.body.milestones : [],
       student: req.user.id,
       academicYear,
-      status: 'draft'
+      status: 'draft',
+      lastUpdatedBy: req.user.id,
+      lastUpdatedByName: req.user.name || 'Student',
+      versionHistory: [starterVersion]
     });
     res.status(201).json({ success: true, data: project });
   } catch (err) {
@@ -278,17 +296,42 @@ exports.updateProject = async (req, res, next) => {
     if (!project) return res.status(404).json({ success: false, error: 'Project not found.' });
 
     const isOwner = project.student.toString() === req.user.id;
+    const userEmail = (req.user.email || '').trim().toLowerCase();
+    const userRoll = (req.user.rollNumber || '').trim().toLowerCase();
+    const isTeamMember = project.teamMembers && project.teamMembers.some(m =>
+      (m.email && m.email.trim().toLowerCase() === userEmail) ||
+      (m.rollNumber && userRoll && m.rollNumber.trim().toLowerCase() === userRoll)
+    );
+    const canEditProject = isOwner || isTeamMember;
     const canReview = ['admin', 'faculty'].includes(req.user.role) && canManageYear(req.user, project.academicYear);
-    if (!isOwner && !canReview) return res.status(403).json({ success: false, error: 'Not authorized to update this project.' });
+
+    if (!canEditProject && !canReview) {
+      return res.status(403).json({ success: false, error: 'Not authorized to update this project.' });
+    }
 
     const studentFields = [
       'title', 'description', 'goals', 'technologies', 'teamMembers',
       'files', 'repositoryUrl', 'previewUrl', 'deploymentUrl', 'milestones'
     ];
 
-    if (isOwner) {
+    if (canEditProject) {
+      let codeOrDeployChanged = false;
+
       studentFields.forEach(field => {
-        if (req.body[field] !== undefined) project[field] = req.body[field];
+        if (req.body[field] !== undefined) {
+          if (field === 'files') {
+            const oldFilesStr = JSON.stringify(project.files || []);
+            const newFilesStr = JSON.stringify(req.body.files || []);
+            if (oldFilesStr !== newFilesStr) {
+              codeOrDeployChanged = true;
+            }
+          } else if (field === 'deploymentUrl' || field === 'previewUrl') {
+            if (project[field] !== req.body[field]) {
+              codeOrDeployChanged = true;
+            }
+          }
+          project[field] = req.body[field];
+        }
       });
 
       // Synchronize previewUrl and deploymentUrl
@@ -301,6 +344,34 @@ exports.updateProject = async (req, res, next) => {
       if (req.body.submit === true) {
         project.status = 'submitted';
       }
+
+      project.lastUpdatedBy = req.user.id;
+      project.lastUpdatedByName = req.user.name || (isOwner ? 'Lead Student' : 'Team Member');
+
+      // Create snapshot version history if files or deployment changed or requested
+      if (codeOrDeployChanged || req.body.saveVersion === true || (req.body.files && (!project.versionHistory || project.versionHistory.length === 0))) {
+        project.versionHistory = project.versionHistory || [];
+        const nextVersionNumber = (project.versionHistory.length > 0
+          ? Math.max(...project.versionHistory.map(v => v.versionNumber || 0))
+          : 0) + 1;
+
+        const newVersion = {
+          versionNumber: nextVersionNumber,
+          summary: req.body.commitMessage || (req.body.files ? `Code update (${project.files?.length || 0} files)` : 'Project details updated'),
+          author: req.user.id,
+          authorName: req.user.name || (isOwner ? 'Lead Student' : 'Team Member'),
+          authorEmail: req.user.email || '',
+          files: project.files || [],
+          deploymentUrl: project.deploymentUrl || '',
+          previewUrl: project.previewUrl || '',
+          createdAt: new Date()
+        };
+
+        project.versionHistory.push(newVersion);
+        if (project.versionHistory.length > 30) {
+          project.versionHistory = project.versionHistory.slice(-30);
+        }
+      }
     }
 
     if (canReview) {
@@ -309,6 +380,30 @@ exports.updateProject = async (req, res, next) => {
       if (req.body.grade !== undefined) {
         project.grade = req.body.grade === '' || req.body.grade === null ? null : Number(req.body.grade);
       }
+      if (req.body.leadStudentGrade !== undefined) {
+        project.leadStudentGrade = req.body.leadStudentGrade === '' || req.body.leadStudentGrade === null ? null : Number(req.body.leadStudentGrade);
+      }
+      if (req.body.leadStudentContribution !== undefined) {
+        project.leadStudentContribution = req.body.leadStudentContribution;
+      }
+      if (req.body.leadStudentFeedback !== undefined) {
+        project.leadStudentFeedback = req.body.leadStudentFeedback;
+      }
+
+      // Handle individual team member contributions, grades, and feedback
+      if (Array.isArray(req.body.teamMembers)) {
+        project.teamMembers = req.body.teamMembers.map(m => ({
+          _id: m._id,
+          name: m.name,
+          rollNumber: m.rollNumber || '',
+          email: m.email || '',
+          role: m.role || 'Developer',
+          contribution: m.contribution || '',
+          grade: m.grade === '' || m.grade === null || m.grade === undefined ? null : Number(m.grade),
+          feedback: m.feedback || ''
+        }));
+      }
+
       if (req.body.codeSuggestions !== undefined) project.codeSuggestions = req.body.codeSuggestions;
       if (req.body.techSuggestions !== undefined) project.techSuggestions = req.body.techSuggestions;
 
@@ -329,29 +424,122 @@ exports.updateProject = async (req, res, next) => {
         });
       }
 
-      // Notify the student about review and suggestions
+      // Send personalized notifications to Lead Student and ALL Team Members
       try {
-        const notifDoc = await Notification.create({
+        const io = req.app.get('socketio');
+
+        // 1. Lead Student Notification
+        const leadGradeText = project.leadStudentGrade !== null ? `Your Individual Grade: ${project.leadStudentGrade}/100.` : (project.grade !== null ? `Project Grade: ${project.grade}/100.` : '');
+        const leadNotif = await Notification.create({
           user: project.student,
           type: 'academic_update',
-          message: `📋 Project Evaluation Updated: "${project.title}" received new suggestions/grade from ${req.user.name || 'Faculty'}.`,
+          message: `📋 Project Evaluated: "${project.title}" was reviewed by ${req.user.name || 'Faculty'}. ${leadGradeText}`,
           metadata: {
             projectId: project._id,
             status: project.status,
-            grade: project.grade
+            grade: project.leadStudentGrade ?? project.grade
           }
         });
-        const io = req.app.get('socketio');
-        if (io) {
-          io.to(`user_${project.student}`).emit('new_notification', notifDoc);
+        if (io) io.to(`user_${project.student}`).emit('new_notification', leadNotif);
+
+        // 2. Teammates Notifications
+        if (project.teamMembers && project.teamMembers.length > 0) {
+          for (const member of project.teamMembers) {
+            if (!member.email && !member.rollNumber) continue;
+            const memberUser = await User.findOne({
+              $or: [
+                ...(member.email ? [{ email: new RegExp(`^${member.email.trim()}$`, 'i') }] : []),
+                ...(member.rollNumber ? [{ rollNumber: new RegExp(`^${member.rollNumber.trim()}$`, 'i') }] : [])
+              ]
+            }).select('_id');
+
+            if (memberUser && memberUser._id.toString() !== project.student.toString()) {
+              const memberGradeText = member.grade !== null && member.grade !== undefined ? `Your Individual Grade: ${member.grade}/100.` : '';
+              const memberNotif = await Notification.create({
+                user: memberUser._id,
+                type: 'academic_update',
+                message: `📋 Team Project Evaluated: "${project.title}" received faculty evaluation. ${memberGradeText}`,
+                metadata: {
+                  projectId: project._id,
+                  status: project.status,
+                  grade: member.grade ?? project.grade
+                }
+              });
+              if (io) io.to(`user_${memberUser._id}`).emit('new_notification', memberNotif);
+            }
+          }
         }
       } catch (notifErr) {
-        console.warn('Error sending project review notification:', notifErr.message);
+        console.warn('Error sending project review notifications:', notifErr.message);
       }
     }
 
     await project.save();
     res.status(200).json({ success: true, data: project });
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.restoreProjectVersion = async (req, res, next) => {
+  try {
+    const project = await Project.findById(req.params.id);
+    if (!project) return res.status(404).json({ success: false, error: 'Project not found.' });
+
+    const isOwner = project.student.toString() === req.user.id;
+    const userEmail = (req.user.email || '').trim().toLowerCase();
+    const userRoll = (req.user.rollNumber || '').trim().toLowerCase();
+    const isTeamMember = project.teamMembers && project.teamMembers.some(m =>
+      (m.email && m.email.trim().toLowerCase() === userEmail) ||
+      (m.rollNumber && userRoll && m.rollNumber.trim().toLowerCase() === userRoll)
+    );
+    const canManage = isOwner || isTeamMember || ['admin', 'faculty'].includes(req.user.role);
+
+    if (!canManage) {
+      return res.status(403).json({ success: false, error: 'Not authorized to restore versions for this project.' });
+    }
+
+    const versionId = req.params.versionId;
+    const targetVersion = (project.versionHistory || []).find(v =>
+      (v._id && v._id.toString() === versionId) ||
+      (String(v.versionNumber) === String(versionId))
+    );
+
+    if (!targetVersion) {
+      return res.status(404).json({ success: false, error: 'Historical version not found.' });
+    }
+
+    // Restore files and deployment
+    project.files = targetVersion.files || [];
+    if (targetVersion.deploymentUrl) project.deploymentUrl = targetVersion.deploymentUrl;
+    if (targetVersion.previewUrl) project.previewUrl = targetVersion.previewUrl;
+
+    project.lastUpdatedBy = req.user.id;
+    project.lastUpdatedByName = req.user.name || 'Team Member';
+
+    // Add a rollback version snapshot
+    const nextVersionNumber = (project.versionHistory.length > 0
+      ? Math.max(...project.versionHistory.map(v => v.versionNumber || 0))
+      : 0) + 1;
+
+    project.versionHistory.push({
+      versionNumber: nextVersionNumber,
+      summary: `Restored to version #${targetVersion.versionNumber} ("${targetVersion.summary || 'Previous snapshot'}")`,
+      author: req.user.id,
+      authorName: req.user.name || 'Team Member',
+      authorEmail: req.user.email || '',
+      files: project.files,
+      deploymentUrl: project.deploymentUrl || '',
+      previewUrl: project.previewUrl || '',
+      createdAt: new Date()
+    });
+
+    await project.save();
+    res.status(200).json({
+      success: true,
+      message: `Successfully restored code files to version #${targetVersion.versionNumber}`,
+      data: project
+    });
   } catch (err) {
     next(err);
   }
@@ -371,3 +559,4 @@ exports.deleteProject = async (req, res, next) => {
     next(err);
   }
 };
+

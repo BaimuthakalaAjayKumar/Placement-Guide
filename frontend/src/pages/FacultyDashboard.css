@@ -1389,6 +1389,186 @@
   width: 95%;
 }
 
+/* Embedded In-Tab Faculty Project Review & Individual Grading Panel */
+.faculty-in-tab-review-panel {
+  background: #0d1326;
+  border: 1px solid rgba(129, 140, 248, 0.4);
+  border-radius: 14px;
+  padding: 22px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.55);
+  margin-top: 18px;
+  margin-bottom: 24px;
+  width: 100%;
+  box-sizing: border-box;
+  animation: fadeInDown 0.25s ease-out;
+}
+
+.individual-grading-section {
+  background: rgba(15, 23, 42, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 18px;
+}
+
+.section-subtitle {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #f8fafc;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.section-desc {
+  margin: 4px 0 0;
+  font-size: 0.84rem;
+  color: #94a3b8;
+}
+
+.faculty-member-grade-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.member-grade-card {
+  background: rgba(15, 23, 42, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  padding: 14px 18px;
+  transition: all 0.2s ease;
+}
+
+.member-grade-card.lead-student-card {
+  border-left: 3px solid #f59e0b;
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.05) 0%, rgba(15, 23, 42, 0.9) 100%);
+}
+
+.member-grade-card.teammate-card {
+  border-left: 3px solid #38bdf8;
+}
+
+.member-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.member-info {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.member-role-badge {
+  display: inline-block;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #38bdf8;
+  background: rgba(56, 189, 248, 0.12);
+  padding: 2px 8px;
+  border-radius: 4px;
+  width: fit-content;
+}
+
+.member-role-badge.lead {
+  color: #f59e0b;
+  background: rgba(245, 158, 11, 0.15);
+}
+
+.member-name {
+  font-size: 0.95rem;
+  color: #f8fafc;
+}
+
+.member-meta {
+  font-size: 0.8rem;
+  color: #94a3b8;
+}
+
+.member-grade-input-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.grade-label {
+  font-size: 0.78rem;
+  color: #94a3b8;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.input-with-max {
+  display: flex;
+  align-items: center;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  padding: 2px 8px;
+  gap: 4px;
+}
+
+.member-grade-input {
+  width: 60px !important;
+  border: none !important;
+  background: transparent !important;
+  color: #fbbf24 !important;
+  font-weight: 700 !important;
+  text-align: center;
+  padding: 4px 0 !important;
+  font-size: 0.95rem;
+}
+
+.member-grade-input:focus {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+.max-score-tag {
+  color: #64748b;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.form-label-sm {
+  display: block;
+  font-size: 0.78rem;
+  color: #cbd5e1;
+  margin-bottom: 4px;
+  font-weight: 500;
+}
+
+.form-control-sm {
+  padding: 6px 12px;
+  font-size: 0.82rem;
+  border-radius: 6px;
+}
+
+.member-grade-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  background: rgba(245, 158, 11, 0.15);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  color: #fbbf24;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 1px 7px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.projects-eval-table tr.row-reviewing-project {
+  background: rgba(129, 140, 248, 0.08) !important;
+  box-shadow: inset 3px 0 0 #818cf8;
+}
+
+
 
 
 
