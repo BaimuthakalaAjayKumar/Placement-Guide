@@ -75,8 +75,16 @@ const CoreCSEPrep = () => {
     };
 
     const openNotesReader = (subject) => {
+        if (selectedSubjectForNotes?._id === subject._id && showNotesReader) {
+            setShowNotesReader(false);
+            setSelectedSubjectForNotes(null);
+            return;
+        }
         setSelectedSubjectForNotes(subject);
         setShowNotesReader(true);
+        setTimeout(() => {
+            document.getElementById('in-tab-notes-viewer')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }, 80);
     };
 
     return (
@@ -113,6 +121,94 @@ const CoreCSEPrep = () => {
                             <span style={{ fontSize: '13px', color: '#94a3b8' }}>Subject notes, revision guides & custom tests by your faculty</span>
                         </div>
 
+                        {/* IN-TAB STUDY NOTES VIEWER (FITS SEAMLESSLY IN THE TAB SPACE OF IMAGE 2) */}
+                        {showNotesReader && selectedSubjectForNotes && (
+                            <div id="in-tab-notes-viewer" className="in-tab-notes-panel animate-fade">
+                                <div className="in-tab-notes-header">
+                                    <div>
+                                        <h3>
+                                            <span>📖</span> Study Notes & Materials: {selectedSubjectForNotes.name}
+                                        </h3>
+                                        <div className="in-tab-notes-tags">
+                                            <span className="curriculum-code-badge" style={{ margin: 0 }}>{selectedSubjectForNotes.code}</span>
+                                            <span className="scope-pill-tag">
+                                                📅 {selectedSubjectForNotes.academicYear} {selectedSubjectForNotes.branch ? `· ${selectedSubjectForNotes.branch}` : ''}
+                                            </span>
+                                            <span className="notes-count-tag">
+                                                📄 {(selectedSubjectForNotes.notes || []).length} Available Notes
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+                                        <button
+                                            type="button"
+                                            className="btn btn-primary"
+                                            style={{ fontSize: '12.5px', padding: '7px 14px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                                            onClick={() => handleStartSubjectPractice(selectedSubjectForNotes)}
+                                        >
+                                            🚀 Take Practice Test
+                                        </button>
+                                        <button
+                                            type="button"
+                                            className="btn-close-notes-panel"
+                                            onClick={() => { setShowNotesReader(false); setSelectedSubjectForNotes(null); }}
+                                        >
+                                            ✕ Close Notes
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div className="in-tab-notes-body">
+                                    {selectedSubjectForNotes.notes && selectedSubjectForNotes.notes.length > 0 ? (
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                                            {selectedSubjectForNotes.notes.map((note, idx) => (
+                                                <div key={note._id || idx} className="note-card-item">
+                                                    <div className="note-card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '8px', marginBottom: '8px' }}>
+                                                        <div>
+                                                            <h4 className="note-card-title">{note.title}</h4>
+                                                            <div className="note-meta-line">
+                                                                Posted by <strong>{note.uploaderName || 'Instructor'}</strong> ({note.uploaderRole || 'faculty'}) · {new Date(note.createdAt).toLocaleDateString()}
+                                                                {note.section && <span style={{ marginLeft: '8px', color: '#38bdf8' }}>· Sec {note.section}</span>}
+                                                            </div>
+                                                        </div>
+                                                        {note.fileUrl && (
+                                                            <a href={note.fileUrl} target="_blank" rel="noopener noreferrer" className="note-file-link">
+                                                                📄 Open PDF / Attachment ↗
+                                                            </a>
+                                                        )}
+                                                    </div>
+                                                    {note.description && (
+                                                        <p style={{ margin: '0 0 10px', fontSize: '13.5px', color: '#cbd5e1', lineHeight: '1.5' }}>{note.description}</p>
+                                                    )}
+                                                    {note.content && (
+                                                        <div className="note-content-box">
+                                                            {note.content}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <div className="in-tab-notes-empty">
+                                            <p style={{ margin: 0, fontSize: '15px', fontWeight: 600, color: '#f1f5f9' }}>
+                                                No study notes or materials have been uploaded for this subject yet.
+                                            </p>
+                                            <p style={{ margin: '6px 0 18px', fontSize: '13px', color: '#94a3b8' }}>
+                                                Check back soon as your faculty uploads lecture summaries and cheat sheets.
+                                            </p>
+                                            <button
+                                                type="button"
+                                                className="btn-orange-test"
+                                                onClick={() => handleStartSubjectPractice(selectedSubjectForNotes)}
+                                            >
+                                                🚀 Practice Test for this Subject
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
                         {loadingSubjects ? (
                             <p className="loading-text" style={{ padding: '16px 0', color: '#94a3b8' }}>Loading assigned curriculum subjects...</p>
                         ) : curriculumSubjects.length > 0 ? (
@@ -120,8 +216,13 @@ const CoreCSEPrep = () => {
                                 {curriculumSubjects.map(subject => {
                                     const testCount = allTests.filter(t => t.subject === subject._id || t.subject?._id === subject._id || (t.title && t.title.toLowerCase().includes(subject.code.toLowerCase()))).length;
                                     const notesCount = subject.notes?.length || 0;
+                                    const isViewingNotes = selectedSubjectForNotes?._id === subject._id && showNotesReader;
                                     return (
-                                        <div key={subject._id} className="curriculum-card">
+                                        <div
+                                            key={subject._id}
+                                            className="curriculum-card"
+                                            style={isViewingNotes ? { borderColor: '#818cf8', boxShadow: '0 0 20px rgba(99, 102, 241, 0.35)' } : {}}
+                                        >
                                             <div>
                                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                                                     <span className="curriculum-code-badge">{subject.code}</span>
@@ -149,10 +250,16 @@ const CoreCSEPrep = () => {
                                                     <button
                                                         type="button"
                                                         className="btn-study-notes"
-                                                        style={{ flex: 1, justifyContent: 'center' }}
+                                                        style={{
+                                                            flex: 1,
+                                                            justifyContent: 'center',
+                                                            background: isViewingNotes ? 'rgba(99, 102, 241, 0.35)' : undefined,
+                                                            borderColor: isViewingNotes ? '#818cf8' : undefined,
+                                                            color: isViewingNotes ? '#ffffff' : undefined
+                                                        }}
                                                         onClick={() => openNotesReader(subject)}
                                                     >
-                                                        📖 Notes ({notesCount})
+                                                        {isViewingNotes ? '📖 Viewing Notes (✕)' : `📖 Notes (${notesCount})`}
                                                     </button>
                                                     <button
                                                         type="button"
@@ -219,78 +326,6 @@ const CoreCSEPrep = () => {
                             </div>
                         </div>
                     ))}
-                </div>
-            )}
-
-            {/* STUDY NOTES READER MODAL */}
-            {showNotesReader && selectedSubjectForNotes && (
-                <div className="progress-modal-overlay" onClick={() => setShowNotesReader(false)}>
-                    <section className="progress-modal modal-wide" onClick={e => e.stopPropagation()}>
-                        <div className="progress-modal-header">
-                            <div>
-                                <h2>📖 Study Notes & Materials: {selectedSubjectForNotes.name}</h2>
-                                <p><span className="code-pill">{selectedSubjectForNotes.code}</span> · {selectedSubjectForNotes.academicYear} {selectedSubjectForNotes.branch ? `· ${selectedSubjectForNotes.branch}` : ''}</p>
-                            </div>
-                            <button className="progress-close" type="button" onClick={() => setShowNotesReader(false)}>×</button>
-                        </div>
-
-                        <div style={{ marginTop: '20px' }}>
-                            {selectedSubjectForNotes.notes && selectedSubjectForNotes.notes.length > 0 ? (
-                                <div>
-                                    {selectedSubjectForNotes.notes.map((note, idx) => (
-                                        <div key={note._id || idx} className="note-card-item">
-                                            <div className="note-card-header">
-                                                <div>
-                                                    <h4 className="note-card-title">{note.title}</h4>
-                                                    <div className="note-meta-line">
-                                                        Posted by <strong>{note.uploaderName || 'Instructor'}</strong> ({note.uploaderRole || 'faculty'}) · {new Date(note.createdAt).toLocaleDateString()}
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            {note.description && (
-                                                <p style={{ margin: '0 0 10px', fontSize: '14px', color: '#cbd5e1' }}>{note.description}</p>
-                                            )}
-                                            {note.content && (
-                                                <div className="note-content-box">{note.content}</div>
-                                            )}
-                                            {note.fileUrl && (
-                                                <div style={{ marginTop: '12px' }}>
-                                                    <a href={note.fileUrl} target="_blank" rel="noopener noreferrer" className="note-file-link">
-                                                        🔗 Open Study Resource Document / Attachment ↗
-                                                    </a>
-                                                </div>
-                                            )}
-                                        </div>
-                                    ))}
-                                </div>
-                            ) : (
-                                <div style={{ textAlign: 'center', padding: '36px', color: '#94a3b8', background: '#0f172a', borderRadius: '8px' }}>
-                                    <p style={{ margin: 0, fontSize: '15px' }}>No study notes or materials have been uploaded for this subject yet.</p>
-                                    <p style={{ margin: '8px 0 0', fontSize: '13px', color: '#64748b' }}>Check back soon as your faculty uploads lecture summaries and cheat sheets.</p>
-                                </div>
-                            )}
-
-                            <div style={{ marginTop: '24px', display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
-                                <button
-                                    type="button"
-                                    className="btn btn-primary"
-                                    onClick={() => {
-                                        setShowNotesReader(false);
-                                        handleStartSubjectPractice(selectedSubjectForNotes);
-                                    }}
-                                >
-                                    🚀 Practice Test for this Subject
-                                </button>
-                                <button
-                                    type="button"
-                                    className="btn btn-secondary"
-                                    onClick={() => setShowNotesReader(false)}
-                                >
-                                    Close
-                                </button>
-                            </div>
-                        </div>
-                    </section>
                 </div>
             )}
         </div>
