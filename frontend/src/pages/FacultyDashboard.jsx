@@ -520,16 +520,25 @@ const FacultyDashboard = () => {
         document.body.removeChild(link);
     };
 
-    // Student progress detail viewer
+    // Student progress detail viewer (Embedded In-Tab)
     const viewProgress = async (student) => {
+        if (selectedStudent?._id === student._id && (progress || progressLoading)) {
+            setSelectedStudent(null);
+            setProgress(null);
+            return;
+        }
         try {
+            setSelectedStudent(student);
             setProgressLoading(true);
             setError(null);
             const res = await axios.get(`${API_URL}/users/students/${student._id}/progress`, getAuthHeaders());
-            setSelectedStudent(student);
             setProgress(res.data?.data || null);
+            setTimeout(() => {
+                document.getElementById('in-tab-student-progress-panel')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }, 80);
         } catch (err) {
             setError(err.response?.data?.error || 'Failed to load student progress.');
+            setProgress(null);
         } finally {
             setProgressLoading(false);
         }
@@ -1120,6 +1129,188 @@ const FacultyDashboard = () => {
                         </div>
                     </div>
                 </form>
+            </section>
+        );
+    };
+
+    // Helper: Render Embedded In-Tab Student Progress Dossier (Image 2 Tab Layout)
+    const renderInTabStudentProgressPanel = () => {
+        if (progressLoading && selectedStudent) {
+            return (
+                <div className="faculty-in-tab-progress-panel loading-card animate-fade" id="in-tab-student-progress-panel">
+                    <div className="spinner-loader" style={{ width: '28px', height: '28px', margin: '0 auto 10px' }}></div>
+                    <p style={{ margin: 0, color: '#38bdf8', fontWeight: 600, fontSize: '14px' }}>
+                        Loading student progress dossier for {selectedStudent.name}...
+                    </p>
+                </div>
+            );
+        }
+
+        if (!progress || !selectedStudent) return null;
+
+        return (
+            <section className="faculty-in-tab-progress-panel animate-fade" id="in-tab-student-progress-panel">
+                {/* Header */}
+                <div className="progress-panel-header">
+                    <div className="progress-student-info">
+                        <div className="student-avatar-badge">🎓</div>
+                        <div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                                <h3 style={{ margin: 0, fontSize: '1.25rem', color: '#f8fafc', fontWeight: 700 }}>
+                                    {selectedStudent.name}
+                                </h3>
+                                <span className="student-scope-pill">
+                                    {selectedStudent.branch || 'Branch N/A'} {selectedStudent.section ? `• Sec ${selectedStudent.section}` : ''}
+                                </span>
+                                <span className="student-year-pill">
+                                    {selectedStudent.academicYear || selectedStudent.year || 'Academic Year N/A'}
+                                </span>
+                            </div>
+                            <p className="student-meta-subline">
+                                <span>📧 {selectedStudent.email}</span>
+                                {selectedStudent.rollNumber && <span>🆔 {selectedStudent.rollNumber}</span>}
+                            </p>
+                        </div>
+                    </div>
+                    <div className="progress-header-actions">
+                        <button
+                            type="button"
+                            className="btn-close-in-tab-progress"
+                            onClick={() => { setProgress(null); setSelectedStudent(null); }}
+                            title="Close student progress dossier"
+                        >
+                            ✕ Close Dossier
+                        </button>
+                    </div>
+                </div>
+
+                {/* Summary Metrics Grid */}
+                <div className="progress-stats-row">
+                    <div className="progress-metric-card readiness-metric">
+                        <span className="metric-label">Readiness Index</span>
+                        <strong className="metric-val">{selectedStudent.readinessScore || 0}%</strong>
+                        <div className="metric-bar-bg">
+                            <div className="metric-bar-fill" style={{ width: `${Math.min(100, selectedStudent.readinessScore || 0)}%` }}></div>
+                        </div>
+                    </div>
+                    <div className="progress-metric-card">
+                        <span className="metric-label">Aptitude Tests</span>
+                        <strong className="metric-val">{progress.attempts?.length || 0}</strong>
+                        <span className="metric-subtext">Completed Tests</span>
+                    </div>
+                    <div className="progress-metric-card">
+                        <span className="metric-label">Coding Submissions</span>
+                        <strong className="metric-val">{progress.submissions?.length || 0}</strong>
+                        <span className="metric-subtext">Problems Solved</span>
+                    </div>
+                    <div className="progress-metric-card">
+                        <span className="metric-label">Projects</span>
+                        <strong className="metric-val">{progress.projects?.length || 0}</strong>
+                        <span className="metric-subtext">Projects Submitted</span>
+                    </div>
+                    <div className="progress-metric-card">
+                        <span className="metric-label">Lab Attempts</span>
+                        <strong className="metric-val">{progress.labAttempts?.length || 0}</strong>
+                        <span className="metric-subtext">Lab Tasks Completed</span>
+                    </div>
+                </div>
+
+                {/* 3 Activity Breakdown Columns */}
+                <div className="progress-activity-grid">
+                    {/* Column 1: Recent Aptitude Tests */}
+                    <div className="activity-column-card">
+                        <div className="activity-col-header">
+                            <span className="col-icon">📝</span>
+                            <h4>Recent Aptitude Tests</h4>
+                            <span className="col-count-pill">{progress.attempts?.length || 0}</span>
+                        </div>
+                        <div className="activity-items-list">
+                            {progress.attempts?.length ? progress.attempts.slice(0, 5).map(attempt => (
+                                <div key={attempt._id} className="attempt-item-card">
+                                    <div className="attempt-item-top">
+                                        <strong title={attempt.test?.title || 'Aptitude Test'}>
+                                            {attempt.test?.title || 'Aptitude Test'}
+                                        </strong>
+                                        <span className="attempt-score-chip">
+                                            Score: {attempt.score}/{attempt.totalQuestions || 20}
+                                        </span>
+                                    </div>
+                                    <div className="attempt-item-bottom">
+                                        <span className="attempt-category">{attempt.test?.category || 'Assessment'}</span>
+                                        {attempt.completedAt && (
+                                            <span className="attempt-date">{new Date(attempt.completedAt).toLocaleDateString()}</span>
+                                        )}
+                                    </div>
+                                </div>
+                            )) : (
+                                <p className="no-data-note">No tests completed yet.</p>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Column 2: Projects Submitted */}
+                    <div className="activity-column-card">
+                        <div className="activity-col-header">
+                            <span className="col-icon">🚀</span>
+                            <h4>Projects Submitted</h4>
+                            <span className="col-count-pill">{progress.projects?.length || 0}</span>
+                        </div>
+                        <div className="activity-items-list">
+                            {progress.projects?.length ? progress.projects.map(proj => (
+                                <div key={proj._id} className="attempt-item-card">
+                                    <div className="attempt-item-top">
+                                        <strong title={proj.title}>{proj.title}</strong>
+                                        <span className={`status-pill-mini ${proj.status || 'draft'}`}>
+                                            {(proj.status || 'draft').replace('_', ' ')}
+                                        </span>
+                                    </div>
+                                    <div className="attempt-item-bottom">
+                                        <span className="proj-grade-text" style={{ color: proj.grade !== null && proj.grade !== undefined ? '#10b981' : '#f59e0b' }}>
+                                            {proj.grade !== null && proj.grade !== undefined ? `★ Grade: ${proj.grade}/100` : '⏳ Pending review'}
+                                        </span>
+                                        {proj.updatedAt && (
+                                            <span className="attempt-date">{new Date(proj.updatedAt).toLocaleDateString()}</span>
+                                        )}
+                                    </div>
+                                    {proj.feedback && (
+                                        <p className="proj-feedback-snippet"><em>"{proj.feedback}"</em></p>
+                                    )}
+                                </div>
+                            )) : (
+                                <p className="no-data-note">No projects submitted yet.</p>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Column 3: Lab Practice Attempts */}
+                    <div className="activity-column-card">
+                        <div className="activity-col-header">
+                            <span className="col-icon">🧪</span>
+                            <h4>Lab Practice Attempts</h4>
+                            <span className="col-count-pill">{progress.labAttempts?.length || 0}</span>
+                        </div>
+                        <div className="activity-items-list">
+                            {progress.labAttempts?.length ? progress.labAttempts.slice(0, 5).map(attempt => (
+                                <div key={attempt._id} className="attempt-item-card">
+                                    <div className="attempt-item-top">
+                                        <strong title={attempt.task?.title || 'Lab Task'}>
+                                            {attempt.task?.title || 'Lab Task'}
+                                        </strong>
+                                        <span className="attempt-score-chip lab-score">Score: {attempt.score || 100}</span>
+                                    </div>
+                                    <div className="attempt-item-bottom">
+                                        <span className="attempt-category">Completed</span>
+                                        {attempt.updatedAt && (
+                                            <span className="attempt-date">{new Date(attempt.updatedAt).toLocaleDateString()}</span>
+                                        )}
+                                    </div>
+                                </div>
+                            )) : (
+                                <p className="no-data-note">No lab attempts recorded yet.</p>
+                            )}
+                        </div>
+                    </div>
+                </div>
             </section>
         );
     };
@@ -1732,6 +1923,9 @@ const FacultyDashboard = () => {
                                     </div>
                                 </div>
 
+                                {/* IN-TAB STUDENT PROGRESS DOSSIER (IMAGE 2 TAB SPACE) */}
+                                {renderInTabStudentProgressPanel()}
+
                                 {loading ? (
                                     <p className="loading-text">Loading student records...</p>
                                 ) : (
@@ -1748,24 +1942,30 @@ const FacultyDashboard = () => {
                                                 </tr>
                                             </thead>
                                             <tbody>
-                                                {filteredStudents.map(student => (
-                                                    <tr key={student._id}>
-                                                        <td><strong>{student.name}</strong></td>
-                                                        <td>{student.email}</td>
-                                                        <td>{student.branch || 'N/A'} {student.section ? `(Sec ${student.section})` : ''}</td>
-                                                        <td>{student.academicYear || student.year || 'N/A'}</td>
-                                                        <td>
-                                                            <span className={`score-badge ${student.readinessScore >= 70 ? 'high' : student.readinessScore >= 40 ? 'medium' : 'low'}`}>
-                                                                {student.readinessScore || 0}%
-                                                            </span>
-                                                        </td>
-                                                        <td>
-                                                            <button className="btn-view" onClick={() => viewProgress(student)}>
-                                                                View Full Progress
-                                                            </button>
-                                                        </td>
-                                                    </tr>
-                                                ))}
+                                                {filteredStudents.map(student => {
+                                                    const isViewingThisStudent = selectedStudent?._id === student._id && (progress || progressLoading);
+                                                    return (
+                                                        <tr key={student._id} className={isViewingThisStudent ? 'row-active-progress' : ''}>
+                                                            <td><strong>{student.name}</strong></td>
+                                                            <td>{student.email}</td>
+                                                            <td>{student.branch || 'N/A'} {student.section ? `(Sec ${student.section})` : ''}</td>
+                                                            <td>{student.academicYear || student.year || 'N/A'}</td>
+                                                            <td>
+                                                                <span className={`score-badge ${student.readinessScore >= 70 ? 'high' : student.readinessScore >= 40 ? 'medium' : 'low'}`}>
+                                                                    {student.readinessScore || 0}%
+                                                                </span>
+                                                            </td>
+                                                            <td>
+                                                                <button
+                                                                    className={`btn-view ${isViewingThisStudent ? 'active' : ''}`}
+                                                                    onClick={() => viewProgress(student)}
+                                                                >
+                                                                    {isViewingThisStudent ? '🔼 Hide Progress' : 'View Full Progress'}
+                                                                </button>
+                                                            </td>
+                                                        </tr>
+                                                    );
+                                                })}
                                                 {filteredStudents.length === 0 && (
                                                     <tr>
                                                         <td colSpan="6" style={{ textAlign: 'center', padding: '30px', color: '#94a3b8' }}>
@@ -3728,59 +3928,7 @@ const FacultyDashboard = () => {
                         );
                     })()}
 
-                    {/* Progress Detail Modal */}
-                    {progressLoading && <div className="progress-loading">Loading student progress dossier...</div>}
-                    {progress && selectedStudent && (
-                        <div className="progress-modal-overlay" onClick={() => setProgress(null)}>
-                            <section className="progress-modal" onClick={event => event.stopPropagation()}>
-                                <div className="progress-modal-header">
-                                    <div>
-                                        <h2>{selectedStudent.name}</h2>
-                                        <p>{selectedStudent.email} · {selectedStudent.branch || 'Branch N/A'} · Section {selectedStudent.section || 'N/A'}</p>
-                                    </div>
-                                    <button className="progress-close" type="button" onClick={() => setProgress(null)}>×</button>
-                                </div>
-                                <div className="progress-summary-grid">
-                                    <div><span>Readiness</span><strong>{selectedStudent.readinessScore || 0}%</strong></div>
-                                    <div><span>Aptitude Tests</span><strong>{progress.attempts?.length || 0}</strong></div>
-                                    <div><span>Coding Submissions</span><strong>{progress.submissions?.length || 0}</strong></div>
-                                    <div><span>Projects</span><strong>{progress.projects?.length || 0}</strong></div>
-                                    <div><span>Lab Attempts</span><strong>{progress.labAttempts?.length || 0}</strong></div>
-                                </div>
-                                <div className="progress-columns">
-                                    <div>
-                                        <h3>Recent Aptitude Tests</h3>
-                                        {progress.attempts?.length ? progress.attempts.slice(0, 5).map(attempt => (
-                                            <div key={attempt._id} className="attempt-item">
-                                                <p><strong>{attempt.test?.title || 'Aptitude Test'}</strong></p>
-                                                <span style={{ fontSize: '12px', color: '#38bdf8' }}>Score: {attempt.score}/{attempt.totalQuestions || 20}</span>
-                                            </div>
-                                        )) : <p className="text-muted">No tests completed.</p>}
-                                    </div>
-                                    <div>
-                                        <h3>Projects Submitted</h3>
-                                        {progress.projects?.length ? progress.projects.map(project => (
-                                            <div key={project._id} className="attempt-item">
-                                                <p><strong>{project.title}</strong></p>
-                                                <span style={{ fontSize: '12px', color: project.grade !== null ? '#10b981' : '#f59e0b' }}>
-                                                    Grade: {project.grade !== null && project.grade !== undefined ? `${project.grade}/100` : 'Pending review'}
-                                                </span>
-                                            </div>
-                                        )) : <p className="text-muted">No projects submitted.</p>}
-                                    </div>
-                                    <div>
-                                        <h3>Lab Practice Attempts</h3>
-                                        {progress.labAttempts?.length ? progress.labAttempts.slice(0, 5).map(attempt => (
-                                            <div key={attempt._id} className="attempt-item">
-                                                <p><strong>{attempt.task?.title || 'Lab task'}</strong></p>
-                                                <span style={{ fontSize: '12px', color: '#10b981' }}>Score: {attempt.score || 100}</span>
-                                            </div>
-                                        )) : <p className="text-muted">No lab attempts.</p>}
-                                    </div>
-                                </div>
-                            </section>
-                        </div>
-                    )}
+
 
 
                     {/* 3. TEST QUESTIONS MANAGER MODAL */}

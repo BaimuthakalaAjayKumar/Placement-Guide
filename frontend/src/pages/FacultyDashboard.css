@@ -1568,6 +1568,322 @@
   box-shadow: inset 3px 0 0 #818cf8;
 }
 
+/* ==========================================================================
+   IN-TAB STUDENT PROGRESS DOSSIER (FITS IN IMAGE 2 TAB SPACE)
+   ========================================================================== */
+.faculty-in-tab-progress-panel {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  background: #111a2e;
+  border: 1px solid rgba(56, 189, 248, 0.35);
+  border-radius: 12px;
+  padding: 22px 24px;
+  margin-top: 16px;
+  margin-bottom: 22px;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.35);
+  animation: fadeInDown 0.25s ease-out;
+}
+
+.faculty-in-tab-progress-panel.loading-card {
+  text-align: center;
+  padding: 36px 20px;
+  background: rgba(15, 23, 42, 0.7);
+}
+
+.progress-panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  padding-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.progress-student-info {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.student-avatar-badge {
+  font-size: 1.8rem;
+  background: rgba(56, 189, 248, 0.12);
+  border: 1px solid rgba(56, 189, 248, 0.3);
+  border-radius: 12px;
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.student-scope-pill {
+  background: rgba(99, 102, 241, 0.18);
+  color: #818cf8;
+  border: 1px solid rgba(99, 102, 241, 0.35);
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 0.76rem;
+  font-weight: 600;
+}
+
+.student-year-pill {
+  background: rgba(255, 255, 255, 0.06);
+  color: #cbd5e1;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 0.76rem;
+}
+
+.student-meta-subline {
+  margin: 6px 0 0;
+  font-size: 0.82rem;
+  color: #94a3b8;
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.btn-close-in-tab-progress {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #cbd5e1;
+  padding: 6px 14px;
+  border-radius: 8px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-close-in-tab-progress:hover {
+  background: rgba(239, 68, 68, 0.15);
+  border-color: rgba(239, 68, 68, 0.4);
+  color: #fca5a5;
+}
+
+/* Summary Metrics Grid - Never overflows */
+.progress-stats-row {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
+  margin: 18px 0 20px;
+}
+
+.progress-metric-card {
+  background: #19243a;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 10px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.progress-metric-card .metric-label {
+  font-size: 0.74rem;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.progress-metric-card .metric-val {
+  font-size: 1.55rem;
+  color: #f8fafc;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.progress-metric-card .metric-subtext {
+  font-size: 0.72rem;
+  color: #64748b;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.progress-metric-card.readiness-metric .metric-val {
+  color: #38bdf8;
+}
+
+.metric-bar-bg {
+  height: 4px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 2px;
+  margin-top: 5px;
+  overflow: hidden;
+}
+
+.metric-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #38bdf8, #818cf8);
+  border-radius: 2px;
+}
+
+/* Activity Breakdown Grid - 3 Columns with wrap */
+.progress-activity-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.activity-column-card {
+  background: #141d30;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.activity-col-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  padding-bottom: 8px;
+}
+
+.activity-col-header .col-icon {
+  font-size: 1.1rem;
+}
+
+.activity-col-header h4 {
+  margin: 0;
+  font-size: 0.92rem;
+  color: #e2e8f0;
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.activity-col-header .col-count-pill {
+  background: rgba(255, 255, 255, 0.08);
+  color: #94a3b8;
+  font-size: 0.72rem;
+  padding: 1px 7px;
+  border-radius: 10px;
+  font-weight: 600;
+}
+
+.activity-items-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 250px;
+  overflow-y: auto;
+}
+
+.attempt-item-card {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 8px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.attempt-item-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.attempt-item-top strong {
+  font-size: 0.85rem;
+  color: #f1f5f9;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+}
+
+.attempt-score-chip {
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: #38bdf8;
+  background: rgba(56, 189, 248, 0.12);
+  border: 1px solid rgba(56, 189, 248, 0.25);
+  padding: 2px 7px;
+  border-radius: 6px;
+  white-space: nowrap;
+}
+
+.attempt-score-chip.lab-score {
+  color: #34d399;
+  background: rgba(16, 185, 129, 0.12);
+  border-color: rgba(16, 185, 129, 0.25);
+}
+
+.attempt-item-bottom {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.73rem;
+  color: #94a3b8;
+  gap: 8px;
+}
+
+.proj-grade-text {
+  font-weight: 600;
+}
+
+.proj-feedback-snippet {
+  margin: 4px 0 0;
+  font-size: 0.74rem;
+  color: #cbd5e1;
+  background: rgba(0, 0, 0, 0.22);
+  padding: 4px 8px;
+  border-radius: 4px;
+  line-height: 1.4;
+}
+
+.no-data-note {
+  margin: 0;
+  font-size: 0.8rem;
+  color: #64748b;
+  font-style: italic;
+  padding: 14px 0;
+  text-align: center;
+}
+
+/* Row highlight when viewing progress */
+.students-table tr.row-active-progress {
+  background: rgba(56, 189, 248, 0.08) !important;
+  box-shadow: inset 3px 0 0 #38bdf8;
+}
+
+/* Responsive adjustments */
+@media (max-width: 992px) {
+  .progress-stats-row {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .progress-activity-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 600px) {
+  .progress-stats-row {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+
 
 
 
