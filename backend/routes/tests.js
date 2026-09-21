@@ -18,6 +18,8 @@ const {
   addPracticeQuestion,
   deletePracticeQuestion,
   getPracticeReport,
+  getStudentPracticeStats,
+  getIndividualPracticeReport,
   editPracticeQuestion,
   bulkCreatePracticeQuestions
 } = require('../controllers/tests');
@@ -33,7 +35,8 @@ router.get('/attempts/history', getAttemptsHistory);
 router.get('/:id', getTestById);
 router.post('/:id/submit', submitTestAttempt);
 
-// Practice questions route for students & admins
+// Practice questions & student stats route for students & admins
+router.get('/practice-stats/me', getStudentPracticeStats);
 router.get('/practice-questions/:platform', getPracticeQuestions);
 
 // Subject Test Reports (Admin & Faculty)
@@ -51,11 +54,12 @@ router.delete('/:id/questions/:qId', authorize('admin', 'faculty'), deleteQuesti
 // Image Upload
 router.post('/upload-image', authorize('admin', 'faculty'), uploadQuestionImage, uploadImage);
 
-// Practice Platform Coordinator
+// Practice Platform Coordinator & Reports (Admin & Faculty)
 router.post('/practice-questions/:platform', authorize('admin'), addPracticeQuestion);
 router.delete('/practice-questions/:platform/:id', authorize('admin'), deletePracticeQuestion);
 router.put('/practice-questions/:platform/:id', authorize('admin'), editPracticeQuestion);
 router.post('/practice-questions/:platform/bulk', authorize('admin'), bulkCreatePracticeQuestions);
-router.get('/practice-reports/:platform', authorize('admin'), getPracticeReport);
+router.get('/practice-reports/student/:studentId', authorize('admin', 'faculty'), getIndividualPracticeReport);
+router.get('/practice-reports/:platform', authorize('admin', 'faculty'), getPracticeReport);
 
 module.exports = router;

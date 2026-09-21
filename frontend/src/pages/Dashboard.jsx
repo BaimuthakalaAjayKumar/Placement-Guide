@@ -9,6 +9,7 @@ const Dashboard = () => {
   const navigate = useNavigate();
   const { token, user } = useAuth();
   const [stats, setStats] = useState(null);
+  const [practiceStats, setPracticeStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -349,11 +350,28 @@ const Dashboard = () => {
     }
   };
 
+  const fetchPracticeStats = async () => {
+    try {
+      const res = await fetch(`${API_URL}/tests/practice-stats/me`, {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      const data = await res.json();
+      if (data.success && data.data) {
+        setPracticeStats(data.data);
+      }
+    } catch (err) {
+      console.error('Failed to fetch practice stats:', err);
+    }
+  };
+
   useEffect(() => {
     if (token) {
       fetchDashboardStats();
       fetchHolidays();
       fetchLeaderboard();
+      fetchPracticeStats();
     }
   }, [token]);
 
@@ -742,17 +760,23 @@ const Dashboard = () => {
                         </span>
                       </div>
                       <div className="report-value" style={{ fontSize: '1.4rem', fontWeight: '700', color: 'var(--text-primary)' }}>
-                        {stats?.leetcodeStats?.totalSolved || 0} <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: '400' }}>solved</span>
+                        {practiceStats?.leetcode ? `${practiceStats.leetcode.solvedCount}/${practiceStats.leetcode.totalCount}` : (stats?.leetcodeStats?.totalSolved || 0)}{' '}
+                        <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: '400' }}>Admin Solved</span>
                       </div>
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '5px', marginTop: '10px', fontSize: '0.75rem', textAlign: 'center' }}>
+                      <div style={{ marginTop: '4px', marginBottom: '8px' }}>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: 'rgba(255, 161, 22, 0.15)', color: '#FFA116', padding: '2px 8px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: '700' }}>
+                          🏆 College Rank: #{practiceStats?.leetcode?.rank || 1}
+                        </span>
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '5px', marginTop: '6px', fontSize: '0.75rem', textAlign: 'center' }}>
                         <div style={{ background: 'rgba(72, 187, 120, 0.1)', color: '#15803d', padding: '4px', borderRadius: '4px', fontWeight: '600' }}>
-                          E: {stats?.leetcodeStats?.easySolved || Math.round((stats?.leetcodeStats?.totalSolved || 0) * 0.35)}
+                          E: {practiceStats?.leetcode ? `${practiceStats.leetcode.easySolved}/${practiceStats.leetcode.easyTotal}` : (stats?.leetcodeStats?.easySolved || Math.round((stats?.leetcodeStats?.totalSolved || 0) * 0.35))}
                         </div>
                         <div style={{ background: 'rgba(237, 137, 54, 0.1)', color: '#c2410c', padding: '4px', borderRadius: '4px', fontWeight: '600' }}>
-                          M: {stats?.leetcodeStats?.mediumSolved || Math.round((stats?.leetcodeStats?.totalSolved || 0) * 0.50)}
+                          M: {practiceStats?.leetcode ? `${practiceStats.leetcode.mediumSolved}/${practiceStats.leetcode.mediumTotal}` : (stats?.leetcodeStats?.mediumSolved || Math.round((stats?.leetcodeStats?.totalSolved || 0) * 0.50))}
                         </div>
                         <div style={{ background: 'rgba(229, 62, 62, 0.1)', color: '#b91c1c', padding: '4px', borderRadius: '4px', fontWeight: '600' }}>
-                          H: {stats?.leetcodeStats?.hardSolved || Math.round((stats?.leetcodeStats?.totalSolved || 0) * 0.15)}
+                          H: {practiceStats?.leetcode ? `${practiceStats.leetcode.hardSolved}/${practiceStats.leetcode.hardTotal}` : (stats?.leetcodeStats?.hardSolved || Math.round((stats?.leetcodeStats?.totalSolved || 0) * 0.15))}
                         </div>
                       </div>
                     </div>
@@ -776,9 +800,15 @@ const Dashboard = () => {
                         </span>
                       </div>
                       <div className="report-value" style={{ fontSize: '1.4rem', fontWeight: '700', color: 'var(--text-primary)' }}>
-                        {stats?.codeforcesStats?.solvedCount || 0} <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: '400' }}>solved</span>
+                        {practiceStats?.codeforces ? `${practiceStats.codeforces.solvedCount}/${practiceStats.codeforces.totalCount}` : (stats?.codeforcesStats?.solvedCount || 0)}{' '}
+                        <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: '400' }}>Admin Solved</span>
                       </div>
-                      <div style={{ display: 'flex', gap: '8px', marginTop: '10px', fontSize: '0.75rem' }}>
+                      <div style={{ marginTop: '4px', marginBottom: '8px' }}>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: 'rgba(255, 75, 75, 0.15)', color: '#FF4B4B', padding: '2px 8px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: '700' }}>
+                          🏆 College Rank: #{practiceStats?.codeforces?.rank || 1}
+                        </span>
+                      </div>
+                      <div style={{ display: 'flex', gap: '8px', marginTop: '6px', fontSize: '0.75rem' }}>
                         <div className="platform-stat-badge">
                           Rating: <strong style={{ color: '#a855f7' }}>{stats?.codeforcesStats?.rating || 'N/A'}</strong>
                         </div>
@@ -807,9 +837,15 @@ const Dashboard = () => {
                         </span>
                       </div>
                       <div className="report-value" style={{ fontSize: '1.4rem', fontWeight: '700', color: 'var(--text-primary)' }}>
-                        {stats?.codechefStats?.rating ? Math.max(15, Math.floor(stats.codechefStats.rating / 12)) : 0} <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: '400' }}>solved</span>
+                        {practiceStats?.codechef ? `${practiceStats.codechef.solvedCount}/${practiceStats.codechef.totalCount}` : (stats?.codechefStats?.rating ? Math.max(15, Math.floor(stats.codechefStats.rating / 12)) : 0)}{' '}
+                        <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: '400' }}>Admin Solved</span>
                       </div>
-                      <div style={{ display: 'flex', gap: '8px', marginTop: '10px', fontSize: '0.75rem' }}>
+                      <div style={{ marginTop: '4px', marginBottom: '8px' }}>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: 'rgba(212, 175, 55, 0.15)', color: '#D4AF37', padding: '2px 8px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: '700' }}>
+                          🏆 College Rank: #{practiceStats?.codechef?.rank || 1}
+                        </span>
+                      </div>
+                      <div style={{ display: 'flex', gap: '8px', marginTop: '6px', fontSize: '0.75rem' }}>
                         <div className="platform-stat-badge">
                           Stars: <strong style={{ color: '#D4AF37' }}>{stats?.codechefStats?.stars || 'N/A'}</strong>
                         </div>
@@ -838,9 +874,15 @@ const Dashboard = () => {
                         </span>
                       </div>
                       <div className="report-value" style={{ fontSize: '1.4rem', fontWeight: '700', color: 'var(--text-primary)' }}>
-                        {stats?.hackerrankStats?.solvedCount || 0} <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: '400' }}>solved</span>
+                        {practiceStats?.hackerrank ? `${practiceStats.hackerrank.solvedCount}/${practiceStats.hackerrank.totalCount}` : (stats?.hackerrankStats?.solvedCount || 0)}{' '}
+                        <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: '400' }}>Admin Solved</span>
                       </div>
-                      <div style={{ display: 'flex', gap: '8px', marginTop: '10px', fontSize: '0.75rem' }}>
+                      <div style={{ marginTop: '4px', marginBottom: '8px' }}>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: 'rgba(46, 200, 102, 0.15)', color: '#2EC866', padding: '2px 8px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: '700' }}>
+                          🏆 College Rank: #{practiceStats?.hackerrank?.rank || 1}
+                        </span>
+                      </div>
+                      <div style={{ display: 'flex', gap: '8px', marginTop: '6px', fontSize: '0.75rem' }}>
                         <div className="platform-stat-badge">
                           Score: <strong style={{ color: '#2ec866' }}>{stats?.hackerrankStats?.solvedCount ? stats.hackerrankStats.solvedCount * 10 : 0}</strong>
                         </div>

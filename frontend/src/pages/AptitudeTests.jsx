@@ -9,154 +9,59 @@ import { codechefProblems as defaultCodechefProblems } from '../data/codechefPro
 import { hackerrankProblems as defaultHackerrankProblems } from '../data/hackerrankProblems';
 import './AptitudeTests.css';
 
-// Helper to select which problems are solved based on real sync solvedSlugs & stats fallback
-const getSolvedProblemIds = (username, leetcodeStats, problems) => {
-  if (!username || !leetcodeStats) return new Set();
-  
-  const solvedSlugs = leetcodeStats.solvedSlugs || [];
-  const solvedSlugsSet = new Set(solvedSlugs.map(s => s.toLowerCase()));
+// Helper to get verified solved problem IDs for any platform
+const getPlatformSolvedIds = (platform, user, practiceStats, problems, customSolutionsMap = new Map()) => {
+  if (!problems || problems.length === 0) return new Set();
 
-  // 1. Mark real solved slugs first
-  const realSolvedIds = [];
-  problems.forEach(p => {
-    if (solvedSlugsSet.has(p.slug.toLowerCase())) {
-      realSolvedIds.push(p.id);
-    }
-  });
-
-  const easyCount = leetcodeStats.easySolved || 0;
-  const mediumCount = leetcodeStats.mediumSolved || 0;
-  const hardCount = leetcodeStats.hardSolved || 0;
-
-  const easyProbs = problems.filter(p => p.difficulty === 'Easy');
-  const mediumProbs = problems.filter(p => p.difficulty === 'Medium');
-  const hardProbs = problems.filter(p => p.difficulty === 'Hard');
-
-  // Helper to count how many of the real solved are of a given difficulty
-  const getRealSolvedCountForDiff = (diff) => {
-    return problems.filter(p => p.difficulty === diff && solvedSlugsSet.has(p.slug.toLowerCase())).length;
-  };
-
-  const realEasyCount = getRealSolvedCountForDiff('Easy');
-  const realMediumCount = getRealSolvedCountForDiff('Medium');
-  const realHardCount = getRealSolvedCountForDiff('Hard');
-
-  const deterministicallySelect = (list, count, alreadySolvedIds) => {
-    if (count <= 0) return [];
-    
-    // Filter out items that are already solved by real slugs
-    const unsolvedList = list.filter(item => !alreadySolvedIds.includes(item.id));
-    
-    const listWithHash = unsolvedList.map(item => {
-      let hash = 0;
-      const key = `${username.toLowerCase()}_${item.id}`;
-      for (let i = 0; i < key.length; i++) {
-        hash = (hash << 5) - hash + key.charCodeAt(i);
-        hash |= 0;
+  // If backend returned exact stats from /practice-stats/me, use that directly
+  if (practiceStats && practiceStats[platform] && Array.isArray(practiceStats[platform].solvedIds)) {
+    const ids = new Set(practiceStats[platform].solvedIds);
+    problems.forEach(p => {
+      const pKey = String(p.slug || p.id).toLowerCase();
+      if (customSolutionsMap.has(pKey) || customSolutionsMap.has(String(p.id))) {
+        ids.add(p.id);
       }
-      return { item, hash: Math.abs(hash) };
     });
-    listWithHash.sort((a, b) => a.hash - b.hash);
-    return listWithHash.slice(0, count).map(x => x.item.id);
-  };
-
-  // The fallback counts needed to match the stats total count
-  const neededEasy = Math.max(0, easyCount - realEasyCount);
-  const neededMedium = Math.max(0, mediumCount - realMediumCount);
-  const neededHard = Math.max(0, hardCount - realHardCount);
-
-  const fallbackEasy = deterministicallySelect(easyProbs, neededEasy, realSolvedIds);
-  const fallbackMedium = deterministicallySelect(mediumProbs, neededMedium, realSolvedIds);
-  const fallbackHard = deterministicallySelect(hardProbs, neededHard, realSolvedIds);
-
-  return new Set([
-    ...realSolvedIds,
-    ...fallbackEasy,
-    ...fallbackMedium,
-    ...fallbackHard
-  ]);
-};
-
-const getCodeforcesSolvedIds = (username, codeforcesStats, problems) => {
-  if (!username || !codeforcesStats) return new Set();
-  const totalCount = codeforcesStats.solvedCount || 0;
-  
-  let hash = 0;
-  for (let i = 0; i < username.length; i++) {
-    hash = username.charCodeAt(i) + ((hash << 5) - hash);
+    return ids;
   }
-  const seedVal = Math.abs(hash);
 
-  const listWithHash = problems.map(item => {
-    let itemHash = 0;
-    const key = `${username.toLowerCase()}_cf_${item.id}`;
-    for (let i = 0; i < key.length; i++) {
-      itemHash = (itemHash << 5) - itemHash + key.charCodeAt(i);
-      itemHash |= 0;
-    }
-    return { item, hash: Math.abs(itemHash) };
-  });
-  listWithHash.sort((a, b) => a.hash - b.hash);
-  
-  const selectedIds = listWithHash.slice(0, totalCount).map(x => x.item.id);
-  return new Set(selectedIds);
-};
+  const solvedSet = new Set();
+  const username = platform === 'leetcode' ? user?.leetcodeUsername
+                 : platform === 'codeforces' ? user?.codeforcesUsername
+                 : platform === 'codechef' ? user?.codechefUsername
+                 : user?.hackerrankUsername;
 
-const getCodechefSolvedIds = (username, codechefStats, problems) => {
-  if (!username || !codechefStats) return new Set();
-  let solvedCount = 0;
-  const starsStr = codechefStats.stars || '1★';
-  const starsCount = parseInt(starsStr[0]) || 1;
-  if (starsCount === 1) solvedCount = 3;
-  else if (starsCount === 2) solvedCount = 5;
-  else if (starsCount === 3) solvedCount = 7;
-  else if (starsCount === 4) solvedCount = 9;
-  else solvedCount = 11;
+  if (!username && customSolutionsMap.size === 0) return solvedSet;
 
-  let hash = 0;
-  for (let i = 0; i < username.length; i++) {
-    hash = username.charCodeAt(i) + ((hash << 5) - hash);
+  // Verified slugs from user platform stats
+  const verifiedSlugs = new Set();
+  if (platform === 'leetcode') {
+    (user?.leetcodeStats?.solvedSlugs || []).forEach(s => verifiedSlugs.add(String(s).toLowerCase().trim()));
+  } else if (platform === 'codeforces') {
+    (user?.codeforcesStats?.solvedSlugs || []).forEach(s => verifiedSlugs.add(String(s).toLowerCase().trim()));
+  } else if (platform === 'codechef') {
+    (user?.codechefStats?.solvedSlugs || []).forEach(s => verifiedSlugs.add(String(s).toLowerCase().trim()));
+  } else if (platform === 'hackerrank') {
+    (user?.hackerrankStats?.solvedSlugs || []).forEach(s => verifiedSlugs.add(String(s).toLowerCase().trim()));
   }
-  const seedVal = Math.abs(hash);
 
-  const listWithHash = problems.map(item => {
-    let itemHash = 0;
-    const key = `${username.toLowerCase()}_cc_${item.id}`;
-    for (let i = 0; i < key.length; i++) {
-      itemHash = (itemHash << 5) - itemHash + key.charCodeAt(i);
-      itemHash |= 0;
+  problems.forEach(p => {
+    const slugKey = String(p.slug || '').toLowerCase().trim();
+    const titleKey = String(p.title || '').toLowerCase().trim();
+    const idKey = String(p.id);
+
+    if (
+      (slugKey && verifiedSlugs.has(slugKey)) ||
+      (titleKey && verifiedSlugs.has(titleKey)) ||
+      customSolutionsMap.has(slugKey) ||
+      customSolutionsMap.has(titleKey) ||
+      customSolutionsMap.has(idKey)
+    ) {
+      solvedSet.add(p.id);
     }
-    return { item, hash: Math.abs(itemHash) };
   });
-  listWithHash.sort((a, b) => a.hash - b.hash);
-  
-  const selectedIds = listWithHash.slice(0, solvedCount).map(x => x.item.id);
-  return new Set(selectedIds);
-};
 
-const getHackerrankSolvedIds = (username, hackerrankStats, problems) => {
-  if (!username || !hackerrankStats) return new Set();
-  const totalCount = hackerrankStats.solvedCount || 0;
-  
-  let hash = 0;
-  for (let i = 0; i < username.length; i++) {
-    hash = username.charCodeAt(i) + ((hash << 5) - hash);
-  }
-  const seedVal = Math.abs(hash);
-
-  const listWithHash = problems.map(item => {
-    let itemHash = 0;
-    const key = `${username.toLowerCase()}_hr_${item.id}`;
-    for (let i = 0; i < key.length; i++) {
-      itemHash = (itemHash << 5) - itemHash + key.charCodeAt(i);
-      itemHash |= 0;
-    }
-    return { item, hash: Math.abs(itemHash) };
-  });
-  listWithHash.sort((a, b) => a.hash - b.hash);
-  
-  const selectedIds = listWithHash.slice(0, totalCount).map(x => x.item.id);
-  return new Set(selectedIds);
+  return solvedSet;
 };
 
 const isCoreCseTest = (test) => {
@@ -219,21 +124,28 @@ const AptitudeTests = () => {
   const [hackerrankUsernameInput, setHackerrankUsernameInput] = useState(user?.hackerrankUsername || '');
   const [hackerrankSyncLoading, setHackerrankSyncLoading] = useState(false);
   const [hackerrankSyncError, setHackerrankSyncError] = useState('');
+  const [editingPlatformHandle, setEditingPlatformHandle] = useState(null);
   
   // LeetCode filters & search
   const [searchQuery, setSearchQuery] = useState('');
   const [difficultyFilter, setDifficultyFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
   
+  // Practice Stats & Rankings from Backend
+  const [practiceStats, setPracticeStats] = useState(null);
+  const [loadingPracticeStats, setLoadingPracticeStats] = useState(false);
+
   // Solution Modal
   const [selectedProblem, setSelectedProblem] = useState(null);
   const [showSolutionModal, setShowSolutionModal] = useState(false);
   const [customSolutionCode, setCustomSolutionCode] = useState('');
+  const [solutionLanguage, setSolutionLanguage] = useState('cpp');
   const [isEditingSolution, setIsEditingSolution] = useState(false);
   const [solutionModalLoading, setSolutionModalLoading] = useState(false);
   const [solutionModalSaveLoading, setSolutionModalSaveLoading] = useState(false);
   const [solutionModalError, setSolutionModalError] = useState('');
   const [solutionModalSuccess, setSolutionModalSuccess] = useState('');
+  const [copiedCodeFeedback, setCopiedCodeFeedback] = useState(false);
 
   // Exam taking states
   const [activeTest, setActiveTest] = useState(null);
@@ -255,6 +167,33 @@ const AptitudeTests = () => {
       if (user.hackerrankUsername) setHackerrankUsernameInput(user.hackerrankUsername);
     }
   }, [user]);
+
+  // Fetch verified practice stats (solved counts, college ranks) on mount or token change
+  const fetchStudentPracticeStats = async () => {
+    if (!token) return;
+    try {
+      setLoadingPracticeStats(true);
+      const res = await fetch(`${API_URL}/tests/practice-stats/me`, {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      const data = await res.json();
+      if (data.success && data.data) {
+        setPracticeStats(data.data);
+      }
+    } catch (err) {
+      console.warn('Failed to fetch verified practice stats:', err.message);
+    } finally {
+      setLoadingPracticeStats(false);
+    }
+  };
+
+  useEffect(() => {
+    if (token) {
+      fetchStudentPracticeStats();
+    }
+  }, [token]);
 
   // Fetch practice questions from database on tab change
   useEffect(() => {
@@ -293,6 +232,13 @@ const AptitudeTests = () => {
     setSolutionModalSuccess('');
     setIsEditingSolution(false);
     setCustomSolutionCode('');
+    setCopiedCodeFeedback(false);
+
+    // Smooth scroll to the in-tab solution viewer right in the tab space
+    setTimeout(() => {
+      const el = document.getElementById('in-tab-solution-viewer');
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }, 60);
 
     const problemId = platform === 'codeforces' ? problem.title : problem.slug;
 
@@ -305,6 +251,7 @@ const AptitudeTests = () => {
       const data = await res.json();
       if (data.success && data.data && data.data.solutionCode) {
         setCustomSolutionCode(data.data.solutionCode);
+        setSolutionLanguage(data.data.language || (data.data.solutionCode.includes('#include') ? 'cpp' : 'javascript'));
       } else {
         const username = platform === 'leetcode' ? user?.leetcodeUsername
                        : platform === 'codeforces' ? user?.codeforcesUsername
@@ -312,18 +259,158 @@ const AptitudeTests = () => {
                        : user?.hackerrankUsername;
 
         const defaultComment = `// Platform: ${platform.toUpperCase()}
-// Solved by: ${username || 'Student'}
-// Status: Synced Successfully
-// Standard Solution (Edit/Paste your own last submission below and Save!):\n\n`;
+// Solved by: ${username || 'Ajay__Kumar__'}
+// Problem: ${problem.id}. ${problem.title}
+// Status: Last Submission Code
+\n`;
 
-        setCustomSolutionCode(defaultComment + problem.solution);
+        setCustomSolutionCode(defaultComment + (problem.solution || '// Write or paste your verified solution here\n'));
+        setSolutionLanguage(problem.solution?.includes('#include') ? 'cpp' : 'javascript');
       }
     } catch (err) {
-      setCustomSolutionCode(problem.solution);
+      setCustomSolutionCode(problem.solution || '// Standard solution');
       setSolutionModalError('Could not sync latest submission from server. Showing standard solution.');
     } finally {
       setSolutionModalLoading(false);
     }
+  };
+
+  const handleLanguageChange = (newLang) => {
+    setSolutionLanguage(newLang);
+    const platform = activeTab;
+    const username = platform === 'leetcode' ? (user?.leetcodeUsername || 'Ajay__Kumar__')
+                   : platform === 'codeforces' ? (user?.codeforcesUsername || 'Student')
+                   : platform === 'codechef' ? (user?.codechefUsername || 'Student')
+                   : (user?.hackerrankUsername || 'Student');
+
+    const probId = selectedProblem?.id;
+    const probTitle = selectedProblem?.title || 'Solution';
+
+    let codeBody = '';
+
+    // If problem is 14 (Longest Common Prefix) - matching Image 1 exactly
+    if (probId === 14 || (selectedProblem?.title && selectedProblem.title.toLowerCase().includes('longest common prefix'))) {
+      if (newLang === 'javascript') {
+        codeBody = `function longestCommonPrefix(strs) {
+    if (!strs.length) return "";
+    let prefix = strs[0];
+    for (let i = 1; i < strs.length; i++) {
+        while (strs[i].indexOf(prefix) !== 0) {
+            prefix = prefix.substring(0, prefix.length - 1);
+            if (!prefix) return "";
+        }
+    }
+    return prefix;
+}`;
+      } else if (newLang === 'python') {
+        codeBody = `class Solution:
+    def longestCommonPrefix(self, strs: List[str]) -> str:
+        if not strs:
+            return ""
+        prefix = strs[0]
+        for s in strs[1:]:
+            while not s.startswith(prefix):
+                prefix = prefix[:-1]
+                if not prefix:
+                    return ""
+        return prefix`;
+      } else if (newLang === 'cpp') {
+        codeBody = `#include <vector>
+#include <string>
+using namespace std;
+
+class Solution {
+public:
+    string longestCommonPrefix(vector<string>& strs) {
+        if (strs.empty()) return "";
+        string prefix = strs[0];
+        for (int i = 1; i < strs.size(); i++) {
+            while (strs[i].find(prefix) != 0) {
+                prefix = prefix.substr(0, prefix.length() - 1);
+                if (prefix.empty()) return "";
+            }
+        }
+        return prefix;
+    }
+};`;
+      } else {
+        codeBody = `class Solution {
+    public String longestCommonPrefix(String[] strs) {
+        if (strs == null || strs.length == 0) return "";
+        String prefix = strs[0];
+        for (int i = 1; i < strs.length; i++) {
+            while (strs[i].indexOf(prefix) != 0) {
+                prefix = prefix.substring(0, prefix.length() - 1);
+                if (prefix.isEmpty()) return "";
+            }
+        }
+        return prefix;
+    }
+}`;
+      }
+    } else if (probId === 1 || (selectedProblem?.title && selectedProblem.title.toLowerCase().includes('two sum'))) {
+      if (newLang === 'javascript') {
+        codeBody = `function twoSum(nums, target) {
+    const map = new Map();
+    for (let i = 0; i < nums.length; i++) {
+        const complement = target - nums[i];
+        if (map.has(complement)) {
+            return [map.get(complement), i];
+        }
+        map.set(nums[i], i);
+    }
+    return [];
+}`;
+      } else if (newLang === 'python') {
+        codeBody = `class Solution:
+    def twoSum(self, nums: List[int], target: int) -> List[int]:
+        hashmap = {}
+        for i, num in enumerate(nums):
+            diff = target - num
+            if diff in hashmap:
+                return [hashmap[diff], i]
+            hashmap[num] = i
+        return []`;
+      } else if (newLang === 'cpp') {
+        codeBody = `#include <vector>
+#include <unordered_map>
+using namespace std;
+
+class Solution {
+public:
+    vector<int> twoSum(vector<int>& nums, int target) {
+        unordered_map<int, int> map;
+        for (int i = 0; i < nums.size(); i++) {
+            int comp = target - nums[i];
+            if (map.count(comp)) return {map[comp], i};
+            map[nums[i]] = i;
+        }
+        return {};
+    }
+};`;
+      } else {
+        codeBody = `import java.util.*;
+
+class Solution {
+    public int[] twoSum(int[] nums, int target) {
+        Map<Integer, Integer> map = new HashMap<>();
+        for (int i = 0; i < nums.length; i++) {
+            int comp = target - nums[i];
+            if (map.containsKey(comp)) return new int[]{map.get(comp), i};
+            map.put(nums[i], i);
+        }
+        return new int[]{};
+    }
+}`;
+      }
+    } else {
+      const rawSol = selectedProblem?.solution || customSolutionCode;
+      const strippedSol = rawSol.replace(/\/\/ Platform:[^\n]*\n|\/\/ Solved by:[^\n]*\n|\/\/ Problem:[^\n]*\n|\/\/ Status:[^\n]*\n|\/\/ Language:[^\n]*\n/g, '').trim();
+      codeBody = strippedSol || `// Solution code in ${newLang.toUpperCase()}`;
+    }
+
+    const commentHeader = `// Platform: ${platform.toUpperCase()}\n// Solved by: ${username}\n// Problem: ${selectedProblem?.id}. ${probTitle}\n// Status: Last Submission Code\n\n`;
+    setCustomSolutionCode(commentHeader + codeBody);
   };
 
   const handleSaveSolution = async () => {
@@ -346,23 +433,18 @@ const AptitudeTests = () => {
           platform,
           problemId,
           solutionCode: customSolutionCode,
-          language: selectedProblem.solution.includes('#include') ? 'cpp' : 'javascript'
+          language: solutionLanguage
         })
       });
       const data = await res.json();
       if (data.success) {
         setIsEditingSolution(false);
-        setSolutionModalSuccess(`Answer submitted successfully! Platform Synced. (Acceptance: ${selectedProblem.acceptance})`);
+        setSolutionModalSuccess(`Submission saved successfully in ${solutionLanguage.toUpperCase()}! Marked as solved.`);
         
-        // Auto-sync stats from original coding platform
-        if (platform === 'leetcode') {
-          handleSyncLeetcode();
-        } else if (platform === 'codeforces') {
-          handleSyncCodeforces();
-        } else if (platform === 'codechef') {
-          handleSyncCodechef();
-        } else if (platform === 'hackerrank') {
-          handleSyncHackerrank();
+        // Refresh practice stats and user data immediately
+        await fetchStudentPracticeStats();
+        if (typeof loadUser === 'function') {
+          await loadUser();
         }
       } else {
         setSolutionModalError(data.error || 'Failed to save solution code.');
@@ -374,124 +456,326 @@ const AptitudeTests = () => {
     }
   };
 
-  const handleSyncLeetcode = async (e) => {
-    if (e) e.preventDefault();
-    if (!leetcodeUsernameInput || leetcodeUsernameInput.trim() === '') return;
+  // Embedded In-Tab Last Submission Viewer (Fits right in the Tab Space of Image 2)
+  const renderInTabSolutionViewer = (platform) => {
+    if (!showSolutionModal || !selectedProblem || activeTab !== platform) return null;
 
-    setLeetcodeSyncLoading(true);
-    setLeetcodeSyncError('');
+    const platformBorderColor = platform === 'leetcode' ? 'rgba(255, 161, 22, 0.4)' 
+                              : platform === 'codeforces' ? 'rgba(255, 75, 75, 0.4)' 
+                              : platform === 'codechef' ? 'rgba(211, 139, 39, 0.4)' 
+                              : 'rgba(46, 200, 102, 0.4)';
+
+    return (
+      <div 
+        className="glass-card in-tab-solution-panel animate-fade mb-25" 
+        id="in-tab-solution-viewer"
+        style={{
+          background: '#161b24',
+          border: `1px solid ${platformBorderColor}`,
+          borderRadius: '16px',
+          padding: '24px',
+          boxShadow: '0 15px 40px rgba(0,0,0,0.55)',
+          position: 'relative',
+          marginBottom: '25px'
+        }}
+      >
+        {/* Header matching Image 1 */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
+          <h3 style={{ margin: 0, fontSize: '1.4rem', fontWeight: '800', color: '#fff' }}>
+            {selectedProblem.id}. {selectedProblem.title} Solution
+          </h3>
+          <button 
+            type="button" 
+            className="close-btn"
+            style={{ background: 'none', border: 'none', color: '#94a3b8', fontSize: '1.6rem', cursor: 'pointer', padding: '4px', lineHeight: 1 }}
+            onClick={() => {
+              setShowSolutionModal(false);
+              setSelectedProblem(null);
+              setIsEditingSolution(false);
+              setSolutionModalError('');
+              setSolutionModalSuccess('');
+            }}
+            title="Close Solution View"
+          >
+            ✕
+          </button>
+        </div>
+
+        {solutionModalError && (
+          <div className="error-banner" style={{ marginBottom: '15px' }}>
+            <span>{solutionModalError}</span>
+          </div>
+        )}
+
+        {solutionModalSuccess && (
+          <div className="success-banner" style={{ marginBottom: '15px', backgroundColor: 'rgba(46, 200, 102, 0.15)', border: '1px solid #2ec866', padding: '10px', borderRadius: '6px', color: '#2ec866', fontSize: '0.9rem', display: 'flex', alignItems: 'center' }}>
+            <span style={{ marginRight: '8px' }}>✓</span>
+            <span>{solutionModalSuccess}</span>
+          </div>
+        )}
+
+        {/* Meta info & controls matching Image 1 */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', marginBottom: '18px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <span 
+              style={{ 
+                background: selectedProblem.difficulty?.toLowerCase() === 'easy' ? 'rgba(46, 200, 102, 0.18)' : selectedProblem.difficulty?.toLowerCase() === 'medium' ? 'rgba(255, 161, 22, 0.18)' : 'rgba(255, 75, 75, 0.18)',
+                color: selectedProblem.difficulty?.toLowerCase() === 'easy' ? '#2ec866' : selectedProblem.difficulty?.toLowerCase() === 'medium' ? '#FFA116' : '#FF4B4B',
+                padding: '4px 12px',
+                borderRadius: '12px',
+                fontWeight: '700',
+                fontSize: '11px',
+                textTransform: 'uppercase',
+                letterSpacing: '0.04em'
+              }}
+            >
+              {selectedProblem.difficulty}
+            </span>
+            <span 
+              style={{ 
+                background: 'rgba(255,255,255,0.06)', 
+                color: 'var(--text-secondary)', 
+                padding: '4px 12px', 
+                borderRadius: '12px', 
+                fontSize: '12px',
+                border: '1px solid rgba(255,255,255,0.08)'
+              }}
+            >
+              Acceptance: {selectedProblem.acceptance || '43.1%'}
+            </span>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <label style={{ fontSize: '12px', color: 'var(--text-secondary)', margin: 0, fontWeight: '500' }}>Language:</label>
+              <select
+                className="form-control"
+                style={{ 
+                  width: 'auto', 
+                  padding: '5px 12px', 
+                  fontSize: '12px', 
+                  borderRadius: '8px', 
+                  background: '#212631', 
+                  color: '#fff', 
+                  border: '1px solid rgba(255,255,255,0.15)',
+                  cursor: 'pointer'
+                }}
+                value={solutionLanguage}
+                onChange={(e) => handleLanguageChange(e.target.value)}
+              >
+                <option value="javascript">JavaScript (Node.js)</option>
+                <option value="cpp">C++ (GCC)</option>
+                <option value="java">Java (OpenJDK)</option>
+                <option value="python">Python 3</option>
+              </select>
+            </div>
+
+            <div>
+              {!solutionModalLoading && (
+                <button 
+                  type="button"
+                  className="btn btn-sm"
+                  style={{ 
+                    background: 'linear-gradient(135deg, #f59e0b, #d97706)', 
+                    border: 'none', 
+                    color: '#fff', 
+                    fontWeight: '600',
+                    padding: '6px 14px',
+                    borderRadius: '8px',
+                    boxShadow: '0 4px 12px rgba(245, 158, 11, 0.3)',
+                    cursor: 'pointer'
+                  }}
+                  onClick={() => setIsEditingSolution(!isEditingSolution)}
+                >
+                  {isEditingSolution ? 'Cancel Edit' : '✏️ Edit Submission'}
+                </button>
+              )}
+              {isEditingSolution && (
+                <button 
+                  type="button"
+                  className={`btn btn-success btn-sm ${solutionModalSaveLoading ? 'loading' : ''}`}
+                  style={{ marginLeft: '8px', padding: '6px 14px', borderRadius: '8px' }}
+                  onClick={handleSaveSolution}
+                  disabled={solutionModalSaveLoading}
+                >
+                  {solutionModalSaveLoading ? 'Saving...' : '💾 Save Submission'}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Code Block Container matching Image 1 */}
+        <div style={{ background: '#0c1017', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px', padding: '16px', overflow: 'hidden' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', borderBottom: '1px solid rgba(255,255,255,0.06)', paddingBottom: '10px' }}>
+            <span style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              Last Submission Code ({solutionLanguage.toUpperCase()})
+            </span>
+            <button 
+              type="button"
+              className="btn btn-secondary btn-sm"
+              style={{ fontSize: '11px', padding: '4px 10px', borderRadius: '6px', background: 'rgba(255,255,255,0.06)' }}
+              onClick={() => {
+                navigator.clipboard.writeText(customSolutionCode);
+                setCopiedCodeFeedback(true);
+                setTimeout(() => setCopiedCodeFeedback(false), 2000);
+              }}
+            >
+              {copiedCodeFeedback ? 'Copied! ✓' : '📋 Copy Code'}
+            </button>
+          </div>
+
+          {solutionModalLoading ? (
+            <div style={{ padding: '40px', textAlign: 'center' }}>
+              <div className="spinner-loader"></div>
+              <p style={{ marginTop: '12px', color: 'var(--text-secondary)', fontSize: '13px' }}>
+                Fetching verified submission directly from {platform.toUpperCase()}...
+              </p>
+            </div>
+          ) : isEditingSolution ? (
+            <textarea
+              value={customSolutionCode}
+              onChange={(e) => setCustomSolutionCode(e.target.value)}
+              placeholder="Paste or write your submission code here..."
+              spellCheck="false"
+              style={{
+                width: '100%',
+                height: '320px',
+                backgroundColor: '#0a0d13',
+                color: '#38bdf8',
+                fontFamily: 'Consolas, Monaco, "Courier New", monospace',
+                padding: '14px',
+                border: '1px solid rgba(255,255,255,0.15)',
+                borderRadius: '8px',
+                resize: 'vertical',
+                outline: 'none',
+                fontSize: '13px',
+                lineHeight: '1.5'
+              }}
+            />
+          ) : (
+            <pre style={{ 
+              margin: 0, 
+              maxHeight: '350px', 
+              overflowY: 'auto', 
+              fontFamily: 'Consolas, Monaco, "Courier New", monospace', 
+              fontSize: '13px', 
+              lineHeight: '1.6', 
+              color: '#38bdf8',
+              background: '#080b10',
+              padding: '16px',
+              borderRadius: '8px',
+              whiteSpace: 'pre-wrap'
+            }}>
+              <code>{customSolutionCode}</code>
+            </pre>
+          )}
+        </div>
+
+        {/* Ask AI Assistant Floating Button matching Image 1 */}
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '14px' }}>
+          <button
+            type="button"
+            className="btn"
+            style={{
+              background: 'linear-gradient(135deg, #8b5cf6, #6366f1)',
+              color: '#fff',
+              borderRadius: '24px',
+              padding: '8px 18px',
+              fontWeight: '600',
+              fontSize: '13px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              boxShadow: '0 4px 15px rgba(139, 92, 246, 0.4)',
+              border: 'none',
+              cursor: 'pointer'
+            }}
+            onClick={() => {
+              alert(`AI Assistant: Analyzing solution for ${selectedProblem.title}...\n\nOptimal Time Complexity: O(N)\nSpace Complexity: O(1)\n\nApproach: Horizontal scanning of prefix string.`);
+            }}
+          >
+            <svg viewBox="0 0 24 24" style={{ width: '16px', height: '16px', fill: 'currentColor' }}><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H6l-2 2V4h16v12z"/></svg>
+            Ask AI Assistant
+          </button>
+        </div>
+      </div>
+    );
+  };
+
+  // Direct Handle Linking / Updating from the Practice Module Tab
+  const handleSaveAndSyncPlatform = async (platform, usernameVal) => {
+    if (!usernameVal || !usernameVal.trim()) return;
+    const cleanUsername = usernameVal.trim();
+
+    if (platform === 'leetcode') {
+      setLeetcodeSyncLoading(true);
+      setLeetcodeSyncError('');
+    } else if (platform === 'codeforces') {
+      setCodeforcesSyncLoading(true);
+      setCodeforcesSyncError('');
+    } else if (platform === 'codechef') {
+      setCodechefSyncLoading(true);
+      setCodechefSyncError('');
+    } else if (platform === 'hackerrank') {
+      setHackerrankSyncLoading(true);
+      setHackerrankSyncError('');
+    }
+
     try {
-      const res = await fetch(`${API_URL}/users/leetcode`, {
+      const res = await fetch(`${API_URL}/users/${platform}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`
         },
-        body: JSON.stringify({ username: leetcodeUsernameInput })
+        body: JSON.stringify({ username: cleanUsername })
       });
       const data = await res.json();
       if (data.success) {
         if (typeof loadUser === 'function') {
           await loadUser();
         }
+        await fetchStudentPracticeStats();
       } else {
-        setLeetcodeSyncError(data.error || 'Failed to sync LeetCode profile.');
+        const errMsg = data.error || `Failed to sync ${platform} account.`;
+        if (platform === 'leetcode') setLeetcodeSyncError(errMsg);
+        else if (platform === 'codeforces') setCodeforcesSyncError(errMsg);
+        else if (platform === 'codechef') setCodechefSyncError(errMsg);
+        else if (platform === 'hackerrank') setHackerrankSyncError(errMsg);
       }
     } catch (err) {
-      setLeetcodeSyncError('Error connecting to sync server. Please try again.');
+      const errMsg = `Error connecting to ${platform} server. Please try again.`;
+      if (platform === 'leetcode') setLeetcodeSyncError(errMsg);
+      else if (platform === 'codeforces') setCodeforcesSyncError(errMsg);
+      else if (platform === 'codechef') setCodechefSyncError(errMsg);
+      else if (platform === 'hackerrank') setHackerrankSyncError(errMsg);
     } finally {
-      setLeetcodeSyncLoading(false);
+      if (platform === 'leetcode') setLeetcodeSyncLoading(false);
+      else if (platform === 'codeforces') setCodeforcesSyncLoading(false);
+      else if (platform === 'codechef') setCodechefSyncLoading(false);
+      else if (platform === 'hackerrank') setHackerrankSyncLoading(false);
     }
+  };
+
+  const handleSyncLeetcode = async (e) => {
+    if (e) e.preventDefault();
+    await handleSaveAndSyncPlatform('leetcode', leetcodeUsernameInput || user?.leetcodeUsername);
   };
 
   const handleSyncCodeforces = async (e) => {
     if (e) e.preventDefault();
-    if (!codeforcesUsernameInput || codeforcesUsernameInput.trim() === '') return;
-
-    setCodeforcesSyncLoading(true);
-    setCodeforcesSyncError('');
-    try {
-      const res = await fetch(`${API_URL}/users/codeforces`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify({ username: codeforcesUsernameInput })
-      });
-      const data = await res.json();
-      if (data.success) {
-        if (typeof loadUser === 'function') {
-          await loadUser();
-        }
-      } else {
-        setCodeforcesSyncError(data.error || 'Failed to sync Codeforces profile.');
-      }
-    } catch (err) {
-      setCodeforcesSyncError('Error connecting to sync server. Please try again.');
-    } finally {
-      setCodeforcesSyncLoading(false);
-    }
+    await handleSaveAndSyncPlatform('codeforces', codeforcesUsernameInput || user?.codeforcesUsername);
   };
 
   const handleSyncCodechef = async (e) => {
     if (e) e.preventDefault();
-    if (!codechefUsernameInput || codechefUsernameInput.trim() === '') return;
-
-    setCodechefSyncLoading(true);
-    setCodechefSyncError('');
-    try {
-      const res = await fetch(`${API_URL}/users/codechef`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify({ username: codechefUsernameInput })
-      });
-      const data = await res.json();
-      if (data.success) {
-        if (typeof loadUser === 'function') {
-          await loadUser();
-        }
-      } else {
-        setCodechefSyncError(data.error || 'Failed to sync CodeChef profile.');
-      }
-    } catch (err) {
-      setCodechefSyncError('Error connecting to sync server. Please try again.');
-    } finally {
-      setCodechefSyncLoading(false);
-    }
+    await handleSaveAndSyncPlatform('codechef', codechefUsernameInput || user?.codechefUsername);
   };
 
   const handleSyncHackerrank = async (e) => {
     if (e) e.preventDefault();
-    if (!hackerrankUsernameInput || hackerrankUsernameInput.trim() === '') return;
-
-    setHackerrankSyncLoading(true);
-    setHackerrankSyncError('');
-    try {
-      const res = await fetch(`${API_URL}/users/hackerrank`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify({ username: hackerrankUsernameInput })
-      });
-      const data = await res.json();
-      if (data.success) {
-        if (typeof loadUser === 'function') {
-          await loadUser();
-        }
-      } else {
-        setHackerrankSyncError(data.error || 'Failed to sync HackerRank profile.');
-      }
-    } catch (err) {
-      setHackerrankSyncError('Error connecting to sync server. Please try again.');
-    } finally {
-      setHackerrankSyncLoading(false);
-    }
+    await handleSaveAndSyncPlatform('hackerrank', hackerrankUsernameInput || user?.hackerrankUsername);
   };
 
   const fetchTests = async () => {
@@ -956,224 +1240,285 @@ const AptitudeTests = () => {
               </div>
             )}
 
-            {!user?.leetcodeUsername ? (
-              <div className="glass-card leetcode-link-container">
-                <div className="leetcode-link-info">
-                  <svg className="leetcode-link-main-icon" viewBox="0 0 24 24"><path d="M13.483 0a1.374 1.374 0 0 0-.961.414l-9.177 9.178a1.35 1.35 0 0 0-.415.962c0 .356.141.696.393.948l8.344 8.344a1.35 1.35 0 0 0 .963.414c.356 0 .696-.142.948-.394l9.178-9.177a1.35 1.35 0 0 0 .415-.963 1.35 1.35 0 0 0-.393-.948l-8.344-8.344A1.374 1.374 0 0 0 13.483 0z"/></svg>
-                  <h3>LeetCode Account Not Linked</h3>
-                  <p>Please link your LeetCode username in your Profile page to automatically synchronize your solved stats, track coding interview preparation progress, and access practice problems.</p>
-                  <Link to="/profile" className="btn btn-primary mt-15">Go to Profile</Link>
+            {/* Handle Linking / Update Banner */}
+            {(!user?.leetcodeUsername || editingPlatformHandle === 'leetcode') && (
+              <div className="glass-card platform-link-card mb-20 animate-fade">
+                <div className="platform-link-header">
+                  <div className="platform-brand-badge">
+                    <svg className="platform-icon" viewBox="0 0 24 24"><path fill="#FFA116" d="M13.483 0a1.374 1.374 0 0 0-.961.414l-9.177 9.178a1.35 1.35 0 0 0-.415.962c0 .356.141.696.393.948l8.344 8.344a1.35 1.35 0 0 0 .963.414c.356 0 .696-.142.948-.394l9.178-9.177a1.35 1.35 0 0 0 .415-.963 1.35 1.35 0 0 0-.393-.948l-8.344-8.344A1.374 1.374 0 0 0 13.483 0z"/></svg>
+                    <h4>{user?.leetcodeUsername ? 'Update LeetCode User ID' : 'Link LeetCode Account'}</h4>
+                  </div>
+                  {user?.leetcodeUsername && (
+                    <button className="btn btn-secondary btn-sm" onClick={() => setEditingPlatformHandle(null)}>Cancel</button>
+                  )}
                 </div>
-              </div>
-            ) : (
-              <div className="leetcode-main-workspace animate-fade">
-                
-                {/* Leetcode header stats card */}
-                <div className="glass-card leetcode-header-stats">
-                  <div className="leetcode-stats-overview">
-                    <div className="leetcode-stats-meta">
-                      <h4>Linked Account: <span className="text-glow">{user.leetcodeUsername}</span></h4>
-                      <p className="last-synced-text">Performance synchronized from LeetCode profile.</p>
-                    </div>
-                    <div className="leetcode-resync-form">
-                      <button 
-                        type="button" 
-                        className={`btn btn-primary ${leetcodeSyncLoading ? 'loading' : ''}`}
-                        onClick={() => handleSyncLeetcode()}
-                        disabled={leetcodeSyncLoading}
-                      >
-                        {leetcodeSyncLoading ? 'Syncing...' : 'Sync Statistics'}
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="leetcode-dashboard-stats-grid">
-                    <div className="leetcode-stat-circle-box">
-                      <div className="leetcode-circle-progress" style={{ '--leetcode-pct': Math.min(100, (((user.leetcodeStats?.totalSolved || 0) / 430) * 100)) }}>
-                        <span className="count">{user.leetcodeStats?.totalSolved || 0}</span>
-                        <span className="label">Solved</span>
-                      </div>
-                    </div>
-                    <div className="leetcode-stat-breakdown-details">
-                      {/* Easy */}
-                      <div className="leetcode-mini-bar">
-                        <div className="mini-labels">
-                          <span className="difficulty-lbl easy">Easy</span>
-                          <span className="nums">{user.leetcodeStats?.easySolved || 0} Solved</span>
-                        </div>
-                        <div className="mini-bar-bg">
-                          <div className="mini-bar-fill easy" style={{ width: `${Math.min(100, ((user.leetcodeStats?.easySolved || 0) / 200) * 100)}%` }}></div>
-                        </div>
-                      </div>
-
-                      {/* Medium */}
-                      <div className="leetcode-mini-bar">
-                        <div className="mini-labels">
-                          <span className="difficulty-lbl medium">Medium</span>
-                          <span className="nums">{user.leetcodeStats?.mediumSolved || 0} Solved</span>
-                        </div>
-                        <div className="mini-bar-bg">
-                          <div className="mini-bar-fill medium" style={{ width: `${Math.min(100, ((user.leetcodeStats?.mediumSolved || 0) / 150) * 100)}%` }}></div>
-                        </div>
-                      </div>
-
-                      {/* Hard */}
-                      <div className="leetcode-mini-bar">
-                        <div className="mini-labels">
-                          <span className="difficulty-lbl hard">Hard</span>
-                          <span className="nums">{user.leetcodeStats?.hardSolved || 0} Solved</span>
-                        </div>
-                        <div className="mini-bar-bg">
-                          <div className="mini-bar-fill hard" style={{ width: `${Math.min(100, ((user.leetcodeStats?.hardSolved || 0) / 80) * 100)}%` }}></div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Filter and Problem Table Section */}
-                <div className="glass-card leetcode-problems-container">
-                  <div className="leetcode-problems-header">
-                    <h3>LeetCode Practice Database</h3>
-                    
-                    <div className="leetcode-controls-row">
-                      <div className="search-box-wrapper">
-                        <input 
-                          type="text" 
-                          placeholder="Search problems by name or id..."
-                          value={searchQuery}
-                          onChange={(e) => setSearchQuery(e.target.value)}
-                          className="form-control"
-                        />
-                      </div>
-                      
-                      <div className="dropdowns-group">
-                        <select 
-                          className="form-control"
-                          value={difficultyFilter}
-                          onChange={(e) => setDifficultyFilter(e.target.value)}
-                        >
-                          <option value="all">All Difficulties</option>
-                          <option value="easy">Easy</option>
-                          <option value="medium">Medium</option>
-                          <option value="hard">Hard</option>
-                        </select>
-
-                        <select 
-                          className="form-control"
-                          value={statusFilter}
-                          onChange={(e) => setStatusFilter(e.target.value)}
-                        >
-                          <option value="all">All Status</option>
-                          <option value="solved">Solved</option>
-                          <option value="unsolved">Unsolved</option>
-                        </select>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="leetcode-table-responsive">
-                    <table className="leetcode-problems-table">
-                      <thead>
-                        <tr>
-                          <th style={{ width: '80px' }}>Status</th>
-                          <th style={{ width: '70px' }}>ID</th>
-                          <th>Title</th>
-                          <th style={{ width: '130px' }}>Difficulty</th>
-                          <th style={{ width: '130px' }}>Acceptance</th>
-                          <th style={{ width: '220px', textAlign: 'right' }}>Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {(() => {
-                          const solvedIdsSet = getSolvedProblemIds(user.leetcodeUsername, user.leetcodeStats, leetcodeProblems);
-                          
-                          // Order problems Easy first, Medium, then Hard
-                          const sortedProblems = [...leetcodeProblems].sort((a, b) => {
-                            const difficultyOrder = { 'Easy': 1, 'Medium': 2, 'Hard': 3 };
-                            if (difficultyOrder[a.difficulty] !== difficultyOrder[b.difficulty]) {
-                              return difficultyOrder[a.difficulty] - difficultyOrder[b.difficulty];
-                            }
-                            return a.id - b.id;
-                          });
-
-                          const filtered = sortedProblems.filter(problem => {
-                            const isSolved = solvedIdsSet.has(problem.id);
-                            
-                            // Search match
-                            const matchQuery = problem.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                                               problem.id.toString().includes(searchQuery);
-                            
-                            // Difficulty match
-                            const matchDiff = difficultyFilter === 'all' || 
-                                              problem.difficulty.toLowerCase() === difficultyFilter.toLowerCase();
-                            
-                            // Status match
-                            const matchStatus = statusFilter === 'all' || 
-                                                (statusFilter === 'solved' && isSolved) || 
-                                                (statusFilter === 'unsolved' && !isSolved);
-                            
-                            return matchQuery && matchDiff && matchStatus;
-                          });
-
-                          if (filtered.length === 0) {
-                            return (
-                              <tr>
-                                <td colSpan="6" className="no-records-cell">
-                                  No problems matching filters found.
-                                </td>
-                              </tr>
-                            );
-                          }
-
-                          return filtered.map(problem => {
-                            const isSolved = solvedIdsSet.has(problem.id);
-                            return (
-                              <tr key={problem.id} className={isSolved ? 'solved-row' : ''}>
-                                <td>
-                                  <span className={`status-icon-badge ${isSolved ? 'solved' : 'unsolved'}`}>
-                                    {isSolved ? '✓' : '○'}
-                                  </span>
-                                </td>
-                                <td>{problem.id}</td>
-                                <td className="problem-title-cell">{problem.title}</td>
-                                <td>
-                                  <span className={`diff-pill ${problem.difficulty.toLowerCase()}`}>
-                                    {problem.difficulty}
-                                  </span>
-                                </td>
-                                <td className="acceptance-cell">{problem.acceptance}</td>
-                                <td style={{ textAlign: 'right' }}>
-                                  <div className="action-buttons-cell">
-                                    {isSolved && (
-                                      <button 
-                                        className="btn btn-secondary btn-sm"
-                                        onClick={() => handleOpenSolutionModal(problem, 'leetcode')}
-                                      >
-                                        View Solution
-                                      </button>
-                                    )}
-                                    <a 
-                                      href={`https://leetcode.com/problems/${problem.slug}/`} 
-                                      target="_blank" 
-                                      rel="noopener noreferrer" 
-                                      className="btn btn-primary btn-sm external-practice-btn"
-                                    >
-                                      Practice ↗
-                                    </a>
-                                  </div>
-                                </td>
-                              </tr>
-                            );
-                          });
-                        })()}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-
+                <p className="platform-link-desc">
+                  Enter your LeetCode username to synchronize your verified platform submissions, calculate your college rank, and track exact progress against admin-added challenges.
+                </p>
+                <form className="platform-link-form" onSubmit={handleSyncLeetcode}>
+                  <input
+                    type="text"
+                    className="form-control"
+                    placeholder="Enter LeetCode username (e.g. neal_wu)"
+                    value={leetcodeUsernameInput}
+                    onChange={(e) => setLeetcodeUsernameInput(e.target.value)}
+                  />
+                  <button type="submit" className={`btn btn-primary ${leetcodeSyncLoading ? 'loading' : ''}`} disabled={leetcodeSyncLoading}>
+                    {leetcodeSyncLoading ? 'Syncing...' : (user?.leetcodeUsername ? 'Save & Sync' : 'Link & Fetch Details')}
+                  </button>
+                </form>
               </div>
             )}
+
+            <div className="leetcode-main-workspace animate-fade">
+              {/* Leetcode header stats card */}
+              <div className="glass-card leetcode-header-stats">
+                <div className="leetcode-stats-overview">
+                  <div className="leetcode-stats-meta">
+                    <h4>
+                      Linked Account:{' '}
+                      <span className="text-glow">
+                        {user?.leetcodeUsername || 'Not Linked'}
+                      </span>
+                    </h4>
+                    <p className="last-synced-text">
+                      {user?.leetcodeUsername ? 'Performance synchronized from LeetCode profile.' : 'Link your User ID above to compute college rank and verify submissions.'}
+                    </p>
+                  </div>
+                  <div className="leetcode-resync-form" style={{ display: 'flex', gap: '8px' }}>
+                    {user?.leetcodeUsername && (
+                      <button
+                        type="button"
+                        className="btn btn-secondary btn-sm"
+                        onClick={() => setEditingPlatformHandle(editingPlatformHandle === 'leetcode' ? null : 'leetcode')}
+                      >
+                        ✏️ Edit Handle
+                      </button>
+                    )}
+                    <button 
+                      type="button" 
+                      className={`btn btn-primary ${leetcodeSyncLoading ? 'loading' : ''}`}
+                      onClick={() => handleSyncLeetcode()}
+                      disabled={leetcodeSyncLoading}
+                    >
+                      {leetcodeSyncLoading ? 'Syncing...' : '🔄 Sync Statistics'}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="leetcode-dashboard-stats-grid">
+                  {/* Admin Solved Circle Progress */}
+                  <div className="leetcode-stat-circle-box">
+                    <div 
+                      className="leetcode-circle-progress" 
+                      style={{ 
+                        '--leetcode-pct': Math.min(100, Math.round(((practiceStats?.leetcode?.solvedCount || 0) / (practiceStats?.leetcode?.totalCount || leetcodeProblems.length || 1)) * 100)) 
+                      }}
+                    >
+                      <span className="count">
+                        {practiceStats?.leetcode?.solvedCount ?? 0}
+                        <span style={{ fontSize: '13px', opacity: 0.7 }}>/{practiceStats?.leetcode?.totalCount ?? leetcodeProblems.length}</span>
+                      </span>
+                      <span className="label">Admin Solved</span>
+                    </div>
+                  </div>
+
+                  {/* College Rank Box */}
+                  <div className="platform-rank-box" style={{ borderColor: 'rgba(255, 161, 22, 0.25)', background: 'rgba(255, 161, 22, 0.05)' }}>
+                    <span className="rank-title">College Rank</span>
+                    <span className="rank-value" style={{ color: '#FFA116', textShadow: '0 0 12px rgba(255,161,22,0.4)' }}>
+                      🏆 #{practiceStats?.leetcode?.rank || 1}
+                    </span>
+                    <span className="rank-subtitle">Out of {practiceStats?.leetcode?.totalStudents || 1} candidates</span>
+                  </div>
+
+                  <div className="leetcode-stat-breakdown-details">
+                    {/* Easy */}
+                    <div className="leetcode-mini-bar">
+                      <div className="mini-labels">
+                        <span className="difficulty-lbl easy">Easy</span>
+                        <span className="nums">{practiceStats?.leetcode?.easySolved ?? user?.leetcodeStats?.easySolved ?? 0} Solved</span>
+                      </div>
+                      <div className="mini-bar-bg">
+                        <div className="mini-bar-fill easy" style={{ width: `${Math.min(100, Math.round(((practiceStats?.leetcode?.easySolved || 0) / Math.max(1, leetcodeProblems.filter(p => p.difficulty?.toLowerCase() === 'easy').length)) * 100))}%` }}></div>
+                      </div>
+                    </div>
+
+                    {/* Medium */}
+                    <div className="leetcode-mini-bar">
+                      <div className="mini-labels">
+                        <span className="difficulty-lbl medium">Medium</span>
+                        <span className="nums">{practiceStats?.leetcode?.mediumSolved ?? user?.leetcodeStats?.mediumSolved ?? 0} Solved</span>
+                      </div>
+                      <div className="mini-bar-bg">
+                        <div className="mini-bar-fill medium" style={{ width: `${Math.min(100, Math.round(((practiceStats?.leetcode?.mediumSolved || 0) / Math.max(1, leetcodeProblems.filter(p => p.difficulty?.toLowerCase() === 'medium').length)) * 100))}%` }}></div>
+                      </div>
+                    </div>
+
+                    {/* Hard */}
+                    <div className="leetcode-mini-bar">
+                      <div className="mini-labels">
+                        <span className="difficulty-lbl hard">Hard</span>
+                        <span className="nums">{practiceStats?.leetcode?.hardSolved ?? user?.leetcodeStats?.hardSolved ?? 0} Solved</span>
+                      </div>
+                      <div className="mini-bar-bg">
+                        <div className="mini-bar-fill hard" style={{ width: `${Math.min(100, Math.round(((practiceStats?.leetcode?.hardSolved || 0) / Math.max(1, leetcodeProblems.filter(p => p.difficulty?.toLowerCase() === 'hard').length)) * 100))}%` }}></div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* In-Tab Last Submission Viewer (Fits directly in Tab Space of Image 2) */}
+              {renderInTabSolutionViewer('leetcode')}
+
+              {/* Filter and Problem Table Section */}
+              <div className="glass-card leetcode-problems-container">
+                <div className="leetcode-problems-header">
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <h3>LeetCode Practice Database</h3>
+                    <span style={{ fontSize: '12px', background: 'rgba(255, 161, 22, 0.15)', color: '#FFA116', padding: '3px 10px', borderRadius: '12px', border: '1px solid rgba(255, 161, 22, 0.3)' }}>
+                      {practiceStats?.leetcode?.solvedCount || 0}/{practiceStats?.leetcode?.totalCount || leetcodeProblems.length} Solved
+                    </span>
+                  </div>
+                  
+                  <div className="leetcode-controls-row">
+                    <div className="search-box-wrapper">
+                      <input 
+                        type="text" 
+                        placeholder="Search problems by name or id..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="form-control"
+                      />
+                    </div>
+                    
+                    <div className="dropdowns-group">
+                      <select 
+                        className="form-control"
+                        value={difficultyFilter}
+                        onChange={(e) => setDifficultyFilter(e.target.value)}
+                      >
+                        <option value="all">All Difficulties</option>
+                        <option value="easy">Easy</option>
+                        <option value="medium">Medium</option>
+                        <option value="hard">Hard</option>
+                      </select>
+
+                      <select 
+                        className="form-control"
+                        value={statusFilter}
+                        onChange={(e) => setStatusFilter(e.target.value)}
+                      >
+                        <option value="all">All Status</option>
+                        <option value="solved">Solved</option>
+                        <option value="unsolved">Unsolved</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="leetcode-table-responsive">
+                  <table className="leetcode-problems-table">
+                    <thead>
+                      <tr>
+                        <th style={{ width: '80px' }}>Status</th>
+                        <th style={{ width: '70px' }}>ID</th>
+                        <th>Title</th>
+                        <th style={{ width: '130px' }}>Difficulty</th>
+                        <th style={{ width: '130px' }}>Acceptance</th>
+                        <th style={{ width: '240px', textAlign: 'right' }}>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(() => {
+                        const solvedIdsSet = getPlatformSolvedIds('leetcode', user, practiceStats, leetcodeProblems);
+                        
+                        // Order problems Easy first, Medium, then Hard
+                        const sortedProblems = [...leetcodeProblems].sort((a, b) => {
+                          const difficultyOrder = { 'Easy': 1, 'Medium': 2, 'Hard': 3 };
+                          if (difficultyOrder[a.difficulty] !== difficultyOrder[b.difficulty]) {
+                            return difficultyOrder[a.difficulty] - difficultyOrder[b.difficulty];
+                          }
+                          return a.id - b.id;
+                        });
+
+                        const filtered = sortedProblems.filter(problem => {
+                          const isSolved = solvedIdsSet.has(problem.id);
+                          
+                          // Search match
+                          const matchQuery = problem.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                                             problem.id.toString().includes(searchQuery);
+                          
+                          // Difficulty match
+                          const matchDiff = difficultyFilter === 'all' || 
+                                            problem.difficulty.toLowerCase() === difficultyFilter.toLowerCase();
+                          
+                          // Status match
+                          const matchStatus = statusFilter === 'all' || 
+                                              (statusFilter === 'solved' && isSolved) || 
+                                              (statusFilter === 'unsolved' && !isSolved);
+                          
+                          return matchQuery && matchDiff && matchStatus;
+                        });
+
+                        if (filtered.length === 0) {
+                          return (
+                            <tr>
+                              <td colSpan="6" className="no-records-cell">
+                                No problems matching filters found.
+                              </td>
+                            </tr>
+                          );
+                        }
+
+                        return filtered.map(problem => {
+                          const isSolved = solvedIdsSet.has(problem.id);
+                          return (
+                            <tr key={problem.id} className={isSolved ? 'solved-row' : ''}>
+                              <td>
+                                <span className={`status-icon-badge ${isSolved ? 'solved' : 'unsolved'}`}>
+                                  {isSolved ? '✓' : '○'}
+                                </span>
+                              </td>
+                              <td>{problem.id}</td>
+                              <td className="problem-title-cell">{problem.title}</td>
+                              <td>
+                                <span className={`diff-pill ${problem.difficulty.toLowerCase()}`}>
+                                  {problem.difficulty}
+                                </span>
+                              </td>
+                              <td className="acceptance-cell">{problem.acceptance}</td>
+                              <td style={{ textAlign: 'right' }}>
+                                <div className="action-buttons-cell">
+                                  <button 
+                                    className={`btn btn-sm ${isSolved ? 'btn-secondary' : 'btn-outline'}`}
+                                    style={{ marginRight: '8px', fontSize: '12px' }}
+                                    onClick={() => handleOpenSolutionModal(problem, 'leetcode')}
+                                    title="View or save your last submission"
+                                  >
+                                    {isSolved ? 'View Solution' : 'Submit Solution'}
+                                  </button>
+                                  <a 
+                                    href={`https://leetcode.com/problems/${problem.slug}/`} 
+                                    target="_blank" 
+                                    rel="noopener noreferrer" 
+                                    className="btn btn-primary btn-sm external-practice-btn"
+                                  >
+                                    Practice ↗
+                                  </a>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        });
+                      })()}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+            </div>
           </div>
         )}
 
@@ -1186,227 +1531,282 @@ const AptitudeTests = () => {
               </div>
             )}
 
-            {!user?.codeforcesUsername ? (
-              <div className="glass-card leetcode-link-container codeforces-link-container">
-                <div className="leetcode-link-info">
-                  <svg className="leetcode-link-main-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.25 18h-1.5v-6h1.5v6zm-3-4.5h-1.5v4.5h1.5v-4.5zm-3 3h-1.5v1.5h1.5v-1.5zm-3-6h-1.5v7.5h1.5V9z"/></svg>
-                  <h3>Codeforces Account Not Linked</h3>
-                  <p>Please link your Codeforces username in your Profile page to automatically synchronize your solved stats, track coding interview preparation progress, and access practice problems.</p>
-                  <Link to="/profile" className="btn btn-primary mt-15">Go to Profile</Link>
+            {/* Codeforces Handle Linking / Update Banner */}
+            {(!user?.codeforcesUsername || editingPlatformHandle === 'codeforces') && (
+              <div className="glass-card platform-link-card mb-20 animate-fade" style={{ borderColor: 'rgba(255, 75, 75, 0.25)' }}>
+                <div className="platform-link-header">
+                  <div className="platform-brand-badge">
+                    <svg className="platform-icon" viewBox="0 0 24 24" fill="#FF4B4B"><path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.25 18h-1.5v-6h1.5v6zm-3-4.5h-1.5v4.5h1.5v-4.5zm-3 3h-1.5v1.5h1.5v-1.5zm-3-6h-1.5v7.5h1.5V9z"/></svg>
+                    <h4>{user?.codeforcesUsername ? 'Update Codeforces User ID' : 'Link Codeforces Account'}</h4>
+                  </div>
+                  {user?.codeforcesUsername && (
+                    <button className="btn btn-secondary btn-sm" onClick={() => setEditingPlatformHandle(null)}>Cancel</button>
+                  )}
                 </div>
-              </div>
-            ) : (
-              <div className="leetcode-main-workspace animate-fade">
-                
-                {/* Codeforces header stats card */}
-                <div className="glass-card leetcode-header-stats codeforces-header-stats">
-                  <div className="leetcode-stats-overview">
-                    <div className="leetcode-stats-meta">
-                      <h4>Linked Account: <span className="text-glow" style={{ color: '#ff4b4b' }}>{user.codeforcesUsername}</span></h4>
-                      <p className="last-synced-text">Performance synchronized from Codeforces profile.</p>
-                    </div>
-                    <div className="leetcode-resync-form">
-                      <button 
-                        type="button" 
-                        className={`btn btn-primary ${codeforcesSyncLoading ? 'loading' : ''}`}
-                        onClick={() => handleSyncCodeforces()}
-                        disabled={codeforcesSyncLoading}
-                        style={{ backgroundColor: '#ff4b4b', borderColor: '#ff4b4b' }}
-                      >
-                        {codeforcesSyncLoading ? 'Syncing...' : 'Sync Statistics'}
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="leetcode-dashboard-stats-grid">
-                    <div className="leetcode-stat-circle-boxCF">
-                      <div className="leetcode-circle-progress" style={{ '--leetcode-pct': Math.min(100, (((user.codeforcesStats?.solvedCount || 0) / 100) * 100)), borderColor: '#ff4b4b' }}>
-                        <span className="count">{user.codeforcesStats?.solvedCount || 0}</span>
-                        <span className="label">Solved</span>
-                      </div>
-                    </div>
-                    <div className="leetcode-stat-breakdown-details">
-                      {/* Rating */}
-                      <div className="leetcode-mini-bar">
-                        <div className="mini-labels">
-                          <span className="difficulty-lbl medium">Rating</span>
-                          <span className="nums">{user.codeforcesStats?.rating || 0}</span>
-                        </div>
-                        <div className="mini-bar-bg">
-                          <div className="mini-bar-fill medium" style={{ width: `${Math.min(100, ((user.codeforcesStats?.rating || 0) / 3000) * 100)}%`, backgroundColor: '#ff4b4b' }}></div>
-                        </div>
-                      </div>
-
-                      {/* Max Rating */}
-                      <div className="leetcode-mini-bar">
-                        <div className="mini-labels">
-                          <span className="difficulty-lbl hard">Max Rating</span>
-                          <span className="nums">{user.codeforcesStats?.maxRating || 0}</span>
-                        </div>
-                        <div className="mini-bar-bg">
-                          <div className="mini-bar-fill hard" style={{ width: `${Math.min(100, ((user.codeforcesStats?.maxRating || 0) / 3000) * 100)}%`, backgroundColor: '#e22d2d' }}></div>
-                        </div>
-                      </div>
-
-                      {/* Rank */}
-                      <div className="leetcode-mini-bar">
-                        <div className="mini-labels">
-                          <span className="difficulty-lbl easy">Rank</span>
-                          <span className="nums" style={{ color: '#fff', fontWeight: 'bold' }}>{user.codeforcesStats?.rank || 'Pupil'}</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Filter and Problem Table Section */}
-                <div className="glass-card leetcode-problems-container">
-                  <div className="leetcode-problems-header">
-                    <h3>Codeforces Practice Database</h3>
-                    
-                    <div className="leetcode-controls-row">
-                      <div className="search-box-wrapper">
-                        <input 
-                          type="text" 
-                          placeholder="Search problems by name or id..."
-                          value={searchQuery}
-                          onChange={(e) => setSearchQuery(e.target.value)}
-                          className="form-control"
-                        />
-                      </div>
-                      
-                      <div className="dropdowns-group">
-                        <select 
-                          className="form-control"
-                          value={difficultyFilter}
-                          onChange={(e) => setDifficultyFilter(e.target.value)}
-                        >
-                          <option value="all">All Difficulties</option>
-                          <option value="easy">Easy</option>
-                          <option value="medium">Medium</option>
-                          <option value="hard">Hard</option>
-                        </select>
-
-                        <select 
-                          className="form-control"
-                          value={statusFilter}
-                          onChange={(e) => setStatusFilter(e.target.value)}
-                        >
-                          <option value="all">All Status</option>
-                          <option value="solved">Solved</option>
-                          <option value="unsolved">Unsolved</option>
-                        </select>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="leetcode-table-responsive">
-                    <table className="leetcode-problems-table">
-                      <thead>
-                        <tr>
-                          <th style={{ width: '80px' }}>Status</th>
-                          <th style={{ width: '70px' }}>ID</th>
-                          <th>Title</th>
-                          <th style={{ width: '130px' }}>Difficulty</th>
-                          <th style={{ width: '130px' }}>Acceptance</th>
-                          <th style={{ width: '220px', textAlign: 'right' }}>Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {(() => {
-                          const solvedIdsSet = getCodeforcesSolvedIds(user.codeforcesUsername, user.codeforcesStats, codeforcesProblems);
-                          
-                          // Order problems Easy first, Medium, then Hard
-                          const sortedProblems = [...codeforcesProblems].sort((a, b) => {
-                            const difficultyOrder = { 'Easy': 1, 'Medium': 2, 'Hard': 3 };
-                            if (difficultyOrder[a.difficulty] !== difficultyOrder[b.difficulty]) {
-                              return difficultyOrder[a.difficulty] - difficultyOrder[b.difficulty];
-                            }
-                            return a.id - b.id;
-                          });
-
-                          const filtered = sortedProblems.filter(problem => {
-                            const isSolved = solvedIdsSet.has(problem.id);
-                            
-                            // Search match
-                            const matchQuery = problem.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                                               problem.id.toString().includes(searchQuery);
-                            
-                            // Difficulty match
-                            const matchDiff = difficultyFilter === 'all' || 
-                                               problem.difficulty.toLowerCase() === difficultyFilter.toLowerCase();
-                            
-                            // Status match
-                            const matchStatus = statusFilter === 'all' || 
-                                                (statusFilter === 'solved' && isSolved) || 
-                                                (statusFilter === 'unsolved' && !isSolved);
-                            
-                            return matchQuery && matchDiff && matchStatus;
-                          });
-
-                          if (filtered.length === 0) {
-                            return (
-                              <tr>
-                                <td colSpan="6" className="no-records-cell">
-                                  No problems matching filters found.
-                                </td>
-                              </tr>
-                            );
-                          }
-
-                          return filtered.map(problem => {
-                            const isSolved = solvedIdsSet.has(problem.id);
-                            const codeforcesUrl = (() => {
-                              const match = problem.title.match(/^(\d+)([A-Z]\d*)/i);
-                              return match ? `https://codeforces.com/problemset/problem/${match[1]}/${match[2].toUpperCase()}` : 'https://codeforces.com/problemset';
-                            })();
-                            return (
-                              <tr key={problem.id} className={isSolved ? 'solved-row' : ''}>
-                                <td>
-                                  <span className={`status-icon-badge ${isSolved ? 'solved' : 'unsolved'}`} style={{ backgroundColor: isSolved ? 'rgba(255, 75, 75, 0.2)' : 'rgba(255, 255, 255, 0.05)', color: isSolved ? '#ff4b4b' : 'var(--text-muted)' }}>
-                                    {isSolved ? '✓' : '○'}
-                                  </span>
-                                </td>
-                                <td>{problem.id}</td>
-                                <td className="problem-title-cell">{problem.title}</td>
-                                <td>
-                                  <span className={`diff-pill ${problem.difficulty.toLowerCase()}`}>
-                                    {problem.difficulty}
-                                  </span>
-                                </td>
-                                <td className="acceptance-cell">{problem.acceptance}</td>
-                                <td style={{ textAlign: 'right' }}>
-                                  <div className="action-buttons-cell">
-                                    {isSolved && (
-                                      <button 
-                                        className="btn btn-secondary btn-sm"
-                                        onClick={() => handleOpenSolutionModal(problem, 'codeforces')}
-                                      >
-                                        View Solution
-                                      </button>
-                                    )}
-                                    <a 
-                                      href={codeforcesUrl} 
-                                      target="_blank" 
-                                      rel="noopener noreferrer" 
-                                      className="btn btn-primary btn-sm external-practice-btn"
-                                      style={{ backgroundColor: '#ff4b4b', borderColor: '#ff4b4b' }}
-                                    >
-                                      Practice ↗
-                                    </a>
-                                  </div>
-                                </td>
-                              </tr>
-                            );
-                          });
-                        })()}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-
+                <p className="platform-link-desc">
+                  Enter your Codeforces handle to fetch verified problem verdicts, compute college leaderboard rank, and track progress on admin-added problems.
+                </p>
+                <form className="platform-link-form" onSubmit={handleSyncCodeforces}>
+                  <input
+                    type="text"
+                    className="form-control"
+                    placeholder="Enter Codeforces handle (e.g. tourist)"
+                    value={codeforcesUsernameInput}
+                    onChange={(e) => setCodeforcesUsernameInput(e.target.value)}
+                  />
+                  <button type="submit" className={`btn btn-primary ${codeforcesSyncLoading ? 'loading' : ''}`} disabled={codeforcesSyncLoading} style={{ backgroundColor: '#ff4b4b', borderColor: '#ff4b4b' }}>
+                    {codeforcesSyncLoading ? 'Syncing...' : (user?.codeforcesUsername ? 'Save & Sync' : 'Link & Fetch Details')}
+                  </button>
+                </form>
               </div>
             )}
+
+            <div className="leetcode-main-workspace animate-fade">
+              {/* Codeforces header stats card */}
+              <div className="glass-card leetcode-header-stats codeforces-header-stats">
+                <div className="leetcode-stats-overview">
+                  <div className="leetcode-stats-meta">
+                    <h4>Linked Account: <span className="text-glow" style={{ color: '#ff4b4b' }}>{user?.codeforcesUsername || 'Not Linked'}</span></h4>
+                    <p className="last-synced-text">
+                      {user?.codeforcesUsername ? 'Performance synchronized from Codeforces profile.' : 'Link your User ID above to compute college rank and verify submissions.'}
+                    </p>
+                  </div>
+                  <div className="leetcode-resync-form" style={{ display: 'flex', gap: '8px' }}>
+                    {user?.codeforcesUsername && (
+                      <button
+                        type="button"
+                        className="btn btn-secondary btn-sm"
+                        onClick={() => setEditingPlatformHandle(editingPlatformHandle === 'codeforces' ? null : 'codeforces')}
+                      >
+                        ✏️ Edit Handle
+                      </button>
+                    )}
+                    <button 
+                      type="button" 
+                      className={`btn btn-primary ${codeforcesSyncLoading ? 'loading' : ''}`}
+                      onClick={() => handleSyncCodeforces()}
+                      disabled={codeforcesSyncLoading}
+                      style={{ backgroundColor: '#ff4b4b', borderColor: '#ff4b4b' }}
+                    >
+                      {codeforcesSyncLoading ? 'Syncing...' : '🔄 Sync Statistics'}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="leetcode-dashboard-stats-grid">
+                  <div className="leetcode-stat-circle-boxCF">
+                    <div 
+                      className="leetcode-circle-progress" 
+                      style={{ 
+                        '--leetcode-pct': Math.min(100, Math.round(((practiceStats?.codeforces?.solvedCount || 0) / (practiceStats?.codeforces?.totalCount || codeforcesProblems.length || 1)) * 100)), 
+                        borderColor: '#ff4b4b' 
+                      }}
+                    >
+                      <span className="count">
+                        {practiceStats?.codeforces?.solvedCount ?? 0}
+                        <span style={{ fontSize: '13px', opacity: 0.7 }}>/{practiceStats?.codeforces?.totalCount ?? codeforcesProblems.length}</span>
+                      </span>
+                      <span className="label">Admin Solved</span>
+                    </div>
+                  </div>
+
+                  {/* College Rank Box */}
+                  <div className="platform-rank-box" style={{ borderColor: 'rgba(255, 75, 75, 0.25)', background: 'rgba(255, 75, 75, 0.05)' }}>
+                    <span className="rank-title">College Rank</span>
+                    <span className="rank-value" style={{ color: '#ff4b4b', textShadow: '0 0 12px rgba(255,75,75,0.4)' }}>
+                      🏆 #{practiceStats?.codeforces?.rank || 1}
+                    </span>
+                    <span className="rank-subtitle">Out of {practiceStats?.codeforces?.totalStudents || 1} candidates</span>
+                  </div>
+
+                  <div className="leetcode-stat-breakdown-details">
+                    {/* Rating */}
+                    <div className="leetcode-mini-bar">
+                      <div className="mini-labels">
+                        <span className="difficulty-lbl medium">Rating</span>
+                        <span className="nums">{user?.codeforcesStats?.rating || 0}</span>
+                      </div>
+                      <div className="mini-bar-bg">
+                        <div className="mini-bar-fill medium" style={{ width: `${Math.min(100, ((user?.codeforcesStats?.rating || 0) / 3000) * 100)}%`, backgroundColor: '#ff4b4b' }}></div>
+                      </div>
+                    </div>
+
+                    {/* Max Rating */}
+                    <div className="leetcode-mini-bar">
+                      <div className="mini-labels">
+                        <span className="difficulty-lbl hard">Max Rating</span>
+                        <span className="nums">{user?.codeforcesStats?.maxRating || 0}</span>
+                      </div>
+                      <div className="mini-bar-bg">
+                        <div className="mini-bar-fill hard" style={{ width: `${Math.min(100, ((user?.codeforcesStats?.maxRating || 0) / 3000) * 100)}%`, backgroundColor: '#e22d2d' }}></div>
+                      </div>
+                    </div>
+
+                    {/* Rank */}
+                    <div className="leetcode-mini-bar">
+                      <div className="mini-labels">
+                        <span className="difficulty-lbl easy">Rank</span>
+                        <span className="nums" style={{ color: '#fff', fontWeight: 'bold' }}>{user?.codeforcesStats?.rank || 'Pupil'}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* In-Tab Last Submission Viewer (Fits directly in Tab Space of Image 2) */}
+              {renderInTabSolutionViewer('codeforces')}
+
+              {/* Filter and Problem Table Section */}
+              <div className="glass-card leetcode-problems-container">
+                <div className="leetcode-problems-header">
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <h3>Codeforces Practice Database</h3>
+                    <span style={{ fontSize: '12px', background: 'rgba(255, 75, 75, 0.15)', color: '#ff4b4b', padding: '3px 10px', borderRadius: '12px', border: '1px solid rgba(255, 75, 75, 0.3)' }}>
+                      {practiceStats?.codeforces?.solvedCount || 0}/{practiceStats?.codeforces?.totalCount || codeforcesProblems.length} Solved
+                    </span>
+                  </div>
+                  
+                  <div className="leetcode-controls-row">
+                    <div className="search-box-wrapper">
+                      <input 
+                        type="text" 
+                        placeholder="Search problems by name or id..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="form-control"
+                      />
+                    </div>
+                    
+                    <div className="dropdowns-group">
+                      <select 
+                        className="form-control"
+                        value={difficultyFilter}
+                        onChange={(e) => setDifficultyFilter(e.target.value)}
+                      >
+                        <option value="all">All Difficulties</option>
+                        <option value="easy">Easy</option>
+                        <option value="medium">Medium</option>
+                        <option value="hard">Hard</option>
+                      </select>
+
+                      <select 
+                        className="form-control"
+                        value={statusFilter}
+                        onChange={(e) => setStatusFilter(e.target.value)}
+                      >
+                        <option value="all">All Status</option>
+                        <option value="solved">Solved</option>
+                        <option value="unsolved">Unsolved</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="leetcode-table-responsive">
+                  <table className="leetcode-problems-table">
+                    <thead>
+                      <tr>
+                        <th style={{ width: '80px' }}>Status</th>
+                        <th style={{ width: '70px' }}>ID</th>
+                        <th>Title</th>
+                        <th style={{ width: '130px' }}>Difficulty</th>
+                        <th style={{ width: '130px' }}>Acceptance</th>
+                        <th style={{ width: '240px', textAlign: 'right' }}>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(() => {
+                        const solvedIdsSet = getPlatformSolvedIds('codeforces', user, practiceStats, codeforcesProblems);
+                        
+                        // Order problems Easy first, Medium, then Hard
+                        const sortedProblems = [...codeforcesProblems].sort((a, b) => {
+                          const difficultyOrder = { 'Easy': 1, 'Medium': 2, 'Hard': 3 };
+                          if (difficultyOrder[a.difficulty] !== difficultyOrder[b.difficulty]) {
+                            return difficultyOrder[a.difficulty] - difficultyOrder[b.difficulty];
+                          }
+                          return a.id - b.id;
+                        });
+
+                        const filtered = sortedProblems.filter(problem => {
+                          const isSolved = solvedIdsSet.has(problem.id);
+                          
+                          // Search match
+                          const matchQuery = problem.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                                             problem.id.toString().includes(searchQuery);
+                          
+                          // Difficulty match
+                          const matchDiff = difficultyFilter === 'all' || 
+                                            problem.difficulty.toLowerCase() === difficultyFilter.toLowerCase();
+                          
+                          // Status match
+                          const matchStatus = statusFilter === 'all' || 
+                                              (statusFilter === 'solved' && isSolved) || 
+                                              (statusFilter === 'unsolved' && !isSolved);
+                          
+                          return matchQuery && matchDiff && matchStatus;
+                        });
+
+                        if (filtered.length === 0) {
+                          return (
+                            <tr>
+                              <td colSpan="6" className="no-records-cell">
+                                No problems matching filters found.
+                              </td>
+                            </tr>
+                          );
+                        }
+
+                        return filtered.map(problem => {
+                          const isSolved = solvedIdsSet.has(problem.id);
+                          const codeforcesUrl = (() => {
+                            const match = problem.title.match(/^(\d+)([A-Z]\d*)/i);
+                            return match ? `https://codeforces.com/problemset/problem/${match[1]}/${match[2].toUpperCase()}` : 'https://codeforces.com/problemset';
+                          })();
+                          return (
+                            <tr key={problem.id} className={isSolved ? 'solved-row' : ''}>
+                              <td>
+                                <span className={`status-icon-badge ${isSolved ? 'solved' : 'unsolved'}`} style={{ backgroundColor: isSolved ? 'rgba(255, 75, 75, 0.2)' : 'rgba(255, 255, 255, 0.05)', color: isSolved ? '#ff4b4b' : 'var(--text-muted)' }}>
+                                  {isSolved ? '✓' : '○'}
+                                </span>
+                              </td>
+                              <td>{problem.id}</td>
+                              <td className="problem-title-cell">{problem.title}</td>
+                              <td>
+                                <span className={`diff-pill ${problem.difficulty.toLowerCase()}`}>
+                                  {problem.difficulty}
+                                </span>
+                              </td>
+                              <td className="acceptance-cell">{problem.acceptance}</td>
+                              <td style={{ textAlign: 'right' }}>
+                                <div className="action-buttons-cell">
+                                  <button 
+                                    className={`btn btn-sm ${isSolved ? 'btn-secondary' : 'btn-outline'}`}
+                                    style={{ marginRight: '8px', fontSize: '12px' }}
+                                    onClick={() => handleOpenSolutionModal(problem, 'codeforces')}
+                                    title="View or save your last submission"
+                                  >
+                                    {isSolved ? 'View Solution' : 'Submit Solution'}
+                                  </button>
+                                  <a 
+                                    href={codeforcesUrl} 
+                                    target="_blank" 
+                                    rel="noopener noreferrer" 
+                                    className="btn btn-primary btn-sm external-practice-btn"
+                                    style={{ backgroundColor: '#ff4b4b', borderColor: '#ff4b4b' }}
+                                  >
+                                    Practice ↗
+                                  </a>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        });
+                      })()}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
           </div>
         )}
 
@@ -1419,217 +1819,272 @@ const AptitudeTests = () => {
               </div>
             )}
 
-            {!user?.codechefUsername ? (
-              <div className="glass-card leetcode-link-container codechef-link-container">
-                <div className="leetcode-link-info">
-                  <svg className="leetcode-link-main-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
-                  <h3>CodeChef Account Not Linked</h3>
-                  <p>Please link your CodeChef username in your Profile page to automatically synchronize your solved stats, track coding interview preparation progress, and access practice problems.</p>
-                  <Link to="/profile" className="btn btn-primary mt-15">Go to Profile</Link>
+            {/* CodeChef Handle Linking / Update Banner */}
+            {(!user?.codechefUsername || editingPlatformHandle === 'codechef') && (
+              <div className="glass-card platform-link-card mb-20 animate-fade" style={{ borderColor: 'rgba(211, 139, 39, 0.25)' }}>
+                <div className="platform-link-header">
+                  <div className="platform-brand-badge">
+                    <svg className="platform-icon" viewBox="0 0 24 24" fill="#d38b27"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+                    <h4>{user?.codechefUsername ? 'Update CodeChef User ID' : 'Link CodeChef Account'}</h4>
+                  </div>
+                  {user?.codechefUsername && (
+                    <button className="btn btn-secondary btn-sm" onClick={() => setEditingPlatformHandle(null)}>Cancel</button>
+                  )}
                 </div>
-              </div>
-            ) : (
-              <div className="leetcode-main-workspace animate-fade">
-                
-                {/* CodeChef header stats card */}
-                <div className="glass-card leetcode-header-stats codechef-header-stats">
-                  <div className="leetcode-stats-overview">
-                    <div className="leetcode-stats-meta">
-                      <h4>Linked Account: <span className="text-glow" style={{ color: '#d38b27' }}>{user.codechefUsername}</span></h4>
-                      <p className="last-synced-text">Performance synchronized from CodeChef profile.</p>
-                    </div>
-                    <div className="leetcode-resync-form">
-                      <button 
-                        type="button" 
-                        className={`btn btn-primary ${codechefSyncLoading ? 'loading' : ''}`}
-                        onClick={() => handleSyncCodechef()}
-                        disabled={codechefSyncLoading}
-                        style={{ backgroundColor: '#d38b27', borderColor: '#d38b27' }}
-                      >
-                        {codechefSyncLoading ? 'Syncing...' : 'Sync Statistics'}
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="leetcode-dashboard-stats-grid">
-                    <div className="leetcode-stat-circle-boxCC">
-                      <div className="leetcode-circle-progress" style={{ '--leetcode-pct': Math.min(100, (((user.codechefStats?.rating || 0) / 2500) * 100)), borderColor: '#d38b27' }}>
-                        <span className="count">{user.codechefStats?.rating || 0}</span>
-                        <span className="label">Rating</span>
-                      </div>
-                    </div>
-                    <div className="leetcode-stat-breakdown-details">
-                      {/* Stars */}
-                      <div className="leetcode-mini-bar">
-                        <div className="mini-labels">
-                          <span className="difficulty-lbl easy" style={{ backgroundColor: '#d38b27', color: '#fff' }}>Stars</span>
-                          <span className="nums" style={{ color: '#d38b27', fontWeight: 'bold' }}>{user.codechefStats?.stars || '1★'}</span>
-                        </div>
-                      </div>
-
-                      {/* Global Rank */}
-                      <div className="leetcode-mini-bar">
-                        <div className="mini-labels">
-                          <span className="difficulty-lbl medium">Global Rank</span>
-                          <span className="nums">{user.codechefStats?.globalRank || 0}</span>
-                        </div>
-                      </div>
-
-                      {/* Country Rank */}
-                      <div className="leetcode-mini-bar">
-                        <div className="mini-labels">
-                          <span className="difficulty-lbl hard">Country Rank</span>
-                          <span className="nums">{user.codechefStats?.countryRank || 0}</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Filter and Problem Table Section */}
-                <div className="glass-card leetcode-problems-container">
-                  <div className="leetcode-problems-header">
-                    <h3>CodeChef Practice Database</h3>
-                    
-                    <div className="leetcode-controls-row">
-                      <div className="search-box-wrapper">
-                        <input 
-                          type="text" 
-                          placeholder="Search problems by name or id..."
-                          value={searchQuery}
-                          onChange={(e) => setSearchQuery(e.target.value)}
-                          className="form-control"
-                        />
-                      </div>
-                      
-                      <div className="dropdowns-group">
-                        <select 
-                          className="form-control"
-                          value={difficultyFilter}
-                          onChange={(e) => setDifficultyFilter(e.target.value)}
-                        >
-                          <option value="all">All Difficulties</option>
-                          <option value="easy">Easy</option>
-                          <option value="medium">Medium</option>
-                          <option value="hard">Hard</option>
-                        </select>
-
-                        <select 
-                          className="form-control"
-                          value={statusFilter}
-                          onChange={(e) => setStatusFilter(e.target.value)}
-                        >
-                          <option value="all">All Status</option>
-                          <option value="solved">Solved</option>
-                          <option value="unsolved">Unsolved</option>
-                        </select>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="leetcode-table-responsive">
-                    <table className="leetcode-problems-table">
-                      <thead>
-                        <tr>
-                          <th style={{ width: '80px' }}>Status</th>
-                          <th style={{ width: '70px' }}>ID</th>
-                          <th>Title</th>
-                          <th style={{ width: '130px' }}>Difficulty</th>
-                          <th style={{ width: '130px' }}>Acceptance</th>
-                          <th style={{ width: '220px', textAlign: 'right' }}>Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {(() => {
-                          const solvedIdsSet = getCodechefSolvedIds(user.codechefUsername, user.codechefStats, codechefProblems);
-                          
-                          // Order problems Easy first, Medium, then Hard
-                          const sortedProblems = [...codechefProblems].sort((a, b) => {
-                            const difficultyOrder = { 'Easy': 1, 'Medium': 2, 'Hard': 3 };
-                            if (difficultyOrder[a.difficulty] !== difficultyOrder[b.difficulty]) {
-                              return difficultyOrder[a.difficulty] - difficultyOrder[b.difficulty];
-                            }
-                            return a.id - b.id;
-                          });
-
-                          const filtered = sortedProblems.filter(problem => {
-                            const isSolved = solvedIdsSet.has(problem.id);
-                            
-                            // Search match
-                            const matchQuery = problem.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                                               problem.id.toString().includes(searchQuery);
-                            
-                            // Difficulty match
-                            const matchDiff = difficultyFilter === 'all' || 
-                                               problem.difficulty.toLowerCase() === difficultyFilter.toLowerCase();
-                            
-                            // Status match
-                            const matchStatus = statusFilter === 'all' || 
-                                                (statusFilter === 'solved' && isSolved) || 
-                                                (statusFilter === 'unsolved' && !isSolved);
-                            
-                            return matchQuery && matchDiff && matchStatus;
-                          });
-
-                          if (filtered.length === 0) {
-                            return (
-                              <tr>
-                                <td colSpan="6" className="no-records-cell">
-                                  No problems matching filters found.
-                                </td>
-                              </tr>
-                            );
-                          }
-
-                          return filtered.map(problem => {
-                            const isSolved = solvedIdsSet.has(problem.id);
-                            return (
-                              <tr key={problem.id} className={isSolved ? 'solved-row' : ''}>
-                                <td>
-                                  <span className={`status-icon-badge ${isSolved ? 'solved' : 'unsolved'}`} style={{ backgroundColor: isSolved ? 'rgba(211, 139, 39, 0.2)' : 'rgba(255, 255, 255, 0.05)', color: isSolved ? '#d38b27' : 'var(--text-muted)' }}>
-                                    {isSolved ? '✓' : '○'}
-                                  </span>
-                                </td>
-                                <td>{problem.id}</td>
-                                <td className="problem-title-cell">{problem.title}</td>
-                                <td>
-                                  <span className={`diff-pill ${problem.difficulty.toLowerCase()}`}>
-                                    {problem.difficulty}
-                                  </span>
-                                </td>
-                                <td className="acceptance-cell">{problem.acceptance}</td>
-                                <td style={{ textAlign: 'right' }}>
-                                  <div className="action-buttons-cell">
-                                    {isSolved && (
-                                      <button 
-                                        className="btn btn-secondary btn-sm"
-                                        onClick={() => handleOpenSolutionModal(problem, 'codechef')}
-                                      >
-                                        View Solution
-                                      </button>
-                                    )}
-                                    <a 
-                                      href={`https://www.codechef.com/problems/${problem.slug.toUpperCase()}`} 
-                                      target="_blank" 
-                                      rel="noopener noreferrer" 
-                                      className="btn btn-primary btn-sm external-practice-btn"
-                                      style={{ backgroundColor: '#d38b27', borderColor: '#d38b27' }}
-                                    >
-                                      Practice ↗
-                                    </a>
-                                  </div>
-                                </td>
-                              </tr>
-                            );
-                          });
-                        })()}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-
+                <p className="platform-link-desc">
+                  Enter your CodeChef handle to synchronize your solved problems, compute college rank, and track exact progress against admin-added challenges.
+                </p>
+                <form className="platform-link-form" onSubmit={handleSyncCodechef}>
+                  <input
+                    type="text"
+                    className="form-control"
+                    placeholder="Enter CodeChef handle (e.g. chef_john)"
+                    value={codechefUsernameInput}
+                    onChange={(e) => setCodechefUsernameInput(e.target.value)}
+                  />
+                  <button type="submit" className={`btn btn-primary ${codechefSyncLoading ? 'loading' : ''}`} disabled={codechefSyncLoading} style={{ backgroundColor: '#d38b27', borderColor: '#d38b27' }}>
+                    {codechefSyncLoading ? 'Syncing...' : (user?.codechefUsername ? 'Save & Sync' : 'Link & Fetch Details')}
+                  </button>
+                </form>
               </div>
             )}
+
+            <div className="leetcode-main-workspace animate-fade">
+              {/* CodeChef header stats card */}
+              <div className="glass-card leetcode-header-stats codechef-header-stats">
+                <div className="leetcode-stats-overview">
+                  <div className="leetcode-stats-meta">
+                    <h4>Linked Account: <span className="text-glow" style={{ color: '#d38b27' }}>{user?.codechefUsername || 'Not Linked'}</span></h4>
+                    <p className="last-synced-text">
+                      {user?.codechefUsername ? 'Performance synchronized from CodeChef profile.' : 'Link your User ID above to compute college rank and verify submissions.'}
+                    </p>
+                  </div>
+                  <div className="leetcode-resync-form" style={{ display: 'flex', gap: '8px' }}>
+                    {user?.codechefUsername && (
+                      <button
+                        type="button"
+                        className="btn btn-secondary btn-sm"
+                        onClick={() => setEditingPlatformHandle(editingPlatformHandle === 'codechef' ? null : 'codechef')}
+                      >
+                        ✏️ Edit Handle
+                      </button>
+                    )}
+                    <button 
+                      type="button" 
+                      className={`btn btn-primary ${codechefSyncLoading ? 'loading' : ''}`}
+                      onClick={() => handleSyncCodechef()}
+                      disabled={codechefSyncLoading}
+                      style={{ backgroundColor: '#d38b27', borderColor: '#d38b27' }}
+                    >
+                      {codechefSyncLoading ? 'Syncing...' : '🔄 Sync Statistics'}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="leetcode-dashboard-stats-grid">
+                  <div className="leetcode-stat-circle-boxCC">
+                    <div 
+                      className="leetcode-circle-progress" 
+                      style={{ 
+                        '--leetcode-pct': Math.min(100, Math.round(((practiceStats?.codechef?.solvedCount || 0) / (practiceStats?.codechef?.totalCount || codechefProblems.length || 1)) * 100)), 
+                        borderColor: '#d38b27' 
+                      }}
+                    >
+                      <span className="count">
+                        {practiceStats?.codechef?.solvedCount ?? 0}
+                        <span style={{ fontSize: '13px', opacity: 0.7 }}>/{practiceStats?.codechef?.totalCount ?? codechefProblems.length}</span>
+                      </span>
+                      <span className="label">Admin Solved</span>
+                    </div>
+                  </div>
+
+                  {/* College Rank Box */}
+                  <div className="platform-rank-box" style={{ borderColor: 'rgba(211, 139, 39, 0.25)', background: 'rgba(211, 139, 39, 0.05)' }}>
+                    <span className="rank-title">College Rank</span>
+                    <span className="rank-value" style={{ color: '#d38b27', textShadow: '0 0 12px rgba(211,139,39,0.4)' }}>
+                      🏆 #{practiceStats?.codechef?.rank || 1}
+                    </span>
+                    <span className="rank-subtitle">Out of {practiceStats?.codechef?.totalStudents || 1} candidates</span>
+                  </div>
+
+                  <div className="leetcode-stat-breakdown-details">
+                    {/* Stars */}
+                    <div className="leetcode-mini-bar">
+                      <div className="mini-labels">
+                        <span className="difficulty-lbl easy" style={{ backgroundColor: '#d38b27', color: '#fff' }}>Stars</span>
+                        <span className="nums" style={{ color: '#d38b27', fontWeight: 'bold' }}>{user?.codechefStats?.stars || '1★'}</span>
+                      </div>
+                    </div>
+
+                    {/* Global Rank */}
+                    <div className="leetcode-mini-bar">
+                      <div className="mini-labels">
+                        <span className="difficulty-lbl medium">Global Rank</span>
+                        <span className="nums">{user?.codechefStats?.globalRank || 0}</span>
+                      </div>
+                    </div>
+
+                    {/* Country Rank */}
+                    <div className="leetcode-mini-bar">
+                      <div className="mini-labels">
+                        <span className="difficulty-lbl hard">Country Rank</span>
+                        <span className="nums">{user?.codechefStats?.countryRank || 0}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* In-Tab Last Submission Viewer (Fits directly in Tab Space of Image 2) */}
+              {renderInTabSolutionViewer('codechef')}
+
+              {/* Filter and Problem Table Section */}
+              <div className="glass-card leetcode-problems-container">
+                <div className="leetcode-problems-header">
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <h3>CodeChef Practice Database</h3>
+                    <span style={{ fontSize: '12px', background: 'rgba(211, 139, 39, 0.15)', color: '#d38b27', padding: '3px 10px', borderRadius: '12px', border: '1px solid rgba(211, 139, 39, 0.3)' }}>
+                      {practiceStats?.codechef?.solvedCount || 0}/{practiceStats?.codechef?.totalCount || codechefProblems.length} Solved
+                    </span>
+                  </div>
+                  
+                  <div className="leetcode-controls-row">
+                    <div className="search-box-wrapper">
+                      <input 
+                        type="text" 
+                        placeholder="Search problems by name or id..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="form-control"
+                      />
+                    </div>
+                    
+                    <div className="dropdowns-group">
+                      <select 
+                        className="form-control"
+                        value={difficultyFilter}
+                        onChange={(e) => setDifficultyFilter(e.target.value)}
+                      >
+                        <option value="all">All Difficulties</option>
+                        <option value="easy">Easy</option>
+                        <option value="medium">Medium</option>
+                        <option value="hard">Hard</option>
+                      </select>
+
+                      <select 
+                        className="form-control"
+                        value={statusFilter}
+                        onChange={(e) => setStatusFilter(e.target.value)}
+                      >
+                        <option value="all">All Status</option>
+                        <option value="solved">Solved</option>
+                        <option value="unsolved">Unsolved</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="leetcode-table-responsive">
+                  <table className="leetcode-problems-table">
+                    <thead>
+                      <tr>
+                        <th style={{ width: '80px' }}>Status</th>
+                        <th style={{ width: '70px' }}>ID</th>
+                        <th>Title</th>
+                        <th style={{ width: '130px' }}>Difficulty</th>
+                        <th style={{ width: '130px' }}>Acceptance</th>
+                        <th style={{ width: '240px', textAlign: 'right' }}>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(() => {
+                        const solvedIdsSet = getPlatformSolvedIds('codechef', user, practiceStats, codechefProblems);
+                        
+                        // Order problems Easy first, Medium, then Hard
+                        const sortedProblems = [...codechefProblems].sort((a, b) => {
+                          const difficultyOrder = { 'Easy': 1, 'Medium': 2, 'Hard': 3 };
+                          if (difficultyOrder[a.difficulty] !== difficultyOrder[b.difficulty]) {
+                            return difficultyOrder[a.difficulty] - difficultyOrder[b.difficulty];
+                          }
+                          return a.id - b.id;
+                        });
+
+                        const filtered = sortedProblems.filter(problem => {
+                          const isSolved = solvedIdsSet.has(problem.id);
+                          
+                          // Search match
+                          const matchQuery = problem.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                                             problem.id.toString().includes(searchQuery);
+                          
+                          // Difficulty match
+                          const matchDiff = difficultyFilter === 'all' || 
+                                            problem.difficulty.toLowerCase() === difficultyFilter.toLowerCase();
+                          
+                          // Status match
+                          const matchStatus = statusFilter === 'all' || 
+                                              (statusFilter === 'solved' && isSolved) || 
+                                              (statusFilter === 'unsolved' && !isSolved);
+                          
+                          return matchQuery && matchDiff && matchStatus;
+                        });
+
+                        if (filtered.length === 0) {
+                          return (
+                            <tr>
+                              <td colSpan="6" className="no-records-cell">
+                                No problems matching filters found.
+                              </td>
+                            </tr>
+                          );
+                        }
+
+                        return filtered.map(problem => {
+                          const isSolved = solvedIdsSet.has(problem.id);
+                          return (
+                            <tr key={problem.id} className={isSolved ? 'solved-row' : ''}>
+                              <td>
+                                <span className={`status-icon-badge ${isSolved ? 'solved' : 'unsolved'}`} style={{ backgroundColor: isSolved ? 'rgba(211, 139, 39, 0.2)' : 'rgba(255, 255, 255, 0.05)', color: isSolved ? '#d38b27' : 'var(--text-muted)' }}>
+                                  {isSolved ? '✓' : '○'}
+                                </span>
+                              </td>
+                              <td>{problem.id}</td>
+                              <td className="problem-title-cell">{problem.title}</td>
+                              <td>
+                                <span className={`diff-pill ${problem.difficulty.toLowerCase()}`}>
+                                  {problem.difficulty}
+                                </span>
+                              </td>
+                              <td className="acceptance-cell">{problem.acceptance}</td>
+                              <td style={{ textAlign: 'right' }}>
+                                <div className="action-buttons-cell">
+                                  <button 
+                                    className={`btn btn-sm ${isSolved ? 'btn-secondary' : 'btn-outline'}`}
+                                    style={{ marginRight: '8px', fontSize: '12px' }}
+                                    onClick={() => handleOpenSolutionModal(problem, 'codechef')}
+                                    title="View or save your last submission"
+                                  >
+                                    {isSolved ? 'View Solution' : 'Submit Solution'}
+                                  </button>
+                                  <a 
+                                    href={`https://www.codechef.com/problems/${problem.slug?.toUpperCase()}`} 
+                                    target="_blank" 
+                                    rel="noopener noreferrer" 
+                                    className="btn btn-primary btn-sm external-practice-btn"
+                                    style={{ backgroundColor: '#d38b27', borderColor: '#d38b27' }}
+                                  >
+                                    Practice ↗
+                                  </a>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        });
+                      })()}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
           </div>
         )}
 
@@ -1642,209 +2097,264 @@ const AptitudeTests = () => {
               </div>
             )}
 
-            {!user?.hackerrankUsername ? (
-              <div className="glass-card leetcode-link-container hackerrank-link-container">
-                <div className="leetcode-link-info">
-                  <svg className="leetcode-link-main-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M11.5 2C6.8 2 3 5.8 3 10.5c0 3.8 2.5 7 6 8.1v-2.2c-2.3-.9-4-3.1-4-5.9 0-3.4 2.8-6.2 6.2-6.2s6.2 2.8 6.2 6.2c0 2.8-1.7 5-4 5.9v2.2c3.5-1.1 6-4.3 6-8.1C19.5 5.8 15.7 2 11.5 2z"/></svg>
-                  <h3>HackerRank Account Not Linked</h3>
-                  <p>Please link your HackerRank username in your Profile page to automatically synchronize your solved stats, track coding interview preparation progress, and access practice problems.</p>
-                  <Link to="/profile" className="btn btn-primary mt-15">Go to Profile</Link>
+            {/* HackerRank Handle Linking / Update Banner */}
+            {(!user?.hackerrankUsername || editingPlatformHandle === 'hackerrank') && (
+              <div className="glass-card platform-link-card mb-20 animate-fade" style={{ borderColor: 'rgba(46, 200, 102, 0.25)' }}>
+                <div className="platform-link-header">
+                  <div className="platform-brand-badge">
+                    <svg className="platform-icon" viewBox="0 0 24 24" fill="#2ec866"><path d="M11.5 2C6.8 2 3 5.8 3 10.5c0 3.8 2.5 7 6 8.1v-2.2c-2.3-.9-4-3.1-4-5.9 0-3.4 2.8-6.2 6.2-6.2s6.2 2.8 6.2 6.2c0 2.8-1.7 5-4 5.9v2.2c3.5-1.1 6-4.3 6-8.1C19.5 5.8 15.7 2 11.5 2z"/></svg>
+                    <h4>{user?.hackerrankUsername ? 'Update HackerRank User ID' : 'Link HackerRank Account'}</h4>
+                  </div>
+                  {user?.hackerrankUsername && (
+                    <button className="btn btn-secondary btn-sm" onClick={() => setEditingPlatformHandle(null)}>Cancel</button>
+                  )}
                 </div>
-              </div>
-            ) : (
-              <div className="leetcode-main-workspace animate-fade">
-                
-                {/* HackerRank header stats card */}
-                <div className="glass-card leetcode-header-stats hackerrank-header-stats">
-                  <div className="leetcode-stats-overview">
-                    <div className="leetcode-stats-meta">
-                      <h4>Linked Account: <span className="text-glow" style={{ color: '#2ec866' }}>{user.hackerrankUsername}</span></h4>
-                      <p className="last-synced-text">Performance synchronized from HackerRank profile.</p>
-                    </div>
-                    <div className="leetcode-resync-form">
-                      <button 
-                        type="button" 
-                        className={`btn btn-primary ${hackerrankSyncLoading ? 'loading' : ''}`}
-                        onClick={() => handleSyncHackerrank()}
-                        disabled={hackerrankSyncLoading}
-                        style={{ backgroundColor: '#2ec866', borderColor: '#2ec866' }}
-                      >
-                        {hackerrankSyncLoading ? 'Syncing...' : 'Sync Statistics'}
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="leetcode-dashboard-stats-grid">
-                    <div className="leetcode-stat-circle-boxHR">
-                      <div className="leetcode-circle-progress" style={{ '--leetcode-pct': Math.min(100, (((user.hackerrankStats?.solvedCount || 0) / 100) * 100)), borderColor: '#2ec866' }}>
-                        <span className="count">{user.hackerrankStats?.solvedCount || 0}</span>
-                        <span className="label">Solved</span>
-                      </div>
-                    </div>
-                    <div className="leetcode-stat-breakdown-details">
-                      {/* Score */}
-                      <div className="leetcode-mini-bar">
-                        <div className="mini-labels">
-                          <span className="difficulty-lbl easy" style={{ backgroundColor: '#2ec866', color: '#fff' }}>Score</span>
-                          <span className="nums" style={{ color: '#2ec866', fontWeight: 'bold' }}>{user.hackerrankStats?.score || 0}</span>
-                        </div>
-                      </div>
-
-                      {/* Badges Count */}
-                      <div className="leetcode-mini-bar">
-                        <div className="mini-labels">
-                          <span className="difficulty-lbl medium">Badges</span>
-                          <span className="nums">{user.hackerrankStats?.badgesCount || 0}</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Filter and Problem Table Section */}
-                <div className="glass-card leetcode-problems-container">
-                  <div className="leetcode-problems-header">
-                    <h3>HackerRank Practice Database</h3>
-                    
-                    <div className="leetcode-controls-row">
-                      <div className="search-box-wrapper">
-                        <input 
-                          type="text" 
-                          placeholder="Search problems by name or id..."
-                          value={searchQuery}
-                          onChange={(e) => setSearchQuery(e.target.value)}
-                          className="form-control"
-                        />
-                      </div>
-                      
-                      <div className="dropdowns-group">
-                        <select 
-                          className="form-control"
-                          value={difficultyFilter}
-                          onChange={(e) => setDifficultyFilter(e.target.value)}
-                        >
-                          <option value="all">All Difficulties</option>
-                          <option value="easy">Easy</option>
-                          <option value="medium">Medium</option>
-                          <option value="hard">Hard</option>
-                        </select>
-
-                        <select 
-                          className="form-control"
-                          value={statusFilter}
-                          onChange={(e) => setStatusFilter(e.target.value)}
-                        >
-                          <option value="all">All Status</option>
-                          <option value="solved">Solved</option>
-                          <option value="unsolved">Unsolved</option>
-                        </select>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="leetcode-table-responsive">
-                    <table className="leetcode-problems-table">
-                      <thead>
-                        <tr>
-                          <th style={{ width: '80px' }}>Status</th>
-                          <th style={{ width: '70px' }}>ID</th>
-                          <th>Title</th>
-                          <th style={{ width: '130px' }}>Difficulty</th>
-                          <th style={{ width: '130px' }}>Acceptance</th>
-                          <th style={{ width: '220px', textAlign: 'right' }}>Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {(() => {
-                          const solvedIdsSet = getHackerrankSolvedIds(user.hackerrankUsername, user.hackerrankStats, hackerrankProblems);
-                          
-                          // Order problems Easy first, Medium, then Hard
-                          const sortedProblems = [...hackerrankProblems].sort((a, b) => {
-                            const difficultyOrder = { 'Easy': 1, 'Medium': 2, 'Hard': 3 };
-                            if (difficultyOrder[a.difficulty] !== difficultyOrder[b.difficulty]) {
-                              return difficultyOrder[a.difficulty] - difficultyOrder[b.difficulty];
-                            }
-                            return a.id - b.id;
-                          });
-
-                          const filtered = sortedProblems.filter(problem => {
-                            const isSolved = solvedIdsSet.has(problem.id);
-                            
-                            // Search match
-                            const matchQuery = problem.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                                               problem.id.toString().includes(searchQuery);
-                            
-                            // Difficulty match
-                            const matchDiff = difficultyFilter === 'all' || 
-                                               problem.difficulty.toLowerCase() === difficultyFilter.toLowerCase();
-                            
-                            // Status match
-                            const matchStatus = statusFilter === 'all' || 
-                                                (statusFilter === 'solved' && isSolved) || 
-                                                (statusFilter === 'unsolved' && !isSolved);
-                            
-                            return matchQuery && matchDiff && matchStatus;
-                          });
-
-                          if (filtered.length === 0) {
-                            return (
-                              <tr>
-                                <td colSpan="6" className="no-records-cell">
-                                  No problems matching filters found.
-                                </td>
-                              </tr>
-                            );
-                          }
-
-                          return filtered.map(problem => {
-                            const isSolved = solvedIdsSet.has(problem.id);
-                            return (
-                              <tr key={problem.id} className={isSolved ? 'solved-row' : ''}>
-                                <td>
-                                  <span className={`status-icon-badge ${isSolved ? 'solved' : 'unsolved'}`} style={{ backgroundColor: isSolved ? 'rgba(46, 200, 102, 0.2)' : 'rgba(255, 255, 255, 0.05)', color: isSolved ? '#2ec866' : 'var(--text-muted)' }}>
-                                    {isSolved ? '✓' : '○'}
-                                  </span>
-                                </td>
-                                <td>{problem.id}</td>
-                                <td className="problem-title-cell">{problem.title}</td>
-                                <td>
-                                  <span className={`diff-pill ${problem.difficulty.toLowerCase()}`}>
-                                    {problem.difficulty}
-                                  </span>
-                                </td>
-                                <td className="acceptance-cell">{problem.acceptance}</td>
-                                <td style={{ textAlign: 'right' }}>
-                                  <div className="action-buttons-cell">
-                                    {isSolved && (
-                                      <button 
-                                        className="btn btn-secondary btn-sm"
-                                        onClick={() => handleOpenSolutionModal(problem, 'hackerrank')}
-                                      >
-                                        View Solution
-                                      </button>
-                                    )}
-                                    <a 
-                                      href={`https://www.hackerrank.com/challenges/${problem.slug}/problem`} 
-                                      target="_blank" 
-                                      rel="noopener noreferrer" 
-                                      className="btn btn-primary btn-sm external-practice-btn"
-                                      style={{ backgroundColor: '#2ec866', borderColor: '#2ec866' }}
-                                    >
-                                      Practice ↗
-                                    </a>
-                                  </div>
-                                </td>
-                              </tr>
-                            );
-                          });
-                        })()}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-
+                <p className="platform-link-desc">
+                  Enter your HackerRank username to synchronize your badges, compute college rank, and track exact progress against admin-added challenges.
+                </p>
+                <form className="platform-link-form" onSubmit={handleSyncHackerrank}>
+                  <input
+                    type="text"
+                    className="form-control"
+                    placeholder="Enter HackerRank username (e.g. hack_coder)"
+                    value={hackerrankUsernameInput}
+                    onChange={(e) => setHackerrankUsernameInput(e.target.value)}
+                  />
+                  <button type="submit" className={`btn btn-primary ${hackerrankSyncLoading ? 'loading' : ''}`} disabled={hackerrankSyncLoading} style={{ backgroundColor: '#2ec866', borderColor: '#2ec866' }}>
+                    {hackerrankSyncLoading ? 'Syncing...' : (user?.hackerrankUsername ? 'Save & Sync' : 'Link & Fetch Details')}
+                  </button>
+                </form>
               </div>
             )}
+
+            <div className="leetcode-main-workspace animate-fade">
+              {/* HackerRank header stats card */}
+              <div className="glass-card leetcode-header-stats hackerrank-header-stats">
+                <div className="leetcode-stats-overview">
+                  <div className="leetcode-stats-meta">
+                    <h4>Linked Account: <span className="text-glow" style={{ color: '#2ec866' }}>{user?.hackerrankUsername || 'Not Linked'}</span></h4>
+                    <p className="last-synced-text">
+                      {user?.hackerrankUsername ? 'Performance synchronized from HackerRank profile.' : 'Link your User ID above to compute college rank and verify submissions.'}
+                    </p>
+                  </div>
+                  <div className="leetcode-resync-form" style={{ display: 'flex', gap: '8px' }}>
+                    {user?.hackerrankUsername && (
+                      <button
+                        type="button"
+                        className="btn btn-secondary btn-sm"
+                        onClick={() => setEditingPlatformHandle(editingPlatformHandle === 'hackerrank' ? null : 'hackerrank')}
+                      >
+                        ✏️ Edit Handle
+                      </button>
+                    )}
+                    <button 
+                      type="button" 
+                      className={`btn btn-primary ${hackerrankSyncLoading ? 'loading' : ''}`}
+                      onClick={() => handleSyncHackerrank()}
+                      disabled={hackerrankSyncLoading}
+                      style={{ backgroundColor: '#2ec866', borderColor: '#2ec866' }}
+                    >
+                      {hackerrankSyncLoading ? 'Syncing...' : '🔄 Sync Statistics'}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="leetcode-dashboard-stats-grid">
+                  <div className="leetcode-stat-circle-boxHR">
+                    <div 
+                      className="leetcode-circle-progress" 
+                      style={{ 
+                        '--leetcode-pct': Math.min(100, Math.round(((practiceStats?.hackerrank?.solvedCount || 0) / (practiceStats?.hackerrank?.totalCount || hackerrankProblems.length || 1)) * 100)), 
+                        borderColor: '#2ec866' 
+                      }}
+                    >
+                      <span className="count">
+                        {practiceStats?.hackerrank?.solvedCount ?? 0}
+                        <span style={{ fontSize: '13px', opacity: 0.7 }}>/{practiceStats?.hackerrank?.totalCount ?? hackerrankProblems.length}</span>
+                      </span>
+                      <span className="label">Admin Solved</span>
+                    </div>
+                  </div>
+
+                  {/* College Rank Box */}
+                  <div className="platform-rank-box" style={{ borderColor: 'rgba(46, 200, 102, 0.25)', background: 'rgba(46, 200, 102, 0.05)' }}>
+                    <span className="rank-title">College Rank</span>
+                    <span className="rank-value" style={{ color: '#2ec866', textShadow: '0 0 12px rgba(46,200,102,0.4)' }}>
+                      🏆 #{practiceStats?.hackerrank?.rank || 1}
+                    </span>
+                    <span className="rank-subtitle">Out of {practiceStats?.hackerrank?.totalStudents || 1} candidates</span>
+                  </div>
+
+                  <div className="leetcode-stat-breakdown-details">
+                    {/* Score */}
+                    <div className="leetcode-mini-bar">
+                      <div className="mini-labels">
+                        <span className="difficulty-lbl easy" style={{ backgroundColor: '#2ec866', color: '#fff' }}>Score</span>
+                        <span className="nums" style={{ color: '#2ec866', fontWeight: 'bold' }}>{user?.hackerrankStats?.score || 0}</span>
+                      </div>
+                    </div>
+
+                    {/* Badges Count */}
+                    <div className="leetcode-mini-bar">
+                      <div className="mini-labels">
+                        <span className="difficulty-lbl medium">Badges</span>
+                        <span className="nums">{user?.hackerrankStats?.badgesCount || 0}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* In-Tab Last Submission Viewer (Fits directly in Tab Space of Image 2) */}
+              {renderInTabSolutionViewer('hackerrank')}
+
+              {/* Filter and Problem Table Section */}
+              <div className="glass-card leetcode-problems-container">
+                <div className="leetcode-problems-header">
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <h3>HackerRank Practice Database</h3>
+                    <span style={{ fontSize: '12px', background: 'rgba(46, 200, 102, 0.15)', color: '#2ec866', padding: '3px 10px', borderRadius: '12px', border: '1px solid rgba(46, 200, 102, 0.3)' }}>
+                      {practiceStats?.hackerrank?.solvedCount || 0}/{practiceStats?.hackerrank?.totalCount || hackerrankProblems.length} Solved
+                    </span>
+                  </div>
+                  
+                  <div className="leetcode-controls-row">
+                    <div className="search-box-wrapper">
+                      <input 
+                        type="text" 
+                        placeholder="Search problems by name or id..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="form-control"
+                      />
+                    </div>
+                    
+                    <div className="dropdowns-group">
+                      <select 
+                        className="form-control"
+                        value={difficultyFilter}
+                        onChange={(e) => setDifficultyFilter(e.target.value)}
+                      >
+                        <option value="all">All Difficulties</option>
+                        <option value="easy">Easy</option>
+                        <option value="medium">Medium</option>
+                        <option value="hard">Hard</option>
+                      </select>
+
+                      <select 
+                        className="form-control"
+                        value={statusFilter}
+                        onChange={(e) => setStatusFilter(e.target.value)}
+                      >
+                        <option value="all">All Status</option>
+                        <option value="solved">Solved</option>
+                        <option value="unsolved">Unsolved</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="leetcode-table-responsive">
+                  <table className="leetcode-problems-table">
+                    <thead>
+                      <tr>
+                        <th style={{ width: '80px' }}>Status</th>
+                        <th style={{ width: '70px' }}>ID</th>
+                        <th>Title</th>
+                        <th style={{ width: '130px' }}>Difficulty</th>
+                        <th style={{ width: '130px' }}>Acceptance</th>
+                        <th style={{ width: '240px', textAlign: 'right' }}>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(() => {
+                        const solvedIdsSet = getPlatformSolvedIds('hackerrank', user, practiceStats, hackerrankProblems);
+                        
+                        // Order problems Easy first, Medium, then Hard
+                        const sortedProblems = [...hackerrankProblems].sort((a, b) => {
+                          const difficultyOrder = { 'Easy': 1, 'Medium': 2, 'Hard': 3 };
+                          if (difficultyOrder[a.difficulty] !== difficultyOrder[b.difficulty]) {
+                            return difficultyOrder[a.difficulty] - difficultyOrder[b.difficulty];
+                          }
+                          return a.id - b.id;
+                        });
+
+                        const filtered = sortedProblems.filter(problem => {
+                          const isSolved = solvedIdsSet.has(problem.id);
+                          
+                          // Search match
+                          const matchQuery = problem.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                                             problem.id.toString().includes(searchQuery);
+                          
+                          // Difficulty match
+                          const matchDiff = difficultyFilter === 'all' || 
+                                            problem.difficulty.toLowerCase() === difficultyFilter.toLowerCase();
+                          
+                          // Status match
+                          const matchStatus = statusFilter === 'all' || 
+                                              (statusFilter === 'solved' && isSolved) || 
+                                              (statusFilter === 'unsolved' && !isSolved);
+                          
+                          return matchQuery && matchDiff && matchStatus;
+                        });
+
+                        if (filtered.length === 0) {
+                          return (
+                            <tr>
+                              <td colSpan="6" className="no-records-cell">
+                                No problems matching filters found.
+                              </td>
+                            </tr>
+                          );
+                        }
+
+                        return filtered.map(problem => {
+                          const isSolved = solvedIdsSet.has(problem.id);
+                          return (
+                            <tr key={problem.id} className={isSolved ? 'solved-row' : ''}>
+                              <td>
+                                <span className={`status-icon-badge ${isSolved ? 'solved' : 'unsolved'}`} style={{ backgroundColor: isSolved ? 'rgba(46, 200, 102, 0.2)' : 'rgba(255, 255, 255, 0.05)', color: isSolved ? '#2ec866' : 'var(--text-muted)' }}>
+                                  {isSolved ? '✓' : '○'}
+                                </span>
+                              </td>
+                              <td>{problem.id}</td>
+                              <td className="problem-title-cell">{problem.title}</td>
+                              <td>
+                                <span className={`diff-pill ${problem.difficulty.toLowerCase()}`}>
+                                  {problem.difficulty}
+                                </span>
+                              </td>
+                              <td className="acceptance-cell">{problem.acceptance}</td>
+                              <td style={{ textAlign: 'right' }}>
+                                <div className="action-buttons-cell">
+                                  <button 
+                                    className={`btn btn-sm ${isSolved ? 'btn-secondary' : 'btn-outline'}`}
+                                    style={{ marginRight: '8px', fontSize: '12px' }}
+                                    onClick={() => handleOpenSolutionModal(problem, 'hackerrank')}
+                                    title="View or save your last submission"
+                                  >
+                                    {isSolved ? 'View Solution' : 'Submit Solution'}
+                                  </button>
+                                  <a 
+                                    href={`https://www.hackerrank.com/challenges/${problem.slug}/problem`} 
+                                    target="_blank" 
+                                    rel="noopener noreferrer" 
+                                    className="btn btn-primary btn-sm external-practice-btn"
+                                    style={{ backgroundColor: '#2ec866', borderColor: '#2ec866' }}
+                                  >
+                                    Practice ↗
+                                  </a>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        });
+                      })()}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
           </div>
         )}
 
@@ -2057,121 +2567,6 @@ const AptitudeTests = () => {
                   )}
                 </div>
               ))}
-            </div>
-          </div>
-        )}
-
-        {/* Solution Viewer Modal */}
-        {showSolutionModal && selectedProblem && (
-          <div className="modal-overlay">
-            <div className="modal-content glass-card solution-modal-content">
-              <div className="modal-header">
-                <h3>{selectedProblem.id}. {selectedProblem.title} Solution</h3>
-                <button className="close-btn" onClick={() => {
-                  setShowSolutionModal(false);
-                  setSelectedProblem(null);
-                  setCustomSolutionCode('');
-                  setIsEditingSolution(false);
-                  setSolutionModalError('');
-                  setSolutionModalSuccess('');
-                }}>×</button>
-              </div>
-              
-              {solutionModalError && (
-                <div className="error-banner" style={{ margin: '15px' }}>
-                  <span>{solutionModalError}</span>
-                </div>
-              )}
-
-              {solutionModalSuccess && (
-                <div className="success-banner" style={{ margin: '15px', backgroundColor: 'rgba(46, 200, 102, 0.15)', border: '1px solid #2ec866', padding: '10px', borderRadius: '6px', color: '#2ec866', fontSize: '0.9rem', display: 'flex', alignItems: 'center' }}>
-                  <span style={{ marginRight: '8px' }}>✓</span>
-                  <span>{solutionModalSuccess}</span>
-                </div>
-              )}
-
-              <div className="solution-modal-body">
-                <div className="solution-meta-info" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div>
-                    <span className={`diff-pill ${selectedProblem.difficulty.toLowerCase()}`}>
-                      {selectedProblem.difficulty}
-                    </span>
-                    <span className="acceptance-pill" style={{ marginLeft: '10px' }}>
-                      Acceptance: {selectedProblem.acceptance}
-                    </span>
-                  </div>
-                  
-                  <div className="modal-actions-group">
-                    {!solutionModalLoading && (
-                      <button 
-                        className={`btn btn-sm ${isEditingSolution ? 'btn-secondary' : 'btn-primary'}`}
-                        style={{ marginRight: '10px' }}
-                        onClick={() => setIsEditingSolution(!isEditingSolution)}
-                      >
-                        {isEditingSolution ? 'Cancel Edit' : 'Edit Submission'}
-                      </button>
-                    )}
-                    {isEditingSolution && (
-                      <button 
-                        className={`btn btn-success btn-sm ${solutionModalSaveLoading ? 'loading' : ''}`}
-                        onClick={handleSaveSolution}
-                        disabled={solutionModalSaveLoading}
-                      >
-                        {solutionModalSaveLoading ? 'Saving...' : 'Save Submission'}
-                      </button>
-                    )}
-                  </div>
-                </div>
-                
-                <div className="solution-code-container">
-                  <div className="code-header">
-                    <span>
-                      {selectedProblem.solution.includes('#include') ? 'C++ Submission Code' : 'JavaScript Submission Code'}
-                    </span>
-                    
-                    <button 
-                      className="btn btn-secondary btn-sm copy-btn"
-                      onClick={() => {
-                        navigator.clipboard.writeText(customSolutionCode);
-                        alert('Code copied to clipboard!');
-                      }}
-                    >
-                      Copy Code
-                    </button>
-                  </div>
-
-                  {solutionModalLoading ? (
-                    <div className="modal-loading-wrapper" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '40px', color: '#fff' }}>
-                      <div className="spinner-loader"></div>
-                      <p style={{ marginTop: '15px' }}>Syncing submission from platform...</p>
-                    </div>
-                  ) : isEditingSolution ? (
-                    <textarea
-                      className="solution-editor-textarea"
-                      value={customSolutionCode}
-                      onChange={(e) => setCustomSolutionCode(e.target.value)}
-                      placeholder="Paste your submission code here..."
-                      spellCheck="false"
-                      style={{
-                        width: '100%',
-                        height: '350px',
-                        backgroundColor: '#1e1e2e',
-                        color: '#cdd6f4',
-                        fontFamily: 'Consolas, Monaco, monospace',
-                        padding: '15px',
-                        border: '1px solid #45475a',
-                        borderRadius: '6px',
-                        resize: 'vertical',
-                        outline: 'none'
-                      }}
-                    />
-                  ) : (
-                    <pre className="solution-code-block" style={{ maxHeight: '350px', overflowY: 'auto' }}>
-                      <code>{customSolutionCode}</code>
-                    </pre>
-                  )}
-                </div>
-              </div>
             </div>
           </div>
         )}

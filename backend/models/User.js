@@ -96,7 +96,8 @@ const UserSchema = new mongoose.Schema({
     rating: { type: Number, default: 0 },
     maxRating: { type: Number, default: 0 },
     rank: { type: String, default: 'Unrated' },
-    solvedCount: { type: Number, default: 0 }
+    solvedCount: { type: Number, default: 0 },
+    solvedSlugs: { type: [String], default: [] }
   },
   codechefUsername: {
     type: String,
@@ -106,7 +107,9 @@ const UserSchema = new mongoose.Schema({
     rating: { type: Number, default: 0 },
     stars: { type: String, default: '1★' },
     globalRank: { type: Number, default: 0 },
-    countryRank: { type: Number, default: 0 }
+    countryRank: { type: Number, default: 0 },
+    solvedCount: { type: Number, default: 0 },
+    solvedSlugs: { type: [String], default: [] }
   },
   hackerrankUsername: {
     type: String,
@@ -115,7 +118,8 @@ const UserSchema = new mongoose.Schema({
   hackerrankStats: {
     solvedCount: { type: Number, default: 0 },
     score: { type: Number, default: 0 },
-    badgesCount: { type: Number, default: 0 }
+    badgesCount: { type: Number, default: 0 },
+    solvedSlugs: { type: [String], default: [] }
   },
   sgpaSem1: { type: Number, default: 0 },
   sgpaSem2: { type: Number, default: 0 },

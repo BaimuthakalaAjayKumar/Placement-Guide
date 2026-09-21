@@ -5,6 +5,7 @@ const AptitudeTest = require('../models/AptitudeTest');
 const TestAttempt = require('../models/TestAttempt');
 const PracticeQuestion = require('../models/PracticeQuestion');
 const User = require('../models/User');
+const UserSolution = require('../models/UserSolution');
 const Notification = require('../models/Notification');
 
 // Seed practice questions from frontend data files if database has none
@@ -841,24 +842,203 @@ exports.deletePracticeQuestion = async (req, res, next) => {
 };
 
 // @desc    Get student practice progress report for a platform (Admin only)
+// Helper to accurately determine which admin-added questions a student has solved
+const calculateStudentPlatformSolved = (student, platform, questions, studentSolutions = []) => {
+  if (!student || !questions || questions.length === 0) {
+    return {
+      solvedIds: [],
+      solvedProblems: [],
+      unsolvedProblems: questions ? questions.map(q => ({ id: q.id, title: q.title, difficulty: q.difficulty, slug: q.slug, acceptance: q.acceptance })) : [],
+      solvedCount: 0,
+      totalCount: questions ? questions.length : 0,
+      percentage: 0,
+      easySolved: 0,
+      mediumSolved: 0,
+      hardSolved: 0,
+      easyTotal: (questions || []).filter(q => q.difficulty === 'Easy').length,
+      mediumTotal: (questions || []).filter(q => q.difficulty === 'Medium').length,
+      hardTotal: (questions || []).filter(q => q.difficulty === 'Hard').length
+    };
+  }
+
+  // 1. Build map of user solutions saved in portal
+  const portalSolutionsMap = new Map();
+  studentSolutions.forEach(sol => {
+    if (sol.problemId) {
+      portalSolutionsMap.set(String(sol.problemId).toLowerCase().trim(), sol);
+    }
+  });
+
+  // 2. Build verified solved slugs set from student's synchronized platform stats
+  const verifiedSlugs = new Set();
+  if (platform === 'leetcode') {
+    (student.leetcodeStats?.solvedSlugs || []).forEach(s => verifiedSlugs.add(String(s).toLowerCase().trim()));
+  } else if (platform === 'codeforces') {
+    (student.codeforcesStats?.solvedSlugs || []).forEach(s => verifiedSlugs.add(String(s).toLowerCase().trim()));
+  } else if (platform === 'codechef') {
+    (student.codechefStats?.solvedSlugs || []).forEach(s => verifiedSlugs.add(String(s).toLowerCase().trim()));
+  } else if (platform === 'hackerrank') {
+    (student.hackerrankStats?.solvedSlugs || []).forEach(s => verifiedSlugs.add(String(s).toLowerCase().trim()));
+  }
+
+  const solvedIds = [];
+  const solvedProblems = [];
+  const unsolvedProblems = [];
+
+  questions.forEach(q => {
+    const slugKey = String(q.slug || '').toLowerCase().trim();
+    const titleKey = String(q.title || '').toLowerCase().trim();
+    const idKey = String(q.id);
+
+    const portalSol = portalSolutionsMap.get(slugKey) || 
+                      portalSolutionsMap.get(titleKey) || 
+                      portalSolutionsMap.get(idKey);
+
+    const isPlatformSolved = (slugKey && verifiedSlugs.has(slugKey)) || 
+                             (titleKey && verifiedSlugs.has(titleKey));
+
+    if (portalSol || isPlatformSolved) {
+      solvedIds.push(q.id);
+      solvedProblems.push({
+        id: q.id,
+        title: q.title,
+        difficulty: q.difficulty,
+        slug: q.slug,
+        acceptance: q.acceptance,
+        language: portalSol?.language || 'cpp',
+        solvedAt: portalSol?.updatedAt || null,
+        hasCustomCode: !!portalSol?.solutionCode,
+        solutionCode: portalSol?.solutionCode || ''
+      });
+    } else {
+      unsolvedProblems.push({
+        id: q.id,
+        title: q.title,
+        difficulty: q.difficulty,
+        slug: q.slug,
+        acceptance: q.acceptance
+      });
+    }
+  });
+
+  const easySolved = solvedProblems.filter(p => p.difficulty === 'Easy').length;
+  const mediumSolved = solvedProblems.filter(p => p.difficulty === 'Medium').length;
+  const hardSolved = solvedProblems.filter(p => p.difficulty === 'Hard').length;
+  const totalCount = questions.length;
+  const solvedCount = solvedProblems.length;
+  const percentage = totalCount > 0 ? Math.round((solvedCount / totalCount) * 100) : 0;
+
+  return {
+    solvedIds,
+    solvedProblems,
+    unsolvedProblems,
+    solvedCount,
+    totalCount,
+    percentage,
+    easySolved,
+    mediumSolved,
+    hardSolved,
+    easyTotal: questions.filter(q => q.difficulty === 'Easy').length,
+    mediumTotal: questions.filter(q => q.difficulty === 'Medium').length,
+    hardTotal: questions.filter(q => q.difficulty === 'Hard').length
+  };
+};
+
+exports.calculateStudentPlatformSolved = calculateStudentPlatformSolved;
+
+// @desc    Get practice stats and rank for logged in student on all platforms
+// @route   GET /api/tests/practice-stats/me
+// @access  Private
+exports.getStudentPracticeStats = async (req, res, next) => {
+  try {
+    const student = await User.findById(req.user.id);
+    if (!student) {
+      return res.status(404).json({ success: false, error: 'Student not found' });
+    }
+
+    const platforms = ['leetcode', 'codeforces', 'codechef', 'hackerrank'];
+    const allQuestions = await PracticeQuestion.find({ isActive: true }).sort({ id: 1 });
+    const allStudentSolutions = await UserSolution.find({ user: student._id });
+    const allStudents = await User.find({ role: { $ne: 'admin' } }).select('name leetcodeUsername leetcodeStats codeforcesUsername codeforcesStats codechefUsername codechefStats hackerrankUsername hackerrankStats');
+    const allCohortSolutions = await UserSolution.find();
+
+    // Map cohort solutions by user and platform
+    const cohortSolutionsByUserPlat = new Map();
+    allCohortSolutions.forEach(sol => {
+      const key = `${sol.user}_${sol.platform}`;
+      if (!cohortSolutionsByUserPlat.has(key)) cohortSolutionsByUserPlat.set(key, []);
+      cohortSolutionsByUserPlat.get(key).push(sol);
+    });
+
+    const stats = {};
+
+    platforms.forEach(plat => {
+      const platQuestions = allQuestions.filter(q => q.platform === plat);
+      const studentPlatSolutions = allStudentSolutions.filter(s => s.platform === plat);
+      const studentResult = calculateStudentPlatformSolved(student, plat, platQuestions, studentPlatSolutions);
+
+      // Calculate rank among all students on this platform
+      const studentScores = allStudents.map(s => {
+        const sPlatSolutions = cohortSolutionsByUserPlat.get(`${s._id}_${plat}`) || [];
+        const res = calculateStudentPlatformSolved(s, plat, platQuestions, sPlatSolutions);
+        return {
+          id: String(s._id),
+          solvedCount: res.solvedCount
+        };
+      });
+
+      studentScores.sort((a, b) => b.solvedCount - a.solvedCount);
+      const rankIndex = studentScores.findIndex(s => s.id === String(student._id));
+      const rank = rankIndex !== -1 ? rankIndex + 1 : 1;
+
+      stats[plat] = {
+        ...studentResult,
+        rank,
+        totalStudents: allStudents.length
+      };
+    });
+
+    res.status(200).json({ success: true, data: stats });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// @desc    Get student practice progress report for a platform or all platforms (Admin & Faculty)
 // @route   GET /api/tests/practice-reports/:platform
 // @access  Private/Admin
 exports.getPracticeReport = async (req, res, next) => {
   try {
     const { platform } = req.params;
+    const { branch, academicYear, section } = req.query;
 
-    // Get all practice questions for this platform from database
-    const questions = await PracticeQuestion.find({ platform, isActive: true }).sort({ id: 1 });
-    const questionCount = questions.length;
+    const query = { role: { $ne: 'admin' } };
+    if (branch && branch !== 'all') query.branch = branch;
+    if (academicYear && academicYear !== 'all') query.academicYear = academicYear;
+    if (section && section !== 'all') query.section = section;
 
-    // Get all users who are students
-    const students = await User.find({ role: { $ne: 'admin' } }).sort({ name: 1 });
+    const students = await User.find(query).sort({ name: 1 });
+    const studentIds = students.map(s => s._id);
+
+    const isAll = platform === 'all';
+    const platQuery = isAll ? { isActive: true } : { platform, isActive: true };
+    const questions = await PracticeQuestion.find(platQuery).sort({ id: 1 });
+
+    const solutionQuery = { user: { $in: studentIds } };
+    if (!isAll) solutionQuery.platform = platform;
+    const allSolutions = await UserSolution.find(solutionQuery);
+
+    const solutionsByUserPlat = new Map();
+    allSolutions.forEach(sol => {
+      const key = `${sol.user}_${sol.platform}`;
+      if (!solutionsByUserPlat.has(key)) solutionsByUserPlat.set(key, []);
+      solutionsByUserPlat.get(key).push(sol);
+    });
 
     const reportData = students.map(student => {
       let username = '';
       let platformTotalSolved = 0;
       let platformSpecificStats = {};
-      let solvedPracticeCount = 0;
 
       if (platform === 'leetcode') {
         username = student.leetcodeUsername || '';
@@ -868,54 +1048,6 @@ exports.getPracticeReport = async (req, res, next) => {
           mediumSolved: student.leetcodeStats?.mediumSolved || 0,
           hardSolved: student.leetcodeStats?.hardSolved || 0
         };
-
-        const solvedSlugs = new Set((student.leetcodeStats?.solvedSlugs || []).map(s => s.toLowerCase()));
-        const easyCount = student.leetcodeStats?.easySolved || 0;
-        const mediumCount = student.leetcodeStats?.mediumSolved || 0;
-        const hardCount = student.leetcodeStats?.hardSolved || 0;
-
-        const easyProbs = questions.filter(p => p.difficulty === 'Easy');
-        const mediumProbs = questions.filter(p => p.difficulty === 'Medium');
-        const hardProbs = questions.filter(p => p.difficulty === 'Hard');
-
-        const realEasyCount = easyProbs.filter(p => p.slug && solvedSlugs.has(p.slug.toLowerCase())).length;
-        const realMediumCount = mediumProbs.filter(p => p.slug && solvedSlugs.has(p.slug.toLowerCase())).length;
-        const realHardCount = hardProbs.filter(p => p.slug && solvedSlugs.has(p.slug.toLowerCase())).length;
-
-        const deterministicallySelect = (list, count, alreadySolvedIds) => {
-          if (count <= 0) return [];
-          const unsolvedList = list.filter(item => !alreadySolvedIds.includes(item.id));
-          const listWithHash = unsolvedList.map(item => {
-            let hash = 0;
-            const key = `${username.toLowerCase()}_${item.id}`;
-            for (let i = 0; i < key.length; i++) {
-              hash = (hash << 5) - hash + key.charCodeAt(i);
-              hash |= 0;
-            }
-            return { item, hash: Math.abs(hash) };
-          });
-          listWithHash.sort((a, b) => a.hash - b.hash);
-          return listWithHash.slice(0, count).map(x => x.item.id);
-        };
-
-        const realSolvedIds = questions.filter(p => p.slug && solvedSlugs.has(p.slug.toLowerCase())).map(p => p.id);
-        const neededEasy = Math.max(0, easyCount - realEasyCount);
-        const neededMedium = Math.max(0, mediumCount - realMediumCount);
-        const neededHard = Math.max(0, hardCount - realHardCount);
-
-        const fallbackEasy = deterministicallySelect(easyProbs, neededEasy, realSolvedIds);
-        const fallbackMedium = deterministicallySelect(mediumProbs, neededMedium, realSolvedIds);
-        const fallbackHard = deterministicallySelect(hardProbs, neededHard, realSolvedIds);
-
-        const allSolvedIds = new Set([
-          ...realSolvedIds,
-          ...fallbackEasy,
-          ...fallbackMedium,
-          ...fallbackHard
-        ]);
-
-        solvedPracticeCount = allSolvedIds.size;
-
       } else if (platform === 'codeforces') {
         username = student.codeforcesUsername || '';
         platformTotalSolved = student.codeforcesStats?.solvedCount || 0;
@@ -923,55 +1055,13 @@ exports.getPracticeReport = async (req, res, next) => {
           rating: student.codeforcesStats?.rating || 0,
           rank: student.codeforcesStats?.rank || 'Unrated'
         };
-
-        if (username) {
-          const listWithHash = questions.map(item => {
-            let itemHash = 0;
-            const key = `${username.toLowerCase()}_cf_${item.id}`;
-            for (let i = 0; i < key.length; i++) {
-              itemHash = (itemHash << 5) - itemHash + key.charCodeAt(i);
-              itemHash |= 0;
-            }
-            return { item, hash: Math.abs(itemHash) };
-          });
-          listWithHash.sort((a, b) => a.hash - b.hash);
-          const selected = listWithHash.slice(0, platformTotalSolved);
-          solvedPracticeCount = selected.length;
-        }
-
       } else if (platform === 'codechef') {
         username = student.codechefUsername || '';
+        platformTotalSolved = student.codechefStats?.solvedCount || 0;
         platformSpecificStats = {
           rating: student.codechefStats?.rating || 0,
           stars: student.codechefStats?.stars || '1★'
         };
-
-        if (username) {
-          let solvedCount = 0;
-          const starsStr = student.codechefStats?.stars || '1★';
-          const starsCount = parseInt(starsStr[0]) || 1;
-          if (starsCount === 1) solvedCount = 3;
-          else if (starsCount === 2) solvedCount = 5;
-          else if (starsCount === 3) solvedCount = 7;
-          else if (starsCount === 4) solvedCount = 9;
-          else solvedCount = 11;
-
-          platformTotalSolved = solvedCount;
-
-          const listWithHash = questions.map(item => {
-            let itemHash = 0;
-            const key = `${username.toLowerCase()}_cc_${item.id}`;
-            for (let i = 0; i < key.length; i++) {
-              itemHash = (itemHash << 5) - itemHash + key.charCodeAt(i);
-              itemHash |= 0;
-            }
-            return { item, hash: Math.abs(itemHash) };
-          });
-          listWithHash.sort((a, b) => a.hash - b.hash);
-          const selected = listWithHash.slice(0, solvedCount);
-          solvedPracticeCount = selected.length;
-        }
-
       } else if (platform === 'hackerrank') {
         username = student.hackerrankUsername || '';
         platformTotalSolved = student.hackerrankStats?.solvedCount || 0;
@@ -979,37 +1069,197 @@ exports.getPracticeReport = async (req, res, next) => {
           score: student.hackerrankStats?.score || 0,
           badges: student.hackerrankStats?.badgesCount || 0
         };
-
-        if (username) {
-          const listWithHash = questions.map(item => {
-            let itemHash = 0;
-            const key = `${username.toLowerCase()}_hr_${item.id}`;
-            for (let i = 0; i < key.length; i++) {
-              itemHash = (itemHash << 5) - itemHash + key.charCodeAt(i);
-              itemHash |= 0;
-            }
-            return { item, hash: Math.abs(itemHash) };
-          });
-          listWithHash.sort((a, b) => a.hash - b.hash);
-          const selected = listWithHash.slice(0, platformTotalSolved);
-          solvedPracticeCount = selected.length;
-        }
+      } else {
+        username = student.leetcodeUsername || student.codeforcesUsername || student.codechefUsername || student.hackerrankUsername || '';
+        platformTotalSolved = (student.leetcodeStats?.totalSolved || 0) +
+                              (student.codeforcesStats?.solvedCount || 0) +
+                              (student.codechefStats?.solvedCount || 0) +
+                              (student.hackerrankStats?.solvedCount || 0);
       }
 
+      let solvedPracticeCount = 0;
+      let solvedProblems = [];
+      let unsolvedProblems = [];
+      let easySolved = 0;
+      let mediumSolved = 0;
+      let hardSolved = 0;
+
+      if (isAll) {
+        ['leetcode', 'codeforces', 'codechef', 'hackerrank'].forEach(p => {
+          const pQuestions = questions.filter(q => q.platform === p);
+          const pSolutions = solutionsByUserPlat.get(`${student._id}_${p}`) || [];
+          const res = calculateStudentPlatformSolved(student, p, pQuestions, pSolutions);
+          solvedPracticeCount += res.solvedCount;
+          solvedProblems.push(...res.solvedProblems.map(sp => ({ ...sp, platform: p })));
+          unsolvedProblems.push(...res.unsolvedProblems.map(up => ({ ...up, platform: p })));
+          easySolved += res.easySolved;
+          mediumSolved += res.mediumSolved;
+          hardSolved += res.hardSolved;
+        });
+      } else {
+        const pSolutions = solutionsByUserPlat.get(`${student._id}_${platform}`) || [];
+        const res = calculateStudentPlatformSolved(student, platform, questions, pSolutions);
+        solvedPracticeCount = res.solvedCount;
+        solvedProblems = res.solvedProblems;
+        unsolvedProblems = res.unsolvedProblems;
+        easySolved = res.easySolved;
+        mediumSolved = res.mediumSolved;
+        hardSolved = res.hardSolved;
+      }
+
+      const totalPracticeCount = questions.length;
+      const percentage = totalPracticeCount > 0 ? Math.round((solvedPracticeCount / totalPracticeCount) * 100) : 0;
+
       return {
+        _id: student._id,
+        studentId: student._id,
+        id: student._id,
         name: student.name,
         email: student.email,
         rollNumber: student.rollNumber || 'N/A',
         branch: student.branch || 'N/A',
+        section: student.section || 'N/A',
+        academicYear: student.academicYear || 'N/A',
         username,
         platformTotalSolved,
         platformSpecificStats,
         solvedPracticeCount,
-        totalPracticeCount: questionCount
+        totalPracticeCount,
+        percentage,
+        solvedPercentage: percentage,
+        easySolved,
+        mediumSolved,
+        hardSolved,
+        solvedProblems,
+        solvedProblemTitles: solvedProblems.map(p => p.title),
+        unsolvedProblems
       };
     });
 
-    res.status(200).json({ success: true, data: reportData });
+    // Compute cohort ranks based on solvedPracticeCount descending
+    reportData.sort((a, b) => b.solvedPracticeCount - a.solvedPracticeCount);
+    reportData.forEach((item, index) => {
+      item.rank = index + 1;
+    });
+
+    res.status(200).json({
+      success: true,
+      platform,
+      totalQuestions: questions.length,
+      data: reportData
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// @desc    Get individual student practice report across platforms (Admin & Faculty)
+// @route   GET /api/tests/practice-reports/student/:studentId
+// @access  Private/Admin
+exports.getIndividualPracticeReport = async (req, res, next) => {
+  try {
+    const { studentId } = req.params;
+    if (!studentId || studentId === 'undefined' || studentId === 'null') {
+      return res.status(400).json({ success: false, error: 'Valid Student ID is required.' });
+    }
+    const student = await User.findById(studentId);
+    if (!student) {
+      return res.status(404).json({ success: false, error: 'Student not found' });
+    }
+
+    const platforms = ['leetcode', 'codeforces', 'codechef', 'hackerrank'];
+    const allQuestions = await PracticeQuestion.find({ isActive: true }).sort({ id: 1 });
+    const studentSolutions = await UserSolution.find({ user: student._id });
+    const allStudents = await User.find({ role: { $ne: 'admin' } }).select('name leetcodeUsername leetcodeStats codeforcesUsername codeforcesStats codechefUsername codechefStats hackerrankUsername hackerrankStats');
+    const allCohortSolutions = await UserSolution.find();
+
+    const cohortSolutionsByUserPlat = new Map();
+    allCohortSolutions.forEach(sol => {
+      const key = `${sol.user}_${sol.platform}`;
+      if (!cohortSolutionsByUserPlat.has(key)) cohortSolutionsByUserPlat.set(key, []);
+      cohortSolutionsByUserPlat.get(key).push(sol);
+    });
+
+    const platformReports = {};
+    let grandTotalAdmin = 0;
+    let grandTotalSolved = 0;
+
+    platforms.forEach(plat => {
+      const platQuestions = allQuestions.filter(q => q.platform === plat);
+      const platSolutions = studentSolutions.filter(s => s.platform === plat);
+      const res = calculateStudentPlatformSolved(student, plat, platQuestions, platSolutions);
+
+      // Rank calculation
+      const studentScores = allStudents.map(s => {
+        const sPlatSolutions = cohortSolutionsByUserPlat.get(`${s._id}_${plat}`) || [];
+        const r = calculateStudentPlatformSolved(s, plat, platQuestions, sPlatSolutions);
+        return { id: String(s._id), solvedCount: r.solvedCount };
+      });
+      studentScores.sort((a, b) => b.solvedCount - a.solvedCount);
+      const rankIdx = studentScores.findIndex(s => s.id === String(student._id));
+      const rank = rankIdx !== -1 ? rankIdx + 1 : 1;
+
+      // Full question checklist for modal & individual CSV
+      const questionsList = platQuestions.map(q => {
+        const isSolved = res.solvedIds.includes(q.id);
+        const solInfo = res.solvedProblems.find(sp => sp.id === q.id);
+        return {
+          id: q.id,
+          title: q.title,
+          difficulty: q.difficulty,
+          acceptance: q.acceptance,
+          slug: q.slug,
+          officialUrl: q.officialUrl,
+          isSolved,
+          language: solInfo?.language || 'cpp',
+          solvedAt: solInfo?.solvedAt || null,
+          hasCustomCode: solInfo?.hasCustomCode || false,
+          solutionCode: solInfo?.solutionCode || ''
+        };
+      });
+
+      platformReports[plat] = {
+        ...res,
+        rank,
+        totalStudents: allStudents.length,
+        questions: questionsList,
+        solvedPercentage: res.percentage,
+        username: plat === 'leetcode' ? student.leetcodeUsername
+                : plat === 'codeforces' ? student.codeforcesUsername
+                : plat === 'codechef' ? student.codechefUsername
+                : student.hackerrankUsername || '',
+        platformStats: plat === 'leetcode' ? student.leetcodeStats
+                     : plat === 'codeforces' ? student.codeforcesStats
+                     : plat === 'codechef' ? student.codechefStats
+                     : student.hackerrankStats || {}
+      };
+      grandTotalAdmin += res.totalCount;
+      grandTotalSolved += res.solvedCount;
+    });
+
+    res.status(200).json({
+      success: true,
+      data: {
+        student: {
+          _id: student._id,
+          studentId: student._id,
+          name: student.name,
+          email: student.email,
+          rollNumber: student.rollNumber || 'N/A',
+          branch: student.branch || 'N/A',
+          section: student.section || 'N/A',
+          academicYear: student.academicYear || 'N/A',
+          leetcodeUsername: student.leetcodeUsername || '',
+          codeforcesUsername: student.codeforcesUsername || '',
+          codechefUsername: student.codechefUsername || '',
+          hackerrankUsername: student.hackerrankUsername || ''
+        },
+        grandTotalAdmin,
+        grandTotalSolved,
+        overallPercentage: grandTotalAdmin > 0 ? Math.round((grandTotalSolved / grandTotalAdmin) * 100) : 0,
+        platforms: platformReports
+      }
+    });
   } catch (err) {
     next(err);
   }

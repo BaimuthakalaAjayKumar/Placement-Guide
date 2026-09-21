@@ -1353,5 +1353,86 @@
   color: #4b5563 !important;
 }
 
+/* Platform Handle Linking & Updating Card */
+.platform-link-card {
+  padding: 20px 24px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--border-radius-md);
+  margin-bottom: 24px;
+}
 
+.platform-link-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
 
+.platform-brand-badge {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.platform-brand-badge h4 {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.platform-icon {
+  width: 22px;
+  height: 22px;
+}
+
+.platform-link-desc {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  margin-bottom: 14px;
+  line-height: 1.5;
+}
+
+.platform-link-form {
+  display: flex;
+  gap: 12px;
+  max-width: 520px;
+}
+
+.platform-link-form .form-control {
+  flex: 1;
+}
+
+/* Platform Rank Card */
+.platform-rank-box {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  padding: 16px 24px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  min-width: 170px;
+  text-align: center;
+}
+
+.platform-rank-box .rank-title {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+.platform-rank-box .rank-value {
+  font-size: 28px;
+  font-weight: 800;
+  margin: 4px 0;
+}
+
+.platform-rank-box .rank-subtitle {
+  font-size: 11px;
+  color: var(--text-muted);
+}

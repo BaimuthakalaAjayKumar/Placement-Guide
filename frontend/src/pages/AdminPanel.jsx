@@ -108,6 +108,21 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
   const [practiceSearch, setPracticeSearch] = useState('');
   const [practiceDifficulty, setPracticeDifficulty] = useState('all');
 
+  // Practice Reports states
+  const [practiceReportPlatform, setPracticeReportPlatform] = useState('leetcode');
+  const [practiceReportsData, setPracticeReportsData] = useState([]);
+  const [loadingPracticeReports, setLoadingPracticeReports] = useState(false);
+  const [practiceReportsSearch, setPracticeReportsSearch] = useState('');
+  const [practiceReportsBranchFilter, setPracticeReportsBranchFilter] = useState('all');
+  const [practiceReportsStatusFilter, setPracticeReportsStatusFilter] = useState('all');
+  const [selectedStudentPracticeReport, setSelectedStudentPracticeReport] = useState(null);
+  const [loadingStudentPracticeReport, setLoadingStudentPracticeReport] = useState(false);
+  const [showStudentPracticeModal, setShowStudentPracticeModal] = useState(false);
+  const [viewingCodeSnippet, setViewingCodeSnippet] = useState(null);
+  const [modalPracticePlatform, setModalPracticePlatform] = useState('leetcode');
+  const [modalQuestionFilter, setModalQuestionFilter] = useState('all');
+  const [copiedSnippet, setCopiedSnippet] = useState(false);
+
   // Practice Question URL form state
   const [submittingPracticeQuestion, setSubmittingPracticeQuestion] = useState(false);
   const [pqUrlInput, setPqUrlInput] = useState('');
@@ -581,6 +596,8 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
       } else if (activeTab === 'faculty-staff') {
         fetchStaff();
         fetchAcademicContent();
+      } else if (activeTab === 'practice-reports') {
+        fetchPracticeReports(practiceReportPlatform);
       } else if (activeTab === 'settings') {
         fetchStaff();
         fetchAcademicContent();
@@ -1511,9 +1528,9 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
     }
   };
 
-  const handleDownloadPracticeReport = async () => {
+  const handleDownloadPracticeReport = async (platform = practiceReportPlatform) => {
     try {
-      const res = await fetch(`${API_URL}/tests/practice-reports/${practicePlatform}`, {
+      const res = await fetch(`${API_URL}/tests/practice-reports/${platform}`, {
         headers: {
           Authorization: `Bearer ${token}`
         }
@@ -1525,14 +1542,14 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
       }
 
       // Convert report data to CSV
-      const headers = ['Roll Number', 'Student Name', 'Email Address', 'Branch', 'Platform Username', 'Solved (DB List)', 'Total Solved on Platform'];
-      if (practicePlatform === 'leetcode') {
+      const headers = ['Roll Number', 'Student Name', 'Email Address', 'Branch', 'Platform Username', 'Admin Solved', 'Total Solved on Platform'];
+      if (platform === 'leetcode') {
         headers.push('Easy Solved', 'Medium Solved', 'Hard Solved');
-      } else if (practicePlatform === 'codeforces') {
+      } else if (platform === 'codeforces') {
         headers.push('Rating', 'Rank');
-      } else if (practicePlatform === 'codechef') {
+      } else if (platform === 'codechef') {
         headers.push('Rating', 'Stars');
-      } else if (practicePlatform === 'hackerrank') {
+      } else if (platform === 'hackerrank') {
         headers.push('Score', 'Badges');
       }
 
@@ -1546,23 +1563,23 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
           `"${item.solvedPracticeCount}/${item.totalPracticeCount}"`,
           `"${item.platformTotalSolved}"`
         ];
-        if (practicePlatform === 'leetcode') {
+        if (platform === 'leetcode') {
           baseRow.push(
             item.platformSpecificStats?.easySolved || 0,
             item.platformSpecificStats?.mediumSolved || 0,
             item.platformSpecificStats?.hardSolved || 0
           );
-        } else if (practicePlatform === 'codeforces') {
+        } else if (platform === 'codeforces') {
           baseRow.push(
             item.platformSpecificStats?.rating || 0,
             `"${item.platformSpecificStats?.rank || 'Unrated'}"`
           );
-        } else if (practicePlatform === 'codechef') {
+        } else if (platform === 'codechef') {
           baseRow.push(
             item.platformSpecificStats?.rating || 0,
             `"${item.platformSpecificStats?.stars || '1★'}"`
           );
-        } else if (practicePlatform === 'hackerrank') {
+        } else if (platform === 'hackerrank') {
           baseRow.push(
             item.platformSpecificStats?.score || 0,
             item.platformSpecificStats?.badges || 0
@@ -1576,13 +1593,99 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.setAttribute("href", url);
-      link.setAttribute("download", `${practicePlatform}_students_report_${new Date().toISOString().slice(0, 10)}.csv`);
+      link.setAttribute("download", `${platform}_students_report_${new Date().toISOString().slice(0, 10)}.csv`);
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
     } catch (err) {
       alert('Error downloading report: ' + err.message);
     }
+  };
+
+  const fetchPracticeReports = async (platform = practiceReportPlatform) => {
+    try {
+      setLoadingPracticeReports(true);
+      const res = await fetch(`${API_URL}/tests/practice-reports/${platform}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (data.success && Array.isArray(data.data)) {
+        setPracticeReportsData(data.data);
+      } else {
+        setPracticeReportsData([]);
+      }
+    } catch (err) {
+      console.error('Failed to fetch practice reports:', err.message);
+      setPracticeReportsData([]);
+    } finally {
+      setLoadingPracticeReports(false);
+    }
+  };
+
+  const handleOpenStudentPracticeReport = async (studentId) => {
+    if (!studentId || studentId === 'undefined' || studentId === 'null') {
+      alert('Unable to identify student record. Please refresh the practice reports table.');
+      return;
+    }
+    try {
+      setLoadingStudentPracticeReport(true);
+      setShowStudentPracticeModal(true);
+      setViewingCodeSnippet(null);
+      setModalPracticePlatform(practiceReportPlatform);
+      setModalQuestionFilter('all');
+      const res = await fetch(`${API_URL}/tests/practice-reports/student/${studentId}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (data.success && data.data) {
+        setSelectedStudentPracticeReport(data.data);
+      } else {
+        alert(data.error || 'Failed to load individual student report');
+        setShowStudentPracticeModal(false);
+      }
+    } catch (err) {
+      alert('Error loading student practice report: ' + err.message);
+      setShowStudentPracticeModal(false);
+    } finally {
+      setLoadingStudentPracticeReport(false);
+    }
+  };
+
+  const handleExportIndividualStudentCSV = (studentReport, platformToExport = modalPracticePlatform || practiceReportPlatform) => {
+    if (!studentReport || !studentReport.student) return;
+    const { student, platforms } = studentReport;
+    const currentPlatData = platforms?.[platformToExport];
+    if (!currentPlatData) return;
+
+    const headers = ['Problem ID', 'Problem Title', 'Difficulty', 'Acceptance', 'Status', 'Language', 'Submission Date'];
+    const rows = (currentPlatData.questions || []).map(q => [
+      `"${q.id}"`,
+      `"${(q.title || '').replace(/"/g, '""')}"`,
+      `"${q.difficulty || 'N/A'}"`,
+      `"${q.acceptance || 'N/A'}"`,
+      `"${q.isSolved ? 'Solved' : 'Unsolved'}"`,
+      `"${q.language || 'N/A'}"`,
+      `"${q.solvedAt ? new Date(q.solvedAt).toLocaleDateString() : 'N/A'}"`
+    ]);
+
+    const summaryHeader = [
+      `"Student: ${student.name} (${student.rollNumber || student.email})"`,
+      `"Branch: ${student.branch || 'N/A'}"`,
+      `"Platform: ${platformToExport.toUpperCase()}"`,
+      `"Handle: ${currentPlatData.username || 'Not Linked'}"`,
+      `"Admin Solved: ${currentPlatData.solvedCount}/${currentPlatData.totalCount} (${currentPlatData.solvedPercentage}%)"`,
+      `"College Rank: #${currentPlatData.rank || 1}"`
+    ];
+
+    const csvContent = "\uFEFF" + [summaryHeader.join(','), '', headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `${student.rollNumber || student.name}_${platformToExport}_report.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   const fetchAdminLabReports = async () => {
@@ -2323,6 +2426,15 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
             }}
           >
             💻 Practice Platforms
+          </button>
+          <button
+            className={`admin-tab-btn ${activeTab === 'practice-reports' ? 'active' : ''}`}
+            onClick={() => {
+              setActiveTab('practice-reports');
+              fetchPracticeReports(practiceReportPlatform);
+            }}
+          >
+            📈 Practice Reports
           </button>
           <button
             className={`admin-tab-btn ${activeTab === 'interview-settings' ? 'active' : ''}`}
@@ -4049,6 +4161,283 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
           )
         }
 
+        {
+          activeTab === 'practice-reports' && (
+            <div className="glass-card practice-reports-manager-card animate-fade">
+              {/* Header */}
+              <div className="manager-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '15px' }}>
+                <div>
+                  <h3>📈 Practice Platform Reports & Verification</h3>
+                  <p className="card-desc">
+                    Audit student progress on admin-added problems across LeetCode, Codeforces, CodeChef, and HackerRank. View college rankings, exact solved counts, and inspect student submissions.
+                  </p>
+                </div>
+                <div style={{ display: 'flex', gap: '10px' }}>
+                  <button 
+                    className="btn btn-primary" 
+                    onClick={() => handleDownloadPracticeReport()}
+                  >
+                    📥 Export All Candidates CSV
+                  </button>
+                </div>
+              </div>
+
+              {/* Platform Selector Tabs */}
+              <div className="platform-sub-nav" style={{ display: 'flex', gap: '10px', margin: '20px 0', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '15px' }}>
+                {[
+                  { id: 'leetcode', name: 'LeetCode', color: '#FFA116' },
+                  { id: 'codeforces', name: 'Codeforces', color: '#FF4B4B' },
+                  { id: 'codechef', name: 'CodeChef', color: '#d38b27' },
+                  { id: 'hackerrank', name: 'HackerRank', color: '#2ec866' }
+                ].map(plat => (
+                  <button
+                    key={plat.id}
+                    className={`btn ${practiceReportPlatform === plat.id ? 'btn-primary' : 'btn-secondary'}`}
+                    style={{ 
+                      borderColor: practiceReportPlatform === plat.id ? plat.color : undefined,
+                      backgroundColor: practiceReportPlatform === plat.id ? plat.color : undefined,
+                      color: practiceReportPlatform === plat.id ? '#fff' : undefined
+                    }}
+                    onClick={() => {
+                      setPracticeReportPlatform(plat.id);
+                      fetchPracticeReports(plat.id);
+                    }}
+                  >
+                    {plat.name} Reports
+                  </button>
+                ))}
+              </div>
+
+              {/* Summary Stats Overview Grid */}
+              <div className="admin-stats-summary-grid" style={{ marginBottom: '25px' }}>
+                <div className="glass-card stat-summary-box">
+                  <span className="stat-label">Total Candidates</span>
+                  <span className="stat-num">{practiceReportsData.length}</span>
+                  <span className="stat-sub">Enrolled students</span>
+                </div>
+                <div className="glass-card stat-summary-box">
+                  <span className="stat-label">Linked Accounts</span>
+                  <span className="stat-num" style={{ color: '#2ec866' }}>
+                    {practiceReportsData.filter(s => s.username).length}
+                  </span>
+                  <span className="stat-sub">
+                    {practiceReportsData.length ? Math.round((practiceReportsData.filter(s => s.username).length / practiceReportsData.length) * 100) : 0}% Linkage Rate
+                  </span>
+                </div>
+                <div className="glass-card stat-summary-box">
+                  <span className="stat-label">Active Solvers</span>
+                  <span className="stat-num" style={{ color: '#60a5fa' }}>
+                    {practiceReportsData.filter(s => s.solvedPracticeCount > 0).length}
+                  </span>
+                  <span className="stat-sub">Solved ≥ 1 admin question</span>
+                </div>
+                <div className="glass-card stat-summary-box">
+                  <span className="stat-label">Top Performer</span>
+                  <span className="stat-num" style={{ fontSize: '1.2rem', color: '#FFA116' }}>
+                    {practiceReportsData[0]?.name ? practiceReportsData[0].name.split(' ')[0] : 'None'}
+                  </span>
+                  <span className="stat-sub">
+                    {practiceReportsData[0]?.solvedPracticeCount || 0} Admin Solved
+                  </span>
+                </div>
+              </div>
+
+              {/* Filters & Search Row */}
+              <div className="practice-filters-bar" style={{ display: 'flex', gap: '15px', marginBottom: '20px', flexWrap: 'wrap' }}>
+                <div style={{ flex: 1, minWidth: '220px' }}>
+                  <input
+                    type="text"
+                    className="form-control"
+                    placeholder="Search by student name, roll no, or handle..."
+                    value={practiceReportsSearch}
+                    onChange={(e) => setPracticeReportsSearch(e.target.value)}
+                  />
+                </div>
+                <div style={{ width: '160px' }}>
+                  <select
+                    className="form-control"
+                    value={practiceReportsBranchFilter}
+                    onChange={(e) => setPracticeReportsBranchFilter(e.target.value)}
+                  >
+                    <option value="all">All Branches</option>
+                    <option value="CSE">CSE</option>
+                    <option value="IT">IT</option>
+                    <option value="ECE">ECE</option>
+                    <option value="EEE">EEE</option>
+                    <option value="MECH">MECH</option>
+                    <option value="CIVIL">CIVIL</option>
+                  </select>
+                </div>
+                <div style={{ width: '160px' }}>
+                  <select
+                    className="form-control"
+                    value={practiceReportsStatusFilter}
+                    onChange={(e) => setPracticeReportsStatusFilter(e.target.value)}
+                  >
+                    <option value="all">All Solved Status</option>
+                    <option value="solved">Solved (≥ 1)</option>
+                    <option value="unsolved">Unsolved (0)</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Main Roster Table */}
+              {loadingPracticeReports ? (
+                <div style={{ padding: '60px 0', textAlign: 'center' }}>
+                  <div className="spinner-loader"></div>
+                  <p style={{ marginTop: '15px', color: 'var(--text-secondary)' }}>Compiling verified practice reports from {practiceReportPlatform}...</p>
+                </div>
+              ) : (
+                <div className="table-responsive-wrapper">
+                  <table className="student-roster-table">
+                    <thead>
+                      <tr>
+                        <th style={{ width: '70px' }}>Rank</th>
+                        <th>Student Details</th>
+                        <th style={{ width: '100px' }}>Branch</th>
+                        <th style={{ width: '150px' }}>Platform Handle</th>
+                        <th style={{ width: '180px' }}>Admin Questions Solved</th>
+                        <th>Solved Problem Titles</th>
+                        <th style={{ width: '140px', textAlign: 'right' }}>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(() => {
+                        const filtered = practiceReportsData.filter(item => {
+                          const query = practiceReportsSearch.toLowerCase();
+                          const matchesQuery = !query || 
+                            (item.name || '').toLowerCase().includes(query) ||
+                            (item.rollNumber || '').toLowerCase().includes(query) ||
+                            (item.email || '').toLowerCase().includes(query) ||
+                            (item.username || '').toLowerCase().includes(query);
+
+                          const matchesBranch = practiceReportsBranchFilter === 'all' || 
+                            (item.branch || '').toUpperCase() === practiceReportsBranchFilter.toUpperCase();
+
+                          const matchesStatus = practiceReportsStatusFilter === 'all' ||
+                            (practiceReportsStatusFilter === 'solved' && item.solvedPracticeCount > 0) ||
+                            (practiceReportsStatusFilter === 'unsolved' && item.solvedPracticeCount === 0);
+
+                          return matchesQuery && matchesBranch && matchesStatus;
+                        });
+
+                        if (filtered.length === 0) {
+                          return (
+                            <tr>
+                              <td colSpan="7" className="table-empty-msg">
+                                No student practice records match your filter criteria.
+                              </td>
+                            </tr>
+                          );
+                        }
+
+                        return filtered.map((item, idx) => {
+                          const medal = item.rank === 1 ? '🥇' : item.rank === 2 ? '🥈' : item.rank === 3 ? '🥉' : null;
+                          const studentId = item.studentId || item._id || item.id;
+                          const solvedPct = item.solvedPercentage ?? item.percentage ?? 0;
+                          return (
+                            <tr key={studentId || idx}>
+                              <td>
+                                <span style={{ fontWeight: '800', color: medal ? '#FFA116' : 'var(--text-primary)', fontSize: '1rem' }}>
+                                  {medal ? `${medal} #${item.rank}` : `#${item.rank}`}
+                                </span>
+                              </td>
+                              <td>
+                                <div style={{ fontWeight: '600', color: 'var(--text-primary)' }}>{item.name}</div>
+                                <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                                  {item.rollNumber ? `Roll: ${item.rollNumber}` : item.email}
+                                </div>
+                              </td>
+                              <td>
+                                <span className="badge" style={{ background: 'rgba(255,255,255,0.08)', padding: '3px 8px', borderRadius: '6px', fontSize: '12px' }}>
+                                  {item.branch || 'CSE'}
+                                </span>
+                              </td>
+                              <td>
+                                {item.username ? (
+                                  <span className="text-glow" style={{ fontSize: '13px', fontWeight: '500' }}>
+                                    @{item.username}
+                                  </span>
+                                ) : (
+                                  <span style={{ fontSize: '12px', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                                    Unlinked
+                                  </span>
+                                )}
+                              </td>
+                              <td>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '4px' }}>
+                                  <span style={{ fontWeight: '700', color: item.solvedPracticeCount > 0 ? '#2ec866' : 'var(--text-muted)' }}>
+                                    {item.solvedPracticeCount} / {item.totalPracticeCount} Solved
+                                  </span>
+                                  <span style={{ color: 'var(--text-secondary)' }}>{solvedPct}%</span>
+                                </div>
+                                <div style={{ width: '100%', height: '6px', background: 'rgba(255,255,255,0.08)', borderRadius: '3px', overflow: 'hidden' }}>
+                                  <div 
+                                    style={{ 
+                                      width: `${solvedPct}%`, 
+                                      height: '100%', 
+                                      background: solvedPct >= 60 ? '#2ec866' : solvedPct > 0 ? '#FFA116' : 'transparent',
+                                      borderRadius: '3px'
+                                    }}
+                                  ></div>
+                                </div>
+                              </td>
+                              <td>
+                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', maxWidth: '350px' }}>
+                                  {item.solvedProblemTitles && item.solvedProblemTitles.length > 0 ? (
+                                    <>
+                                      {item.solvedProblemTitles.slice(0, 3).map((title, tIdx) => (
+                                        <span 
+                                          key={tIdx}
+                                          style={{ 
+                                            background: 'rgba(46, 200, 102, 0.12)', 
+                                            color: '#2ec866', 
+                                            border: '1px solid rgba(46, 200, 102, 0.25)', 
+                                            padding: '2px 8px', 
+                                            borderRadius: '4px', 
+                                            fontSize: '11px', 
+                                            maxWidth: '140px',
+                                            overflow: 'hidden',
+                                            textOverflow: 'ellipsis',
+                                            whiteSpace: 'nowrap'
+                                          }}
+                                          title={title}
+                                        >
+                                          ✓ {title}
+                                        </span>
+                                      ))}
+                                      {item.solvedProblemTitles.length > 3 && (
+                                        <span style={{ fontSize: '11px', color: 'var(--text-muted)', alignSelf: 'center' }}>
+                                          +{item.solvedProblemTitles.length - 3} more
+                                        </span>
+                                      )}
+                                    </>
+                                  ) : (
+                                    <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>None solved yet</span>
+                                  )}
+                                </div>
+                              </td>
+                              <td style={{ textAlign: 'right' }}>
+                                <button
+                                  className="btn btn-secondary btn-sm"
+                                  onClick={() => handleOpenStudentPracticeReport(studentId)}
+                                  title="View full questions solved checklist and code"
+                                >
+                                  🔍 View Report
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        });
+                      })()}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )
+        }
+
         {activeTab === 'interview-settings' && (
           <div className="interview-settings-wrapper animate-fade">
             <div className="glass-card interview-settings-header-card">
@@ -5220,6 +5609,370 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
                 onClick={handlePostPracticeBulk}
               >
                 {isSubmittingPracticeBulk ? 'Submitting Batch...' : '✓ Confirm Batch Import'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Individual Student Practice Audit & Code Drilldown Modal */}
+      {showStudentPracticeModal && (
+        <div className="modal-overlay" style={{ zIndex: 1150, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '15px' }}>
+          <div 
+            className="glass-card modal-content animate-fade" 
+            style={{ 
+              maxWidth: '960px', 
+              width: '100%', 
+              maxHeight: '92vh', 
+              display: 'flex', 
+              flexDirection: 'column', 
+              padding: 0, 
+              overflow: 'hidden',
+              background: '#0f172a',
+              border: '1px solid rgba(255,255,255,0.12)',
+              borderRadius: '16px',
+              boxShadow: '0 25px 60px rgba(0,0,0,0.7)'
+            }}
+          >
+            {/* Header */}
+            <div style={{ padding: '18px 24px', borderBottom: '1px solid rgba(255,255,255,0.08)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.02)' }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '1.25rem', color: '#fff', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span>📋</span> Student Practice Audit & Verification
+                </h3>
+                {selectedStudentPracticeReport?.student && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginTop: '6px', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                    <span style={{ fontWeight: '600', color: '#fff' }}>{selectedStudentPracticeReport.student.name}</span>
+                    <span>•</span>
+                    <span>Roll: <strong style={{ color: '#60a5fa' }}>{selectedStudentPracticeReport.student.rollNumber || 'N/A'}</strong></span>
+                    <span>•</span>
+                    <span>Branch: <strong>{selectedStudentPracticeReport.student.branch || 'N/A'}</strong></span>
+                    <span>•</span>
+                    <span>Email: <strong>{selectedStudentPracticeReport.student.email}</strong></span>
+                  </div>
+                )}
+              </div>
+              <button
+                type="button"
+                className="close-btn"
+                style={{ background: 'none', border: 'none', color: '#94a3b8', fontSize: '1.5rem', cursor: 'pointer', padding: '4px' }}
+                onClick={() => {
+                  setShowStudentPracticeModal(false);
+                  setSelectedStudentPracticeReport(null);
+                  setViewingCodeSnippet(null);
+                }}
+              >
+                &times;
+              </button>
+            </div>
+
+            {/* Platform Sub-Nav inside Modal */}
+            <div style={{ display: 'flex', gap: '8px', padding: '12px 24px', background: 'rgba(0,0,0,0.2)', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+              {[
+                { id: 'leetcode', name: 'LeetCode', color: '#FFA116' },
+                { id: 'codeforces', name: 'Codeforces', color: '#FF4B4B' },
+                { id: 'codechef', name: 'CodeChef', color: '#d38b27' },
+                { id: 'hackerrank', name: 'HackerRank', color: '#2ec866' }
+              ].map(plat => {
+                const isSelected = modalPracticePlatform === plat.id;
+                const platData = selectedStudentPracticeReport?.platforms?.[plat.id];
+                return (
+                  <button
+                    key={plat.id}
+                    type="button"
+                    style={{
+                      background: isSelected ? plat.color : 'rgba(255,255,255,0.05)',
+                      color: isSelected ? '#fff' : 'var(--text-secondary)',
+                      border: isSelected ? `1px solid ${plat.color}` : '1px solid rgba(255,255,255,0.1)',
+                      borderRadius: '8px',
+                      padding: '6px 14px',
+                      fontSize: '0.82rem',
+                      fontWeight: '600',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px'
+                    }}
+                    onClick={() => {
+                      setModalPracticePlatform(plat.id);
+                      setViewingCodeSnippet(null);
+                    }}
+                  >
+                    <span>{plat.name}</span>
+                    {platData && (
+                      <span style={{ 
+                        background: isSelected ? 'rgba(0,0,0,0.25)' : 'rgba(255,255,255,0.1)',
+                        padding: '1px 6px',
+                        borderRadius: '10px',
+                        fontSize: '0.72rem'
+                      }}>
+                        {platData.solvedCount}/{platData.totalCount}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Modal Body */}
+            <div style={{ padding: '20px 24px', overflowY: 'auto', flex: 1 }}>
+              {loadingStudentPracticeReport ? (
+                <div style={{ padding: '60px 0', textAlign: 'center' }}>
+                  <div className="spinner-loader"></div>
+                  <p style={{ marginTop: '15px', color: 'var(--text-secondary)' }}>Loading student practice audit record...</p>
+                </div>
+              ) : selectedStudentPracticeReport ? (() => {
+                const platData = selectedStudentPracticeReport.platforms?.[modalPracticePlatform];
+                const allQuestions = platData?.questions || [];
+                const filteredQuestions = allQuestions.filter(q => {
+                  if (modalQuestionFilter === 'solved') return q.isSolved;
+                  if (modalQuestionFilter === 'unsolved') return !q.isSolved;
+                  return true;
+                });
+
+                return (
+                  <div>
+                    {/* Metrics Banner */}
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px', marginBottom: '20px' }}>
+                      <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '10px', padding: '12px 16px' }}>
+                        <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Admin Questions Solved</div>
+                        <div style={{ fontSize: '1.4rem', fontWeight: '800', color: '#2ec866', marginTop: '4px' }}>
+                          {platData?.solvedCount || 0} / {platData?.totalCount || 0}
+                        </div>
+                        <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                          {platData?.solvedPercentage || 0}% Completed
+                        </div>
+                      </div>
+
+                      <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '10px', padding: '12px 16px' }}>
+                        <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>College Rank</div>
+                        <div style={{ fontSize: '1.4rem', fontWeight: '800', color: '#FFA116', marginTop: '4px' }}>
+                          🏆 #{platData?.rank || 1}
+                        </div>
+                        <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                          Out of {platData?.totalStudents || 1} cohort candidates
+                        </div>
+                      </div>
+
+                      <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '10px', padding: '12px 16px' }}>
+                        <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Platform Account</div>
+                        <div style={{ fontSize: '1.1rem', fontWeight: '700', color: '#60a5fa', marginTop: '4px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {platData?.username ? `@${platData.username}` : 'Not Linked'}
+                        </div>
+                        <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                          {platData?.username ? '✓ Verified Account' : 'Pending Link'}
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <button
+                          type="button"
+                          className="btn btn-secondary"
+                          style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '6px', padding: '12px' }}
+                          onClick={() => handleExportIndividualStudentCSV(selectedStudentPracticeReport, modalPracticePlatform)}
+                        >
+                          <span style={{ fontSize: '1.2rem' }}>📥</span>
+                          <span style={{ fontSize: '0.82rem', fontWeight: '600' }}>Export Student CSV</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Code Snippet Drawer (if viewing a solution) */}
+                    {viewingCodeSnippet && (
+                      <div 
+                        style={{ 
+                          marginBottom: '20px', 
+                          background: '#090d16', 
+                          border: '1px solid #38bdf8', 
+                          borderRadius: '12px', 
+                          padding: '16px',
+                          boxShadow: '0 8px 24px rgba(0,0,0,0.5)'
+                        }}
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap', gap: '8px' }}>
+                          <div>
+                            <span style={{ fontSize: '0.9rem', fontWeight: '700', color: '#fff' }}>
+                              Last Submission: {viewingCodeSnippet.title}
+                            </span>
+                            <span style={{ marginLeft: '10px', background: 'rgba(56, 189, 248, 0.15)', color: '#38bdf8', padding: '2px 8px', borderRadius: '4px', fontSize: '0.75rem', fontWeight: '600' }}>
+                              {viewingCodeSnippet.language ? viewingCodeSnippet.language.toUpperCase() : 'CODE'}
+                            </span>
+                            {viewingCodeSnippet.solvedAt && (
+                              <span style={{ marginLeft: '8px', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                                Submitted on {new Date(viewingCodeSnippet.solvedAt).toLocaleDateString()}
+                              </span>
+                            )}
+                          </div>
+                          <div style={{ display: 'flex', gap: '8px' }}>
+                            <button
+                              type="button"
+                              className="btn btn-secondary btn-sm"
+                              onClick={() => {
+                                if (viewingCodeSnippet.solutionCode) {
+                                  navigator.clipboard.writeText(viewingCodeSnippet.solutionCode);
+                                  setCopiedSnippet(true);
+                                  setTimeout(() => setCopiedSnippet(false), 2000);
+                                }
+                              }}
+                            >
+                              {copiedSnippet ? 'Copied! ✓' : '📋 Copy Code'}
+                            </button>
+                            <button
+                              type="button"
+                              className="btn btn-secondary btn-sm"
+                              onClick={() => setViewingCodeSnippet(null)}
+                            >
+                              ✕ Close Viewer
+                            </button>
+                          </div>
+                        </div>
+
+                        <pre style={{ 
+                          background: '#040711', 
+                          color: '#e2e8f0', 
+                          padding: '14px', 
+                          borderRadius: '8px', 
+                          fontFamily: 'Consolas, Monaco, "Courier New", monospace', 
+                          fontSize: '0.82rem', 
+                          lineHeight: '1.5', 
+                          maxHeight: '260px', 
+                          overflowY: 'auto',
+                          margin: 0,
+                          border: '1px solid rgba(255,255,255,0.06)'
+                        }}>
+                          <code>{viewingCodeSnippet.solutionCode || '// Submission verified via profile activity. Direct code stored upon test run.'}</code>
+                        </pre>
+                      </div>
+                    )}
+
+                    {/* Filter row for questions */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap', gap: '10px' }}>
+                      <h4 style={{ margin: 0, fontSize: '0.95rem', color: '#fff' }}>
+                        Admin Questions Checklist ({filteredQuestions.length} of {allQuestions.length})
+                      </h4>
+                      <div style={{ display: 'flex', gap: '6px' }}>
+                        {[
+                          { id: 'all', label: `All (${allQuestions.length})` },
+                          { id: 'solved', label: `Solved (${allQuestions.filter(q => q.isSolved).length})` },
+                          { id: 'unsolved', label: `Pending (${allQuestions.filter(q => !q.isSolved).length})` }
+                        ].map(f => (
+                          <button
+                            key={f.id}
+                            type="button"
+                            className={`btn btn-sm ${modalQuestionFilter === f.id ? 'btn-primary' : 'btn-secondary'}`}
+                            style={{ fontSize: '0.75rem', padding: '4px 10px' }}
+                            onClick={() => setModalQuestionFilter(f.id)}
+                          >
+                            {f.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Questions Table */}
+                    <div className="table-responsive-wrapper" style={{ maxHeight: '350px', overflowY: 'auto' }}>
+                      <table className="student-roster-table mini-table" style={{ fontSize: '0.8rem' }}>
+                        <thead>
+                          <tr>
+                            <th style={{ width: '45px' }}>#</th>
+                            <th>Problem Title</th>
+                            <th style={{ width: '90px' }}>Difficulty</th>
+                            <th style={{ width: '100px' }}>Status</th>
+                            <th style={{ width: '90px' }}>Language</th>
+                            <th style={{ width: '110px' }}>Date</th>
+                            <th style={{ width: '100px', textAlign: 'right' }}>Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {filteredQuestions.length === 0 ? (
+                            <tr>
+                              <td colSpan="7" className="table-empty-msg" style={{ padding: '20px', textAlign: 'center' }}>
+                                No questions found in this category.
+                              </td>
+                            </tr>
+                          ) : (
+                            filteredQuestions.map(q => (
+                              <tr key={q.id}>
+                                <td><span style={{ fontWeight: '700', color: 'var(--text-secondary)' }}>#{q.id}</span></td>
+                                <td>
+                                  <div style={{ fontWeight: '600', color: '#fff' }}>{q.title}</div>
+                                  {q.slug && <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>{q.slug}</div>}
+                                </td>
+                                <td>
+                                  <span 
+                                    className="badge" 
+                                    style={{ 
+                                      background: q.difficulty === 'Easy' ? 'rgba(46, 200, 102, 0.15)' : q.difficulty === 'Medium' ? 'rgba(255, 161, 22, 0.15)' : 'rgba(255, 75, 75, 0.15)',
+                                      color: q.difficulty === 'Easy' ? '#2ec866' : q.difficulty === 'Medium' ? '#FFA116' : '#FF4B4B',
+                                      padding: '2px 6px',
+                                      borderRadius: '4px',
+                                      fontSize: '0.72rem'
+                                    }}
+                                  >
+                                    {q.difficulty}
+                                  </span>
+                                </td>
+                                <td>
+                                  {q.isSolved ? (
+                                    <span style={{ color: '#2ec866', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                      ✓ Solved
+                                    </span>
+                                  ) : (
+                                    <span style={{ color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                      ○ Pending
+                                    </span>
+                                  )}
+                                </td>
+                                <td>
+                                  {q.isSolved ? (
+                                    <span style={{ background: 'rgba(255,255,255,0.08)', padding: '2px 6px', borderRadius: '4px', fontSize: '0.72rem', color: '#e2e8f0' }}>
+                                      {(q.language || 'cpp').toUpperCase()}
+                                    </span>
+                                  ) : (
+                                    <span style={{ color: 'var(--text-secondary)' }}>—</span>
+                                  )}
+                                </td>
+                                <td>
+                                  <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
+                                    {q.solvedAt ? new Date(q.solvedAt).toLocaleDateString() : '—'}
+                                  </span>
+                                </td>
+                                <td style={{ textAlign: 'right' }}>
+                                  {q.isSolved ? (
+                                    <button
+                                      type="button"
+                                      className="btn btn-secondary btn-sm"
+                                      style={{ fontSize: '0.72rem', padding: '3px 8px' }}
+                                      onClick={() => setViewingCodeSnippet(q)}
+                                    >
+                                      👁️ View Code
+                                    </button>
+                                  ) : (
+                                    <span style={{ color: 'var(--text-secondary)', fontSize: '0.72rem' }}>Not Solved</span>
+                                  )}
+                                </td>
+                              </tr>
+                            ))
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                );
+              })() : null}
+            </div>
+
+            {/* Footer */}
+            <div style={{ padding: '14px 24px', borderTop: '1px solid rgba(255,255,255,0.08)', display: 'flex', justifyContent: 'flex-end', gap: '10px', background: 'rgba(255,255,255,0.02)' }}>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => {
+                  setShowStudentPracticeModal(false);
+                  setSelectedStudentPracticeReport(null);
+                  setViewingCodeSnippet(null);
+                }}
+              >
+                Close
               </button>
             </div>
           </div>
