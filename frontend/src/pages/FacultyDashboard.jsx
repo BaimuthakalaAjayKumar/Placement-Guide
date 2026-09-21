@@ -79,9 +79,17 @@ const FacultyDashboard = () => {
     const [labReports, setLabReports] = useState([]);
     const [loadingReports, setLoadingReports] = useState(false);
 
-    // Project review state
+    // Project review & code viewer state
     const [selectedProject, setSelectedProject] = useState(null);
-    const [projectReviewForm, setProjectReviewForm] = useState({ status: 'approved', grade: '', feedback: '' });
+    const [viewingCodeProject, setViewingCodeProject] = useState(null);
+    const [viewingFileIdx, setViewingFileIdx] = useState(0);
+    const [projectReviewForm, setProjectReviewForm] = useState({
+        status: 'approved',
+        grade: '',
+        feedback: '',
+        codeSuggestions: '',
+        techSuggestions: ''
+    });
     const [savingReview, setSavingReview] = useState(false);
 
     // Lab task creation state
@@ -521,7 +529,7 @@ const FacultyDashboard = () => {
         }
     };
 
-    // Project grading handler
+    // Project grading & suggestions handler
     const handleSaveProjectReview = async (e) => {
         e.preventDefault();
         if (!selectedProject) return;
@@ -530,11 +538,13 @@ const FacultyDashboard = () => {
             const payload = {
                 status: projectReviewForm.status,
                 grade: projectReviewForm.grade === '' ? null : Number(projectReviewForm.grade),
-                feedback: projectReviewForm.feedback
+                feedback: projectReviewForm.feedback,
+                codeSuggestions: projectReviewForm.codeSuggestions,
+                techSuggestions: projectReviewForm.techSuggestions
             };
             const res = await axios.put(`${API_URL}/academic/projects/${selectedProject._id}`, payload, getAuthHeaders());
             if (res.data?.success) {
-                setSuccessMsg('Project review and grade submitted successfully!');
+                setSuccessMsg('Project review, code & technology suggestions submitted successfully!');
                 setSelectedProject(null);
                 fetchProjects();
             }
@@ -543,6 +553,64 @@ const FacultyDashboard = () => {
         } finally {
             setSavingReview(false);
         }
+    };
+
+    // Download Student Projects CSV Report
+    const downloadProjectsReportCSV = () => {
+        if (!projects || projects.length === 0) return;
+        const escape = val => `"${String(val ?? '').replace(/"/g, '""')}"`;
+        const headers = [
+            'Project Title',
+            'Lead Student Name',
+            'Lead Student Email',
+            'Roll Number',
+            'Academic Year',
+            'Teammates',
+            'Technologies Used',
+            'Project Goals',
+            'Deployment URL',
+            'Repository URL',
+            'Status',
+            'Grade',
+            'Faculty Code Suggestions',
+            'Faculty Technology Suggestions',
+            'Evaluator Feedback',
+            'Reviewed By',
+            'Last Updated'
+        ];
+        const rows = projects.map(p => {
+            const teamStr = (p.teamMembers || []).map(m => `${m.name} (${m.rollNumber || 'No RollNo'} - ${m.role || 'Member'})`).join('; ');
+            const techStr = (p.technologies || []).join(', ');
+            return [
+                p.title,
+                p.student?.name || 'Student',
+                p.student?.email || 'N/A',
+                p.student?.rollNumber || '',
+                p.academicYear || '',
+                teamStr || 'Individual Project',
+                techStr,
+                p.goals || '',
+                p.deploymentUrl || p.previewUrl || '',
+                p.repositoryUrl || '',
+                p.status || 'draft',
+                p.grade ?? 'Not graded',
+                p.codeSuggestions || '',
+                p.techSuggestions || '',
+                p.feedback || '',
+                p.reviewedBy?.name || '',
+                p.updatedAt ? new Date(p.updatedAt).toLocaleDateString() : ''
+            ];
+        });
+        const csvContent = `\uFEFF${[headers, ...rows].map(r => r.map(escape).join(',')).join('\n')}`;
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `Student_Academic_Projects_Report_${new Date().toISOString().slice(0, 10)}.csv`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
     };
 
     // Lab task creation handler
@@ -1735,103 +1803,393 @@ const FacultyDashboard = () => {
                     {/* TAB 3: STUDENT PROJECTS & GRADING */}
                     {activeTab === 'projects' && (
                         <div className="faculty-card">
-                            <h3>📁 Student Academic Projects Review</h3>
-                            <p className="card-desc">Review submitted capstone and studio projects, inspect code repositories, and submit grades & constructive feedback.</p>
+                            <div className="project-tab-header">
+                                <div>
+                                    <h3>📁 Student Academic Projects Review</h3>
+                                    <p className="card-desc">Review submitted capstone and studio projects, inspect code written by students, offer suggestions on code and technology, and download evaluation reports.</p>
+                                </div>
+                                <div className="project-tab-actions">
+                                    <button
+                                        type="button"
+                                        className="btn-primary-action btn-sm"
+                                        onClick={downloadProjectsReportCSV}
+                                        disabled={!projects.length}
+                                        title="Download full student projects report as CSV"
+                                    >
+                                        📥 Download Reports (CSV)
+                                    </button>
+                                </div>
+                            </div>
 
                             {loading ? (
                                 <p className="loading-text">Loading projects...</p>
                             ) : (
-                                <div className="students-table-scroll mt-20">
-                                    <table className="students-table">
+                                <div className="students-table-scroll mt-16">
+                                    <table className="students-table projects-eval-table">
                                         <thead>
                                             <tr>
-                                                <th>Project Title</th>
-                                                <th>Student</th>
-                                                <th>Year</th>
+                                                <th>Project Title & Links</th>
+                                                <th>Lead Student & Teammates</th>
+                                                <th>Technologies Used</th>
+                                                <th>Goals & Objectives</th>
                                                 <th>Status</th>
-                                                <th>Current Grade</th>
-                                                <th>Action</th>
+                                                <th>Grade</th>
+                                                <th>Actions</th>
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            {projects.map(p => (
-                                                <tr key={p._id}>
-                                                    <td>
-                                                        <strong>{p.title}</strong>
-                                                        {p.repositoryUrl && <p style={{ fontSize: '11px', margin: '4px 0 0' }}><a href={p.repositoryUrl} target="_blank" rel="noreferrer" style={{ color: '#38bdf8' }}>View Repository ↗</a></p>}
-                                                    </td>
-                                                    <td>{p.student?.name || 'Student'} ({p.student?.email})</td>
-                                                    <td>{p.academicYear}</td>
-                                                    <td><span className={`status-pill ${p.status}`}>{p.status.replace('_', ' ')}</span></td>
-                                                    <td>{p.grade !== null && p.grade !== undefined ? <strong>{p.grade}/100</strong> : <span style={{ color: '#94a3b8' }}>Not graded</span>}</td>
-                                                    <td>
-                                                        <button className="btn-view" onClick={() => {
-                                                            setSelectedProject(p);
-                                                            setProjectReviewForm({ status: p.status || 'approved', grade: p.grade ?? '', feedback: p.feedback || '' });
-                                                        }}>
-                                                            Grade & Review
-                                                        </button>
+                                            {projects.map(p => {
+                                                const hasTeam = p.teamMembers && p.teamMembers.length > 0;
+                                                const liveUrl = p.deploymentUrl || p.previewUrl;
+                                                return (
+                                                    <tr key={p._id}>
+                                                        <td>
+                                                            <div className="table-project-title">
+                                                                <strong>{p.title}</strong>
+                                                                <div className="project-table-links mt-4">
+                                                                    {liveUrl && (
+                                                                        <a
+                                                                            href={liveUrl.startsWith('http') ? liveUrl : `https://${liveUrl}`}
+                                                                            target="_blank"
+                                                                            rel="noreferrer"
+                                                                            className="table-link-live"
+                                                                            title="Open Live Deployment"
+                                                                        >
+                                                                            🚀 Live App ↗
+                                                                        </a>
+                                                                    )}
+                                                                    {p.repositoryUrl && (
+                                                                        <a
+                                                                            href={p.repositoryUrl}
+                                                                            target="_blank"
+                                                                            rel="noreferrer"
+                                                                            className="table-link-repo"
+                                                                            title="Open GitHub Repository"
+                                                                        >
+                                                                            💻 GitHub ↗
+                                                                        </a>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                        </td>
+                                                        <td>
+                                                            <div className="table-student-col">
+                                                                <strong>{p.student?.name || 'Student'}</strong>
+                                                                <span className="text-secondary" style={{ fontSize: '11px' }}>
+                                                                    {p.student?.email}
+                                                                    {p.student?.rollNumber && ` · ${p.student.rollNumber}`}
+                                                                </span>
+                                                                {hasTeam && (
+                                                                    <details className="teammates-collapsible mt-4">
+                                                                        <summary className="teammates-summary">
+                                                                            👥 +{p.teamMembers.length} Teammates
+                                                                        </summary>
+                                                                        <ul className="teammates-dropdown">
+                                                                            {p.teamMembers.map((m, idx) => (
+                                                                                <li key={idx}>
+                                                                                    <strong>{m.name}</strong>
+                                                                                    {m.rollNumber && <span> ({m.rollNumber})</span>}
+                                                                                    {m.role && <span className="teammate-role-tag"> - {m.role}</span>}
+                                                                                </li>
+                                                                            ))}
+                                                                        </ul>
+                                                                    </details>
+                                                                )}
+                                                            </div>
+                                                        </td>
+                                                        <td>
+                                                            <div className="table-tech-tags">
+                                                                {p.technologies && p.technologies.length > 0 ? (
+                                                                    p.technologies.map(t => (
+                                                                        <span key={t} className="table-tech-pill">{t}</span>
+                                                                    ))
+                                                                ) : (
+                                                                    <span className="text-secondary" style={{ fontSize: '11px' }}>General</span>
+                                                                )}
+                                                            </div>
+                                                        </td>
+                                                        <td>
+                                                            <div className="table-goals-cell" title={p.goals || 'No goals specified'}>
+                                                                {p.goals ? (
+                                                                    p.goals.length > 80 ? `${p.goals.substring(0, 80)}...` : p.goals
+                                                                ) : (
+                                                                    <span className="text-secondary" style={{ fontSize: '11px' }}>Not documented</span>
+                                                                )}
+                                                            </div>
+                                                        </td>
+                                                        <td>
+                                                            <span className={`status-pill ${p.status}`}>
+                                                                {(p.status || 'draft').replace('_', ' ')}
+                                                            </span>
+                                                        </td>
+                                                        <td>
+                                                            {p.grade !== null && p.grade !== undefined ? (
+                                                                <strong style={{ color: '#fbbf24' }}>{p.grade}/100</strong>
+                                                            ) : (
+                                                                <span style={{ color: '#94a3b8' }}>Not graded</span>
+                                                            )}
+                                                        </td>
+                                                        <td>
+                                                            <div className="table-actions-cell">
+                                                                <button
+                                                                    className="btn-view"
+                                                                    type="button"
+                                                                    onClick={() => {
+                                                                        setViewingCodeProject(p);
+                                                                        setViewingFileIdx(0);
+                                                                    }}
+                                                                    title="View Code and Files written by student"
+                                                                >
+                                                                    👁️ View Code
+                                                                </button>
+                                                                <button
+                                                                    className="btn-primary-action btn-sm"
+                                                                    type="button"
+                                                                    onClick={() => {
+                                                                        setSelectedProject(p);
+                                                                        setProjectReviewForm({
+                                                                            status: p.status || 'approved',
+                                                                            grade: p.grade ?? '',
+                                                                            feedback: p.feedback || '',
+                                                                            codeSuggestions: p.codeSuggestions || '',
+                                                                            techSuggestions: p.techSuggestions || ''
+                                                                        });
+                                                                    }}
+                                                                    title="Grade and give suggestions on code & technology"
+                                                                >
+                                                                    📝 Grade & Suggest
+                                                                </button>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })}
+                                            {!projects.length && (
+                                                <tr>
+                                                    <td colSpan="7" style={{ textAlign: 'center', padding: '30px', color: '#94a3b8' }}>
+                                                        No student project submissions yet.
                                                     </td>
                                                 </tr>
-                                            ))}
-                                            {!projects.length && (
-                                                <tr><td colSpan="6" style={{ textAlign: 'center', padding: '30px', color: '#94a3b8' }}>No student project submissions yet.</td></tr>
                                             )}
                                         </tbody>
                                     </table>
                                 </div>
                             )}
 
-                            {/* Project Review Modal */}
-                            {selectedProject && (
-                                <div className="progress-modal-overlay" onClick={() => setSelectedProject(null)}>
-                                    <section className="progress-modal" onClick={e => e.stopPropagation()}>
+                            {/* CODE VIEWER MODAL FOR FACULTY */}
+                            {viewingCodeProject && (
+                                <div className="progress-modal-overlay" onClick={() => setViewingCodeProject(null)}>
+                                    <section className="progress-modal faculty-code-viewer-modal" onClick={e => e.stopPropagation()}>
                                         <div className="progress-modal-header">
                                             <div>
-                                                <h2>Grade Project: {selectedProject.title}</h2>
-                                                <p>Submitted by {selectedProject.student?.name} ({selectedProject.student?.email})</p>
+                                                <h2>💻 Student Project Code & Architecture: {viewingCodeProject.title}</h2>
+                                                <p>Submitted by <strong>{viewingCodeProject.student?.name}</strong> ({viewingCodeProject.student?.email} - {viewingCodeProject.student?.rollNumber || 'No Roll Number'})</p>
+                                            </div>
+                                            <button className="progress-close" type="button" onClick={() => setViewingCodeProject(null)}>×</button>
+                                        </div>
+
+                                        {/* Project Meta Details */}
+                                        <div className="code-viewer-summary-grid mt-16">
+                                            <div className="summary-box">
+                                                <span className="summary-title">🚀 Deployment Link</span>
+                                                {(viewingCodeProject.deploymentUrl || viewingCodeProject.previewUrl) ? (
+                                                    <a
+                                                        href={viewingCodeProject.deploymentUrl || viewingCodeProject.previewUrl}
+                                                        target="_blank"
+                                                        rel="noreferrer"
+                                                        className="summary-link"
+                                                    >
+                                                        {viewingCodeProject.deploymentUrl || viewingCodeProject.previewUrl} ↗
+                                                    </a>
+                                                ) : (
+                                                    <span className="text-secondary">Not deployed</span>
+                                                )}
+                                            </div>
+                                            <div className="summary-box">
+                                                <span className="summary-title">💻 Code Repository</span>
+                                                {viewingCodeProject.repositoryUrl ? (
+                                                    <a href={viewingCodeProject.repositoryUrl} target="_blank" rel="noreferrer" className="summary-link">
+                                                        {viewingCodeProject.repositoryUrl} ↗
+                                                    </a>
+                                                ) : (
+                                                    <span className="text-secondary">No repository link provided</span>
+                                                )}
+                                            </div>
+                                            <div className="summary-box">
+                                                <span className="summary-title">👥 Team Members</span>
+                                                {viewingCodeProject.teamMembers && viewingCodeProject.teamMembers.length > 0 ? (
+                                                    <span>{viewingCodeProject.teamMembers.map(m => `${m.name} (${m.role})`).join(', ')}</span>
+                                                ) : (
+                                                    <span className="text-secondary">Individual Project</span>
+                                                )}
+                                            </div>
+                                            <div className="summary-box">
+                                                <span className="summary-title">⚡ Technologies</span>
+                                                <span>{(viewingCodeProject.technologies || []).join(', ') || 'General Web'}</span>
+                                            </div>
+                                        </div>
+
+                                        {viewingCodeProject.goals && (
+                                            <div className="project-goals-banner mt-14">
+                                                <strong>🎯 Project Goals & Objectives:</strong>
+                                                <p>{viewingCodeProject.goals}</p>
+                                            </div>
+                                        )}
+
+                                        {/* Files Inspector */}
+                                        <div className="faculty-file-tabs-container mt-16">
+                                            <div className="faculty-file-tabs">
+                                                {(viewingCodeProject.files || []).map((file, idx) => (
+                                                    <button
+                                                        key={file.path || idx}
+                                                        type="button"
+                                                        className={`faculty-file-tab ${viewingFileIdx === idx ? 'active' : ''}`}
+                                                        onClick={() => setViewingFileIdx(idx)}
+                                                    >
+                                                        📄 {file.path}
+                                                    </button>
+                                                ))}
+                                                {(!viewingCodeProject.files || viewingCodeProject.files.length === 0) && (
+                                                    <span className="text-secondary p-10">No code files committed to this project.</span>
+                                                )}
+                                            </div>
+
+                                            {viewingCodeProject.files?.[viewingFileIdx] && (
+                                                <div className="faculty-code-box">
+                                                    <div className="code-box-header">
+                                                        <span>File: <strong>{viewingCodeProject.files[viewingFileIdx].path}</strong></span>
+                                                        <button
+                                                            type="button"
+                                                            className="btn-copy-code"
+                                                            onClick={() => {
+                                                                navigator.clipboard.writeText(viewingCodeProject.files[viewingFileIdx].content || '');
+                                                                setSuccessMsg(`Copied ${viewingCodeProject.files[viewingFileIdx].path} code to clipboard!`);
+                                                            }}
+                                                        >
+                                                            📋 Copy Code
+                                                        </button>
+                                                    </div>
+                                                    <pre className="code-content-pre">
+                                                        {viewingCodeProject.files[viewingFileIdx].content || '(Empty file content)'}
+                                                    </pre>
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '20px' }}>
+                                            <button
+                                                type="button"
+                                                className="btn-secondary-action"
+                                                onClick={() => setViewingCodeProject(null)}
+                                            >
+                                                Close Viewer
+                                            </button>
+                                            <button
+                                                type="button"
+                                                className="btn-primary-action"
+                                                onClick={() => {
+                                                    const p = viewingCodeProject;
+                                                    setViewingCodeProject(null);
+                                                    setSelectedProject(p);
+                                                    setProjectReviewForm({
+                                                        status: p.status || 'approved',
+                                                        grade: p.grade ?? '',
+                                                        feedback: p.feedback || '',
+                                                        codeSuggestions: p.codeSuggestions || '',
+                                                        techSuggestions: p.techSuggestions || ''
+                                                    });
+                                                }}
+                                            >
+                                                📝 Proceed to Grade & Suggest
+                                            </button>
+                                        </div>
+                                    </section>
+                                </div>
+                            )}
+
+                            {/* PROJECT REVIEW & SUGGESTIONS MODAL */}
+                            {selectedProject && (
+                                <div className="progress-modal-overlay" onClick={() => setSelectedProject(null)}>
+                                    <section className="progress-modal faculty-review-modal" onClick={e => e.stopPropagation()}>
+                                        <div className="progress-modal-header">
+                                            <div>
+                                                <h2>Grade & Suggest: {selectedProject.title}</h2>
+                                                <p>Submitted by <strong>{selectedProject.student?.name}</strong> ({selectedProject.student?.email})</p>
                                             </div>
                                             <button className="progress-close" type="button" onClick={() => setSelectedProject(null)}>×</button>
                                         </div>
                                         <form className="faculty-form mt-20" onSubmit={handleSaveProjectReview}>
-                                            <div className="form-group">
-                                                <label className="form-label">Review Status</label>
-                                                <select
-                                                    className="form-control"
-                                                    value={projectReviewForm.status}
-                                                    onChange={e => setProjectReviewForm({ ...projectReviewForm, status: e.target.value })}
-                                                >
-                                                    <option value="approved">Approved</option>
-                                                    <option value="under_review">Under Review</option>
-                                                    <option value="changes_requested">Changes Requested</option>
-                                                </select>
+                                            <div className="form-grid-2col">
+                                                <div className="form-group">
+                                                    <label className="form-label">Review Status</label>
+                                                    <select
+                                                        className="form-control"
+                                                        value={projectReviewForm.status}
+                                                        onChange={e => setProjectReviewForm({ ...projectReviewForm, status: e.target.value })}
+                                                    >
+                                                        <option value="approved">Approved</option>
+                                                        <option value="under_review">Under Review</option>
+                                                        <option value="changes_requested">Changes Requested</option>
+                                                    </select>
+                                                </div>
+                                                <div className="form-group">
+                                                    <label className="form-label">Grade (0 - 100)</label>
+                                                    <input
+                                                        type="number"
+                                                        min="0"
+                                                        max="100"
+                                                        className="form-control"
+                                                        placeholder="Enter numerical score (e.g. 85)"
+                                                        value={projectReviewForm.grade}
+                                                        onChange={e => setProjectReviewForm({ ...projectReviewForm, grade: e.target.value })}
+                                                    />
+                                                </div>
                                             </div>
-                                            <div className="form-group">
-                                                <label className="form-label">Grade (0 - 100)</label>
-                                                <input
-                                                    type="number"
-                                                    min="0"
-                                                    max="100"
-                                                    className="form-control"
-                                                    placeholder="Enter numerical score"
-                                                    value={projectReviewForm.grade}
-                                                    onChange={e => setProjectReviewForm({ ...projectReviewForm, grade: e.target.value })}
-                                                />
-                                            </div>
-                                            <div className="form-group">
-                                                <label className="form-label">Feedback & Evaluator Notes</label>
+
+                                            {/* CODE SUGGESTIONS */}
+                                            <div className="form-group mt-16">
+                                                <label className="form-label">
+                                                    💻 Code Review & Optimization Suggestions
+                                                </label>
                                                 <textarea
                                                     className="form-control"
-                                                    rows="4"
-                                                    placeholder="Write constructive evaluation notes for the student..."
+                                                    rows="3"
+                                                    placeholder="Provide suggestions based on the student's code (e.g. code modularity, variable naming, error handling, algorithmic time complexity, security issues)..."
+                                                    value={projectReviewForm.codeSuggestions}
+                                                    onChange={e => setProjectReviewForm({ ...projectReviewForm, codeSuggestions: e.target.value })}
+                                                />
+                                            </div>
+
+                                            {/* TECHNOLOGY SUGGESTIONS */}
+                                            <div className="form-group mt-16">
+                                                <label className="form-label">
+                                                    ⚡ Technology & Architecture Suggestions
+                                                </label>
+                                                <textarea
+                                                    className="form-control"
+                                                    rows="3"
+                                                    placeholder="Suggest relevant technologies, frameworks, libraries, or architectural upgrades (e.g. recommend Redis for caching, Docker containers, TailwindCSS, TypeScript)..."
+                                                    value={projectReviewForm.techSuggestions}
+                                                    onChange={e => setProjectReviewForm({ ...projectReviewForm, techSuggestions: e.target.value })}
+                                                />
+                                            </div>
+
+                                            {/* GENERAL FEEDBACK */}
+                                            <div className="form-group mt-16">
+                                                <label className="form-label">General Evaluator Feedback</label>
+                                                <textarea
+                                                    className="form-control"
+                                                    rows="3"
+                                                    placeholder="Overall performance evaluation, remarks, and next milestone instructions..."
                                                     value={projectReviewForm.feedback}
                                                     onChange={e => setProjectReviewForm({ ...projectReviewForm, feedback: e.target.value })}
                                                 />
                                             </div>
-                                            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '16px' }}>
+
+                                            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '20px' }}>
                                                 <button type="button" className="btn-secondary-action" onClick={() => setSelectedProject(null)}>Cancel</button>
                                                 <button type="submit" className="btn-primary-action" disabled={savingReview}>
-                                                    {savingReview ? 'Saving...' : 'Submit Evaluation'}
+                                                    {savingReview ? 'Saving Evaluation...' : 'Submit Evaluation & Suggestions'}
                                                 </button>
                                             </div>
                                         </form>

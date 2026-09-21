@@ -42,6 +42,15 @@ const connectDB = async () => {
         mustChangePassword: false
       },
       {
+        name: 'Dr. Madhuri (Faculty Coordinator)',
+        email: 'madhuri845@grietcollege.com',
+        password: 'TNPMadhuri@845',
+        role: 'faculty',
+        mustChangePassword: false,
+        managedScopes: [],
+        managedAcademicYears: []
+      },
+      {
         name: 'Faculty Coordinator',
         email: 'theaibulletin.media@gmail.com',
         password: 'Ajay@1234',
@@ -65,18 +74,20 @@ const connectDB = async () => {
     for (const acc of defaultAccounts) {
       let existingUser = await User.findOne({ email: acc.email });
       if (existingUser) {
-        existingUser.name = acc.name;
-        existingUser.password = acc.password;
-        existingUser.role = acc.role;
-        existingUser.mustChangePassword = false;
+        // Preserve existing user's password and credentials without overwriting
+        let modified = false;
         if (acc.managedScopes && (!existingUser.managedScopes || existingUser.managedScopes.length === 0)) {
           existingUser.managedScopes = acc.managedScopes;
+          modified = true;
         }
         if (acc.managedAcademicYears && (!existingUser.managedAcademicYears || existingUser.managedAcademicYears.length === 0)) {
           existingUser.managedAcademicYears = acc.managedAcademicYears;
+          modified = true;
         }
-        await existingUser.save();
-        console.log(`Default ${acc.role} account (${acc.email}) synchronized.`);
+        if (modified) {
+          await existingUser.save();
+        }
+        console.log(`Account (${acc.email}) verified.`);
       } else {
         await User.create({
           name: acc.name,

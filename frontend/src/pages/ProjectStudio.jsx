@@ -7,8 +7,14 @@ import { API_URL } from '../config/api';
 import './ProjectStudio.css';
 
 const starterFiles = [
-  { path: 'README.md', content: '# My Project\n\nDescribe your project here.' },
-  { path: 'src/main.js', content: "console.log('Start building your project');\n" }
+  { path: 'README.md', content: '# My Project\n\nDescribe your project, objectives, architecture, and deployment instructions here.' },
+  { path: 'src/main.js', content: "console.log('Project Studio - Start building your project!');\n" }
+];
+
+const COMMON_TECHS = [
+  'React', 'Node.js', 'Express.js', 'MongoDB', 'JavaScript', 'TypeScript',
+  'Python', 'FastAPI', 'Django', 'Next.js', 'TailwindCSS', 'PostgreSQL',
+  'MySQL', 'Docker', 'AWS', 'TensorFlow', 'PyTorch', 'Java', 'C++', 'Firebase'
 ];
 
 const editorLanguage = (filePath) => {
@@ -21,18 +27,36 @@ const editorLanguage = (filePath) => {
 };
 
 const ProjectStudio = () => {
-  const { token } = useAuth();
+  const { token, user } = useAuth();
   const { theme } = useTheme();
   const [projects, setProjects] = useState([]);
   const [project, setProject] = useState(null);
   const [activeFile, setActiveFile] = useState(0);
+  const [activeStudioTab, setActiveStudioTab] = useState('editor'); // 'editor' | 'details' | 'team' | 'feedback'
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
   const [output, setOutput] = useState('');
   const [running, setRunning] = useState(false);
+
+  // Form Fields
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
+  const [goals, setGoals] = useState('');
+  const [deploymentUrl, setDeploymentUrl] = useState('');
+  const [repositoryUrl, setRepositoryUrl] = useState('');
+  const [technologies, setTechnologies] = useState([]);
+  const [techInput, setTechInput] = useState('');
+  const [teamMembers, setTeamMembers] = useState([]);
+
+  // Add Member State
+  const [showMemberModal, setShowMemberModal] = useState(false);
+  const [memberForm, setMemberForm] = useState({
+    name: '',
+    rollNumber: '',
+    email: '',
+    role: 'Developer'
+  });
 
   const request = async (url, options = {}) => {
     const response = await fetch(url, {
@@ -52,9 +76,11 @@ const ProjectStudio = () => {
     try {
       setLoading(true);
       const data = await request(`${API_URL}/academic/projects`);
-      setProjects(data.data);
-      if (data.data.length > 0) {
+      setProjects(data.data || []);
+      if (data.data && data.data.length > 0) {
         selectProject(data.data[0]);
+      } else {
+        setProject(null);
       }
     } catch (error) {
       setMessage(error.message);
@@ -64,13 +90,20 @@ const ProjectStudio = () => {
   };
 
   useEffect(() => {
-    loadProjects();
+    if (token) {
+      loadProjects();
+    }
   }, [token]);
 
   const selectProject = (selected) => {
     setProject(selected);
-    setTitle(selected.title);
+    setTitle(selected.title || '');
     setDescription(selected.description || '');
+    setGoals(selected.goals || '');
+    setDeploymentUrl(selected.deploymentUrl || selected.previewUrl || '');
+    setRepositoryUrl(selected.repositoryUrl || '');
+    setTechnologies(Array.isArray(selected.technologies) ? selected.technologies : []);
+    setTeamMembers(Array.isArray(selected.teamMembers) ? selected.teamMembers : []);
     setActiveFile(0);
     setMessage('');
     setOutput('');
@@ -78,21 +111,29 @@ const ProjectStudio = () => {
 
   const createProject = async () => {
     try {
+      setSaving(true);
       const data = await request(`${API_URL}/academic/projects`, {
         method: 'POST',
         body: JSON.stringify({
-          title: 'Untitled Project',
+          title: 'Untitled Capstone Project',
           description: '',
+          goals: '',
           technologies: [],
+          teamMembers: [],
+          deploymentUrl: '',
+          repositoryUrl: '',
           files: starterFiles,
           milestones: []
         })
       });
       setProjects(previous => [data.data, ...previous]);
       selectProject(data.data);
-      setMessage('Project created.');
+      setActiveStudioTab('details');
+      setMessage('New project created! You can now set up your project details, team members, and code.');
     } catch (error) {
       setMessage(error.message);
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -105,7 +146,7 @@ const ProjectStudio = () => {
 
   const addFile = () => {
     if (!project) return;
-    const path = window.prompt('File path', 'src/new-file.js')?.trim();
+    const path = window.prompt('Enter file path (e.g. src/utils.js, styles.css):', 'src/new-file.js')?.trim();
     if (!path || project.files.some(file => file.path === path)) return;
     setProject(previous => ({
       ...previous,
@@ -133,7 +174,7 @@ const ProjectStudio = () => {
       setProjects(remaining);
       if (remaining.length > 0) selectProject(remaining[0]);
       else setProject(null);
-      setMessage('Project deleted.');
+      setMessage('Project deleted successfully.');
     } catch (error) {
       setMessage(error.message);
     }
@@ -146,14 +187,14 @@ const ProjectStudio = () => {
     }
     try {
       setRunning(true);
-      setOutput('Running in the secure sandbox...');
+      setOutput('Executing in secure sandbox environment...');
       const data = await request(`${API_URL}/questions/run-sandbox`, {
         method: 'POST',
         body: JSON.stringify({ code: currentFile.content, language: editorLanguage(currentFile.path), input: '' })
       });
-      setOutput(data.error ? `Error: ${data.error}\n${data.stdout || ''}` : (data.stdout || '(No output)'));
+      setOutput(data.error ? `Error: ${data.error}\n${data.stdout || ''}` : (data.stdout || '(Program executed with no console output)'));
     } catch (error) {
-      setOutput(error.message);
+      setOutput(`Sandbox Execution Error: ${error.message}`);
     } finally {
       setRunning(false);
     }
@@ -163,18 +204,26 @@ const ProjectStudio = () => {
     if (!project) return;
     try {
       setSaving(true);
+      const payload = {
+        title: title.trim() || 'Untitled Project',
+        description,
+        goals,
+        technologies,
+        teamMembers,
+        deploymentUrl: deploymentUrl.trim(),
+        previewUrl: deploymentUrl.trim(),
+        repositoryUrl: repositoryUrl.trim(),
+        files: project.files,
+        submit
+      };
+
       const data = await request(`${API_URL}/academic/projects/${project._id}`, {
         method: 'PUT',
-        body: JSON.stringify({
-          title,
-          description,
-          files: project.files,
-          submit
-        })
+        body: JSON.stringify(payload)
       });
       setProject(data.data);
       setProjects(previous => previous.map(item => item._id === data.data._id ? data.data : item));
-      setMessage(submit ? 'Project submitted for administrator review.' : 'Project saved.');
+      setMessage(submit ? '🚀 Project submitted successfully for faculty and administrator review!' : '💾 Project changes saved successfully.');
     } catch (error) {
       setMessage(error.message);
     } finally {
@@ -182,91 +231,635 @@ const ProjectStudio = () => {
     }
   };
 
+  // Team Member Management
+  const handleAddMember = (e) => {
+    e.preventDefault();
+    if (!memberForm.name.trim()) return;
+
+    const newMemberItem = {
+      name: memberForm.name.trim(),
+      rollNumber: memberForm.rollNumber.trim(),
+      email: memberForm.email.trim(),
+      role: memberForm.role.trim() || 'Developer'
+    };
+
+    const updatedMembers = [...teamMembers, newMemberItem];
+    setTeamMembers(updatedMembers);
+    setProject(prev => ({ ...prev, teamMembers: updatedMembers }));
+    setMemberForm({ name: '', rollNumber: '', email: '', role: 'Developer' });
+    setShowMemberModal(false);
+    setMessage(`Added team member: ${newMemberItem.name}`);
+  };
+
+  const handleRemoveMember = (index) => {
+    const updatedMembers = teamMembers.filter((_, i) => i !== index);
+    setTeamMembers(updatedMembers);
+    setProject(prev => ({ ...prev, teamMembers: updatedMembers }));
+  };
+
+  // Technology Tags Management
+  const handleAddTech = (techToAdd) => {
+    const tech = (techToAdd || techInput).trim();
+    if (!tech) return;
+    if (!technologies.some(t => t.toLowerCase() === tech.toLowerCase())) {
+      const updated = [...technologies, tech];
+      setTechnologies(updated);
+      setProject(prev => ({ ...prev, technologies: updated }));
+    }
+    setTechInput('');
+  };
+
+  const handleRemoveTech = (techToRemove) => {
+    const updated = technologies.filter(t => t !== techToRemove);
+    setTechnologies(updated);
+    setProject(prev => ({ ...prev, technologies: updated }));
+  };
+
   const currentFile = project?.files?.[activeFile];
+  const hasFeedback = project && (project.codeSuggestions || project.techSuggestions || project.feedback || project.grade !== null);
 
   return (
     <>
       <Header title="Project Studio" />
       <div className="content-wrapper project-studio-page animate-fade">
-        <div className="project-studio-toolbar">
-          <div>
-            <h2>Build Your Project</h2>
-            <p className="card-desc">Create files, save your work, and submit a complete project for academic review.</p>
+        <div className="project-studio-toolbar glass-card">
+          <div className="toolbar-info">
+            <div className="toolbar-badge-row">
+              <span className="studio-badge">⚡ Interactive Studio</span>
+              {project && (
+                <span className={`status-pill ${project.status || 'draft'}`}>
+                  {(project.status || 'draft').replace('_', ' ')}
+                </span>
+              )}
+              {project?.grade !== null && project?.grade !== undefined && (
+                <span className="grade-badge">Grade: {project.grade}/100</span>
+              )}
+              {deploymentUrl && (
+                <a
+                  href={deploymentUrl.startsWith('http') ? deploymentUrl : `https://${deploymentUrl}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="deployment-live-chip"
+                  title="Open live deployment"
+                >
+                  🚀 Live App ↗
+                </a>
+              )}
+            </div>
+            <h2>{project ? project.title || 'Untitled Project' : 'Project Studio'}</h2>
+            <p className="card-desc">Build, collaborate with teammates, deploy live links, and submit your project for faculty & administrator evaluation.</p>
           </div>
           <div className="project-studio-actions">
-            <button className="btn btn-secondary" type="button" onClick={createProject}>New Project</button>
-            <button className="btn btn-primary" type="button" onClick={() => saveProject(false)} disabled={!project || saving}>Save</button>
-            <button className="btn btn-secondary" type="button" onClick={runCurrentFile} disabled={!project || running}>{running ? 'Running...' : 'Run'}</button>
-            <button className="btn btn-accent" type="button" onClick={() => saveProject(true)} disabled={!project || saving}>Submit for Review</button>
-            <button className="btn btn-danger" type="button" onClick={deleteProject} disabled={!project}>Delete Project</button>
+            <button className="btn btn-secondary btn-sm" type="button" onClick={createProject} disabled={saving}>
+              + New Project
+            </button>
+            <button className="btn btn-primary btn-sm" type="button" onClick={() => saveProject(false)} disabled={!project || saving}>
+              {saving ? 'Saving...' : '💾 Save Project'}
+            </button>
+            <button className="btn btn-secondary btn-sm" type="button" onClick={runCurrentFile} disabled={!project || running}>
+              {running ? 'Running...' : '▶ Run Code'}
+            </button>
+            <button className="btn btn-accent btn-sm" type="button" onClick={() => saveProject(true)} disabled={!project || saving}>
+              🚀 {project?.status === 'submitted' ? 'Update Submission' : 'Submit for Review'}
+            </button>
+            <button className="btn btn-danger btn-sm" type="button" onClick={deleteProject} disabled={!project}>
+              Delete
+            </button>
           </div>
         </div>
 
-        {message && <div className="success-banner">{message}</div>}
+        {message && (
+          <div className="success-banner animate-fade">
+            <span>{message}</span>
+            <button type="button" className="close-alert-btn" onClick={() => setMessage('')}>×</button>
+          </div>
+        )}
 
         {loading ? (
-          <div className="dashboard-loading-container"><div className="spinner-loader"></div><p>Loading projects...</p></div>
+          <div className="dashboard-loading-container">
+            <div className="spinner-loader"></div>
+            <p>Loading projects and files...</p>
+          </div>
         ) : (
           <div className="project-studio-layout">
             <aside className="project-list glass-card">
-              <h3>Your Projects</h3>
-              {projects.length === 0 && <p className="text-secondary">No projects yet.</p>}
-              {projects.map(item => (
-                <button key={item._id} type="button" className={`project-list-item ${project?._id === item._id ? 'active' : ''}`} onClick={() => selectProject(item)}>
-                  <strong>{item.title}</strong>
-                  <span>{item.status.replace('_', ' ')}</span>
-                </button>
-              ))}
+              <div className="project-list-header">
+                <h3>Your Projects</h3>
+                <span className="badge-counter">{projects.length}</span>
+              </div>
+              {projects.length === 0 && (
+                <div className="no-projects-notice">
+                  <p className="text-secondary">No projects created yet.</p>
+                  <button className="btn btn-primary btn-sm mt-10" type="button" onClick={createProject}>Create One</button>
+                </div>
+              )}
+              <div className="project-list-items">
+                {projects.map(item => (
+                  <button
+                    key={item._id}
+                    type="button"
+                    className={`project-list-item ${project?._id === item._id ? 'active' : ''}`}
+                    onClick={() => selectProject(item)}
+                  >
+                    <div className="item-title-row">
+                      <strong>{item.title || 'Untitled'}</strong>
+                      <span className={`status-pill-mini ${item.status}`}>{item.status?.replace('_', ' ')}</span>
+                    </div>
+                    <div className="item-meta-row">
+                      {item.teamMembers?.length > 0 && (
+                        <span className="meta-tag">👥 {item.teamMembers.length + 1} Members</span>
+                      )}
+                      {(item.deploymentUrl || item.previewUrl) && (
+                        <span className="meta-tag live-tag">🚀 Deployed</span>
+                      )}
+                      {item.grade !== null && item.grade !== undefined && (
+                        <span className="meta-tag grade-tag">★ {item.grade}</span>
+                      )}
+                    </div>
+                  </button>
+                ))}
+              </div>
             </aside>
 
             {project ? (
               <section className="project-editor-shell glass-card">
-                <div className="project-details-row">
-                  <input className="form-control" value={title} onChange={event => setTitle(event.target.value)} placeholder="Project title" />
-                  <input className="form-control" value={description} onChange={event => setDescription(event.target.value)} placeholder="Short project description" />
+                {/* STUDIO NAVIGATION TABS */}
+                <div className="studio-tabs-bar">
+                  <button
+                    type="button"
+                    className={`studio-tab-btn ${activeStudioTab === 'editor' ? 'active' : ''}`}
+                    onClick={() => setActiveStudioTab('editor')}
+                  >
+                    💻 Code Studio ({project.files?.length || 0} Files)
+                  </button>
+                  <button
+                    type="button"
+                    className={`studio-tab-btn ${activeStudioTab === 'details' ? 'active' : ''}`}
+                    onClick={() => setActiveStudioTab('details')}
+                  >
+                    🎯 Goals, Tech & Deployment
+                  </button>
+                  <button
+                    type="button"
+                    className={`studio-tab-btn ${activeStudioTab === 'team' ? 'active' : ''}`}
+                    onClick={() => setActiveStudioTab('team')}
+                  >
+                    👥 Team Members ({teamMembers.length > 0 ? teamMembers.length + 1 : 1})
+                  </button>
+                  <button
+                    type="button"
+                    className={`studio-tab-btn ${activeStudioTab === 'feedback' ? 'active' : ''}`}
+                    onClick={() => setActiveStudioTab('feedback')}
+                  >
+                    💡 Faculty & Admin Feedback
+                    {hasFeedback && <span className="feedback-indicator-dot" title="Feedback available">•</span>}
+                  </button>
                 </div>
-                <div className="project-editor-layout">
-                  <div className="project-file-tree">
-                    <div className="project-file-tree-header">
-                      <h4>Explorer</h4>
-                      <div>
-                        <button type="button" className="editor-icon-button" onClick={addFile} title="New file">+</button>
-                        <button type="button" className="editor-icon-button" onClick={deleteFile} title="Delete file" disabled={project.files.length === 1}>-</button>
+
+                {/* TAB 1: CODE EDITOR & SANDBOX */}
+                {activeStudioTab === 'editor' && (
+                  <div className="tab-pane animate-fade">
+                    <div className="project-details-row">
+                      <input
+                        className="form-control"
+                        value={title}
+                        onChange={event => setTitle(event.target.value)}
+                        placeholder="Project title"
+                      />
+                      <input
+                        className="form-control"
+                        value={description}
+                        onChange={event => setDescription(event.target.value)}
+                        placeholder="Short summary of project features"
+                      />
+                    </div>
+                    <div className="project-editor-layout">
+                      <div className="project-file-tree">
+                        <div className="project-file-tree-header">
+                          <h4>Explorer</h4>
+                          <div>
+                            <button type="button" className="editor-icon-button" onClick={addFile} title="New file">+</button>
+                            <button type="button" className="editor-icon-button" onClick={deleteFile} title="Delete file" disabled={project.files.length === 1}>-</button>
+                          </div>
+                        </div>
+                        {project.files.map((file, index) => (
+                          <button
+                            key={file.path}
+                            type="button"
+                            className={`project-file-item ${activeFile === index ? 'active' : ''}`}
+                            onClick={() => setActiveFile(index)}
+                          >
+                            <span className="file-icon">📄</span> {file.path}
+                          </button>
+                        ))}
+                      </div>
+                      <div className="project-monaco-wrapper">
+                        <div className="project-editor-tabs">
+                          {project.files.map((file, index) => (
+                            <button
+                              key={file.path}
+                              type="button"
+                              className={`project-editor-tab ${activeFile === index ? 'active' : ''}`}
+                              onClick={() => setActiveFile(index)}
+                            >
+                              {file.path}
+                            </button>
+                          ))}
+                        </div>
+                        {currentFile && (
+                          <Editor
+                            height="520px"
+                            theme={theme === 'light' ? 'light' : 'vs-dark'}
+                            language={editorLanguage(currentFile.path)}
+                            value={currentFile.content}
+                            onChange={value => updateActiveFile(value || '')}
+                            options={{
+                              minimap: { enabled: false },
+                              fontSize: 14,
+                              automaticLayout: true,
+                              tabSize: 2
+                            }}
+                          />
+                        )}
+                        <pre className="project-output-panel">
+                          {output || 'Click "▶ Run Code" above to execute current file in sandbox.'}
+                        </pre>
                       </div>
                     </div>
-                    {project.files.map((file, index) => (
-                      <button key={file.path} type="button" className={`project-file-item ${activeFile === index ? 'active' : ''}`} onClick={() => setActiveFile(index)}>
-                        {file.path}
-                      </button>
-                    ))}
                   </div>
-                  <div className="project-monaco-wrapper">
-                    <div className="project-editor-tabs">
-                      {project.files.map((file, index) => (
-                        <button key={file.path} type="button" className={`project-editor-tab ${activeFile === index ? 'active' : ''}`} onClick={() => setActiveFile(index)}>
-                          {file.path}
-                        </button>
-                      ))}
+                )}
+
+                {/* TAB 2: GOALS, TECH STACK & DEPLOYMENT */}
+                {activeStudioTab === 'details' && (
+                  <div className="tab-pane animate-fade project-details-pane">
+                    {/* DEPLOYMENT COLUMN */}
+                    <div className="deployment-banner-card">
+                      <div className="deployment-card-header">
+                        <div className="deploy-icon-badge">🚀</div>
+                        <div>
+                          <h4>Project Deployment & Live Demo Link</h4>
+                          <p className="text-secondary">If you or your team have already built and hosted this project (on Vercel, Netlify, Render, GitHub Pages, etc.), add the live link below.</p>
+                        </div>
+                      </div>
+                      <div className="deploy-input-group">
+                        <input
+                          type="url"
+                          className="form-control"
+                          placeholder="https://your-project.vercel.app or https://github.io/..."
+                          value={deploymentUrl}
+                          onChange={e => setDeploymentUrl(e.target.value)}
+                        />
+                        {deploymentUrl ? (
+                          <a
+                            href={deploymentUrl.startsWith('http') ? deploymentUrl : `https://${deploymentUrl}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="btn btn-accent"
+                          >
+                            🚀 Open Live App ↗
+                          </a>
+                        ) : (
+                          <button className="btn btn-secondary" type="button" disabled>Not Deployed Yet</button>
+                        )}
+                      </div>
                     </div>
-                    {currentFile && (
-                      <Editor
-                        height="560px"
-                        theme={theme === 'light' ? 'light' : 'vs-dark'}
-                        language={editorLanguage(currentFile.path)}
-                        value={currentFile.content}
-                        onChange={value => updateActiveFile(value || '')}
-                        options={{ minimap: { enabled: false }, fontSize: 14, automaticLayout: true }}
+
+                    <div className="form-grid-2col mt-20">
+                      <div className="form-group">
+                        <label className="form-label">Project Title *</label>
+                        <input
+                          className="form-control"
+                          value={title}
+                          onChange={e => setTitle(e.target.value)}
+                          placeholder="Enter comprehensive project title"
+                        />
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label">Code Repository URL (GitHub / GitLab)</label>
+                        <div className="input-with-action">
+                          <input
+                            type="url"
+                            className="form-control"
+                            value={repositoryUrl}
+                            onChange={e => setRepositoryUrl(e.target.value)}
+                            placeholder="https://github.com/username/project-repo"
+                          />
+                          {repositoryUrl && (
+                            <a
+                              href={repositoryUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="btn btn-secondary btn-sm"
+                            >
+                              View Repo ↗
+                            </a>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="form-group mt-16">
+                      <label className="form-label">Project Goals & Objectives</label>
+                      <textarea
+                        className="form-control"
+                        rows="4"
+                        value={goals}
+                        onChange={e => setGoals(e.target.value)}
+                        placeholder="What problem does this project solve? What are the key architectural goals, user requirements, and expected performance metrics?"
                       />
-                    )}
-                    <pre className="project-output-panel">{output || 'Run the active file to see output here.'}</pre>
+                    </div>
+
+                    <div className="form-group mt-16">
+                      <label className="form-label">Project Description</label>
+                      <textarea
+                        className="form-control"
+                        rows="3"
+                        value={description}
+                        onChange={e => setDescription(e.target.value)}
+                        placeholder="High-level summary of features, user roles, and implementation methodology..."
+                      />
+                    </div>
+
+                    {/* TECHNOLOGIES USED */}
+                    <div className="form-group mt-20">
+                      <label className="form-label">Technologies & Frameworks Used</label>
+                      <div className="tech-input-row">
+                        <input
+                          className="form-control"
+                          value={techInput}
+                          onChange={e => setTechInput(e.target.value)}
+                          onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddTech(); } }}
+                          placeholder="Type a technology (e.g. React, Node.js) and press Enter or Add"
+                        />
+                        <button type="button" className="btn btn-secondary" onClick={() => handleAddTech()}>
+                          + Add
+                        </button>
+                      </div>
+
+                      <div className="tech-tags-container mt-10">
+                        {technologies.map(t => (
+                          <span key={t} className="tech-badge">
+                            {t}
+                            <button type="button" onClick={() => handleRemoveTech(t)} title={`Remove ${t}`}>×</button>
+                          </span>
+                        ))}
+                        {technologies.length === 0 && (
+                          <span className="text-secondary" style={{ fontSize: '0.85rem' }}>No technologies added yet. Select from common suggestions below or type your own:</span>
+                        )}
+                      </div>
+
+                      {/* Common Tech Suggestions */}
+                      <div className="quick-tech-suggestions mt-10">
+                        <span className="suggestion-label">Quick Add:</span>
+                        {COMMON_TECHS.map(tech => (
+                          <button
+                            key={tech}
+                            type="button"
+                            className={`suggestion-pill ${technologies.includes(tech) ? 'selected' : ''}`}
+                            onClick={() => technologies.includes(tech) ? handleRemoveTech(tech) : handleAddTech(tech)}
+                          >
+                            {technologies.includes(tech) ? `✓ ${tech}` : `+ ${tech}`}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="details-save-row mt-20">
+                      <button className="btn btn-primary" type="button" onClick={() => saveProject(false)} disabled={saving}>
+                        {saving ? 'Saving...' : '💾 Save Goals & Details'}
+                      </button>
+                    </div>
                   </div>
-                </div>
+                )}
+
+                {/* TAB 3: TEAM MEMBERS */}
+                {activeStudioTab === 'team' && (
+                  <div className="tab-pane animate-fade team-management-pane">
+                    <div className="team-header-card">
+                      <div>
+                        <h3>Team Members & Collaborators</h3>
+                        <p className="card-desc">If this project is built by multiple students, add all team members with their roll numbers, emails, and roles.</p>
+                      </div>
+                      <button
+                        className="btn btn-accent btn-sm"
+                        type="button"
+                        onClick={() => setShowMemberModal(true)}
+                      >
+                        + Add Team Member
+                      </button>
+                    </div>
+
+                    <div className="team-members-list mt-20">
+                      {/* Project Lead (Owner) */}
+                      <div className="team-member-card lead-card">
+                        <div className="member-avatar">👑</div>
+                        <div className="member-info">
+                          <h4>{project.student?.name || user?.name || 'Project Creator'} <span className="lead-tag">Project Lead</span></h4>
+                          <p className="member-meta">
+                            <span>📧 {project.student?.email || user?.email || 'N/A'}</span>
+                            {project.student?.rollNumber && <span>🆔 {project.student.rollNumber}</span>}
+                            <span>🎓 {project.academicYear || 'Final Year'}</span>
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Added Teammates */}
+                      {teamMembers.map((member, index) => (
+                        <div key={index} className="team-member-card">
+                          <div className="member-avatar">👤</div>
+                          <div className="member-info">
+                            <h4>{member.name} <span className="role-tag">{member.role || 'Developer'}</span></h4>
+                            <p className="member-meta">
+                              {member.email && <span>📧 {member.email}</span>}
+                              {member.rollNumber && <span>🆔 {member.rollNumber}</span>}
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            className="btn-remove-member"
+                            onClick={() => handleRemoveMember(index)}
+                            title="Remove teammate"
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      ))}
+
+                      {teamMembers.length === 0 && (
+                        <div className="no-teammates-box">
+                          <p className="text-secondary">No additional team members added. This project is currently listed as an individual submission.</p>
+                          <button
+                            type="button"
+                            className="btn btn-secondary btn-sm mt-10"
+                            onClick={() => setShowMemberModal(true)}
+                          >
+                            Add Teammates
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="details-save-row mt-20">
+                      <button className="btn btn-primary" type="button" onClick={() => saveProject(false)} disabled={saving}>
+                        {saving ? 'Saving...' : '💾 Save Team Changes'}
+                      </button>
+                    </div>
+
+                    {/* ADD MEMBER MODAL */}
+                    {showMemberModal && (
+                      <div className="modal-overlay" onClick={() => setShowMemberModal(false)}>
+                        <div className="modal-content" onClick={e => e.stopPropagation()}>
+                          <div className="modal-header">
+                            <h3>Add Team Member</h3>
+                            <button className="close-btn" type="button" onClick={() => setShowMemberModal(false)}>×</button>
+                          </div>
+                          <form onSubmit={handleAddMember} className="member-form">
+                            <div className="form-group">
+                              <label className="form-label">Full Name *</label>
+                              <input
+                                className="form-control"
+                                required
+                                value={memberForm.name}
+                                onChange={e => setMemberForm({ ...memberForm, name: e.target.value })}
+                                placeholder="Teammate's full name"
+                              />
+                            </div>
+                            <div className="form-group">
+                              <label className="form-label">Student Roll Number / ID</label>
+                              <input
+                                className="form-control"
+                                value={memberForm.rollNumber}
+                                onChange={e => setMemberForm({ ...memberForm, rollNumber: e.target.value })}
+                                placeholder="e.g. 21241A0501"
+                              />
+                            </div>
+                            <div className="form-group">
+                              <label className="form-label">Email Address</label>
+                              <input
+                                type="email"
+                                className="form-control"
+                                value={memberForm.email}
+                                onChange={e => setMemberForm({ ...memberForm, email: e.target.value })}
+                                placeholder="teammate@grietcollege.com"
+                              />
+                            </div>
+                            <div className="form-group">
+                              <label className="form-label">Contribution Role</label>
+                              <select
+                                className="form-control"
+                                value={memberForm.role}
+                                onChange={e => setMemberForm({ ...memberForm, role: e.target.value })}
+                              >
+                                <option value="Developer">Developer</option>
+                                <option value="Frontend Lead">Frontend Lead</option>
+                                <option value="Backend Developer">Backend Developer</option>
+                                <option value="Full Stack Engineer">Full Stack Engineer</option>
+                                <option value="AI / ML Engineer">AI / ML Engineer</option>
+                                <option value="UI / UX Designer">UI / UX Designer</option>
+                                <option value="QA & Testing">QA & Testing</option>
+                                <option value="DevOps & Deployment">DevOps & Deployment</option>
+                                <option value="Documentation & Research">Documentation & Research</option>
+                              </select>
+                            </div>
+                            <div className="modal-actions mt-20">
+                              <button type="button" className="btn btn-secondary" onClick={() => setShowMemberModal(false)}>Cancel</button>
+                              <button type="submit" className="btn btn-primary">Add Member</button>
+                            </div>
+                          </form>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* TAB 4: FACULTY & ADMIN FEEDBACK & SUGGESTIONS */}
+                {activeStudioTab === 'feedback' && (
+                  <div className="tab-pane animate-fade feedback-pane">
+                    <div className="feedback-header">
+                      <h3>Faculty & Administrator Evaluation</h3>
+                      <p className="card-desc">Review constructive feedback, official grades, code suggestions, and technology recommendations from your faculty coordinators.</p>
+                    </div>
+
+                    <div className="evaluation-summary-row mt-16">
+                      <div className="eval-card">
+                        <span className="eval-label">Project Status</span>
+                        <span className={`status-pill ${project.status}`}>{project.status.replace('_', ' ')}</span>
+                      </div>
+                      <div className="eval-card">
+                        <span className="eval-label">Assigned Score</span>
+                        <strong className="eval-grade">{project.grade !== null && project.grade !== undefined ? `${project.grade} / 100` : 'Pending Evaluation'}</strong>
+                      </div>
+                      <div className="eval-card">
+                        <span className="eval-label">Evaluator</span>
+                        <span>{project.reviewedBy?.name || 'Academic Review Committee'}</span>
+                      </div>
+                    </div>
+
+                    {/* CODE SUGGESTIONS SECTION */}
+                    <div className="suggestion-section code-suggestion-card mt-20">
+                      <div className="suggestion-header">
+                        <span className="suggestion-icon">💻</span>
+                        <div>
+                          <h4>Faculty Code Suggestions & Best Practices</h4>
+                          <p className="text-secondary">Recommendations on code architecture, syntax optimization, security, and algorithmic efficiency.</p>
+                        </div>
+                      </div>
+                      <div className="suggestion-body">
+                        {project.codeSuggestions ? (
+                          <div className="suggestion-text-box">
+                            {project.codeSuggestions}
+                          </div>
+                        ) : (
+                          <p className="text-secondary italic-note">No code suggestions provided yet. Faculty will review your code files and provide architectural notes here.</p>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* TECHNOLOGY SUGGESTIONS SECTION */}
+                    <div className="suggestion-section tech-suggestion-card mt-20">
+                      <div className="suggestion-header">
+                        <span className="suggestion-icon">⚡</span>
+                        <div>
+                          <h4>Faculty Technology & Architecture Suggestions</h4>
+                          <p className="text-secondary">Advice on frameworks, modern libraries, database choices, cloud hosting, and scalability improvements.</p>
+                        </div>
+                      </div>
+                      <div className="suggestion-body">
+                        {project.techSuggestions ? (
+                          <div className="suggestion-text-box">
+                            {project.techSuggestions}
+                          </div>
+                        ) : (
+                          <p className="text-secondary italic-note">No technology suggestions provided yet. Once reviewed, recommended libraries and tools will be listed here.</p>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* GENERAL FEEDBACK */}
+                    {project.feedback && (
+                      <div className="suggestion-section feedback-card mt-20">
+                        <div className="suggestion-header">
+                          <span className="suggestion-icon">📝</span>
+                          <div>
+                            <h4>General Evaluator Notes</h4>
+                          </div>
+                        </div>
+                        <div className="suggestion-body">
+                          <div className="suggestion-text-box">
+                            {project.feedback}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
               </section>
             ) : (
               <div className="glass-card project-empty-state">
-                <h3>Start a project</h3>
-                <p className="text-secondary">Create a project to open the multi-file editor.</p>
-                <button className="btn btn-primary" type="button" onClick={createProject}>Create Project</button>
+                <div className="empty-state-icon">📁</div>
+                <h3>Start Your Academic Project</h3>
+                <p className="text-secondary">Create a new project to open the multi-file code editor, add your team members, and prepare your deployment.</p>
+                <button className="btn btn-primary mt-16" type="button" onClick={createProject}>+ Create Project</button>
               </div>
             )}
           </div>

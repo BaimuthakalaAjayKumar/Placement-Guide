@@ -216,9 +216,16 @@ exports.getProjects = async (req, res, next) => {
   try {
     const query = {};
     if (req.user.role === 'student') {
-      query.student = req.user.id;
+      // Students can view projects they created or where they are listed as a team member
+      const userEmail = (req.user.email || '').trim().toLowerCase();
+      query.$or = [
+        { student: req.user.id },
+        { 'teamMembers.email': new RegExp(`^${userEmail}$`, 'i') }
+      ];
     } else if (req.user.role === 'faculty' && !req.query.academicYear) {
-      query.academicYear = { $in: req.user.managedAcademicYears };
+      if (req.user.managedAcademicYears && req.user.managedAcademicYears.length > 0 && !req.user.managedAcademicYears.includes('All')) {
+        query.academicYear = { $in: req.user.managedAcademicYears };
+      }
     } else if (req.query.academicYear) {
       if (!canManageScope(req.user, req.query.academicYear, req.query.branch || '', req.query.section || '')) {
         return res.status(403).json({ success: false, error: 'You are not assigned to manage this academic year.' });
@@ -239,13 +246,22 @@ exports.getProjects = async (req, res, next) => {
 
 exports.createProject = async (req, res, next) => {
   try {
-    const academicYear = req.user.academicYear || req.user.year;
-    if (!academicYear) {
-      return res.status(400).json({ success: false, error: 'Set your academic year before creating a project.' });
-    }
+    const academicYear = req.body.academicYear || req.user.academicYear || req.user.year || 'Final Year';
+
+    const deploymentUrl = req.body.deploymentUrl || req.body.previewUrl || '';
+    const previewUrl = req.body.previewUrl || deploymentUrl;
 
     const project = await Project.create({
-      ...req.body,
+      title: req.body.title || 'Untitled Project',
+      description: req.body.description || '',
+      goals: req.body.goals || '',
+      technologies: Array.isArray(req.body.technologies) ? req.body.technologies : [],
+      teamMembers: Array.isArray(req.body.teamMembers) ? req.body.teamMembers : [],
+      files: Array.isArray(req.body.files) ? req.body.files : [],
+      repositoryUrl: req.body.repositoryUrl || '',
+      previewUrl,
+      deploymentUrl,
+      milestones: Array.isArray(req.body.milestones) ? req.body.milestones : [],
       student: req.user.id,
       academicYear,
       status: 'draft'
@@ -265,16 +281,73 @@ exports.updateProject = async (req, res, next) => {
     const canReview = ['admin', 'faculty'].includes(req.user.role) && canManageYear(req.user, project.academicYear);
     if (!isOwner && !canReview) return res.status(403).json({ success: false, error: 'Not authorized to update this project.' });
 
-    const allowedFields = ['title', 'description', 'technologies', 'files', 'repositoryUrl', 'previewUrl', 'milestones'];
-    if (canReview) allowedFields.push('status', 'feedback', 'grade');
-    allowedFields.forEach(field => {
-      if (req.body[field] !== undefined) project[field] = req.body[field];
-    });
+    const studentFields = [
+      'title', 'description', 'goals', 'technologies', 'teamMembers',
+      'files', 'repositoryUrl', 'previewUrl', 'deploymentUrl', 'milestones'
+    ];
 
-    if (req.body.submit === true && isOwner) project.status = 'submitted';
-    if (canReview && req.body.status) {
+    if (isOwner) {
+      studentFields.forEach(field => {
+        if (req.body[field] !== undefined) project[field] = req.body[field];
+      });
+
+      // Synchronize previewUrl and deploymentUrl
+      if (req.body.deploymentUrl !== undefined && !project.previewUrl) {
+        project.previewUrl = req.body.deploymentUrl;
+      } else if (req.body.previewUrl !== undefined && !project.deploymentUrl) {
+        project.deploymentUrl = req.body.previewUrl;
+      }
+
+      if (req.body.submit === true) {
+        project.status = 'submitted';
+      }
+    }
+
+    if (canReview) {
+      if (req.body.status) project.status = req.body.status;
+      if (req.body.feedback !== undefined) project.feedback = req.body.feedback;
+      if (req.body.grade !== undefined) {
+        project.grade = req.body.grade === '' || req.body.grade === null ? null : Number(req.body.grade);
+      }
+      if (req.body.codeSuggestions !== undefined) project.codeSuggestions = req.body.codeSuggestions;
+      if (req.body.techSuggestions !== undefined) project.techSuggestions = req.body.techSuggestions;
+
       project.reviewedBy = req.user.id;
       project.reviewedAt = new Date();
+
+      // Push to facultySuggestions history if suggestions or feedback provided
+      if (req.body.codeSuggestions || req.body.techSuggestions || req.body.feedback) {
+        project.facultySuggestions = project.facultySuggestions || [];
+        project.facultySuggestions.push({
+          faculty: req.user.id,
+          facultyName: req.user.name || (req.user.role === 'admin' ? 'Administrator' : 'Faculty Evaluator'),
+          facultyRole: req.user.role,
+          codeSuggestion: req.body.codeSuggestions || '',
+          techSuggestion: req.body.techSuggestions || '',
+          generalFeedback: req.body.feedback || '',
+          suggestedAt: new Date()
+        });
+      }
+
+      // Notify the student about review and suggestions
+      try {
+        const notifDoc = await Notification.create({
+          user: project.student,
+          type: 'academic_update',
+          message: `📋 Project Evaluation Updated: "${project.title}" received new suggestions/grade from ${req.user.name || 'Faculty'}.`,
+          metadata: {
+            projectId: project._id,
+            status: project.status,
+            grade: project.grade
+          }
+        });
+        const io = req.app.get('socketio');
+        if (io) {
+          io.to(`user_${project.student}`).emit('new_notification', notifDoc);
+        }
+      } catch (notifErr) {
+        console.warn('Error sending project review notification:', notifErr.message);
+      }
     }
 
     await project.save();

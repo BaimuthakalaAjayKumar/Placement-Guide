@@ -4,8 +4,15 @@ import { useAuth } from '../context/AuthContext';
 import './Auth.css';
 
 const Login = () => {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState(() => {
+    return localStorage.getItem('last_login_email') || '';
+  });
+  const [password, setPassword] = useState(() => {
+    return localStorage.getItem('last_login_password') || '';
+  });
+  const [rememberMe, setRememberMe] = useState(() => {
+    return localStorage.getItem('remember_credentials') !== 'false';
+  });
   const [error, setError] = useState('');
   const [localLoading, setLocalLoading] = useState(false);
 
@@ -26,6 +33,17 @@ const Login = () => {
     setLocalLoading(false);
 
     if (result.success) {
+      // Preserve last login credentials so user never has to retype
+      if (rememberMe) {
+        localStorage.setItem('last_login_email', email);
+        localStorage.setItem('last_login_password', password);
+        localStorage.setItem('remember_credentials', 'true');
+      } else {
+        localStorage.removeItem('last_login_email');
+        localStorage.removeItem('last_login_password');
+        localStorage.setItem('remember_credentials', 'false');
+      }
+
       if (result.user && result.user.role === 'admin') {
         navigate('/admin');
       } else if (result.user && result.user.role === 'faculty') {
@@ -71,6 +89,7 @@ const Login = () => {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
+              autoComplete="username"
             />
           </div>
 
@@ -84,8 +103,18 @@ const Login = () => {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
+              autoComplete="current-password"
             />
-            <div className="auth-form-extra">
+            <div className="auth-form-extra" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <label style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '12.5px', color: 'var(--text-secondary)', userSelect: 'none' }}>
+                <input
+                  type="checkbox"
+                  checked={rememberMe}
+                  onChange={(e) => setRememberMe(e.target.checked)}
+                  style={{ cursor: 'pointer', accentColor: 'var(--accent-primary, #6366f1)', width: '14px', height: '14px' }}
+                />
+                <span>Remember Credentials</span>
+              </label>
               <Link to="/forgot-password" className="auth-link">
                 Forgot password?
               </Link>

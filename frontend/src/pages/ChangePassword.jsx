@@ -28,6 +28,9 @@ const ChangePassword = () => {
       });
       const data = await response.json();
       if (!data.success) throw new Error(data.error || 'Unable to change password.');
+      if (localStorage.getItem('remember_credentials') !== 'false') {
+        localStorage.setItem('last_login_password', newPassword);
+      }
       setSuccess('Password changed successfully. Reloading your portal...');
       setTimeout(() => window.location.reload(), 800);
     } catch (err) {

@@ -836,5 +836,356 @@
   box-shadow: 0 4px 12px rgba(37, 99, 235, 0.35);
 }
 
+/* Faculty Default Account Banner */
+.faculty-default-account-banner {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.12), rgba(168, 85, 247, 0.08));
+  border: 1px solid rgba(99, 102, 241, 0.35);
+  border-radius: 12px;
+  padding: 16px 20px;
+  margin-bottom: 20px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+}
+
+.account-banner-icon {
+  font-size: 2.2rem;
+  background: rgba(99, 102, 241, 0.15);
+  padding: 10px;
+  border-radius: 12px;
+}
+
+.account-banner-content {
+  flex: 1;
+}
+
+.account-banner-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 4px;
+}
+
+.account-banner-title strong {
+  font-size: 1.05rem;
+  color: #f8fafc;
+}
+
+.account-verified-tag {
+  background: rgba(16, 185, 129, 0.2);
+  border: 1px solid rgba(16, 185, 129, 0.4);
+  color: #34d399;
+  font-size: 0.72rem;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-weight: 600;
+}
+
+.account-banner-desc {
+  font-size: 0.82rem;
+  color: #94a3b8;
+  margin: 0 0 8px;
+}
+
+.account-credentials-chips {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.cred-chip {
+  background: rgba(15, 23, 42, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 4px 12px;
+  border-radius: 8px;
+  font-size: 0.82rem;
+  color: #cbd5e1;
+}
+
+.cred-chip strong {
+  color: #38bdf8;
+  font-family: monospace;
+}
+
+.btn-copy-account {
+  background: rgba(99, 102, 241, 0.2);
+  border: 1px solid rgba(99, 102, 241, 0.4);
+  color: #a5b4fc;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s ease;
+}
+
+.btn-copy-account:hover {
+  background: rgba(99, 102, 241, 0.35);
+  color: #ffffff;
+}
+
+/* Projects Table Enhancements */
+.project-tab-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.projects-eval-table {
+  width: 100%;
+}
+
+.table-project-title strong {
+  font-size: 0.95rem;
+  color: #f8fafc;
+}
+
+.project-table-links {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.table-link-live {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(16, 185, 129, 0.15);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  color: #34d399;
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 6px;
+  text-decoration: none;
+}
+
+.table-link-live:hover {
+  background: rgba(16, 185, 129, 0.3);
+}
+
+.table-link-repo {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(56, 189, 248, 0.12);
+  border: 1px solid rgba(56, 189, 248, 0.3);
+  color: #38bdf8;
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 6px;
+  text-decoration: none;
+}
+
+.table-link-repo:hover {
+  background: rgba(56, 189, 248, 0.25);
+}
+
+.table-student-col {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.teammates-collapsible {
+  cursor: pointer;
+}
+
+.teammates-summary {
+  font-size: 0.75rem;
+  color: #a5b4fc;
+  font-weight: 600;
+}
+
+.teammates-dropdown {
+  list-style: none;
+  padding: 6px 10px;
+  margin: 4px 0 0;
+  background: rgba(15, 23, 42, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  font-size: 0.75rem;
+}
+
+.teammates-dropdown li {
+  padding: 2px 0;
+  color: #cbd5e1;
+}
+
+.teammate-role-tag {
+  color: #94a3b8;
+  font-style: italic;
+}
+
+.table-tech-tags {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  max-width: 220px;
+}
+
+.table-tech-pill {
+  background: rgba(99, 102, 241, 0.15);
+  border: 1px solid rgba(99, 102, 241, 0.3);
+  color: #a5b4fc;
+  font-size: 0.7rem;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.table-goals-cell {
+  max-width: 200px;
+  font-size: 0.8rem;
+  color: #cbd5e1;
+  line-height: 1.4;
+}
+
+.table-actions-cell {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+/* Faculty Code Viewer Modal */
+.faculty-code-viewer-modal {
+  max-width: 900px;
+  width: 95%;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.code-viewer-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+.summary-box {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-size: 0.85rem;
+}
+
+.summary-title {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #94a3b8;
+  font-weight: 600;
+}
+
+.summary-link {
+  color: #38bdf8;
+  text-decoration: none;
+  word-break: break-all;
+}
+
+.summary-link:hover {
+  text-decoration: underline;
+}
+
+.project-goals-banner {
+  background: rgba(99, 102, 241, 0.08);
+  border-left: 3px solid #818cf8;
+  padding: 10px 14px;
+  border-radius: 6px;
+  font-size: 0.88rem;
+}
+
+.project-goals-banner p {
+  margin: 4px 0 0;
+  color: #e2e8f0;
+  white-space: pre-wrap;
+}
+
+.faculty-file-tabs-container {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.faculty-file-tabs {
+  display: flex;
+  align-items: center;
+  background: #0b0f19;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  overflow-x: auto;
+}
+
+.faculty-file-tab {
+  background: transparent;
+  border: 0;
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: 2px solid transparent;
+  color: #94a3b8;
+  padding: 8px 14px;
+  font-size: 0.82rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.faculty-file-tab.active {
+  color: #38bdf8;
+  border-bottom-color: #38bdf8;
+  background: rgba(56, 189, 248, 0.1);
+  font-weight: 600;
+}
+
+.faculty-code-box {
+  background: #090d16;
+}
+
+.code-box-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 14px;
+  background: rgba(255, 255, 255, 0.03);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  font-size: 0.82rem;
+  color: #94a3b8;
+}
+
+.btn-copy-code {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #e2e8f0;
+  font-size: 0.75rem;
+  padding: 3px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.btn-copy-code:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.code-content-pre {
+  margin: 0;
+  padding: 14px 16px;
+  max-height: 400px;
+  overflow: auto;
+  font-family: 'Fira Code', monospace;
+  font-size: 0.82rem;
+  line-height: 1.5;
+  color: #e2e8f0;
+  white-space: pre-wrap;
+}
+
+.faculty-review-modal {
+  max-width: 650px;
+  width: 95%;
+}
+
 
 
