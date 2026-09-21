@@ -384,14 +384,11 @@ exports.createTest = async (req, res, next) => {
         const canManage = req.user.managedScopes.some(scope => {
           const sYear = (scope.academicYear || '').trim().toLowerCase();
           const sBranch = (scope.branch || '').trim().toLowerCase();
-          const sSection = (scope.section || '').trim().toLowerCase();
           const reqYear = (subject.academicYear || '').trim().toLowerCase();
           const reqBranch = (subject.branch || '').trim().toLowerCase();
-          const reqSection = (subject.section || '').trim().toLowerCase();
           const yearMatch = !sYear || sYear === 'all' || !reqYear || sYear === reqYear || reqYear.includes(sYear) || sYear.includes(reqYear);
           const branchMatch = !sBranch || sBranch === 'all' || !reqBranch || sBranch === reqBranch;
-          const sectionMatch = !sSection || sSection === 'all' || !reqSection || sSection === reqSection;
-          return yearMatch && branchMatch && sectionMatch;
+          return yearMatch && branchMatch;
         });
         if (!canManage) {
           return res.status(403).json({ success: false, error: 'You are not assigned to manage this subject.' });
@@ -582,14 +579,11 @@ exports.getSubjectTestReports = async (req, res, next) => {
       const canManage = !req.user.managedScopes || req.user.managedScopes.length === 0 || req.user.managedScopes.some(scope => {
         const sYear = (scope.academicYear || '').trim().toLowerCase();
         const sBranch = (scope.branch || '').trim().toLowerCase();
-        const sSection = (scope.section || '').trim().toLowerCase();
         const reqYear = (subject.academicYear || '').trim().toLowerCase();
         const reqBranch = (subject.branch || '').trim().toLowerCase();
-        const reqSection = (subject.section || '').trim().toLowerCase();
         const yearMatch = !sYear || sYear === 'all' || !reqYear || sYear === reqYear || reqYear.includes(sYear) || sYear.includes(reqYear);
         const branchMatch = !sBranch || sBranch === 'all' || !reqBranch || sBranch === reqBranch;
-        const sectionMatch = !sSection || sSection === 'all' || !reqSection || sSection === reqSection;
-        return yearMatch && branchMatch && sectionMatch;
+        return yearMatch && branchMatch;
       });
       if (!canManage) {
         return res.status(403).json({ success: false, error: 'You are not assigned to manage this subject.' });

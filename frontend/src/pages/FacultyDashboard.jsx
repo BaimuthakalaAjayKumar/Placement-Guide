@@ -1155,15 +1155,18 @@ const FacultyDashboard = () => {
                     <div className="progress-student-info">
                         <div className="student-avatar-badge">🎓</div>
                         <div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                                 <h3 style={{ margin: 0, fontSize: '1.25rem', color: '#f8fafc', fontWeight: 700 }}>
                                     {selectedStudent.name}
                                 </h3>
-                                <span className="student-scope-pill">
-                                    {selectedStudent.branch || 'Branch N/A'} {selectedStudent.section ? `• Sec ${selectedStudent.section}` : ''}
+                                <span className="student-year-pill" style={{ background: 'rgba(99, 102, 241, 0.15)', color: '#a5b4fc', border: '1px solid rgba(99, 102, 241, 0.35)', padding: '3px 10px', borderRadius: '6px', fontSize: '12px', fontWeight: 600 }}>
+                                    📅 Year: {selectedStudent.academicYear || selectedStudent.year || 'N/A'}
                                 </span>
-                                <span className="student-year-pill">
-                                    {selectedStudent.academicYear || selectedStudent.year || 'Academic Year N/A'}
+                                <span className="student-scope-pill" style={{ background: 'rgba(16, 185, 129, 0.15)', color: '#34d399', border: '1px solid rgba(16, 185, 129, 0.35)', padding: '3px 10px', borderRadius: '6px', fontSize: '12px', fontWeight: 600 }}>
+                                    🏢 Branch: {selectedStudent.branch || 'N/A'}
+                                </span>
+                                <span className="student-scope-pill" style={{ background: 'rgba(56, 189, 248, 0.15)', color: '#38bdf8', border: '1px solid rgba(56, 189, 248, 0.35)', padding: '3px 10px', borderRadius: '6px', fontSize: '12px', fontWeight: 600 }}>
+                                    🏷️ Section: Sec {selectedStudent.section || '—'}
                                 </span>
                             </div>
                             <p className="student-meta-subline">
@@ -1935,8 +1938,9 @@ const FacultyDashboard = () => {
                                                 <tr>
                                                     <th>Student</th>
                                                     <th>Email</th>
-                                                    <th>Branch</th>
                                                     <th>Academic Year</th>
+                                                    <th>Branch</th>
+                                                    <th>Section</th>
                                                     <th>Readiness Index</th>
                                                     <th>Action</th>
                                                 </tr>
@@ -1946,10 +1950,26 @@ const FacultyDashboard = () => {
                                                     const isViewingThisStudent = selectedStudent?._id === student._id && (progress || progressLoading);
                                                     return (
                                                         <tr key={student._id} className={isViewingThisStudent ? 'row-active-progress' : ''}>
-                                                            <td><strong>{student.name}</strong></td>
+                                                            <td>
+                                                                <strong>{student.name}</strong>
+                                                                {student.rollNumber && <div style={{ fontSize: '11.5px', color: '#94a3b8' }}>🆔 {student.rollNumber}</div>}
+                                                            </td>
                                                             <td>{student.email}</td>
-                                                            <td>{student.branch || 'N/A'} {student.section ? `(Sec ${student.section})` : ''}</td>
-                                                            <td>{student.academicYear || student.year || 'N/A'}</td>
+                                                            <td>
+                                                                <span className="code-pill" style={{ fontSize: '12px', background: 'rgba(99, 102, 241, 0.12)', color: '#c7d2fe', border: '1px solid rgba(99, 102, 241, 0.25)' }}>
+                                                                    {student.academicYear || student.year || 'N/A'}
+                                                                </span>
+                                                            </td>
+                                                            <td>
+                                                                <span className="code-pill" style={{ fontSize: '12px', background: 'rgba(16, 185, 129, 0.12)', color: '#6ee7b7', border: '1px solid rgba(16, 185, 129, 0.25)' }}>
+                                                                    {student.branch || 'N/A'}
+                                                                </span>
+                                                            </td>
+                                                            <td>
+                                                                <span className="code-pill" style={{ fontSize: '12px', background: 'rgba(56, 189, 248, 0.15)', color: '#38bdf8', border: '1px solid rgba(56, 189, 248, 0.35)', fontWeight: 600 }}>
+                                                                    Sec {student.section || '—'}
+                                                                </span>
+                                                            </td>
                                                             <td>
                                                                 <span className={`score-badge ${student.readinessScore >= 70 ? 'high' : student.readinessScore >= 40 ? 'medium' : 'low'}`}>
                                                                     {student.readinessScore || 0}%
@@ -1968,7 +1988,7 @@ const FacultyDashboard = () => {
                                                 })}
                                                 {filteredStudents.length === 0 && (
                                                     <tr>
-                                                        <td colSpan="6" style={{ textAlign: 'center', padding: '30px', color: '#94a3b8' }}>
+                                                        <td colSpan="7" style={{ textAlign: 'center', padding: '30px', color: '#94a3b8' }}>
                                                             No student records found matching current criteria.
                                                         </td>
                                                     </tr>
@@ -2438,7 +2458,7 @@ const FacultyDashboard = () => {
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
                                         <div>
                                             <h3>📚 Registered Academic Preparation Subjects ({subjects.length})</h3>
-                                            <p className="card-desc">Curriculum preparation subjects assigned to your academic scope. Click any subject action to access study notes, practice tests, and student reports.</p>
+                                            <p className="card-desc">Curriculum preparation subjects assigned to your academic scope (Year & Branch). Click any subject action to access study notes, practice tests, and student reports.</p>
                                         </div>
                                     </div>
 
@@ -2452,7 +2472,7 @@ const FacultyDashboard = () => {
                                                         <th>Code</th>
                                                         <th>Subject Name</th>
                                                         <th>Academic Year</th>
-                                                        <th>Branch / Section</th>
+                                                        <th>Branch</th>
                                                         <th>Study Notes</th>
                                                         <th>Subject Actions</th>
                                                     </tr>
@@ -2463,7 +2483,7 @@ const FacultyDashboard = () => {
                                                             <td><span className="code-pill">{s.code}</span></td>
                                                             <td><strong>{s.name}</strong></td>
                                                             <td>{s.academicYear}</td>
-                                                            <td>{s.branch || 'All'} {s.section ? `· Sec ${s.section}` : ''}</td>
+                                                            <td>{s.branch || 'All Branches'}</td>
                                                             <td>
                                                                 <span style={{ fontSize: '12px', color: '#93c5fd', background: 'rgba(59, 130, 246, 0.1)', padding: '4px 8px', borderRadius: '4px', border: '1px solid rgba(59, 130, 246, 0.25)' }}>
                                                                     📄 {s.notes?.length || 0} Notes

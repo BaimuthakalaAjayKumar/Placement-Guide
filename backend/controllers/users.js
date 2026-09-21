@@ -572,28 +572,67 @@ exports.getAllStudents = async (req, res, next) => {
       });
     }
 
+    const escapeRegexStr = (str) => (str || '').replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&');
+
     const orConditions = scopes.map(scope => {
       const condList = [{ role: 'student' }];
       const sYear = String(scope.academicYear || '').trim();
       const sBranch = String(scope.branch || '').trim();
       const sSection = String(scope.section || '').trim();
 
+      // 1. Academic Year matching (flexible matching for 4th Year, 4, IV, 2026, etc.)
       if (sYear && sYear.toLowerCase() !== 'all') {
-        const escapedYear = sYear.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const escapedYear = escapeRegexStr(sYear);
+        const yearPatterns = [new RegExp(`^${escapedYear}$`, 'i'), new RegExp(escapedYear, 'i')];
+        const digits = sYear.match(/\d+/);
+        if (digits) {
+          yearPatterns.push(new RegExp(`^${digits[0]}$`, 'i'));
+        }
+        if (/4th|final|IV|^4$/i.test(sYear)) {
+          yearPatterns.push(/4th|final|IV|^4$/i);
+        } else if (/3rd|III|^3$/i.test(sYear)) {
+          yearPatterns.push(/3rd|III|^3$/i);
+        } else if (/2nd|II|^2$/i.test(sYear)) {
+          yearPatterns.push(/2nd|II|^2$/i);
+        } else if (/1st|I|^1$/i.test(sYear)) {
+          yearPatterns.push(/1st|I|^1$/i);
+        }
+
         condList.push({
           $or: [
-            { academicYear: new RegExp(escapedYear, 'i') },
-            { year: new RegExp(escapedYear, 'i') }
+            { academicYear: { $in: yearPatterns } },
+            { year: { $in: yearPatterns } }
           ]
         });
       }
 
+      // 2. Branch matching
       if (sBranch && sBranch.toLowerCase() !== 'all') {
-        condList.push({ branch: new RegExp(`^${sBranch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') });
+        const escapedBranch = escapeRegexStr(sBranch);
+        const branchPatterns = [new RegExp(`^${escapedBranch}$`, 'i')];
+        const cleanBranch = sBranch.split('(')[0].trim();
+        if (cleanBranch && cleanBranch.toLowerCase() !== sBranch.toLowerCase()) {
+          branchPatterns.push(new RegExp(`^${escapeRegexStr(cleanBranch)}$`, 'i'));
+        }
+        const acronyms = ['CSE', 'IT', 'ECE', 'EEE', 'MECH', 'CIVIL', 'CSD', 'CSM', 'CSBS', 'AIDS'];
+        for (const acr of acronyms) {
+          if (new RegExp(`\\b${acr}\\b`, 'i').test(sBranch)) {
+            branchPatterns.push(new RegExp(`^${acr}$`, 'i'));
+          }
+        }
+        condList.push({ branch: { $in: branchPatterns } });
       }
 
+      // 3. Section matching - COMPULSORY FOR STUDENT DETAILS
       if (sSection && sSection.toLowerCase() !== 'all') {
-        condList.push({ section: new RegExp(`^${sSection.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') });
+        condList.push({
+          section: new RegExp(`^(?:Section\\s*)?${escapeRegexStr(sSection)}$`, 'i')
+        });
+      } else {
+        // Section is compulsory for students: student must have an assigned section
+        condList.push({
+          section: { $exists: true, $nin: ['', null] }
+        });
       }
 
       return { $and: condList };
@@ -629,7 +668,13 @@ exports.getStudentProgress = async (req, res, next) => {
 
         const yearMatch = !scopeYear || scopeYear === 'all' || !studentYear || scopeYear === studentYear || studentYear.includes(scopeYear) || scopeYear.includes(studentYear);
         const branchMatch = !scopeBranch || scopeBranch === 'all' || !studentBranch || scopeBranch === studentBranch;
-        const sectionMatch = !scopeSection || scopeSection === 'all' || !studentSection || scopeSection === studentSection;
+        
+        // Section is compulsory for students: student must have a section and match scope's section
+        if (!studentSection) return false;
+        const sectionMatch = !scopeSection || scopeSection === 'all' ||
+                             studentSection === scopeSection ||
+                             studentSection === `section ${scopeSection}` ||
+                             `section ${studentSection}` === scopeSection;
         return yearMatch && branchMatch && sectionMatch;
       });
 

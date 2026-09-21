@@ -12,21 +12,19 @@ const canManageYear = (user, academicYear) => {
   return user.managedAcademicYears.some(y => !y || y.trim().toLowerCase() === 'all' || y.trim().toLowerCase() === targetYear || targetYear.includes(y.trim().toLowerCase()) || y.trim().toLowerCase().includes(targetYear));
 };
 
-const canManageScope = (user, academicYear, branch = '', section = '') => {
+const canManageScope = (user, academicYear, branch = '') => {
   if (user.role === 'admin') return true;
   if (user.role !== 'faculty') return false;
   if (!user.managedScopes || user.managedScopes.length === 0) return true;
   return user.managedScopes.some(scope => {
     const sYear = (scope.academicYear || '').trim().toLowerCase();
     const sBranch = (scope.branch || '').trim().toLowerCase();
-    const sSection = (scope.section || '').trim().toLowerCase();
     const reqYear = (academicYear || '').trim().toLowerCase();
     const reqBranch = (branch || '').trim().toLowerCase();
-    const reqSection = (section || '').trim().toLowerCase();
     const yearMatch = !sYear || sYear === 'all' || !reqYear || sYear === reqYear || reqYear.includes(sYear) || sYear.includes(reqYear);
     const branchMatch = !sBranch || sBranch === 'all' || !reqBranch || sBranch === reqBranch;
-    const sectionMatch = !sSection || sSection === 'all' || !reqSection || sSection === reqSection;
-    return yearMatch && branchMatch && sectionMatch;
+    // Academic preparation subjects are scoped by Year and Branch only (no section requirement)
+    return yearMatch && branchMatch;
   });
 };
 
@@ -98,22 +96,67 @@ exports.getSubjects = async (req, res, next) => {
       }
       // Note: NO SECTION RESTRICTION for students! All students in that year and branch can see all subjects!
 
-    } else if (req.user.role === 'faculty' && !req.query.academicYear) {
+    } else if (req.user.role === 'faculty') {
+      // If a Scope is added to the Faculty, show registered Academic Preparation Subjects based on Year and Branch
       if (req.user.managedScopes && req.user.managedScopes.length > 0) {
-        query.$or = req.user.managedScopes.map(scope => {
-          const scopeCond = {
-            academicYear: new RegExp(`^${escapeRegex(scope.academicYear)}$`, 'i')
-          };
-          if (scope.branch && scope.branch.toLowerCase() !== 'all') {
-            scopeCond.$or = [
-              { branch: new RegExp(`^${escapeRegex(scope.branch)}$`, 'i') },
-              { branch: '' },
-              { branch: null },
-              { branch: { $regex: /^all$/i } }
-            ];
+        const scopeConditions = req.user.managedScopes.map(scope => {
+          const scopeYear = (scope.academicYear || '').trim();
+          const scopeBranch = (scope.branch || '').trim();
+
+          const yearConditions = [
+            { academicYear: { $regex: /^all$/i } },
+            { academicYear: '' },
+            { academicYear: null }
+          ];
+
+          if (scopeYear && scopeYear.toLowerCase() !== 'all') {
+            yearConditions.push({ academicYear: new RegExp(`^${escapeRegex(scopeYear)}$`, 'i') });
+
+            const digits = scopeYear.match(/\d+/);
+            if (digits) {
+              yearConditions.push({ academicYear: new RegExp(digits[0], 'i') });
+            }
+            if (/4th|final|IV|^4$/i.test(scopeYear)) {
+              yearConditions.push({ academicYear: { $regex: /4th|final|IV|^4$/i } });
+            } else if (/3rd|III|^3$/i.test(scopeYear)) {
+              yearConditions.push({ academicYear: { $regex: /3rd|III|^3$/i } });
+            } else if (/2nd|II|^2$/i.test(scopeYear)) {
+              yearConditions.push({ academicYear: { $regex: /2nd|II|^2$/i } });
+            } else if (/1st|I|^1$/i.test(scopeYear)) {
+              yearConditions.push({ academicYear: { $regex: /1st|I|^1$/i } });
+            }
           }
-          return scopeCond;
+
+          const branchConditions = [
+            { branch: '' },
+            { branch: null },
+            { branch: { $regex: /^all$/i } }
+          ];
+
+          if (scopeBranch && scopeBranch.toLowerCase() !== 'all') {
+            const cleanBranch = scopeBranch.split('(')[0].trim();
+            branchConditions.push({ branch: new RegExp(`^${escapeRegex(scopeBranch)}$`, 'i') });
+            if (cleanBranch && cleanBranch.toLowerCase() !== scopeBranch.toLowerCase()) {
+              branchConditions.push({ branch: new RegExp(`^${escapeRegex(cleanBranch)}$`, 'i') });
+            }
+
+            const acronyms = ['CSE', 'IT', 'ECE', 'EEE', 'MECH', 'CIVIL', 'CSD', 'CSM', 'CSBS', 'AIDS'];
+            for (const acr of acronyms) {
+              if (new RegExp(`\\b${acr}\\b`, 'i').test(scopeBranch)) {
+                branchConditions.push({ branch: new RegExp(`^${acr}$`, 'i') });
+              }
+            }
+          }
+
+          return {
+            $and: [
+              { $or: yearConditions },
+              { $or: branchConditions }
+            ]
+          };
         });
+
+        query.$or = scopeConditions;
       }
     } else {
       const academicYear = req.query.academicYear || '';
@@ -145,7 +188,7 @@ exports.createSubject = async (req, res, next) => {
     if (!name || !code || !academicYear) {
       return res.status(400).json({ success: false, error: 'Name, code, and academic year are required.' });
     }
-    if (!canManageScope(req.user, academicYear, branch, section)) {
+    if (!canManageScope(req.user, academicYear, branch)) {
       return res.status(403).json({ success: false, error: 'You are not assigned to manage this academic year.' });
     }
 
@@ -197,7 +240,7 @@ exports.addSubjectNote = async (req, res, next) => {
     const subject = await Subject.findById(req.params.id);
     if (!subject) return res.status(404).json({ success: false, error: 'Subject not found.' });
 
-    if (req.user.role === 'faculty' && !canManageScope(req.user, subject.academicYear, subject.branch, subject.section)) {
+    if (req.user.role === 'faculty' && !canManageScope(req.user, subject.academicYear, subject.branch)) {
       return res.status(403).json({ success: false, error: 'You are not assigned to manage this subject.' });
     }
 
@@ -281,7 +324,7 @@ exports.deleteSubjectNote = async (req, res, next) => {
     if (!note) return res.status(404).json({ success: false, error: 'Note not found.' });
 
     const isAuthor = note.uploadedBy && note.uploadedBy.toString() === req.user.id;
-    const canManage = req.user.role === 'admin' || (req.user.role === 'faculty' && canManageScope(req.user, subject.academicYear, subject.branch, subject.section));
+    const canManage = req.user.role === 'admin' || (req.user.role === 'faculty' && canManageScope(req.user, subject.academicYear, subject.branch));
 
     if (!isAuthor && !canManage) {
       return res.status(403).json({ success: false, error: 'Not authorized to delete this study note.' });

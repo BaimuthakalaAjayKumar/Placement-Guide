@@ -4940,7 +4940,7 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
                       <input className="form-control" placeholder="e.g. CSE" value={scopeForm.branch} onChange={event => setScopeForm({ ...scopeForm, branch: event.target.value })} />
                     </div>
                     <div className="form-group">
-                      <label className="form-label">Section (Optional)</label>
+                      <label className="form-label">Section (Compulsory for Student Scoping)</label>
                       <input className="form-control" placeholder="e.g. C" value={scopeForm.section} onChange={event => setScopeForm({ ...scopeForm, section: event.target.value })} />
                     </div>
                     <div className="form-group">
