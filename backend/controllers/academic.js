@@ -175,7 +175,41 @@ exports.getSubjects = async (req, res, next) => {
       }
     }
 
-    const subjects = await Subject.find(query).sort({ code: 1, name: 1 });
+    let subjects = await Subject.find(query).sort({ code: 1, name: 1 });
+
+    if (req.user.role === 'student') {
+      const studentSection = (req.user.section || '').trim().toLowerCase();
+      const studentBranch = (req.user.branch || '').trim().toLowerCase();
+      const studentYear = (req.user.academicYear || req.user.year || '').toString().trim().toLowerCase();
+      subjects = subjects.map(s => {
+        const subjObj = s.toObject ? s.toObject() : s;
+        if (subjObj.notes && subjObj.notes.length > 0) {
+          subjObj.notes = subjObj.notes.filter(note => {
+            if (note.academicYear && note.academicYear.trim() !== '' && note.academicYear.toLowerCase() !== 'all') {
+              const noteYr = note.academicYear.trim().toLowerCase();
+              if (!studentYear) return false;
+              const matchesYr = studentYear === noteYr || studentYear.includes(noteYr) || noteYr.includes(studentYear);
+              if (!matchesYr) return false;
+            }
+            if (note.branch && note.branch.trim() !== '' && note.branch.toLowerCase() !== 'all') {
+              const noteBr = note.branch.trim().toLowerCase();
+              if (!studentBranch) return false;
+              const matchesBr = studentBranch === noteBr || studentBranch.includes(noteBr) || noteBr.includes(studentBranch);
+              if (!matchesBr) return false;
+            }
+            if (note.section && note.section.trim() !== '' && note.section.toLowerCase() !== 'all') {
+              const noteSec = note.section.trim().toLowerCase();
+              if (!studentSection) return false;
+              const matchesSec = studentSection === noteSec || studentSection === `section ${noteSec}` || `section ${studentSection}` === noteSec;
+              if (!matchesSec) return false;
+            }
+            return true;
+          });
+        }
+        return subjObj;
+      });
+    }
+
     res.status(200).json({ success: true, count: subjects.length, data: subjects });
   } catch (err) {
     next(err);
@@ -224,7 +258,36 @@ exports.getSubjectNotes = async (req, res, next) => {
     const subject = await Subject.findById(req.params.id);
     if (!subject) return res.status(404).json({ success: false, error: 'Subject not found.' });
 
-    res.status(200).json({ success: true, count: subject.notes.length, data: subject.notes });
+    let notes = subject.notes || [];
+    if (req.user.role === 'student') {
+      const studentSection = (req.user.section || '').trim().toLowerCase();
+      const studentBranch = (req.user.branch || '').trim().toLowerCase();
+      const studentYear = (req.user.academicYear || req.user.year || '').toString().trim().toLowerCase();
+
+      notes = notes.filter(note => {
+        if (note.academicYear && note.academicYear.trim() !== '' && note.academicYear.toLowerCase() !== 'all') {
+          const noteYr = note.academicYear.trim().toLowerCase();
+          if (!studentYear) return false;
+          const matchesYr = studentYear === noteYr || studentYear.includes(noteYr) || noteYr.includes(studentYear);
+          if (!matchesYr) return false;
+        }
+        if (note.branch && note.branch.trim() !== '' && note.branch.toLowerCase() !== 'all') {
+          const noteBr = note.branch.trim().toLowerCase();
+          if (!studentBranch) return false;
+          const matchesBr = studentBranch === noteBr || studentBranch.includes(noteBr) || noteBr.includes(studentBranch);
+          if (!matchesBr) return false;
+        }
+        if (note.section && note.section.trim() !== '' && note.section.toLowerCase() !== 'all') {
+          const noteSec = note.section.trim().toLowerCase();
+          if (!studentSection) return false;
+          const matchesSec = studentSection === noteSec || studentSection === `section ${noteSec}` || `section ${studentSection}` === noteSec;
+          if (!matchesSec) return false;
+        }
+        return true;
+      });
+    }
+
+    res.status(200).json({ success: true, count: notes.length, data: notes });
   } catch (err) {
     next(err);
   }
@@ -242,6 +305,33 @@ exports.addSubjectNote = async (req, res, next) => {
 
     if (req.user.role === 'faculty' && !canManageScope(req.user, subject.academicYear, subject.branch)) {
       return res.status(403).json({ success: false, error: 'You are not assigned to manage this subject.' });
+    }
+
+    // Determine target scope (Year, Branch, Section) for the note
+    let noteAcademicYear = req.body.academicYear || '';
+    let noteBranch = req.body.branch || '';
+    let noteSection = req.body.section || '';
+
+    if (req.user.role === 'faculty') {
+      const matchingScope = req.user.managedScopes?.find(s => {
+        if (s.subject && String(s.subject) === String(subject._id)) return true;
+        const yearMatch = !s.academicYear || s.academicYear.toLowerCase() === 'all' ||
+          !subject.academicYear ||
+          s.academicYear.trim().toLowerCase() === subject.academicYear.trim().toLowerCase() ||
+          subject.academicYear.toLowerCase().includes(s.academicYear.toLowerCase());
+        const branchMatch = !s.branch || s.branch.toLowerCase() === 'all' ||
+          !subject.branch ||
+          s.branch.trim().toLowerCase() === subject.branch.trim().toLowerCase();
+        return yearMatch && branchMatch;
+      }) || req.user.managedScopes?.[0];
+
+      if (!noteAcademicYear) noteAcademicYear = matchingScope?.academicYear || subject.academicYear || '';
+      if (!noteBranch) noteBranch = matchingScope?.branch || subject.branch || '';
+      if (!noteSection) noteSection = matchingScope?.section || '';
+    } else {
+      if (!noteAcademicYear) noteAcademicYear = subject.academicYear || '';
+      if (!noteBranch) noteBranch = subject.branch || '';
+      if (!noteSection) noteSection = subject.section || '';
     }
 
     let finalFileUrl = fileUrl || '';
@@ -267,6 +357,9 @@ exports.addSubjectNote = async (req, res, next) => {
       uploadedBy: req.user.id,
       uploaderName: req.user.name || 'Instructor',
       uploaderRole: req.user.role,
+      academicYear: noteAcademicYear,
+      branch: noteBranch,
+      section: noteSection,
       createdAt: new Date()
     };
 
@@ -275,17 +368,17 @@ exports.addSubjectNote = async (req, res, next) => {
 
     const createdNote = subject.notes[subject.notes.length - 1];
 
-    // Notify relevant students
+    // Notify relevant students in the assigned scope
     try {
       const studentQuery = { role: 'student' };
-      if (subject.academicYear && subject.academicYear !== 'All' && subject.academicYear !== 'All Years') {
-        studentQuery.$or = [{ academicYear: subject.academicYear }, { year: subject.academicYear }];
+      if (noteAcademicYear && noteAcademicYear !== 'All' && noteAcademicYear !== 'All Years') {
+        studentQuery.$or = [{ academicYear: noteAcademicYear }, { year: noteAcademicYear }];
       }
-      if (subject.branch && subject.branch !== 'All' && subject.branch !== 'All Branches') {
-        studentQuery.branch = new RegExp(`^${subject.branch}$`, 'i');
+      if (noteBranch && noteBranch !== 'All' && noteBranch !== 'All Branches') {
+        studentQuery.branch = new RegExp(`^${noteBranch}$`, 'i');
       }
-      if (subject.section && subject.section !== 'All' && subject.section !== 'All Sections') {
-        studentQuery.section = new RegExp(`^${subject.section}$`, 'i');
+      if (noteSection && noteSection !== 'All' && noteSection !== 'All Sections') {
+        studentQuery.section = new RegExp(`^(?:Section\\s*)?${escapeRegex(noteSection)}$`, 'i');
       }
 
       const students = await User.find(studentQuery).select('_id');

@@ -683,8 +683,48 @@ exports.getStudentProgress = async (req, res, next) => {
       }
     }
 
+    let attemptsQuery = { user: student._id };
+    if (req.user.role === 'faculty') {
+      const Subject = require('../models/Subject');
+      const AptitudeTest = require('../models/AptitudeTest');
+
+      let facultySubjectIds = [];
+      if (req.user.managedScopes && req.user.managedScopes.length > 0) {
+        const directSubjectIds = req.user.managedScopes.map(s => s.subject).filter(Boolean);
+        const scopeConditions = req.user.managedScopes.map(scope => {
+          const sYear = (scope.academicYear || '').trim();
+          const sBranch = (scope.branch || '').trim();
+          const cond = {};
+          if (sYear && sYear.toLowerCase() !== 'all') {
+            cond.academicYear = new RegExp(sYear.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+          }
+          if (sBranch && sBranch.toLowerCase() !== 'all') {
+            cond.branch = new RegExp(sBranch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+          }
+          return cond;
+        });
+        const validConditions = scopeConditions.filter(c => Object.keys(c).length > 0);
+        let matchedSubjects = [];
+        if (validConditions.length > 0) {
+          matchedSubjects = await Subject.find({ $or: validConditions }).distinct('_id');
+        }
+        facultySubjectIds = [...new Set([...directSubjectIds.map(String), ...matchedSubjects.map(String)])];
+      }
+
+      // Show ONLY the Practice Tests attempted by the student for the specific subject of the specific faculty
+      const facultyTestIds = await AptitudeTest.find({
+        $or: [
+          { createdBy: req.user._id },
+          { createdBy: req.user.id },
+          { subject: { $in: facultySubjectIds } }
+        ]
+      }).distinct('_id');
+
+      attemptsQuery.test = { $in: facultyTestIds };
+    }
+
     const [attempts, interviews, submissions, projects, labAttempts] = await Promise.all([
-      TestAttempt.find({ user: student._id }).populate('test', 'title category').sort({ completedAt: -1 }).limit(10),
+      TestAttempt.find(attemptsQuery).populate('test', 'title category duration difficulty subject').sort({ completedAt: -1 }).limit(15),
       MockInterview.find({ user: student._id }).sort({ createdAt: -1 }).limit(10),
       Submission.find({ user: student._id }).populate('question', 'title').sort({ createdAt: -1 }).limit(10),
       Project.find({ student: student._id }).select('title status grade feedback updatedAt').sort({ updatedAt: -1 }),

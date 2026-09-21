@@ -73,6 +73,10 @@ const AptitudeTestSchema = new mongoose.Schema({
   subject: { type: mongoose.Schema.Types.ObjectId, ref: 'Subject' },
   questionLimit: { type: Number, default: 20, min: 1 },
   questions: [QuestionSchema],
+  createdBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
+  },
   createdAt: {
     type: Date,
     default: Date.now

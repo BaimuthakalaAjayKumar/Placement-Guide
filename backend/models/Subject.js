@@ -42,6 +42,21 @@ const NoteSchema = new mongoose.Schema({
     type: String,
     default: ''
   },
+  academicYear: {
+    type: String,
+    default: '',
+    trim: true
+  },
+  branch: {
+    type: String,
+    default: '',
+    trim: true
+  },
+  section: {
+    type: String,
+    default: '',
+    trim: true
+  },
   createdAt: {
     type: Date,
     default: Date.now

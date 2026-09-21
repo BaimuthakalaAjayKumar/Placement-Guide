@@ -123,6 +123,8 @@ exports.getTests = async (req, res, next) => {
     const query = {};
     if (req.user.role === 'student') {
       const studentAcademicYear = req.user.academicYear || req.user.year;
+      const studentBranch = req.user.branch;
+      const studentSection = req.user.section;
       const scopeFilters = [];
 
       // Academic year filter: matches student's year or general tests (empty, null, All, or non-existent)
@@ -135,13 +137,27 @@ exports.getTests = async (req, res, next) => {
             { year: Number(studentAcademicYear) || -1 }
           ]
         });
+      } else {
+        scopeFilters.push({
+          $or: [
+            { academicYear: { $in: ['', null, 'All', 'all'] } },
+            { academicYear: { $exists: false } }
+          ]
+        });
       }
 
       // Branch filter: matches student's branch or general tests (empty, null, All, or non-existent)
-      if (req.user.branch) {
+      if (studentBranch) {
         scopeFilters.push({
           $or: [
-            { branch: new RegExp(`^${req.user.branch}$`, 'i') },
+            { branch: new RegExp(`^${studentBranch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') },
+            { branch: { $in: ['', null, 'All', 'all'] } },
+            { branch: { $exists: false } }
+          ]
+        });
+      } else {
+        scopeFilters.push({
+          $or: [
             { branch: { $in: ['', null, 'All', 'all'] } },
             { branch: { $exists: false } }
           ]
@@ -149,10 +165,17 @@ exports.getTests = async (req, res, next) => {
       }
 
       // Section filter: matches student's section or general tests (empty, null, All, or non-existent)
-      if (req.user.section) {
+      if (studentSection) {
         scopeFilters.push({
           $or: [
-            { section: new RegExp(`^${req.user.section}$`, 'i') },
+            { section: new RegExp(`^(?:Section\\s*)?${studentSection.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') },
+            { section: { $in: ['', null, 'All', 'all'] } },
+            { section: { $exists: false } }
+          ]
+        });
+      } else {
+        scopeFilters.push({
+          $or: [
             { section: { $in: ['', null, 'All', 'all'] } },
             { section: { $exists: false } }
           ]
@@ -162,6 +185,37 @@ exports.getTests = async (req, res, next) => {
       if (scopeFilters.length) {
         query.$and = scopeFilters;
       }
+    } else if (req.user.role === 'faculty') {
+      // For faculty: show only practice tests kept by this faculty or linked to their managed academic subjects
+      const Subject = require('../models/Subject');
+      let facultySubjectIds = [];
+      if (req.user.managedScopes && req.user.managedScopes.length > 0) {
+        const directSubjectIds = req.user.managedScopes.map(s => s.subject).filter(Boolean);
+        const scopeConditions = req.user.managedScopes.map(scope => {
+          const sYear = (scope.academicYear || '').trim();
+          const sBranch = (scope.branch || '').trim();
+          const cond = {};
+          if (sYear && sYear.toLowerCase() !== 'all') {
+            cond.academicYear = new RegExp(sYear.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+          }
+          if (sBranch && sBranch.toLowerCase() !== 'all') {
+            cond.branch = new RegExp(sBranch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+          }
+          return cond;
+        });
+        const validConditions = scopeConditions.filter(c => Object.keys(c).length > 0);
+        let matchedSubjects = [];
+        if (validConditions.length > 0) {
+          matchedSubjects = await Subject.find({ $or: validConditions }).distinct('_id');
+        }
+        facultySubjectIds = [...new Set([...directSubjectIds.map(String), ...matchedSubjects.map(String)])];
+      }
+
+      query.$or = [
+        { createdBy: req.user.id },
+        { createdBy: req.user._id },
+        { subject: { $in: facultySubjectIds } }
+      ];
     }
 
     if (req.query.company) {
@@ -229,21 +283,37 @@ exports.getTestById = async (req, res, next) => {
     if (req.user.role === 'student') {
       const studentAcademicYear = (req.user.academicYear || req.user.year || '').toString().toLowerCase();
       const testAcademicYear = (test.academicYear || String(test.year || '')).toLowerCase();
-      const isUnscopedYear = !test.academicYear || test.academicYear.toLowerCase() === 'all';
-      const isYearAllowed = !studentAcademicYear || isUnscopedYear || testAcademicYear === studentAcademicYear;
+      const isUnscopedYear = !test.academicYear || test.academicYear.toLowerCase() === 'all' || testAcademicYear === 'all years';
+      const isYearAllowed = isUnscopedYear || (studentAcademicYear && (
+        testAcademicYear === studentAcademicYear ||
+        studentAcademicYear.includes(testAcademicYear) ||
+        testAcademicYear.includes(studentAcademicYear)
+      ));
 
       const userBranch = (req.user.branch || '').toLowerCase();
       const testBranch = (test.branch || '').toLowerCase();
-      const branchAllowed = !test.branch || testBranch === 'all' || !userBranch || testBranch === userBranch;
+      const branchAllowed = !test.branch || testBranch === 'all' || testBranch === 'all branches' || (
+        userBranch && (
+          testBranch === userBranch ||
+          userBranch.includes(testBranch) ||
+          testBranch.includes(userBranch)
+        )
+      );
 
       const userSection = (req.user.section || '').toLowerCase();
       const testSection = (test.section || '').toLowerCase();
-      const sectionAllowed = !test.section || testSection === 'all' || !userSection || testSection === userSection;
+      const sectionAllowed = !test.section || testSection === 'all' || testSection === 'all sections' || (
+        userSection && (
+          testSection === userSection ||
+          userSection === `section ${testSection}` ||
+          `section ${userSection}` === testSection
+        )
+      );
 
       if (!isYearAllowed || !branchAllowed || !sectionAllowed) {
         return res.status(403).json({
           success: false,
-          error: 'This exam is not assigned to your academic year.'
+          error: 'This exam is not assigned to your academic scope (Year, Branch, Section).'
         });
       }
     }
@@ -374,35 +444,52 @@ exports.getAttemptsHistory = async (req, res, next) => {
 // @access  Private (Admin, Faculty)
 exports.createTest = async (req, res, next) => {
   try {
-    if (req.user.role === 'faculty' && req.body.subject) {
-      const Subject = require('../models/Subject');
-      const subject = await Subject.findById(req.body.subject);
-      if (!subject) {
-        return res.status(404).json({ success: false, error: 'Subject not found' });
-      }
-      if (req.user.managedScopes && req.user.managedScopes.length > 0) {
-        const canManage = req.user.managedScopes.some(scope => {
-          const sYear = (scope.academicYear || '').trim().toLowerCase();
-          const sBranch = (scope.branch || '').trim().toLowerCase();
-          const reqYear = (subject.academicYear || '').trim().toLowerCase();
-          const reqBranch = (subject.branch || '').trim().toLowerCase();
-          const yearMatch = !sYear || sYear === 'all' || !reqYear || sYear === reqYear || reqYear.includes(sYear) || sYear.includes(reqYear);
-          const branchMatch = !sBranch || sBranch === 'all' || !reqBranch || sBranch === reqBranch;
-          return yearMatch && branchMatch;
-        });
-        if (!canManage) {
-          return res.status(403).json({ success: false, error: 'You are not assigned to manage this subject.' });
+    if (req.user.role === 'faculty') {
+      req.body.createdBy = req.user.id;
+
+      if (req.body.subject) {
+        const Subject = require('../models/Subject');
+        const subject = await Subject.findById(req.body.subject);
+        if (!subject) {
+          return res.status(404).json({ success: false, error: 'Subject not found' });
         }
+        if (req.user.managedScopes && req.user.managedScopes.length > 0) {
+          const canManage = req.user.managedScopes.some(scope => {
+            const sYear = (scope.academicYear || '').trim().toLowerCase();
+            const sBranch = (scope.branch || '').trim().toLowerCase();
+            const reqYear = (subject.academicYear || '').trim().toLowerCase();
+            const reqBranch = (subject.branch || '').trim().toLowerCase();
+            const yearMatch = !sYear || sYear === 'all' || !reqYear || sYear === reqYear || reqYear.includes(sYear) || sYear.includes(reqYear);
+            const branchMatch = !sBranch || sBranch === 'all' || !reqBranch || sBranch === reqBranch;
+            return yearMatch && branchMatch;
+          });
+          if (!canManage) {
+            return res.status(403).json({ success: false, error: 'You are not assigned to manage this subject.' });
+          }
+        }
+
+        // Scope inheritance for faculty practice tests (Year, Branch, Section)
+        const matchingScope = req.user.managedScopes?.find(s => {
+          if (s.subject && String(s.subject) === String(subject._id)) return true;
+          const yearMatch = !s.academicYear || s.academicYear.toLowerCase() === 'all' ||
+            !subject.academicYear ||
+            s.academicYear.trim().toLowerCase() === subject.academicYear.trim().toLowerCase() ||
+            subject.academicYear.toLowerCase().includes(s.academicYear.toLowerCase());
+          const branchMatch = !s.branch || s.branch.toLowerCase() === 'all' ||
+            !subject.branch ||
+            s.branch.trim().toLowerCase() === subject.branch.trim().toLowerCase();
+          return yearMatch && branchMatch;
+        }) || req.user.managedScopes?.[0];
+
+        if (!req.body.academicYear) req.body.academicYear = matchingScope?.academicYear || subject.academicYear || '';
+        if (!req.body.branch) req.body.branch = matchingScope?.branch || subject.branch || '';
+        if (!req.body.section) req.body.section = matchingScope?.section || '';
       }
-      // Inherit subject's academic metadata if not explicitly provided
-      if (!req.body.academicYear) req.body.academicYear = subject.academicYear;
-      if (!req.body.branch) req.body.branch = subject.branch;
-      if (!req.body.section) req.body.section = subject.section;
     }
 
     const test = await AptitudeTest.create(req.body);
 
-    // Notify matching students about new test
+    // Notify matching students in the assigned scope (Year, Branch, Section)
     try {
       const studentQuery = { role: 'student' };
       if (test.academicYear && test.academicYear !== 'All' && test.academicYear !== 'All Years') {
@@ -412,7 +499,7 @@ exports.createTest = async (req, res, next) => {
         studentQuery.branch = new RegExp(`^${test.branch}$`, 'i');
       }
       if (test.section && test.section !== 'All' && test.section !== 'All Sections') {
-        studentQuery.section = new RegExp(`^${test.section}$`, 'i');
+        studentQuery.section = new RegExp(`^(?:Section\\s*)?${test.section.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i');
       }
 
       const students = await User.find(studentQuery).select('_id');

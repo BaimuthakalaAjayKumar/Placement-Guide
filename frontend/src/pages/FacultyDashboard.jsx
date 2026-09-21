@@ -325,6 +325,18 @@ const FacultyDashboard = () => {
         const currentSubject = subjectWorkspace?.subject || selectedSubjectForNotes;
         if (!currentSubject) return;
 
+        const matchingScope = (user?.managedScopes || []).find(s => {
+            if (s.subject && String(s.subject) === String(currentSubject._id)) return true;
+            const yearMatch = !s.academicYear || s.academicYear.toLowerCase() === 'all' ||
+                !currentSubject.academicYear ||
+                s.academicYear.trim().toLowerCase() === currentSubject.academicYear.trim().toLowerCase() ||
+                currentSubject.academicYear.toLowerCase().includes(s.academicYear.toLowerCase());
+            const branchMatch = !s.branch || s.branch.toLowerCase() === 'all' ||
+                !currentSubject.branch ||
+                s.branch.trim().toLowerCase() === currentSubject.branch.trim().toLowerCase();
+            return yearMatch && branchMatch;
+        }) || (user?.managedScopes || [])[0];
+
         try {
             setSubmittingNote(true);
             let res;
@@ -334,6 +346,9 @@ const FacultyDashboard = () => {
                 formData.append('description', noteForm.description || '');
                 formData.append('content', noteForm.content || '');
                 formData.append('fileUrl', noteForm.fileUrl || '');
+                formData.append('academicYear', matchingScope?.academicYear || currentSubject.academicYear || '');
+                formData.append('branch', matchingScope?.branch || currentSubject.branch || '');
+                formData.append('section', matchingScope?.section || '');
                 formData.append('pdfFile', notePdfFile);
 
                 res = await axios.post(`${API_URL}/academic/subjects/${currentSubject._id}/notes`, formData, {
@@ -343,7 +358,13 @@ const FacultyDashboard = () => {
                     }
                 });
             } else {
-                res = await axios.post(`${API_URL}/academic/subjects/${currentSubject._id}/notes`, noteForm, getAuthHeaders());
+                const notePayload = {
+                    ...noteForm,
+                    academicYear: matchingScope?.academicYear || currentSubject.academicYear || '',
+                    branch: matchingScope?.branch || currentSubject.branch || '',
+                    section: matchingScope?.section || ''
+                };
+                res = await axios.post(`${API_URL}/academic/subjects/${currentSubject._id}/notes`, notePayload, getAuthHeaders());
             }
 
             setNotesList(prev => [res.data.data, ...prev]);
@@ -382,7 +403,11 @@ const FacultyDashboard = () => {
             setLoadingSubjectTests(true);
             const res = await axios.get(`${API_URL}/tests`, getAuthHeaders());
             const allTests = res.data?.data || [];
-            const matched = allTests.filter(t => t.subject === subject._id || (t.subject?._id === subject._id) || (t.title?.toLowerCase().includes(subject.code.toLowerCase())) || (t.title?.toLowerCase().includes(subject.name.toLowerCase())));
+            const matched = allTests.filter(t =>
+                String(t.subject?._id || t.subject) === String(subject._id) ||
+                ((t.createdBy && (String(t.createdBy?._id || t.createdBy) === String(user?._id || user?.id))) &&
+                 ((t.title?.toLowerCase().includes(subject.code.toLowerCase())) || (t.title?.toLowerCase().includes(subject.name.toLowerCase()))))
+            );
             setSubjectTests(matched);
         } catch (err) {
             setError('Failed to fetch tests for this subject.');
@@ -397,13 +422,25 @@ const FacultyDashboard = () => {
         if (!currentSubject) return;
         try {
             setCreatingTest(true);
+            const matchingScope = (user?.managedScopes || []).find(s => {
+                if (s.subject && String(s.subject) === String(currentSubject._id)) return true;
+                const yearMatch = !s.academicYear || s.academicYear.toLowerCase() === 'all' ||
+                    !currentSubject.academicYear ||
+                    s.academicYear.trim().toLowerCase() === currentSubject.academicYear.trim().toLowerCase() ||
+                    currentSubject.academicYear.toLowerCase().includes(s.academicYear.toLowerCase());
+                const branchMatch = !s.branch || s.branch.toLowerCase() === 'all' ||
+                    !currentSubject.branch ||
+                    s.branch.trim().toLowerCase() === currentSubject.branch.trim().toLowerCase();
+                return yearMatch && branchMatch;
+            }) || (user?.managedScopes || [])[0];
+
             const payload = {
                 ...testForm,
                 category: 'core-cse',
                 subject: currentSubject._id,
-                academicYear: currentSubject.academicYear,
-                branch: currentSubject.branch,
-                section: currentSubject.section
+                academicYear: matchingScope?.academicYear || currentSubject.academicYear || '',
+                branch: matchingScope?.branch || currentSubject.branch || '',
+                section: matchingScope?.section || ''
             };
             const res = await axios.post(`${API_URL}/tests`, payload, getAuthHeaders());
             setSubjectTests(prev => [res.data.data, ...prev]);
@@ -1246,7 +1283,7 @@ const FacultyDashboard = () => {
                                     </div>
                                 </div>
                             )) : (
-                                <p className="no-data-note">No tests completed yet.</p>
+                                <p className="no-data-note">No practice tests attempted for your subjects yet.</p>
                             )}
                         </div>
                     </div>
@@ -3432,58 +3469,26 @@ const FacultyDashboard = () => {
                         // Helper to find matching subject for a test
                         const getTestSubject = (test) => {
                             if (test.subject) {
-                                if (typeof test.subject === 'object' && test.subject._id) {
-                                    return subjects.find(s => s._id === test.subject._id) || test.subject;
-                                }
-                                const found = subjects.find(s => s._id === test.subject);
-                                if (found) return found;
+                                const subId = String(test.subject?._id || test.subject);
+                                return subjects.find(s => String(s._id) === subId) || (typeof test.subject === 'object' ? test.subject : null);
                             }
-                            // Match by title or category against subjects
-                            const testTitleLower = (test.title || '').toLowerCase();
-                            const testCatLower = (test.category || '').toLowerCase();
-                            return subjects.find(s => {
-                                const sName = (s.name || '').toLowerCase();
-                                const sCode = (s.code || '').toLowerCase();
-                                return testTitleLower.includes(sName) ||
-                                       testTitleLower.includes(sCode) ||
-                                       (testCatLower && !['general', 'numerical', 'quantitative', 'verbal'].includes(testCatLower) && (sName.includes(testCatLower) || sCode.includes(testCatLower)));
-                            }) || null;
+                            return null;
                         };
 
-                        // Only showcase tests based on specific academic subjects (excluding general platform aptitude tests)
-                        const generalAptitudeKeywords = ['numerical', 'quantitative', 'verbal', 'general', 'logical', 'reasoning', 'aptitude'];
+                        // Only showcase tests kept by the faculty in their academic subjects (excluding platform generic tests)
+                        const currentFacultyId = String(user?._id || user?.id || '');
                         const academicSubjectTests = repoTests.filter(t => {
-                            const cat = (t.category || '').toLowerCase().trim();
-                            const title = (t.title || '').toLowerCase().trim();
-                            const isGeneralAptitude = generalAptitudeKeywords.some(kw =>
-                                cat === kw ||
-                                (cat.includes(kw) && !cat.includes('academic') && !cat.includes('subject')) ||
-                                (title.includes(kw) && !title.includes('academic') && !title.includes('subject'))
-                            );
-                            if (isGeneralAptitude) return false;
-
-                            const sub = getTestSubject(t);
-                            if (sub || t.subject) return true;
-
-                            const academicKeywords = ['dbms', 'os', 'oop', 'cn', 'se', 'dsa', 'core-cse', 'network', 'database', 'operating', 'software', 'programming', 'java', 'python', 'c++', 'compiler', 'cloud', 'ai', 'data'];
-                            return academicKeywords.some(kw => cat.includes(kw) || title.includes(kw));
+                            const hasSubjectLink = t.subject && subjects.some(s => String(s._id) === String(t.subject?._id || t.subject));
+                            const createdByFaculty = t.createdBy && String(t.createdBy?._id || t.createdBy) === currentFacultyId;
+                            return hasSubjectLink || createdByFaculty;
                         });
 
                         // Filter tests by specific subject selection and search
                         const filteredRepoTests = academicSubjectTests.filter(t => {
                             const sub = getTestSubject(t);
                             const matchesSubject = repoSubjectFilter === 'all' ||
-                                (sub && (sub._id === repoSubjectFilter || sub.code?.toLowerCase() === repoSubjectFilter.toLowerCase())) ||
-                                (t.subject?._id === repoSubjectFilter || t.subject === repoSubjectFilter) ||
-                                (() => {
-                                    const sel = subjects.find(s => s._id === repoSubjectFilter);
-                                    if (!sel) return false;
-                                    const sName = (sel.name || '').toLowerCase();
-                                    const sCode = (sel.code || '').toLowerCase();
-                                    const titleLower = (t.title || '').toLowerCase();
-                                    const catLower = (t.category || '').toLowerCase();
-                                    return titleLower.includes(sName) || titleLower.includes(sCode) || (catLower && (sName.includes(catLower) || sCode.includes(catLower)));
-                                })();
+                                (sub && (String(sub._id) === String(repoSubjectFilter) || sub.code?.toLowerCase() === repoSubjectFilter.toLowerCase())) ||
+                                (String(t.subject?._id || t.subject) === String(repoSubjectFilter));
                             if (!matchesSubject) return false;
 
                             if (!repoSearch) return true;
@@ -3491,6 +3496,8 @@ const FacultyDashboard = () => {
                             return t.title?.toLowerCase().includes(q) ||
                                    t.category?.toLowerCase().includes(q) ||
                                    t.academicYear?.toLowerCase().includes(q) ||
+                                   t.branch?.toLowerCase().includes(q) ||
+                                   t.section?.toLowerCase().includes(q) ||
                                    (sub?.name && sub.name.toLowerCase().includes(q)) ||
                                    (sub?.code && sub.code.toLowerCase().includes(q));
                         });
