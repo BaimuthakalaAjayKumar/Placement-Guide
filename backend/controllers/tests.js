@@ -221,7 +221,10 @@ exports.getTests = async (req, res, next) => {
     if (req.query.company) {
       query.company = req.query.company;
     }
-    const tests = await AptitudeTest.find(query).select('-questions').populate('subject', 'name code academicYear branch section');
+    const tests = await AptitudeTest.find(query)
+      .select('-questions')
+      .populate('subject', 'name code academicYear branch section')
+      .populate('createdBy', 'name email role');
 
     // Enrich with question count and completion status
     const enrichedTests = await Promise.all(
@@ -241,6 +244,13 @@ exports.getTests = async (req, res, next) => {
           branch: test.branch,
           section: test.section,
           subject: test.subject,
+          createdBy: test.createdBy ? {
+            _id: test.createdBy._id,
+            name: test.createdBy.name,
+            email: test.createdBy.email,
+            role: test.createdBy.role
+          } : null,
+          createdAt: test.createdAt,
           completed: !!attempt,
           score: attempt ? attempt.score : null
         };
@@ -597,10 +607,11 @@ exports.editQuestion = async (req, res, next) => {
       return res.status(404).json({ success: false, error: 'Question not found' });
     }
 
-    const { questionText, questionImage, options, correctOptionIndex, difficulty, explanation, explanationImage } = req.body;
+    const { questionText, questionImage, options, optionImages, correctOptionIndex, difficulty, explanation, explanationImage } = req.body;
     if (questionText !== undefined) question.questionText = questionText;
     if (questionImage !== undefined) question.questionImage = questionImage;
     if (options !== undefined) question.options = options;
+    if (optionImages !== undefined) question.optionImages = optionImages;
     if (correctOptionIndex !== undefined) question.correctOptionIndex = correctOptionIndex;
     if (difficulty !== undefined) question.difficulty = difficulty;
     if (explanation !== undefined) question.explanation = explanation;
@@ -638,9 +649,13 @@ exports.deleteQuestion = async (req, res, next) => {
 // @access  Private/Admin
 exports.getAdminAttempts = async (req, res, next) => {
   try {
-    const attempts = await TestAttempt.find()
-      .populate('user', 'name email rollNumber branch')
-      .populate('test', 'title category')
+    const query = {};
+    if (req.query.testId) {
+      query.test = req.query.testId;
+    }
+    const attempts = await TestAttempt.find(query)
+      .populate('user', 'name email rollNumber branch section academicYear year')
+      .populate('test', 'title category duration questionLimit subject')
       .sort({ completedAt: -1 });
 
     res.status(200).json({ success: true, data: attempts });

@@ -51,14 +51,25 @@ const FacultyDashboard = () => {
     const [showQuestionsModal, setShowQuestionsModal] = useState(false);
     const [testQuestions, setTestQuestions] = useState([]);
     const [loadingQuestions, setLoadingQuestions] = useState(false);
-    const [questionForm, setQuestionForm] = useState({
-        questionText: '',
-        options: ['', '', '', ''],
-        correctOptionIndex: 0,
-        difficulty: 'medium',
-        explanation: ''
-    });
+
+    // Question Form states inside modal
+    const [showQuestionForm, setShowQuestionForm] = useState(false);
+    const [editingQuestionId, setEditingQuestionId] = useState(null);
+    const [questionText, setQuestionText] = useState('');
+    const [questionImage, setQuestionImage] = useState('');
+    const [option1, setOption1] = useState('');
+    const [option2, setOption2] = useState('');
+    const [option3, setOption3] = useState('');
+    const [option4, setOption4] = useState('');
+    const [optionImages, setOptionImages] = useState(['', '', '', '']);
+    const [correctOptionIndex, setCorrectOptionIndex] = useState(0);
+    const [questionDifficulty, setQuestionDifficulty] = useState('medium');
+    const [questionExplanation, setQuestionExplanation] = useState('');
+    const [explanationImage, setExplanationImage] = useState('');
     const [submittingQuestion, setSubmittingQuestion] = useState(false);
+    const [uploadingQImage, setUploadingQImage] = useState(false);
+    const [uploadingExpImage, setUploadingExpImage] = useState(false);
+    const [uploadingOptImages, setUploadingOptImages] = useState([false, false, false, false]);
 
     // Subject Student Reports states
     const [selectedSubjectForReports, setSelectedSubjectForReports] = useState(null);
@@ -446,7 +457,8 @@ const FacultyDashboard = () => {
             setSubjectTests(prev => [res.data.data, ...prev]);
             setShowCreateTestForm(false);
             setTestForm({ title: '', description: '', duration: 20, questionLimit: 20, difficulty: 'medium' });
-            setSuccessMsg('Practice test created successfully! Click "Manage Questions" to add questions.');
+            setSuccessMsg('Practice test created! Add questions directly in the tab space below.');
+            openQuestionsModal(res.data.data);
         } catch (err) {
             setError(err.response?.data?.error || 'Failed to create practice test.');
         } finally {
@@ -454,17 +466,45 @@ const FacultyDashboard = () => {
         }
     };
 
+    // Helper to format image URLs
+    const getImageUrl = (url) => {
+        if (!url) return '';
+        if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:')) return url;
+        const base = API_URL.replace(/\/api\/?$/, '');
+        return `${base}${url.startsWith('/') ? '' : '/'}${url}`;
+    };
+
     // Questions Manager Handlers
+    const clearQuestionForm = () => {
+        setEditingQuestionId(null);
+        setQuestionText('');
+        setQuestionImage('');
+        setOption1('');
+        setOption2('');
+        setOption3('');
+        setOption4('');
+        setOptionImages(['', '', '', '']);
+        setCorrectOptionIndex(0);
+        setQuestionDifficulty('medium');
+        setQuestionExplanation('');
+        setExplanationImage('');
+    };
+
     const openQuestionsModal = async (test) => {
         setSelectedTestForQuestions(test);
-        setShowQuestionsModal(true);
-        setQuestionForm({
-            questionText: '',
-            options: ['', '', '', ''],
-            correctOptionIndex: 0,
-            difficulty: 'medium',
-            explanation: ''
-        });
+        setShowQuestionsModal(false);
+        setShowQuestionForm(false);
+        clearQuestionForm();
+        const subjectId = test.subject?._id || test.subject;
+        if (subjectId && (!subjectWorkspace || subjectWorkspace.subject?._id !== subjectId)) {
+            const subj = subjects.find(s => s._id === subjectId) || (typeof test.subject === 'object' ? test.subject : null);
+            if (subj) {
+                setActiveTab('subjects');
+                setSubjectWorkspace({ subject: subj, activeView: 'tests' });
+            }
+        } else if (subjectWorkspace) {
+            setSubjectWorkspace(prev => ({ ...prev, activeView: 'tests' }));
+        }
         try {
             setLoadingQuestions(true);
             const res = await axios.get(`${API_URL}/tests/${test._id}/questions`, getAuthHeaders());
@@ -476,26 +516,137 @@ const FacultyDashboard = () => {
         }
     };
 
-    const handleAddQuestion = async (e) => {
+    const handleOpenAddQuestion = () => {
+        clearQuestionForm();
+        setShowQuestionForm(true);
+    };
+
+    const handleOpenEditQuestion = (q) => {
+        setEditingQuestionId(q._id);
+        setQuestionText(q.questionText || '');
+        setQuestionImage(q.questionImage || '');
+        setOption1(q.options?.[0] || '');
+        setOption2(q.options?.[1] || '');
+        setOption3(q.options?.[2] || '');
+        setOption4(q.options?.[3] || '');
+        setOptionImages([
+            q.optionImages?.[0] || '',
+            q.optionImages?.[1] || '',
+            q.optionImages?.[2] || '',
+            q.optionImages?.[3] || ''
+        ]);
+        setCorrectOptionIndex(q.correctOptionIndex || 0);
+        setQuestionDifficulty(q.difficulty || 'medium');
+        setQuestionExplanation(q.explanation || '');
+        setExplanationImage(q.explanationImage || '');
+        setShowQuestionForm(true);
+    };
+
+    const handleUploadQuestionImage = async (file, type, optIdx = null) => {
+        if (!file) return;
+        const formData = new FormData();
+        formData.append('image', file);
+
+        if (type === 'question') setUploadingQImage(true);
+        else if (type === 'explanation') setUploadingExpImage(true);
+        else if (type === 'option' && optIdx !== null) {
+            setUploadingOptImages(prev => {
+                const arr = [...prev];
+                arr[optIdx] = true;
+                return arr;
+            });
+        }
+
+        try {
+            const res = await axios.post(`${API_URL}/tests/upload-image`, formData, {
+                headers: {
+                    ...getAuthHeaders().headers,
+                    'Content-Type': 'multipart/form-data'
+                }
+            });
+            if (res.data?.success) {
+                const uploadedUrl = res.data.url;
+                if (type === 'question') {
+                    setQuestionImage(uploadedUrl);
+                } else if (type === 'explanation') {
+                    setExplanationImage(uploadedUrl);
+                } else if (type === 'option' && optIdx !== null) {
+                    setOptionImages(prev => {
+                        const arr = [...prev];
+                        arr[optIdx] = uploadedUrl;
+                        return arr;
+                    });
+                }
+            } else {
+                setError(res.data?.error || 'Image upload failed.');
+            }
+        } catch (err) {
+            setError(err.response?.data?.error || 'Failed to upload image.');
+        } finally {
+            if (type === 'question') setUploadingQImage(false);
+            else if (type === 'explanation') setUploadingExpImage(false);
+            else if (type === 'option' && optIdx !== null) {
+                setUploadingOptImages(prev => {
+                    const arr = [...prev];
+                    arr[optIdx] = false;
+                    return arr;
+                });
+            }
+        }
+    };
+
+    const handleSaveQuestion = async (e) => {
         e.preventDefault();
-        if (!questionForm.questionText.trim() || questionForm.options.some(opt => !opt.trim())) {
-            setError('Please provide question text and all 4 options.');
+        if (!questionText.trim()) {
+            setError('Please provide question prompt text.');
             return;
         }
+        if (!option1.trim() || !option2.trim()) {
+            setError('Please provide at least Option A and Option B.');
+            return;
+        }
+        if (Number(correctOptionIndex) === 2 && !option3.trim()) {
+            setError('Please enter text for Option C since it is selected as the correct answer.');
+            return;
+        }
+        if (Number(correctOptionIndex) === 3 && !option4.trim()) {
+            setError('Please enter text for Option D since it is selected as the correct answer.');
+            return;
+        }
+        if (option4.trim() && !option3.trim()) {
+            setError('Please provide Option C before providing Option D.');
+            return;
+        }
+        const optionsList = [option1, option2, option3 || '', option4 || ''];
         try {
             setSubmittingQuestion(true);
-            const res = await axios.post(`${API_URL}/tests/${selectedTestForQuestions._id}/questions`, questionForm, getAuthHeaders());
-            setTestQuestions(prev => [...prev, res.data.data]);
-            setQuestionForm({
-                questionText: '',
-                options: ['', '', '', ''],
-                correctOptionIndex: 0,
-                difficulty: 'medium',
-                explanation: ''
-            });
-            setSuccessMsg('Question added successfully.');
+            const payload = {
+                questionText,
+                questionImage,
+                options: optionsList,
+                optionImages,
+                correctOptionIndex: Number(correctOptionIndex),
+                difficulty: questionDifficulty,
+                explanation: questionExplanation,
+                explanationImage
+            };
+
+            if (editingQuestionId) {
+                const res = await axios.put(`${API_URL}/tests/${selectedTestForQuestions._id}/questions/${editingQuestionId}`, payload, getAuthHeaders());
+                setTestQuestions(prev => prev.map(q => q._id === editingQuestionId ? res.data.data : q));
+                setSuccessMsg('Question updated successfully!');
+            } else {
+                const res = await axios.post(`${API_URL}/tests/${selectedTestForQuestions._id}/questions`, payload, getAuthHeaders());
+                setTestQuestions(prev => [...prev, res.data.data]);
+                setSuccessMsg('Question added successfully!');
+            }
+            if (subjectWorkspace?.subject?._id) {
+                fetchSubjectTests(subjectWorkspace.subject._id);
+            }
+            setShowQuestionForm(false);
+            clearQuestionForm();
         } catch (err) {
-            setError(err.response?.data?.error || 'Failed to add question.');
+            setError(err.response?.data?.error || 'Failed to save question.');
         } finally {
             setSubmittingQuestion(false);
         }
@@ -506,6 +657,9 @@ const FacultyDashboard = () => {
         try {
             await axios.delete(`${API_URL}/tests/${selectedTestForQuestions._id}/questions/${qId}`, getAuthHeaders());
             setTestQuestions(prev => prev.filter(q => q._id !== qId));
+            if (subjectWorkspace?.subject?._id) {
+                fetchSubjectTests(subjectWorkspace.subject._id);
+            }
             setSuccessMsg('Question removed.');
         } catch (err) {
             setError('Failed to delete question.');
@@ -2274,137 +2428,492 @@ const FacultyDashboard = () => {
                                     {/* 2. PRACTICE TESTS VIEW */}
                                     {subjectWorkspace.activeView === 'tests' && (
                                         <div>
-                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
-                                                <h4 style={{ margin: 0, fontSize: '15px', color: '#f8fafc' }}>
-                                                    Subject Practice Tests ({subjectTests.length})
-                                                </h4>
-                                                <button
-                                                    type="button"
-                                                    className="btn btn-primary btn-sm"
-                                                    onClick={() => setShowCreateTestForm(!showCreateTestForm)}
-                                                >
-                                                    {showCreateTestForm ? 'Cancel' : '➕ Create Practice Test'}
-                                                </button>
-                                            </div>
-
-                                            {showCreateTestForm && (
-                                                <div style={{ background: '#0f172a', border: '1px solid #334155', borderRadius: '8px', padding: '18px', marginBottom: '20px' }}>
-                                                    <h4 style={{ margin: '0 0 12px 0', color: '#c084fc', fontSize: '15px' }}>
-                                                        Create New Practice Test for {subjectWorkspace.subject.code}
-                                                    </h4>
-                                                    <form onSubmit={handleCreateSubjectTest}>
-                                                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px', marginBottom: '12px' }}>
+                                            {selectedTestForQuestions ? (
+                                                /* QUESTION MANAGEMENT INLINE IN TAB SPACE (IMAGE 2) */
+                                                <div className="animate-fade">
+                                                    {/* Header with Back button and Add Question button */}
+                                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '12px', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '14px' }}>
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+                                                            <button
+                                                                type="button"
+                                                                className="btn btn-secondary btn-sm"
+                                                                onClick={() => {
+                                                                    setSelectedTestForQuestions(null);
+                                                                    setShowQuestionForm(false);
+                                                                    clearQuestionForm();
+                                                                    if (subjectWorkspace?.subject?._id) {
+                                                                        fetchSubjectTests(subjectWorkspace.subject._id);
+                                                                    }
+                                                                }}
+                                                            >
+                                                                ← Back to Practice Tests
+                                                            </button>
                                                             <div>
-                                                                <label style={{ display: 'block', fontSize: '12px', color: '#94a3b8', marginBottom: '4px' }}>Test Title *</label>
-                                                                <input
-                                                                    type="text"
-                                                                    className="form-control"
-                                                                    placeholder={`e.g. ${subjectWorkspace.subject.code} Unit 1 Assessment`}
-                                                                    value={testForm.title}
-                                                                    onChange={e => setTestForm({ ...testForm, title: e.target.value })}
-                                                                    required
-                                                                />
-                                                            </div>
-                                                            <div>
-                                                                <label style={{ display: 'block', fontSize: '12px', color: '#94a3b8', marginBottom: '4px' }}>Duration (Minutes) *</label>
-                                                                <input
-                                                                    type="number"
-                                                                    min={5}
-                                                                    max={180}
-                                                                    className="form-control"
-                                                                    value={testForm.duration}
-                                                                    onChange={e => setTestForm({ ...testForm, duration: Number(e.target.value) })}
-                                                                    required
-                                                                />
-                                                            </div>
-                                                            <div>
-                                                                <label style={{ display: 'block', fontSize: '12px', color: '#94a3b8', marginBottom: '4px' }}>Difficulty</label>
-                                                                <select
-                                                                    className="form-control"
-                                                                    value={testForm.difficulty}
-                                                                    onChange={e => setTestForm({ ...testForm, difficulty: e.target.value })}
-                                                                >
-                                                                    <option value="easy">Easy</option>
-                                                                    <option value="medium">Medium</option>
-                                                                    <option value="hard">Hard</option>
-                                                                </select>
-                                                            </div>
-                                                            <div>
-                                                                <label style={{ display: 'block', fontSize: '12px', color: '#94a3b8', marginBottom: '4px' }}>Question Limit</label>
-                                                                <input
-                                                                    type="number"
-                                                                    min={1}
-                                                                    max={100}
-                                                                    className="form-control"
-                                                                    value={testForm.questionLimit}
-                                                                    onChange={e => setTestForm({ ...testForm, questionLimit: Number(e.target.value) })}
-                                                                />
-                                                            </div>
-                                                            <div style={{ gridColumn: '1 / -1' }}>
-                                                                <label style={{ display: 'block', fontSize: '12px', color: '#94a3b8', marginBottom: '4px' }}>Test Description / Syllabus</label>
-                                                                <input
-                                                                    type="text"
-                                                                    className="form-control"
-                                                                    placeholder="Topics covered in this test..."
-                                                                    value={testForm.description}
-                                                                    onChange={e => setTestForm({ ...testForm, description: e.target.value })}
-                                                                />
+                                                                <h4 style={{ margin: 0, fontSize: '17px', color: '#f8fafc', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                                    <span>📝</span> Manage Questions — {selectedTestForQuestions.title}
+                                                                </h4>
+                                                                <div style={{ fontSize: '12.5px', color: '#94a3b8', marginTop: '3px' }}>
+                                                                    Question Pool · Shuffles and serves up to {selectedTestForQuestions.questionLimit || 20} questions per student attempt
+                                                                </div>
                                                             </div>
                                                         </div>
-                                                        <button
-                                                            type="submit"
-                                                            className="btn btn-primary"
-                                                            disabled={creatingTest || !testForm.title.trim()}
-                                                        >
-                                                            {creatingTest ? 'Creating Test...' : 'Save & Proceed to Questions'}
-                                                        </button>
-                                                    </form>
-                                                </div>
-                                            )}
+                                                        {!showQuestionForm && (
+                                                            <button
+                                                                type="button"
+                                                                className="btn-gradient-add"
+                                                                onClick={handleOpenAddQuestion}
+                                                            >
+                                                                ➕ Add New Question
+                                                            </button>
+                                                        )}
+                                                    </div>
 
-                                            {loadingSubjectTests ? (
-                                                <p className="loading-text">Loading tests...</p>
-                                            ) : subjectTests.length > 0 ? (
-                                                <div className="students-table-scroll">
-                                                    <table className="students-table">
-                                                        <thead>
-                                                            <tr>
-                                                                <th>Test Title</th>
-                                                                <th>Questions</th>
-                                                                <th>Duration</th>
-                                                                <th>Difficulty</th>
-                                                                <th>Action</th>
-                                                            </tr>
-                                                        </thead>
-                                                        <tbody>
-                                                            {subjectTests.map(t => (
-                                                                <tr key={t._id}>
-                                                                    <td>
-                                                                        <strong>{t.title}</strong>
-                                                                        {t.description && <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '2px' }}>{t.description}</div>}
-                                                                    </td>
-                                                                    <td><span className="code-pill">{t.questionCount || t.questions?.length || 0} Qs</span></td>
-                                                                    <td>{t.duration} mins</td>
-                                                                    <td><span style={{ textTransform: 'capitalize', color: t.difficulty === 'hard' ? '#ef4444' : t.difficulty === 'medium' ? '#f59e0b' : '#10b981' }}>{t.difficulty || 'medium'}</span></td>
-                                                                    <td>
-                                                                        <button
-                                                                            type="button"
-                                                                            className="btn btn-secondary btn-sm"
-                                                                            style={{ color: '#c084fc', borderColor: 'rgba(168, 85, 247, 0.4)' }}
-                                                                            onClick={() => openQuestionsModal(t)}
-                                                                        >
-                                                                            ⚙️ Manage Questions ({t.questionCount || t.questions?.length || 0})
+                                                    {!showQuestionForm ? (
+                                                        <>
+                                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
+                                                                <span style={{ fontSize: '13.5px', color: '#cbd5e1' }}>
+                                                                    Total Questions in Pool: <strong style={{ color: '#c084fc' }}>{testQuestions.length}</strong>
+                                                                </span>
+                                                            </div>
+
+                                                            {loadingQuestions ? (
+                                                                <div style={{ padding: '40px', textAlign: 'center' }}>
+                                                                    <div className="spinner-loader"></div>
+                                                                    <p style={{ marginTop: '12px', color: '#94a3b8' }}>Fetching question pool...</p>
+                                                                </div>
+                                                            ) : (
+                                                                <div className="questions-pool-list">
+                                                                    {testQuestions.length > 0 ? (
+                                                                        testQuestions.map((q, idx) => (
+                                                                            <div key={q._id || idx} className="question-pool-item">
+                                                                                <div className="q-item-header">
+                                                                                    <span className="q-number">Question #{idx + 1}</span>
+                                                                                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                                                                        <span className={`difficulty-badge ${q.difficulty || 'medium'}`}>
+                                                                                            {q.difficulty || 'medium'}
+                                                                                        </span>
+                                                                                        <button
+                                                                                            type="button"
+                                                                                            className="icon-action-btn edit"
+                                                                                            title="Edit Question"
+                                                                                            onClick={() => handleOpenEditQuestion(q)}
+                                                                                        >
+                                                                                            ✏️
+                                                                                        </button>
+                                                                                        <button
+                                                                                            type="button"
+                                                                                            className="icon-action-btn delete"
+                                                                                            title="Delete Question"
+                                                                                            onClick={() => handleDeleteQuestion(q._id)}
+                                                                                        >
+                                                                                            ❌
+                                                                                        </button>
+                                                                                    </div>
+                                                                                </div>
+                                                                                <div style={{ marginTop: '10px' }}>
+                                                                                    <p className="q-text"><strong>{q.questionText}</strong></p>
+                                                                                    {q.questionImage && (
+                                                                                        <img
+                                                                                            src={getImageUrl(q.questionImage)}
+                                                                                            alt="Question prompt visual"
+                                                                                            className="q-image-thumbnail"
+                                                                                        />
+                                                                                    )}
+                                                                                    <ul className="q-options-list">
+                                                                                        {(q.options || []).map((opt, oIdx) => (
+                                                                                            <li key={oIdx} className={oIdx === q.correctOptionIndex ? 'correct-option' : ''}>
+                                                                                                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '8px' }}>
+                                                                                                    <span>
+                                                                                                        <strong>{String.fromCharCode(65 + oIdx)}.</strong> {opt} {oIdx === q.correctOptionIndex && '✓ (Correct)'}
+                                                                                                    </span>
+                                                                                                </div>
+                                                                                                {q.optionImages?.[oIdx] && (
+                                                                                                    <img
+                                                                                                        src={getImageUrl(q.optionImages[oIdx])}
+                                                                                                        alt={`Option ${String.fromCharCode(65 + oIdx)}`}
+                                                                                                        style={{ maxHeight: '70px', borderRadius: '4px', marginTop: '6px', border: '1px solid rgba(255,255,255,0.1)' }}
+                                                                                                    />
+                                                                                                )}
+                                                                                            </li>
+                                                                                        ))}
+                                                                                    </ul>
+                                                                                    {(q.explanation || q.explanationImage) && (
+                                                                                        <div style={{ marginTop: '12px', padding: '10px 14px', background: 'rgba(15, 23, 42, 0.65)', borderRadius: '6px', fontSize: '12.5px', color: '#cbd5e1' }}>
+                                                                                            {q.explanation && <div>💡 <strong>Explanation:</strong> {q.explanation}</div>}
+                                                                                            {q.explanationImage && (
+                                                                                                <img
+                                                                                                    src={getImageUrl(q.explanationImage)}
+                                                                                                    alt="Explanation"
+                                                                                                    className="q-image-thumbnail"
+                                                                                                />
+                                                                                            )}
+                                                                                        </div>
+                                                                                    )}
+                                                                                </div>
+                                                                            </div>
+                                                                        ))
+                                                                    ) : (
+                                                                        <div style={{ textAlign: 'center', padding: '48px 24px', color: '#94a3b8', background: 'rgba(15, 23, 42, 0.4)', borderRadius: '10px' }}>
+                                                                            <p style={{ margin: 0, fontSize: '15px' }}>No questions in this test pool yet. Click "Add New Question" above to create one.</p>
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            )}
+                                                        </>
+                                                    ) : (
+                                                        /* Question Add / Edit Form */
+                                                        <form onSubmit={handleSaveQuestion} style={{ display: 'flex', flexDirection: 'column', gap: '16px', background: 'rgba(15, 23, 42, 0.4)', padding: '20px', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.08)' }}>
+                                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '12px' }}>
+                                                                <h4 style={{ margin: 0, color: '#c084fc', fontSize: '16px' }}>
+                                                                    {editingQuestionId ? '✏️ Edit MCQ Question' : '➕ Add New MCQ Question'}
+                                                                </h4>
+                                                                <button
+                                                                    type="button"
+                                                                    className="btn btn-secondary btn-sm"
+                                                                    onClick={() => setShowQuestionForm(false)}
+                                                                >
+                                                                    ← Back to Question Pool
+                                                                </button>
+                                                            </div>
+
+                                                            <div>
+                                                                <label style={{ display: 'block', fontSize: '12.5px', color: '#94a3b8', marginBottom: '6px', fontWeight: 600 }}>
+                                                                    Question Prompt / Scenario *
+                                                                </label>
+                                                                <textarea
+                                                                    className="form-control"
+                                                                    rows={3}
+                                                                    placeholder="Enter question text, code problem, or scenario..."
+                                                                    value={questionText}
+                                                                    onChange={e => setQuestionText(e.target.value)}
+                                                                    required
+                                                                />
+                                                            </div>
+
+                                                            {/* Question Image Upload */}
+                                                            <div style={{ background: 'rgba(15, 23, 42, 0.5)', padding: '12px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.06)' }}>
+                                                                <label style={{ display: 'block', fontSize: '12px', color: '#94a3b8', marginBottom: '6px', fontWeight: 600 }}>
+                                                                    🖼️ Question Image (Optional)
+                                                                </label>
+                                                                <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+                                                                    <input
+                                                                        type="text"
+                                                                        className="form-control"
+                                                                        placeholder="Image URL or choose file from device..."
+                                                                        value={questionImage}
+                                                                        onChange={e => setQuestionImage(e.target.value)}
+                                                                        style={{ flex: 1, minWidth: '200px' }}
+                                                                    />
+                                                                    <input
+                                                                        type="file"
+                                                                        accept="image/*"
+                                                                        id="faculty-q-image"
+                                                                        style={{ display: 'none' }}
+                                                                        onChange={e => handleUploadQuestionImage(e.target.files[0], 'question')}
+                                                                    />
+                                                                    <label htmlFor="faculty-q-image" className="btn btn-secondary" style={{ cursor: 'pointer', margin: 0, whiteSpace: 'nowrap' }}>
+                                                                        {uploadingQImage ? 'Uploading...' : '📁 Choose Image'}
+                                                                    </label>
+                                                                    {questionImage && (
+                                                                        <button type="button" className="btn btn-secondary btn-sm" onClick={() => setQuestionImage('')} style={{ color: '#ef4444' }}>
+                                                                            Clear
                                                                         </button>
-                                                                    </td>
-                                                                </tr>
-                                                            ))}
-                                                        </tbody>
-                                                    </table>
+                                                                    )}
+                                                                </div>
+                                                                {questionImage && (
+                                                                    <div style={{ marginTop: '10px' }}>
+                                                                        <img src={getImageUrl(questionImage)} alt="Question visual preview" style={{ maxHeight: '80px', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.1)' }} />
+                                                                    </div>
+                                                                )}
+                                                            </div>
+
+                                                            {/* Options Grid with per-option Image Upload */}
+                                                            <div>
+                                                                <label style={{ display: 'block', fontSize: '12.5px', color: '#94a3b8', marginBottom: '8px', fontWeight: 600 }}>
+                                                                    MCQ Options (With Optional Option Images)
+                                                                </label>
+                                                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+                                                                    {[
+                                                                        { label: 'Option A *', val: option1, setVal: setOption1, idx: 0 },
+                                                                        { label: 'Option B *', val: option2, setVal: setOption2, idx: 1 },
+                                                                        { label: 'Option C', val: option3, setVal: setOption3, idx: 2 },
+                                                                        { label: 'Option D', val: option4, setVal: setOption4, idx: 3 }
+                                                                    ].map(opt => (
+                                                                        <div key={opt.idx} style={{ background: 'rgba(15, 23, 42, 0.4)', padding: '12px', borderRadius: '8px', border: correctOptionIndex === opt.idx ? '1px solid rgba(16, 185, 129, 0.5)' : '1px solid rgba(255,255,255,0.06)' }}>
+                                                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                                                                                <label style={{ fontSize: '12px', fontWeight: 600, color: correctOptionIndex === opt.idx ? '#34d399' : '#cbd5e1' }}>
+                                                                                    {opt.label} {correctOptionIndex === opt.idx && '✓ (Correct Choice)'}
+                                                                                </label>
+                                                                            </div>
+                                                                            <input
+                                                                                type="text"
+                                                                                className="form-control"
+                                                                                placeholder={`Choice for ${opt.label.replace(' *', '')}`}
+                                                                                value={opt.val}
+                                                                                onChange={e => opt.setVal(e.target.value)}
+                                                                                required={opt.idx < 2}
+                                                                            />
+                                                                            {/* Option Image Upload */}
+                                                                            <div style={{ marginTop: '8px', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                                                                                <input
+                                                                                    type="file"
+                                                                                    accept="image/*"
+                                                                                    id={`faculty-opt-img-${opt.idx}`}
+                                                                                    style={{ display: 'none' }}
+                                                                                    onChange={e => handleUploadQuestionImage(e.target.files[0], 'option', opt.idx)}
+                                                                                />
+                                                                                <label htmlFor={`faculty-opt-img-${opt.idx}`} className="btn btn-secondary btn-sm" style={{ cursor: 'pointer', margin: 0, fontSize: '11px', padding: '3px 8px' }}>
+                                                                                    {uploadingOptImages[opt.idx] ? 'Uploading...' : '📁 Option Image'}
+                                                                                </label>
+                                                                                {optionImages[opt.idx] && (
+                                                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                                                        <img
+                                                                                            src={getImageUrl(optionImages[opt.idx])}
+                                                                                            alt="Option visual"
+                                                                                            style={{ maxHeight: '36px', borderRadius: '4px', border: '1px solid rgba(255,255,255,0.1)' }}
+                                                                                        />
+                                                                                        <button
+                                                                                            type="button"
+                                                                                            className="btn btn-secondary btn-sm"
+                                                                                            style={{ fontSize: '10px', padding: '2px 6px', color: '#ef4444' }}
+                                                                                            onClick={() => setOptionImages(prev => { const arr = [...prev]; arr[opt.idx] = ''; return arr; })}
+                                                                                        >
+                                                                                            ×
+                                                                                        </button>
+                                                                                    </div>
+                                                                                )}
+                                                                            </div>
+                                                                        </div>
+                                                                    ))}
+                                                                </div>
+                                                            </div>
+
+                                                            {/* Correct Option & Difficulty */}
+                                                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+                                                                <div>
+                                                                    <label style={{ display: 'block', fontSize: '12px', color: '#94a3b8', marginBottom: '6px', fontWeight: 600 }}>
+                                                                        Correct Answer Key *
+                                                                    </label>
+                                                                    <select
+                                                                        className="form-control"
+                                                                        value={correctOptionIndex}
+                                                                        onChange={e => setCorrectOptionIndex(Number(e.target.value))}
+                                                                    >
+                                                                        <option value={0}>Option A</option>
+                                                                        <option value={1}>Option B</option>
+                                                                        <option value={2}>Option C</option>
+                                                                        <option value={3}>Option D</option>
+                                                                    </select>
+                                                                </div>
+                                                                <div>
+                                                                    <label style={{ display: 'block', fontSize: '12px', color: '#94a3b8', marginBottom: '6px', fontWeight: 600 }}>
+                                                                        Difficulty Tier
+                                                                    </label>
+                                                                    <select
+                                                                        className="form-control"
+                                                                        value={questionDifficulty}
+                                                                        onChange={e => setQuestionDifficulty(e.target.value)}
+                                                                    >
+                                                                        <option value="easy">Easy</option>
+                                                                        <option value="medium">Medium</option>
+                                                                        <option value="hard">Hard</option>
+                                                                    </select>
+                                                                </div>
+                                                            </div>
+
+                                                            {/* Explanation Text & Image */}
+                                                            <div style={{ background: 'rgba(15, 23, 42, 0.5)', padding: '12px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.06)' }}>
+                                                                <label style={{ display: 'block', fontSize: '12px', color: '#94a3b8', marginBottom: '6px', fontWeight: 600 }}>
+                                                                    💡 Explanation / Solution Step (Optional)
+                                                                </label>
+                                                                <input
+                                                                    type="text"
+                                                                    className="form-control"
+                                                                    placeholder="Explain why this option is correct to help students learn..."
+                                                                    value={questionExplanation}
+                                                                    onChange={e => setQuestionExplanation(e.target.value)}
+                                                                    style={{ marginBottom: '8px' }}
+                                                                />
+                                                                <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+                                                                    <input
+                                                                        type="file"
+                                                                        accept="image/*"
+                                                                        id="faculty-exp-image"
+                                                                        style={{ display: 'none' }}
+                                                                        onChange={e => handleUploadQuestionImage(e.target.files[0], 'explanation')}
+                                                                    />
+                                                                    <label htmlFor="faculty-exp-image" className="btn btn-secondary btn-sm" style={{ cursor: 'pointer', margin: 0, whiteSpace: 'nowrap' }}>
+                                                                        {uploadingExpImage ? 'Uploading...' : '📁 Choose Explanation Image'}
+                                                                    </label>
+                                                                    {explanationImage && (
+                                                                        <button type="button" className="btn btn-secondary btn-sm" onClick={() => setExplanationImage('')} style={{ color: '#ef4444' }}>
+                                                                            Clear
+                                                                        </button>
+                                                                    )}
+                                                                </div>
+                                                                {explanationImage && (
+                                                                    <div style={{ marginTop: '10px' }}>
+                                                                        <img src={getImageUrl(explanationImage)} alt="Explanation visual preview" style={{ maxHeight: '80px', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.1)' }} />
+                                                                    </div>
+                                                                )}
+                                                            </div>
+
+                                                            <div style={{ display: 'flex', gap: '12px', marginTop: '10px' }}>
+                                                                <button
+                                                                    type="submit"
+                                                                    className="btn btn-primary"
+                                                                    disabled={submittingQuestion}
+                                                                    style={{ minWidth: '160px' }}
+                                                                >
+                                                                    {submittingQuestion ? 'Saving Question...' : '💾 Save Question'}
+                                                                </button>
+                                                                <button
+                                                                    type="button"
+                                                                    className="btn btn-secondary"
+                                                                    onClick={() => setShowQuestionForm(false)}
+                                                                >
+                                                                    Cancel
+                                                                </button>
+                                                            </div>
+                                                        </form>
+                                                    )}
                                                 </div>
                                             ) : (
-                                                <p style={{ textAlign: 'center', padding: '24px', color: '#94a3b8', background: '#0f172a', borderRadius: '8px' }}>
-                                                    No practice tests set up for this subject yet. Click "+ Create Practice Test" above to configure one!
-                                                </p>
+                                                /* REGULAR TESTS LIST VIEW */
+                                                <>
+                                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
+                                                        <h4 style={{ margin: 0, fontSize: '15px', color: '#f8fafc' }}>
+                                                            Subject Practice Tests ({subjectTests.length})
+                                                        </h4>
+                                                        <button
+                                                            type="button"
+                                                            className="btn btn-primary btn-sm"
+                                                            onClick={() => setShowCreateTestForm(!showCreateTestForm)}
+                                                        >
+                                                            {showCreateTestForm ? 'Cancel' : '➕ Create Practice Test'}
+                                                        </button>
+                                                    </div>
+
+                                                    {showCreateTestForm && (
+                                                        <div style={{ background: '#0f172a', border: '1px solid #334155', borderRadius: '8px', padding: '18px', marginBottom: '20px' }}>
+                                                            <h4 style={{ margin: '0 0 12px 0', color: '#c084fc', fontSize: '15px' }}>
+                                                                Create New Practice Test for {subjectWorkspace.subject.code}
+                                                            </h4>
+                                                            <form onSubmit={handleCreateSubjectTest}>
+                                                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px', marginBottom: '12px' }}>
+                                                                    <div>
+                                                                        <label style={{ display: 'block', fontSize: '12px', color: '#94a3b8', marginBottom: '4px' }}>Test Title *</label>
+                                                                        <input
+                                                                            type="text"
+                                                                            className="form-control"
+                                                                            placeholder={`e.g. ${subjectWorkspace.subject.code} Unit 1 Assessment`}
+                                                                            value={testForm.title}
+                                                                            onChange={e => setTestForm({ ...testForm, title: e.target.value })}
+                                                                            required
+                                                                        />
+                                                                    </div>
+                                                                    <div>
+                                                                        <label style={{ display: 'block', fontSize: '12px', color: '#94a3b8', marginBottom: '4px' }}>Duration (Minutes) *</label>
+                                                                        <input
+                                                                            type="number"
+                                                                            min={5}
+                                                                            max={180}
+                                                                            className="form-control"
+                                                                            value={testForm.duration}
+                                                                            onChange={e => setTestForm({ ...testForm, duration: Number(e.target.value) })}
+                                                                            required
+                                                                        />
+                                                                    </div>
+                                                                    <div>
+                                                                        <label style={{ display: 'block', fontSize: '12px', color: '#94a3b8', marginBottom: '4px' }}>Difficulty</label>
+                                                                        <select
+                                                                            className="form-control"
+                                                                            value={testForm.difficulty}
+                                                                            onChange={e => setTestForm({ ...testForm, difficulty: e.target.value })}
+                                                                        >
+                                                                            <option value="easy">Easy</option>
+                                                                            <option value="medium">Medium</option>
+                                                                            <option value="hard">Hard</option>
+                                                                        </select>
+                                                                    </div>
+                                                                    <div>
+                                                                        <label style={{ display: 'block', fontSize: '12px', color: '#94a3b8', marginBottom: '4px' }}>Question Limit</label>
+                                                                        <input
+                                                                            type="number"
+                                                                            min={1}
+                                                                            max={100}
+                                                                            className="form-control"
+                                                                            value={testForm.questionLimit}
+                                                                            onChange={e => setTestForm({ ...testForm, questionLimit: Number(e.target.value) })}
+                                                                        />
+                                                                    </div>
+                                                                    <div style={{ gridColumn: '1 / -1' }}>
+                                                                        <label style={{ display: 'block', fontSize: '12px', color: '#94a3b8', marginBottom: '4px' }}>Test Description / Syllabus</label>
+                                                                        <input
+                                                                            type="text"
+                                                                            className="form-control"
+                                                                            placeholder="Topics covered in this test..."
+                                                                            value={testForm.description}
+                                                                            onChange={e => setTestForm({ ...testForm, description: e.target.value })}
+                                                                        />
+                                                                    </div>
+                                                                </div>
+                                                                <button
+                                                                    type="submit"
+                                                                    className="btn btn-primary"
+                                                                    disabled={creatingTest || !testForm.title.trim()}
+                                                                >
+                                                                    {creatingTest ? 'Creating Test...' : 'Save & Proceed to Questions'}
+                                                                </button>
+                                                            </form>
+                                                        </div>
+                                                    )}
+
+                                                    {loadingSubjectTests ? (
+                                                        <p className="loading-text">Loading tests...</p>
+                                                    ) : subjectTests.length > 0 ? (
+                                                        <div className="students-table-scroll">
+                                                            <table className="students-table">
+                                                                <thead>
+                                                                    <tr>
+                                                                        <th>Test Title</th>
+                                                                        <th>Questions</th>
+                                                                        <th>Duration</th>
+                                                                        <th>Difficulty</th>
+                                                                        <th>Action</th>
+                                                                    </tr>
+                                                                </thead>
+                                                                <tbody>
+                                                                    {subjectTests.map(t => (
+                                                                        <tr key={t._id}>
+                                                                            <td>
+                                                                                <strong>{t.title}</strong>
+                                                                                {t.description && <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '2px' }}>{t.description}</div>}
+                                                                            </td>
+                                                                            <td><span className="code-pill">{t.questionCount || t.questions?.length || 0} Qs</span></td>
+                                                                            <td>{t.duration} mins</td>
+                                                                            <td><span style={{ textTransform: 'capitalize', color: t.difficulty === 'hard' ? '#ef4444' : t.difficulty === 'medium' ? '#f59e0b' : '#10b981' }}>{t.difficulty || 'medium'}</span></td>
+                                                                            <td>
+                                                                                <button
+                                                                                    type="button"
+                                                                                    className="btn btn-secondary btn-sm"
+                                                                                    style={{ color: '#c084fc', borderColor: 'rgba(168, 85, 247, 0.4)' }}
+                                                                                    onClick={() => openQuestionsModal(t)}
+                                                                                >
+                                                                                    ⚙️ Manage Questions ({t.questionCount || t.questions?.length || 0})
+                                                                                </button>
+                                                                            </td>
+                                                                        </tr>
+                                                                    ))}
+                                                                </tbody>
+                                                            </table>
+                                                        </div>
+                                                    ) : (
+                                                        <p style={{ textAlign: 'center', padding: '24px', color: '#94a3b8', background: '#0f172a', borderRadius: '8px' }}>
+                                                            No practice tests set up for this subject yet. Click "+ Create Practice Test" above to configure one!
+                                                        </p>
+                                                    )}
+                                                </>
                                             )}
                                         </div>
                                     )}
@@ -3956,160 +4465,6 @@ const FacultyDashboard = () => {
                     })()}
 
 
-
-
-                    {/* 3. TEST QUESTIONS MANAGER MODAL */}
-                    {showQuestionsModal && selectedTestForQuestions && (
-                        <div className="progress-modal-overlay" onClick={() => setShowQuestionsModal(false)}>
-                            <section className="progress-modal modal-wide" onClick={e => e.stopPropagation()}>
-                                <div className="progress-modal-header">
-                                    <div>
-                                        <h2>❓ Test Questions: {selectedTestForQuestions.title}</h2>
-                                        <p>Add and configure multiple-choice questions (MCQs), options, correct answers, and explanations.</p>
-                                    </div>
-                                    <button className="progress-close" type="button" onClick={() => setShowQuestionsModal(false)}>×</button>
-                                </div>
-
-                                <div style={{ marginTop: '20px' }}>
-                                    {/* Add Question Form */}
-                                    <div style={{ background: '#0f172a', border: '1px solid #334155', borderRadius: '8px', padding: '18px', marginBottom: '24px' }}>
-                                        <h4 style={{ margin: '0 0 12px 0', color: '#c084fc', fontSize: '15px' }}>➕ Add MCQ Question</h4>
-                                        <form onSubmit={handleAddQuestion}>
-                                            <div style={{ marginBottom: '12px' }}>
-                                                <label style={{ display: 'block', fontSize: '12px', color: '#94a3b8', marginBottom: '4px' }}>Question Text *</label>
-                                                <textarea
-                                                    className="form-control"
-                                                    rows={3}
-                                                    placeholder="Type the question prompt..."
-                                                    value={questionForm.questionText}
-                                                    onChange={e => setQuestionForm({ ...questionForm, questionText: e.target.value })}
-                                                    required
-                                                />
-                                            </div>
-
-                                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
-                                                {[0, 1, 2, 3].map(idx => (
-                                                    <div key={idx}>
-                                                        <label style={{ display: 'block', fontSize: '12px', color: '#94a3b8', marginBottom: '4px' }}>
-                                                            Option {String.fromCharCode(65 + idx)} * {questionForm.correctOptionIndex === idx ? '✅ (Correct Choice)' : ''}
-                                                        </label>
-                                                        <input
-                                                            type="text"
-                                                            className="form-control"
-                                                            placeholder={`Option ${String.fromCharCode(65 + idx)} text`}
-                                                            value={questionForm.options[idx] || ''}
-                                                            onChange={e => {
-                                                                const opts = [...questionForm.options];
-                                                                opts[idx] = e.target.value;
-                                                                setQuestionForm({ ...questionForm, options: opts });
-                                                            }}
-                                                            required
-                                                        />
-                                                    </div>
-                                                ))}
-                                            </div>
-
-                                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px', marginBottom: '12px' }}>
-                                                <div>
-                                                    <label style={{ display: 'block', fontSize: '12px', color: '#94a3b8', marginBottom: '4px' }}>Correct Option *</label>
-                                                    <select
-                                                        className="form-control"
-                                                        value={questionForm.correctOptionIndex}
-                                                        onChange={e => setQuestionForm({ ...questionForm, correctOptionIndex: Number(e.target.value) })}
-                                                    >
-                                                        <option value={0}>Option A</option>
-                                                        <option value={1}>Option B</option>
-                                                        <option value={2}>Option C</option>
-                                                        <option value={3}>Option D</option>
-                                                    </select>
-                                                </div>
-                                                <div>
-                                                    <label style={{ display: 'block', fontSize: '12px', color: '#94a3b8', marginBottom: '4px' }}>Difficulty</label>
-                                                    <select
-                                                        className="form-control"
-                                                        value={questionForm.difficulty}
-                                                        onChange={e => setQuestionForm({ ...questionForm, difficulty: e.target.value })}
-                                                    >
-                                                        <option value="easy">Easy</option>
-                                                        <option value="medium">Medium</option>
-                                                        <option value="hard">Hard</option>
-                                                    </select>
-                                                </div>
-                                                <div style={{ gridColumn: '1 / -1' }}>
-                                                    <label style={{ display: 'block', fontSize: '12px', color: '#94a3b8', marginBottom: '4px' }}>Explanation / Solution Step (Optional)</label>
-                                                    <input
-                                                        type="text"
-                                                        className="form-control"
-                                                        placeholder="Explain why this option is correct to help students learn..."
-                                                        value={questionForm.explanation}
-                                                        onChange={e => setQuestionForm({ ...questionForm, explanation: e.target.value })}
-                                                    />
-                                                </div>
-                                            </div>
-
-                                            <button
-                                                type="submit"
-                                                className="btn btn-primary"
-                                                disabled={submittingQuestion}
-                                            >
-                                                {submittingQuestion ? 'Saving Question...' : '💾 Save Question'}
-                                            </button>
-                                        </form>
-                                    </div>
-
-                                    {/* Questions List */}
-                                    <h4 style={{ margin: '0 0 14px 0', fontSize: '15px' }}>Current Questions ({testQuestions.length})</h4>
-                                    {loadingQuestions ? (
-                                        <p className="loading-text">Loading questions...</p>
-                                    ) : testQuestions.length > 0 ? (
-                                        <div>
-                                            {testQuestions.map((q, qIndex) => (
-                                                <div key={q._id || qIndex} style={{ background: '#1e293b', border: '1px solid #334155', borderRadius: '8px', padding: '16px', marginBottom: '14px' }}>
-                                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px' }}>
-                                                        <strong style={{ color: '#f8fafc', fontSize: '14px' }}>Q{qIndex + 1}. {q.questionText}</strong>
-                                                        <button
-                                                            type="button"
-                                                            className="btn btn-secondary btn-sm"
-                                                            style={{ color: '#ef4444', borderColor: 'rgba(239,68,68,0.3)', padding: '2px 8px', fontSize: '12px' }}
-                                                            onClick={() => handleDeleteQuestion(q._id)}
-                                                        >
-                                                            🗑️ Delete
-                                                        </button>
-                                                    </div>
-                                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '10px' }}>
-                                                        {q.options?.map((opt, oIdx) => (
-                                                            <div
-                                                                key={oIdx}
-                                                                style={{
-                                                                    padding: '8px 12px',
-                                                                    borderRadius: '6px',
-                                                                    fontSize: '13px',
-                                                                    background: oIdx === q.correctOptionIndex ? 'rgba(16, 185, 129, 0.15)' : '#0f172a',
-                                                                    border: oIdx === q.correctOptionIndex ? '1px solid #10b981' : '1px solid #334155',
-                                                                    color: oIdx === q.correctOptionIndex ? '#34d399' : '#cbd5e1'
-                                                                }}
-                                                            >
-                                                                <strong>{String.fromCharCode(65 + oIdx)}.</strong> {opt} {oIdx === q.correctOptionIndex ? ' ✓' : ''}
-                                                            </div>
-                                                        ))}
-                                                    </div>
-                                                    {q.explanation && (
-                                                        <div style={{ fontSize: '12px', color: '#94a3b8', background: '#0f172a', padding: '8px', borderRadius: '6px' }}>
-                                                            💡 <strong>Explanation:</strong> {q.explanation}
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            ))}
-                                        </div>
-                                    ) : (
-                                        <p style={{ textAlign: 'center', padding: '24px', color: '#94a3b8', background: '#0f172a', borderRadius: '8px' }}>
-                                            No questions added yet. Use the form above to add questions to this test.
-                                        </p>
-                                    )}
-                                </div>
-                            </section>
-                        </div>
-                    )}
 
 
                 </div>

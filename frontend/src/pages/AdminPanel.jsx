@@ -5,6 +5,33 @@ import Header from '../components/Header';
 import { API_URL } from '../config/api';
 import './AdminPanel.css';
 
+const isCoreCseTest = (test) => {
+  const cat = (test?.category || '').toLowerCase();
+  const title = (test?.title || '').toLowerCase();
+  return (
+    !!test?.subject ||
+    ['dbms', 'os', 'oop', 'networks', 'cn', 'core-cse', 'subject', 'dsa'].includes(cat) ||
+    title.includes('dbms') ||
+    title.includes('database') ||
+    title.includes('operating system') ||
+    title.includes('object-oriented') ||
+    title.includes('oop') ||
+    title.includes('computer network') ||
+    title.includes('network') ||
+    title.includes('cn') ||
+    (test?.createdBy && (test?.createdBy?.role === 'faculty' || test?.createdBy === 'faculty'))
+  );
+};
+
+const isAptitudeTest = (test) => !isCoreCseTest(test);
+
+const getImageUrl = (path) => {
+  if (!path) return '';
+  if (path.startsWith('http://') || path.startsWith('https://')) return path;
+  const baseUrl = API_URL.replace('/api', '');
+  return `${baseUrl}${path.startsWith('/') ? '' : '/'}${path}`;
+};
+
 const AdminPanel = ({ defaultTab = 'analytics' }) => {
   const { token, user } = useAuth();
   const [searchParams] = useSearchParams();
@@ -88,6 +115,7 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
   const [option2, setOption2] = useState('');
   const [option3, setOption3] = useState('');
   const [option4, setOption4] = useState('');
+  const [optionImages, setOptionImages] = useState(['', '', '', '']);
   const [correctOptionIndex, setCorrectOptionIndex] = useState(0);
   const [questionDifficulty, setQuestionDifficulty] = useState('medium');
   const [questionExplanation, setQuestionExplanation] = useState('');
@@ -95,10 +123,19 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
   const [submittingQuestion, setSubmittingQuestion] = useState(false);
   const [uploadingQImage, setUploadingQImage] = useState(false);
   const [uploadingExpImage, setUploadingExpImage] = useState(false);
+  const [uploadingOptImages, setUploadingOptImages] = useState([false, false, false, false]);
 
-  // Attempts list inside modal
+  // Attempts list inside modal & filters
   const [attempts, setAttempts] = useState([]);
   const [loadingAttempts, setLoadingAttempts] = useState(false);
+  const [attemptSearch, setAttemptSearch] = useState('');
+  const [attemptBranchFilter, setAttemptBranchFilter] = useState('all');
+  const [attemptStatusFilter, setAttemptStatusFilter] = useState('all');
+
+  // Core CSE Tests Manager states
+  const [coreTestSearch, setCoreTestSearch] = useState('');
+  const [coreTestFilter, setCoreTestFilter] = useState('all'); // 'all' | 'curriculum' | 'faculty'
+  const [coreSubTab, setCoreSubTab] = useState('tests'); // 'tests' | 'curriculum'
 
   // Practice Platforms manager states
   const [practicePlatform, setPracticePlatform] = useState('leetcode'); // leetcode, codeforces, codechef, hackerrank
@@ -1122,6 +1159,7 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
     setOption2('');
     setOption3('');
     setOption4('');
+    setOptionImages(['', '', '', '']);
     setCorrectOptionIndex(0);
     setQuestionDifficulty('medium');
     setQuestionExplanation('');
@@ -1136,13 +1174,19 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
 
   const handleOpenEditQuestion = (q) => {
     setEditingQuestionId(q._id);
-    setQuestionText(q.questionText);
+    setQuestionText(q.questionText || '');
     setQuestionImage(q.questionImage || '');
-    setOption1(q.options[0] || '');
-    setOption2(q.options[1] || '');
-    setOption3(q.options[2] || '');
-    setOption4(q.options[3] || '');
-    setCorrectOptionIndex(q.correctOptionIndex);
+    setOption1(q.options?.[0] || '');
+    setOption2(q.options?.[1] || '');
+    setOption3(q.options?.[2] || '');
+    setOption4(q.options?.[3] || '');
+    setOptionImages([
+      q.optionImages?.[0] || '',
+      q.optionImages?.[1] || '',
+      q.optionImages?.[2] || '',
+      q.optionImages?.[3] || ''
+    ]);
+    setCorrectOptionIndex(q.correctOptionIndex || 0);
     setQuestionDifficulty(q.difficulty || 'medium');
     setQuestionExplanation(q.explanation || '');
     setExplanationImage(q.explanationImage || '');
@@ -1152,7 +1196,19 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
   const handleSaveQuestion = async (e) => {
     e.preventDefault();
     if (!questionText || !option1 || !option2) {
-      alert('Question and at least two options are required.');
+      setError('At least 2 options (A & B) are required.');
+      return;
+    }
+    if (parseInt(correctOptionIndex) === 2 && !option3) {
+      setError('Please enter text for Option C since it is selected as the correct option.');
+      return;
+    }
+    if (parseInt(correctOptionIndex) === 3 && !option4) {
+      setError('Please enter text for Option D since it is selected as the correct option.');
+      return;
+    }
+    if (option4 && !option3) {
+      setError('Please provide Option C before providing Option D.');
       return;
     }
 
@@ -1165,6 +1221,7 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
       questionText,
       questionImage,
       options: optionsArray,
+      optionImages,
       correctOptionIndex: parseInt(correctOptionIndex),
       difficulty: questionDifficulty,
       explanation: questionExplanation,
@@ -1232,16 +1289,40 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
     }
   };
 
+  const handleDeleteTest = async (testId, testTitle) => {
+    if (!window.confirm(`Are you sure you want to delete test "${testTitle}"? All student attempts and question pool will be permanently deleted.`)) return;
+    try {
+      const res = await fetch(`${API_URL}/tests/${testId}`, {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      const data = await res.json();
+      if (data.success) {
+        setAptitudeTests(prev => prev.filter(t => t._id !== testId));
+        setSuccess(`Test "${testTitle}" deleted successfully.`);
+      } else {
+        setError(data.error || 'Failed to delete test.');
+      }
+    } catch (err) {
+      setError('Error deleting test.');
+    }
+  };
+
   const openAttemptsModal = async (test) => {
     setSelectedTest(test);
     setShowAttemptsModal(true);
+    setAttemptSearch('');
+    setAttemptBranchFilter('all');
+    setAttemptStatusFilter('all');
     await fetchTestAttempts(test._id);
   };
 
   const fetchTestAttempts = async (testId) => {
     setLoadingAttempts(true);
     try {
-      const res = await fetch(`${API_URL}/tests/admin/attempts`, {
+      const res = await fetch(`${API_URL}/tests/admin/attempts?testId=${testId}`, {
         headers: {
           Authorization: `Bearer ${token}`
         }
@@ -1249,7 +1330,7 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
       const data = await res.json();
       if (data.success) {
         // Filter attempts to only match the selected test
-        const testAttempts = data.data.filter(att => att.test?._id === testId);
+        const testAttempts = data.data.filter(att => !att.test?._id || att.test?._id === testId);
         setAttempts(testAttempts);
       } else {
         alert(data.error || 'Failed to retrieve attempts.');
@@ -1267,7 +1348,7 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
       return;
     }
 
-    const headers = ['Roll Number', 'Student Name', 'Email Address', 'Branch', 'Score Obtained', 'Total Questions', 'Percentage', 'Date Completed'];
+    const headers = ['Roll Number', 'Student Name', 'Email Address', 'Branch', 'Section', 'Academic Year', 'Test Title', 'Score Obtained', 'Total Questions', 'Percentage', 'Status', 'Date Completed'];
     const rows = attempts.map(att => {
       const u = att.user || {};
       const score = att.score;
@@ -1280,9 +1361,13 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
         `"${u.name || 'N/A'}"`,
         `"${u.email || 'N/A'}"`,
         `"${u.branch || 'N/A'}"`,
+        `"${u.section || 'N/A'}"`,
+        `"${u.academicYear || u.year || 'N/A'}"`,
+        `"${test.title}"`,
         score,
         total,
         `${pct}%`,
+        pct >= 50 ? 'PASSED' : 'RETAKE NEEDED',
         `"${date}"`
       ];
     });
@@ -1298,15 +1383,21 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
     document.body.removeChild(link);
   };
 
-  const handleUploadImage = async (file, type) => {
+  const handleUploadImage = async (file, type, optIdx = null) => {
     if (!file) return;
     const formData = new FormData();
     formData.append('image', file);
 
     if (type === 'question') {
       setUploadingQImage(true);
-    } else {
+    } else if (type === 'explanation') {
       setUploadingExpImage(true);
+    } else if (type === 'option' && optIdx !== null) {
+      setUploadingOptImages(prev => {
+        const arr = [...prev];
+        arr[optIdx] = true;
+        return arr;
+      });
     }
 
     try {
@@ -1321,8 +1412,14 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
       if (data.success) {
         if (type === 'question') {
           setQuestionImage(data.url);
-        } else {
+        } else if (type === 'explanation') {
           setExplanationImage(data.url);
+        } else if (type === 'option' && optIdx !== null) {
+          setOptionImages(prev => {
+            const arr = [...prev];
+            arr[optIdx] = data.url;
+            return arr;
+          });
         }
       } else {
         alert(data.error || 'Failed to upload image');
@@ -1332,8 +1429,14 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
     } finally {
       if (type === 'question') {
         setUploadingQImage(false);
-      } else {
+      } else if (type === 'explanation') {
         setUploadingExpImage(false);
+      } else if (type === 'option' && optIdx !== null) {
+        setUploadingOptImages(prev => {
+          const arr = [...prev];
+          arr[optIdx] = false;
+          return arr;
+        });
       }
     }
   };
@@ -2543,6 +2646,15 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
             🔬 Lab Practice Reports
           </button>
           <button
+            className={`admin-tab-btn ${activeTab === 'aptitude' ? 'active' : ''}`}
+            onClick={() => {
+              setActiveTab('aptitude');
+              fetchAptitudeTests();
+            }}
+          >
+            🧠 Aptitude Tests Manager
+          </button>
+          <button
             className={`admin-tab-btn ${activeTab === 'core-subjects' ? 'active' : ''}`}
             onClick={() => {
               setActiveTab('core-subjects');
@@ -2550,19 +2662,13 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
               fetchAptitudeTests();
             }}
           >
-            💻 Core CSE Subjects & Tests
+            💻 Core CSE Subjects
           </button>
           <button
             className={`admin-tab-btn ${activeTab === 'academic-content' ? 'active' : ''}`}
             onClick={() => setActiveTab('academic-content')}
           >
             📚 Academic Subjects & Projects
-          </button>
-          <button
-            className={`admin-tab-btn ${activeTab === 'aptitude' ? 'active' : ''}`}
-            onClick={() => setActiveTab('aptitude')}
-          >
-            🧠 Aptitude Tests Manager
           </button>
           <button
             className={`admin-tab-btn ${activeTab === 'practice' ? 'active' : ''}`}
@@ -3120,38 +3226,290 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
         {
           activeTab === 'core-subjects' && (
             <div className="admin-view-content animate-fade" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-              {/* Summary Stats Grid */}
-              <div className="admin-stats-summary-grid">
-                <div className="glass-card admin-summary-card">
-                  <h4>Core CSE Subjects</h4>
-                  <span className="admin-stat-number">{academicSubjects.length}</span>
-                  <p className="admin-stat-sub">Registered across all batches</p>
+              {/* Header & Sub-Tab Switcher */}
+              <div className="glass-card" style={{ padding: '20px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '1.3rem', color: '#f8fafc', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <span>💻</span> Core CSE Subjects & Practice Tests Coordinator
+                  </h3>
+                  <p style={{ margin: '6px 0 0', color: '#94a3b8', fontSize: '0.9rem' }}>
+                    Default curriculum practice tests (DBMS, OS, OOP, CN) and all subject practice tests configured by Faculty.
+                  </p>
                 </div>
-                <div className="glass-card admin-summary-card">
-                  <h4>Uploaded Study Notes</h4>
-                  <span className="admin-stat-number">
-                    {academicSubjects.reduce((acc, s) => acc + (s.notes ? s.notes.length : 0), 0)}
-                  </span>
-                  <p className="admin-stat-sub">Materials and revision guides</p>
-                </div>
-                <div className="glass-card admin-summary-card">
-                  <h4>Core Subject Tests</h4>
-                  <span className="admin-stat-number">
-                    {(aptitudeTests || []).filter(t => t.subject || (academicSubjects.some(s => t.title?.toLowerCase().includes(s.code.toLowerCase())))).length}
-                  </span>
-                  <p className="admin-stat-sub">Assessments & MCQ modules</p>
-                </div>
-                <div className="glass-card admin-summary-card">
-                  <h4>Active Faculty Scopes</h4>
-                  <span className="admin-stat-number">
-                    {staffMembers.filter(m => m.role === 'faculty' && m.managedScopes?.length > 0).length}
-                  </span>
-                  <p className="admin-stat-sub">Instructors with assigned subjects</p>
+                <div style={{ display: 'flex', gap: '10px', background: 'rgba(15, 23, 42, 0.6)', padding: '6px', borderRadius: '10px', border: '1px solid rgba(255, 255, 255, 0.08)' }}>
+                  <button
+                    type="button"
+                    className={`btn btn-sm ${coreSubTab === 'tests' ? 'btn-primary' : 'btn-secondary'}`}
+                    style={coreSubTab === 'tests' ? { background: '#6366f1', borderColor: '#4f46e5' } : {}}
+                    onClick={() => setCoreSubTab('tests')}
+                  >
+                    🧪 Practice Tests ({ (aptitudeTests || []).filter(isCoreCseTest).length })
+                  </button>
+                  <button
+                    type="button"
+                    className={`btn btn-sm ${coreSubTab === 'curriculum' ? 'btn-primary' : 'btn-secondary'}`}
+                    style={coreSubTab === 'curriculum' ? { background: '#6366f1', borderColor: '#4f46e5' } : {}}
+                    onClick={() => setCoreSubTab('curriculum')}
+                  >
+                    📚 Subjects & Syllabus ({ academicSubjects.length })
+                  </button>
                 </div>
               </div>
 
-              {/* Main Subject Directory or Inline Academic Workspace */}
-              <div className="glass-card" style={{ padding: '24px' }}>
+              {coreSubTab === 'tests' && (
+                <>
+                  {/* Summary Stats Grid */}
+                  <div className="admin-stats-summary-grid">
+                    <div className="glass-card admin-summary-card">
+                      <h4>Total Core Tests</h4>
+                      <span className="admin-stat-number">{(aptitudeTests || []).filter(isCoreCseTest).length}</span>
+                      <p className="admin-stat-sub">Curriculum core & faculty practice exams</p>
+                    </div>
+                    <div className="glass-card admin-summary-card">
+                      <h4>Curriculum Standards</h4>
+                      <span className="admin-stat-number">4</span>
+                      <p className="admin-stat-sub">DBMS, OS, OOP, CN modules</p>
+                    </div>
+                    <div className="glass-card admin-summary-card">
+                      <h4>Faculty Practice Tests</h4>
+                      <span className="admin-stat-number">
+                        {(aptitudeTests || []).filter(isCoreCseTest).filter(t => t.createdBy?.role === 'faculty' || t.createdBy === 'faculty' || !!t.subject).length}
+                      </span>
+                      <p className="admin-stat-sub">Created by academic course faculty</p>
+                    </div>
+                    <div className="glass-card admin-summary-card">
+                      <h4>Total Questions Pool</h4>
+                      <span className="admin-stat-number">
+                        {(aptitudeTests || []).filter(isCoreCseTest).reduce((sum, t) => sum + (t.questionCount || t.questions?.length || 0), 0)}
+                      </span>
+                      <p className="admin-stat-sub">Across all core domain tests</p>
+                    </div>
+                  </div>
+
+                  {/* Core Tests Table Card */}
+                  <div className="glass-card aptitude-tests-manager-card animate-fade" style={{ padding: '24px' }}>
+                    <div className="manager-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
+                      <div>
+                        <h3 style={{ margin: 0, fontSize: '1.2rem', color: '#f8fafc' }}>
+                          Core CSE Subject Tests & Faculty Practice Assessments
+                        </h3>
+                        <p className="card-desc" style={{ margin: '4px 0 0' }}>
+                          Manage question pools, upload question/option images, and inspect or export candidate attendance reports per test.
+                        </p>
+                      </div>
+                      <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                        <button
+                          type="button"
+                          className="btn btn-secondary btn-sm"
+                          onClick={() => {
+                            fetchAptitudeTests();
+                            fetchAcademicContent();
+                          }}
+                        >
+                          🔄 Refresh Tests
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Filters Bar */}
+                    <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', margin: '20px 0 16px 0' }}>
+                      <input
+                        type="text"
+                        className="form-control"
+                        placeholder="Search tests by subject name, title, or faculty..."
+                        value={coreTestSearch}
+                        onChange={(e) => setCoreTestSearch(e.target.value)}
+                        style={{ flex: 1, minWidth: '240px' }}
+                      />
+                      <select
+                        className="form-control"
+                        value={coreTestFilter}
+                        onChange={(e) => setCoreTestFilter(e.target.value)}
+                        style={{ minWidth: '220px' }}
+                      >
+                        <option value="all">All Core Tests ({ (aptitudeTests || []).filter(isCoreCseTest).length })</option>
+                        <option value="curriculum">Curriculum Defaults (DBMS, OS, OOP, CN)</option>
+                        <option value="faculty">Faculty Practice Tests</option>
+                      </select>
+                    </div>
+
+                    {/* Table */}
+                    <div className="table-responsive-wrapper">
+                      <table className="student-roster-table">
+                        <thead>
+                          <tr>
+                            <th>Subject / Test Title</th>
+                            <th>Domain / Code</th>
+                            <th>Origin / Scope</th>
+                            <th>Question Pool</th>
+                            <th>Duration & Level</th>
+                            <th style={{ textAlign: 'right' }}>Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {(() => {
+                            const filtered = (aptitudeTests || [])
+                              .filter(isCoreCseTest)
+                              .filter(test => {
+                                const isFaculty = test.createdBy?.role === 'faculty' || test.createdBy === 'faculty' || !!test.subject;
+                                if (coreTestFilter === 'curriculum' && isFaculty) return false;
+                                if (coreTestFilter === 'faculty' && !isFaculty) return false;
+
+                                if (coreTestSearch.trim()) {
+                                  const q = coreTestSearch.toLowerCase();
+                                  const titleMatch = (test.title || '').toLowerCase().includes(q);
+                                  const descMatch = (test.description || '').toLowerCase().includes(q);
+                                  const catMatch = (test.category || '').toLowerCase().includes(q);
+                                  const creatorMatch = (test.createdBy?.name || '').toLowerCase().includes(q);
+                                  const subjMatch = (test.subject?.name || test.subject?.code || '').toLowerCase().includes(q);
+                                  return titleMatch || descMatch || catMatch || creatorMatch || subjMatch;
+                                }
+                                return true;
+                              });
+
+                            if (filtered.length === 0) {
+                              return (
+                                <tr>
+                                  <td colSpan="6" className="table-empty-msg" style={{ textAlign: 'center', padding: '36px', color: '#94a3b8' }}>
+                                    No Core CSE practice tests match your search criteria.
+                                  </td>
+                                </tr>
+                              );
+                            }
+
+                            return filtered.map((test) => {
+                              const isFaculty = test.createdBy?.role === 'faculty' || test.createdBy === 'faculty' || !!test.subject;
+                              return (
+                                <tr key={test._id}>
+                                  <td>
+                                    <strong>{test.title}</strong>
+                                    {test.description && <div className="text-secondary small mt-5">{test.description}</div>}
+                                    {test.subject && (
+                                      <div style={{ marginTop: '4px' }}>
+                                        <span className="code-pill" style={{ fontSize: '11px' }}>
+                                          {test.subject.code ? `${test.subject.code} · ${test.subject.name}` : (test.subject.name || 'Faculty Subject')}
+                                        </span>
+                                      </div>
+                                    )}
+                                  </td>
+                                  <td>
+                                    <span className="status-badge-inline" style={{ textTransform: 'uppercase', fontSize: '11px' }}>
+                                      {test.category || 'core-cse'}
+                                    </span>
+                                  </td>
+                                  <td>
+                                    {isFaculty ? (
+                                      <span
+                                        className="status-badge-inline"
+                                        style={{
+                                          background: 'rgba(168, 85, 247, 0.15)',
+                                          color: '#c084fc',
+                                          border: '1px solid rgba(168, 85, 247, 0.35)',
+                                          fontSize: '11.5px'
+                                        }}
+                                      >
+                                        👨‍🏫 Faculty: {test.createdBy?.name || 'Faculty Staff'}
+                                      </span>
+                                    ) : (
+                                      <span
+                                        className="status-badge-inline"
+                                        style={{
+                                          background: 'rgba(59, 130, 246, 0.15)',
+                                          color: '#60a5fa',
+                                          border: '1px solid rgba(59, 130, 246, 0.35)',
+                                          fontSize: '11.5px'
+                                        }}
+                                      >
+                                        🌟 Curriculum Core
+                                      </span>
+                                    )}
+                                  </td>
+                                  <td>
+                                    <strong>{test.questionCount || test.questions?.length || 0}</strong> Questions
+                                    <div className="small text-secondary">({test.questionLimit || 20} Picked)</div>
+                                  </td>
+                                  <td>
+                                    <span className="text-glow">{test.duration} Mins</span>
+                                    <div className="small text-secondary" style={{ textTransform: 'capitalize' }}>
+                                      {test.difficulty || 'medium'}
+                                    </div>
+                                  </td>
+                                  <td>
+                                    <div className="admin-actions-cell" style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+                                      <button
+                                        type="button"
+                                        className="btn btn-secondary btn-sm"
+                                        onClick={() => openQuestionsModal(test)}
+                                        title="Manage question pool with option images"
+                                      >
+                                        📝 Manage Questions
+                                      </button>
+                                      <button
+                                        type="button"
+                                        className="btn btn-primary btn-sm"
+                                        onClick={() => openAttemptsModal(test)}
+                                        title="View student reports for this specific test"
+                                      >
+                                        📊 View Reports
+                                      </button>
+                                      {isFaculty && (
+                                        <button
+                                          type="button"
+                                          className="btn btn-secondary btn-sm"
+                                          style={{ color: '#ef4444', borderColor: 'rgba(239, 68, 68, 0.3)' }}
+                                          onClick={() => handleDeleteTest(test._id, test.title)}
+                                          title="Delete this faculty-created test"
+                                        >
+                                          🗑️
+                                        </button>
+                                      )}
+                                    </div>
+                                  </td>
+                                </tr>
+                              );
+                            });
+                          })()}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {coreSubTab === 'curriculum' && (
+                <>
+                  {/* Summary Stats Grid */}
+                  <div className="admin-stats-summary-grid">
+                    <div className="glass-card admin-summary-card">
+                      <h4>Core CSE Subjects</h4>
+                      <span className="admin-stat-number">{academicSubjects.length}</span>
+                      <p className="admin-stat-sub">Registered across all batches</p>
+                    </div>
+                    <div className="glass-card admin-summary-card">
+                      <h4>Uploaded Study Notes</h4>
+                      <span className="admin-stat-number">
+                        {academicSubjects.reduce((acc, s) => acc + (s.notes ? s.notes.length : 0), 0)}
+                      </span>
+                      <p className="admin-stat-sub">Materials and revision guides</p>
+                    </div>
+                    <div className="glass-card admin-summary-card">
+                      <h4>Core Subject Tests</h4>
+                      <span className="admin-stat-number">
+                        {(aptitudeTests || []).filter(t => t.subject || (academicSubjects.some(s => t.title?.toLowerCase().includes(s.code.toLowerCase())))).length}
+                      </span>
+                      <p className="admin-stat-sub">Assessments & MCQ modules</p>
+                    </div>
+                    <div className="glass-card admin-summary-card">
+                      <h4>Active Faculty Scopes</h4>
+                      <span className="admin-stat-number">
+                        {staffMembers.filter(m => m.role === 'faculty' && m.managedScopes?.length > 0).length}
+                      </span>
+                      <p className="admin-stat-sub">Instructors with assigned subjects</p>
+                    </div>
+                  </div>
+
+                  {/* Main Subject Directory or Inline Academic Workspace */}
+                  <div className="glass-card" style={{ padding: '24px' }}>
                 {adminSubjectWorkspace ? (
                   <div className="admin-subject-workspace animate-fade">
                     {/* Workspace Header */}
@@ -3752,6 +4110,8 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
                   </>
                 )}
               </div>
+            </>
+          )}
             </div>
           )
         }
@@ -4176,8 +4536,8 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
                     </tr>
                   </thead>
                   <tbody>
-                    {aptitudeTests.length > 0 ? (
-                      aptitudeTests.map((test) => (
+                    {aptitudeTests.filter(isAptitudeTest).length > 0 ? (
+                      aptitudeTests.filter(isAptitudeTest).map((test) => (
                         <tr key={test._id}>
                           <td>
                             <strong>{test.title}</strong>
@@ -4188,7 +4548,7 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
                               {test.category}
                             </span>
                           </td>
-                          <td>{test.questionCount} Questions (20 Picked)</td>
+                          <td>{test.questionCount} Questions ({test.questionLimit || 20} Picked)</td>
                           <td>
                             <span className="text-glow">{test.duration} Mins</span>
                           </td>
@@ -5304,17 +5664,42 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
                               </div>
                               <div className="q-item-body mt-10">
                                 <p className="q-text"><strong>{q.questionText}</strong></p>
+                                {q.questionImage && (
+                                  <div style={{ marginTop: '8px', marginBottom: '8px' }}>
+                                    <img
+                                      src={getImageUrl(q.questionImage)}
+                                      alt="Question Prompt"
+                                      style={{ maxHeight: '120px', maxWidth: '100%', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.1)' }}
+                                    />
+                                  </div>
+                                )}
                                 <ul className="q-options-list mt-10">
                                   {q.options.map((opt, oIdx) => (
                                     <li key={oIdx} className={oIdx === q.correctOptionIndex ? 'correct-option' : ''}>
-                                      {String.fromCharCode(65 + oIdx)}. {opt} {oIdx === q.correctOptionIndex && '✓ (Correct)'}
+                                      <div>
+                                        {String.fromCharCode(65 + oIdx)}. {opt} {oIdx === q.correctOptionIndex && '✓ (Correct)'}
+                                      </div>
+                                      {q.optionImages?.[oIdx] && (
+                                        <img
+                                          src={getImageUrl(q.optionImages[oIdx])}
+                                          alt={`Option ${String.fromCharCode(65 + oIdx)} visual`}
+                                          style={{ maxHeight: '60px', borderRadius: '4px', marginTop: '6px', border: '1px solid rgba(255,255,255,0.1)' }}
+                                        />
+                                      )}
                                     </li>
                                   ))}
                                 </ul>
-                                {q.explanation && (
-                                  <p className="q-explanation mt-10 small text-secondary">
-                                    <strong>Explanation:</strong> {q.explanation}
-                                  </p>
+                                {(q.explanation || q.explanationImage) && (
+                                  <div className="q-explanation mt-10 small text-secondary" style={{ padding: '8px 12px', background: 'rgba(15, 23, 42, 0.6)', borderRadius: '6px' }}>
+                                    {q.explanation && <div><strong>Explanation:</strong> {q.explanation}</div>}
+                                    {q.explanationImage && (
+                                      <img
+                                        src={getImageUrl(q.explanationImage)}
+                                        alt="Explanation visual"
+                                        style={{ maxHeight: '80px', borderRadius: '4px', marginTop: '6px', border: '1px solid rgba(255,255,255,0.1)' }}
+                                      />
+                                    )}
+                                  </div>
                                 )}
                               </div>
                             </div>
@@ -5333,7 +5718,7 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
                     <h4>{editingQuestionId ? 'Edit Question' : 'Add New Question'}</h4>
 
                     <div className="form-group">
-                      <label className="form-label">Question text</label>
+                      <label className="form-label">Question text *</label>
                       <textarea
                         className="form-control"
                         rows="3"
@@ -5368,7 +5753,7 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
                       {questionImage && (
                         <div className="image-preview-container" style={{ marginTop: '10px', display: 'flex', alignItems: 'center', gap: '10px' }}>
                           <img
-                            src={questionImage.startsWith('http') || questionImage.startsWith('/') ? questionImage : `${API_URL.replace('/api', '')}${questionImage.startsWith('/') ? '' : '/'}${questionImage}`}
+                            src={getImageUrl(questionImage)}
                             alt="Question Preview"
                             style={{ maxHeight: '80px', borderRadius: '4px', border: '1px solid rgba(255,255,255,0.1)' }}
                           />
@@ -5377,51 +5762,70 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
                       )}
                     </div>
 
-                    <div className="form-grid-2-col">
-                      <div className="form-group">
-                        <label className="form-label">Option A</label>
-                        <input
-                          type="text"
-                          className="form-control"
-                          value={option1}
-                          onChange={(e) => setOption1(e.target.value)}
-                          placeholder="Option A choice"
-                          required
-                        />
-                      </div>
-                      <div className="form-group">
-                        <label className="form-label">Option B</label>
-                        <input
-                          type="text"
-                          className="form-control"
-                          value={option2}
-                          onChange={(e) => setOption2(e.target.value)}
-                          placeholder="Option B choice"
-                          required
-                        />
-                      </div>
-                    </div>
-
-                    <div className="form-grid-2-col">
-                      <div className="form-group">
-                        <label className="form-label">Option C (Optional)</label>
-                        <input
-                          type="text"
-                          className="form-control"
-                          value={option3}
-                          onChange={(e) => setOption3(e.target.value)}
-                          placeholder="Option C choice"
-                        />
-                      </div>
-                      <div className="form-group">
-                        <label className="form-label">Option D (Optional)</label>
-                        <input
-                          type="text"
-                          className="form-control"
-                          value={option4}
-                          onChange={(e) => setOption4(e.target.value)}
-                          placeholder="Option D choice"
-                        />
+                    {/* Options Grid with Option Images */}
+                    <div className="form-group">
+                      <label className="form-label">MCQ Options (With Optional File Image per option)</label>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+                        {[
+                          { label: 'Option A *', val: option1, setVal: setOption1, idx: 0 },
+                          { label: 'Option B *', val: option2, setVal: setOption2, idx: 1 },
+                          { label: 'Option C', val: option3, setVal: setOption3, idx: 2 },
+                          { label: 'Option D', val: option4, setVal: setOption4, idx: 3 }
+                        ].map(opt => (
+                          <div
+                            key={opt.idx}
+                            style={{
+                              background: 'rgba(15, 23, 42, 0.4)',
+                              padding: '12px',
+                              borderRadius: '8px',
+                              border: parseInt(correctOptionIndex) === opt.idx ? '1px solid rgba(16, 185, 129, 0.5)' : '1px solid rgba(255,255,255,0.08)'
+                            }}
+                          >
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                              <label style={{ fontSize: '12px', fontWeight: 600, color: parseInt(correctOptionIndex) === opt.idx ? '#34d399' : '#cbd5e1' }}>
+                                {opt.label} {parseInt(correctOptionIndex) === opt.idx && '✓ (Correct Choice)'}
+                              </label>
+                            </div>
+                            <input
+                              type="text"
+                              className="form-control"
+                              placeholder={`Choice for ${opt.label.replace(' *', '')}`}
+                              value={opt.val}
+                              onChange={e => opt.setVal(e.target.value)}
+                              required={opt.idx < 2}
+                            />
+                            {/* Option Image Upload */}
+                            <div style={{ marginTop: '8px', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                              <input
+                                type="file"
+                                accept="image/*"
+                                id={`admin-opt-img-${opt.idx}`}
+                                style={{ display: 'none' }}
+                                onChange={e => handleUploadImage(e.target.files[0], 'option', opt.idx)}
+                              />
+                              <label htmlFor={`admin-opt-img-${opt.idx}`} className="btn btn-secondary btn-sm" style={{ cursor: 'pointer', margin: 0, fontSize: '11px', padding: '3px 8px' }}>
+                                {uploadingOptImages[opt.idx] ? 'Uploading...' : '📁 Option Image'}
+                              </label>
+                              {optionImages[opt.idx] && (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                  <img
+                                    src={getImageUrl(optionImages[opt.idx])}
+                                    alt="Option visual"
+                                    style={{ maxHeight: '36px', borderRadius: '4px', border: '1px solid rgba(255,255,255,0.1)' }}
+                                  />
+                                  <button
+                                    type="button"
+                                    className="btn btn-secondary btn-sm"
+                                    style={{ fontSize: '10px', padding: '2px 6px', color: '#ef4444' }}
+                                    onClick={() => setOptionImages(prev => { const arr = [...prev]; arr[opt.idx] = ''; return arr; })}
+                                  >
+                                    ×
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        ))}
                       </div>
                     </div>
 
@@ -5431,12 +5835,12 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
                         <select
                           className="form-control"
                           value={correctOptionIndex}
-                          onChange={(e) => setCorrectOptionIndex(e.target.value)}
+                          onChange={(e) => setCorrectOptionIndex(Number(e.target.value))}
                         >
                           <option value={0}>Option A (Index 0)</option>
                           <option value={1}>Option B (Index 1)</option>
-                          {option3 && <option value={2}>Option C (Index 2)</option>}
-                          {option4 && <option value={3}>Option D (Index 3)</option>}
+                          <option value={2}>Option C (Index 2)</option>
+                          <option value={3}>Option D (Index 3)</option>
                         </select>
                       </div>
 
@@ -5489,7 +5893,7 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
                       {explanationImage && (
                         <div className="image-preview-container" style={{ marginTop: '10px', display: 'flex', alignItems: 'center', gap: '10px' }}>
                           <img
-                            src={explanationImage.startsWith('http') || explanationImage.startsWith('/') ? explanationImage : `${API_URL.replace('/api', '')}${explanationImage.startsWith('/') ? '' : '/'}${explanationImage}`}
+                            src={getImageUrl(explanationImage)}
                             alt="Explanation Preview"
                             style={{ maxHeight: '80px', borderRadius: '4px', border: '1px solid rgba(255,255,255,0.1)' }}
                           />
@@ -5529,20 +5933,92 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
           <div className="modal-overlay">
             <div className="modal-content glass-card large-modal">
               <div className="modal-header">
-                <h3>Grades Report — {selectedTest.title}</h3>
+                <div>
+                  <h3 style={{ margin: 0 }}>Candidate Exam Report — {selectedTest.title}</h3>
+                  <div className="small text-secondary mt-5">
+                    {selectedTest.subject ? `Subject: ${selectedTest.subject.name || selectedTest.subject.code || 'Faculty Practice Test'}` : `Domain: ${(selectedTest.category || 'General').toUpperCase()}`}
+                    {selectedTest.createdBy?.name ? ` · Administered by: ${selectedTest.createdBy.name}` : ''}
+                  </div>
+                </div>
                 <button className="close-btn" onClick={() => setShowAttemptsModal(false)}>×</button>
               </div>
 
               <div className="modal-body">
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-                  <p className="text-secondary">Student scores list. Results are compiled in real-time as users submit their tests.</p>
+                {/* Header Action Bar */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
+                  <p className="text-secondary" style={{ margin: 0 }}>
+                    Separate grading log for this specific test. Real-time submissions recorded.
+                  </p>
                   <button
                     className="btn btn-accent"
                     onClick={() => downloadAttemptsCSV(selectedTest)}
                     disabled={attempts.length === 0}
                   >
-                    📥 Download CSV Report
+                    📥 Download CSV Report ({attempts.length})
                   </button>
+                </div>
+
+                {/* Performance Summary Metrics */}
+                <div className="progress-summary-grid" style={{ marginBottom: '20px' }}>
+                  <div>
+                    <span>Total Attempts</span>
+                    <strong>{attempts.length}</strong>
+                  </div>
+                  <div>
+                    <span>Unique Students</span>
+                    <strong>{new Set(attempts.map(att => att.user?._id || att.user?.email || att.user?.rollNumber).filter(Boolean)).size}</strong>
+                  </div>
+                  <div>
+                    <span>Passed (&gt;=50%)</span>
+                    <strong style={{ color: '#10b981' }}>
+                      {attempts.filter(att => (att.totalQuestions > 0 ? (att.score / att.totalQuestions) * 100 : 0) >= 50).length}
+                    </strong>
+                  </div>
+                  <div>
+                    <span>Retake Needed</span>
+                    <strong style={{ color: '#ef4444' }}>
+                      {attempts.filter(att => (att.totalQuestions > 0 ? (att.score / att.totalQuestions) * 100 : 0) < 50).length}
+                    </strong>
+                  </div>
+                  <div>
+                    <span>Average Score</span>
+                    <strong style={{ color: '#60a5fa' }}>
+                      {attempts.length ? Math.round(attempts.reduce((sum, att) => sum + (att.totalQuestions > 0 ? (att.score / att.totalQuestions) * 100 : 0), 0) / attempts.length) : 0}%
+                    </strong>
+                  </div>
+                </div>
+
+                {/* Search & Filter Bar */}
+                <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginBottom: '16px' }}>
+                  <input
+                    type="text"
+                    className="form-control"
+                    placeholder="Search by student name, roll no, email, or branch..."
+                    value={attemptSearch}
+                    onChange={(e) => setAttemptSearch(e.target.value)}
+                    style={{ flex: 1, minWidth: '220px' }}
+                  />
+                  <select
+                    className="form-control"
+                    value={attemptBranchFilter}
+                    onChange={(e) => setAttemptBranchFilter(e.target.value)}
+                    style={{ minWidth: '150px' }}
+                  >
+                    <option value="all">All Branches</option>
+                    {[...new Set(attempts.map(att => att.user?.branch).filter(Boolean))].map(b => (
+                      <option key={b} value={b}>{b}</option>
+                    ))}
+                  </select>
+                  <select
+                    className="form-control"
+                    value={attemptStatusFilter}
+                    onChange={(e) => setAttemptStatusFilter(e.target.value)}
+                    style={{ minWidth: '150px' }}
+                  >
+                    <option value="all">All Statuses</option>
+                    <option value="passed">Passed (&gt;=50%)</option>
+                    <option value="failed">Retake Needed (&lt;50%)</option>
+                  </select>
                 </div>
 
                 {loadingAttempts ? (
@@ -5557,38 +6033,89 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
                         <tr>
                           <th>Student Candidate</th>
                           <th>Roll No</th>
-                          <th>Branch</th>
+                          <th>Branch & Sec</th>
                           <th>Score</th>
                           <th>Percentage</th>
+                          <th>Status</th>
                           <th>Completion Date</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {attempts.length > 0 ? (
-                          attempts.map((att) => {
+                        {(() => {
+                          const filtered = attempts.filter(att => {
                             const u = att.user || {};
                             const pct = att.totalQuestions > 0 ? Math.round((att.score / att.totalQuestions) * 100) : 0;
+                            const isPassed = pct >= 50;
+
+                            if (attemptStatusFilter === 'passed' && !isPassed) return false;
+                            if (attemptStatusFilter === 'failed' && isPassed) return false;
+
+                            if (attemptBranchFilter !== 'all' && (u.branch || '').toLowerCase() !== attemptBranchFilter.toLowerCase()) {
+                              return false;
+                            }
+
+                            if (attemptSearch.trim()) {
+                              const q = attemptSearch.toLowerCase();
+                              const nameMatch = (u.name || '').toLowerCase().includes(q);
+                              const emailMatch = (u.email || '').toLowerCase().includes(q);
+                              const rollMatch = (u.rollNumber || '').toLowerCase().includes(q);
+                              const branchMatch = (u.branch || '').toLowerCase().includes(q);
+                              return nameMatch || emailMatch || rollMatch || branchMatch;
+                            }
+
+                            return true;
+                          });
+
+                          if (filtered.length === 0) {
+                            return (
+                              <tr>
+                                <td colSpan="7" className="table-empty-msg" style={{ textAlign: 'center', padding: '36px', color: '#94a3b8' }}>
+                                  {attempts.length === 0 ? 'No students have taken this test yet.' : 'No candidates match the specified filter criteria.'}
+                                </td>
+                              </tr>
+                            );
+                          }
+
+                          return filtered.map((att) => {
+                            const u = att.user || {};
+                            const pct = att.totalQuestions > 0 ? Math.round((att.score / att.totalQuestions) * 100) : 0;
+                            const isPassed = pct >= 50;
+
                             return (
                               <tr key={att._id}>
                                 <td>
                                   <strong>{u.name || 'N/A'}</strong>
                                   <div className="small text-secondary">{u.email || 'N/A'}</div>
                                 </td>
-                                <td>{u.rollNumber || 'N/A'}</td>
-                                <td>{u.branch || 'N/A'}</td>
-                                <td>{att.score} / {att.totalQuestions}</td>
                                 <td>
-                                  <strong className="text-glow">{pct}%</strong>
+                                  <span className="code-pill">{u.rollNumber || 'N/A'}</span>
                                 </td>
-                                <td>{new Date(att.completedAt).toLocaleString()}</td>
+                                <td>
+                                  {u.branch || 'N/A'}
+                                  {u.section ? ` · Sec ${u.section}` : ''}
+                                </td>
+                                <td>
+                                  <strong>{att.score}</strong> / {att.totalQuestions}
+                                </td>
+                                <td>
+                                  <span className={`score-badge ${pct >= 70 ? 'high' : pct >= 50 ? 'medium' : 'low'}`}>
+                                    {pct}%
+                                  </span>
+                                </td>
+                                <td>
+                                  {isPassed ? (
+                                    <span style={{ color: '#10b981', fontWeight: 600, fontSize: '12px' }}>PASSED</span>
+                                  ) : (
+                                    <span style={{ color: '#ef4444', fontWeight: 600, fontSize: '12px' }}>RETAKE NEEDED</span>
+                                  )}
+                                </td>
+                                <td style={{ fontSize: '12px', color: '#94a3b8' }}>
+                                  {att.completedAt ? new Date(att.completedAt).toLocaleString() : 'N/A'}
+                                </td>
                               </tr>
                             );
-                          })
-                        ) : (
-                          <tr>
-                            <td colSpan="6" className="table-empty-msg">No students have taken this test yet.</td>
-                          </tr>
-                        )}
+                          });
+                        })()}
                       </tbody>
                     </table>
                   </div>

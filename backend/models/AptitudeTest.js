@@ -14,6 +14,10 @@ const QuestionSchema = new mongoose.Schema({
     required: true,
     validate: [opts => opts.length >= 2, 'Options must have at least 2 choices']
   },
+  optionImages: {
+    type: [String],
+    default: ['', '', '', '']
+  },
   correctOptionIndex: {
     type: Number,
     required: true

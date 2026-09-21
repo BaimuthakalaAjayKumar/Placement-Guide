@@ -2436,6 +2436,7 @@ class Solution {
                 <div className="options-selection-list">
                   {activeTest.questions[currentQuestionIndex].options.map((option, idx) => {
                     const isSelected = selectedAnswers[currentQuestionIndex] === idx;
+                    const optImg = activeTest.questions[currentQuestionIndex].optionImages?.[idx];
                     return (
                       <label className={`option-item-label ${isSelected ? 'selected' : ''}`} key={idx}>
                         <input
@@ -2446,7 +2447,16 @@ class Solution {
                           style={{ display: 'none' }}
                         />
                         <span className="option-letter">{String.fromCharCode(65 + idx)}</span>
-                        <span className="option-text-content">{option}</span>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', flex: 1 }}>
+                          <span className="option-text-content">{option}</span>
+                          {optImg && (
+                            <img
+                              src={getImageUrl(optImg)}
+                              alt={`Option ${String.fromCharCode(65 + idx)} visual`}
+                              style={{ maxHeight: '90px', maxWidth: '100%', objectFit: 'contain', borderRadius: '4px', border: '1px solid rgba(255,255,255,0.1)' }}
+                            />
+                          )}
+                        </div>
                       </label>
                     );
                   })}
@@ -2534,6 +2544,7 @@ class Solution {
                     {q.options.map((opt, oIdx) => {
                       const isCorrectAnswer = oIdx === q.correctAnswer;
                       const isChosenAnswer = oIdx === q.userAnswer;
+                      const optImg = q.optionImages?.[oIdx];
                       
                       let optionState = '';
                       if (isCorrectAnswer) optionState = 'correct-option';
@@ -2542,7 +2553,16 @@ class Solution {
                       return (
                         <div className={`result-opt-item ${optionState}`} key={oIdx}>
                           <span className="option-letter">{String.fromCharCode(65 + oIdx)}</span>
-                          <span>{opt}</span>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: 1 }}>
+                            <span>{opt}</span>
+                            {optImg && (
+                              <img
+                                src={getImageUrl(optImg)}
+                                alt={`Option ${String.fromCharCode(65 + oIdx)} visual`}
+                                style={{ maxHeight: '70px', maxWidth: '100%', objectFit: 'contain', borderRadius: '4px', border: '1px solid rgba(255,255,255,0.1)', marginTop: '4px' }}
+                              />
+                            )}
+                          </div>
                           {isCorrectAnswer && <span className="state-tag-option correct">Correct Choice</span>}
                           {isChosenAnswer && !q.isCorrect && <span className="state-tag-option wrong">Your Choice</span>}
                         </div>

@@ -256,8 +256,9 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 1000;
+  z-index: 9999;
   padding: 24px;
+  box-sizing: border-box;
 }
 
 .modal-actions {
@@ -445,10 +446,11 @@
   box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
   border: 1px solid rgba(255, 255, 255, 0.1);
   overflow: hidden;
+  box-sizing: border-box;
 }
 
 .modal-content.large-modal {
-  max-width: 850px;
+  max-width: min(850px, calc(100vw - 48px));
 }
 
 .modal-header {
