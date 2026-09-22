@@ -1251,6 +1251,38 @@ exports.updateHackerrankProfile = async (req, res, next) => {
   }
 };
 
+// @desc    Update / Link GitHub profile
+// @route   PUT /api/users/github
+// @access  Private
+exports.updateGithubProfile = async (req, res, next) => {
+  try {
+    const { username, avatarUrl, profileUrl } = req.body;
+    const cleanUsername = (username || '').trim();
+
+    const updatedUser = await User.findByIdAndUpdate(
+      req.user.id,
+      {
+        githubUsername: cleanUsername,
+        githubAvatar: avatarUrl || (cleanUsername ? `https://github.com/${cleanUsername}.png` : ''),
+        githubProfileUrl: profileUrl || (cleanUsername ? `https://github.com/${cleanUsername}` : '')
+      },
+      { new: true }
+    );
+
+    res.status(200).json({
+      success: true,
+      message: cleanUsername ? 'GitHub account linked successfully.' : 'GitHub account unlinked successfully.',
+      data: {
+        githubUsername: updatedUser.githubUsername,
+        githubAvatar: updatedUser.githubAvatar,
+        githubProfileUrl: updatedUser.githubProfileUrl
+      }
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
 exports.fetchLeetcodeData = fetchLeetcodeData;
 exports.fetchCodeforcesData = fetchCodeforcesData;
 exports.fetchCodechefData = fetchCodechefData;

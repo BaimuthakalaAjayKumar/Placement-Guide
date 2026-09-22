@@ -14,6 +14,7 @@ const {
   updateCodeforcesProfile,
   updateCodechefProfile,
   updateHackerrankProfile,
+  updateGithubProfile,
   getUserSolution,
   saveUserSolution,
   getCPLeaderboard,
@@ -35,6 +36,7 @@ router.put('/leetcode', protect, updateLeetcodeProfile);
 router.put('/codeforces', protect, updateCodeforcesProfile);
 router.put('/codechef', protect, updateCodechefProfile);
 router.put('/hackerrank', protect, updateHackerrankProfile);
+router.put('/github', protect, updateGithubProfile);
 router.get('/solutions/:platform/:problemId', protect, getUserSolution);
 router.post('/solutions', protect, saveUserSolution);
 router.get('/students', protect, authorize('admin', 'faculty'), getAllStudents);

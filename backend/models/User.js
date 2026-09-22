@@ -121,6 +121,18 @@ const UserSchema = new mongoose.Schema({
     badgesCount: { type: Number, default: 0 },
     solvedSlugs: { type: [String], default: [] }
   },
+  githubUsername: {
+    type: String,
+    default: ''
+  },
+  githubAvatar: {
+    type: String,
+    default: ''
+  },
+  githubProfileUrl: {
+    type: String,
+    default: ''
+  },
   sgpaSem1: { type: Number, default: 0 },
   sgpaSem2: { type: Number, default: 0 },
   sgpaSem3: { type: Number, default: 0 },
