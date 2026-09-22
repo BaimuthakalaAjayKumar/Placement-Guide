@@ -77,19 +77,21 @@ const ProjectStudio = () => {
   const [editorTabSize, setEditorTabSize] = useState(2);
   const [showMinimap, setShowMinimap] = useState(true);
   const [wordWrap, setWordWrap] = useState('on');
-  const [editorThemeSetting, setEditorThemeSetting] = useState('vs-dark'); // 'vs-dark' | 'vs' | 'hc-black'
+  const [editorThemeSetting, setEditorThemeSetting] = useState(theme === 'light' ? 'vs' : 'vs-dark');
   const [cursorPos, setCursorPos] = useState({ line: 1, col: 1 });
   const [openTabs, setOpenTabs] = useState([0]);
   const [modifiedFiles, setModifiedFiles] = useState(new Set());
-  const [collapsedFolders, setCollapsedFolders] = useState(new Set());
 
   // GitHub Account Linking State
   const [githubUsername, setGithubUsername] = useState(user?.githubUsername || '');
-  const [githubToken, setGithubToken] = useState('');
   const [githubProfile, setGithubProfile] = useState(null);
   const [githubLoading, setGithubLoading] = useState(false);
   const [githubSyncing, setGithubSyncing] = useState(false);
   const [githubLogs, setGithubLogs] = useState([]);
+
+  // Active file & feedback helpers (declared early to prevent TDZ ReferenceError)
+  const currentFile = project?.files?.[activeFile] || null;
+  const hasFeedback = Boolean(project && (project.codeSuggestions || project.techSuggestions || project.feedback || project.grade !== null));
 
   const request = async (url, options = {}) => {
     const response = await fetch(url, {
@@ -399,7 +401,48 @@ const ProjectStudio = () => {
     setMessage('GitHub account disconnected.');
   };
 
+  const saveProject = async (submit = false) => {
+    if (!project) return;
+    try {
+      setSaving(true);
+      const payload = {
+        title: title.trim() || 'Untitled Project',
+        description,
+        goals,
+        academicYear: project.academicYear || user?.academicYear || user?.year || 'Final Year',
+        branch: project.branch || user?.branch || '',
+        section: project.section || user?.section || '',
+        technologies,
+        teamMembers,
+        deploymentUrl: deploymentUrl.trim(),
+        previewUrl: deploymentUrl.trim(),
+        repositoryUrl: repositoryUrl.trim(),
+        files: project.files,
+        commitMessage: commitMessage.trim() || undefined,
+        submit
+      };
+
+      const data = await request(`${API_URL}/academic/projects/${project._id}`, {
+        method: 'PUT',
+        body: JSON.stringify(payload)
+      });
+      setProject(data.data);
+      setProjects(previous => previous.map(item => item._id === data.data._id ? data.data : item));
+      setCommitMessage('');
+      setModifiedFiles(new Set());
+      setMessage(submit ? '🚀 Project submitted successfully for faculty and administrator review!' : '💾 Project changes saved successfully (new code snapshot recorded).');
+    } catch (error) {
+      setMessage(error.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const handleGitHubPush = async () => {
+    if (!project?.files || project.files.length === 0) {
+      setMessage('No active project or files to push.');
+      return;
+    }
     if (!githubUsername && !githubProfile) {
       setSidebarView('github');
       setIsSidebarOpen(true);
@@ -505,43 +548,6 @@ const ProjectStudio = () => {
     return matches;
   }, [searchQuery, project?.files]);
 
-  const saveProject = async (submit = false) => {
-    if (!project) return;
-    try {
-      setSaving(true);
-      const payload = {
-        title: title.trim() || 'Untitled Project',
-        description,
-        goals,
-        academicYear: project.academicYear || user?.academicYear || user?.year || 'Final Year',
-        branch: project.branch || user?.branch || '',
-        section: project.section || user?.section || '',
-        technologies,
-        teamMembers,
-        deploymentUrl: deploymentUrl.trim(),
-        previewUrl: deploymentUrl.trim(),
-        repositoryUrl: repositoryUrl.trim(),
-        files: project.files,
-        commitMessage: commitMessage.trim() || undefined,
-        submit
-      };
-
-      const data = await request(`${API_URL}/academic/projects/${project._id}`, {
-        method: 'PUT',
-        body: JSON.stringify(payload)
-      });
-      setProject(data.data);
-      setProjects(previous => previous.map(item => item._id === data.data._id ? data.data : item));
-      setCommitMessage('');
-      setModifiedFiles(new Set());
-      setMessage(submit ? '🚀 Project submitted successfully for faculty and administrator review!' : '💾 Project changes saved successfully (new code snapshot recorded).');
-    } catch (error) {
-      setMessage(error.message);
-    } finally {
-      setSaving(false);
-    }
-  };
-
   const handleRestoreVersion = async (versionNumber) => {
     if (!window.confirm(`⚠️ Restore Project to Version #${versionNumber}?\n\nThis will safely roll back your code files to this snapshot. A new recovery snapshot will be recorded in history.`)) return;
     try {
@@ -605,9 +611,6 @@ const ProjectStudio = () => {
     setTechnologies(updated);
     setProject(prev => ({ ...prev, technologies: updated }));
   };
-
-  const currentFile = project?.files?.[activeFile];
-  const hasFeedback = project && (project.codeSuggestions || project.techSuggestions || project.feedback || project.grade !== null);
 
   return (
     <>
@@ -1593,9 +1596,9 @@ const ProjectStudio = () => {
                         {/* BREADCRUMBS BAR */}
                         <div className="vscode-breadcrumbs-bar">
                           <span className="crumb-icon">📁</span>
-                          <span className="crumb-segment">{project.title || 'project'}</span>
+                          <span className="crumb-segment">{project?.title || 'project'}</span>
                           <span className="crumb-sep">›</span>
-                          {currentFile?.path.includes('/') && (
+                          {currentFile?.path?.includes('/') && (
                             <>
                               <span className="crumb-segment">{currentFile.path.substring(0, currentFile.path.lastIndexOf('/'))}</span>
                               <span className="crumb-sep">›</span>
@@ -1603,7 +1606,7 @@ const ProjectStudio = () => {
                           )}
                           <span className="crumb-file">
                             {getFileIcon(currentFile?.path)}
-                            <span className="crumb-active-name">{currentFile?.path.split('/').pop() || 'Untitled'}</span>
+                            <span className="crumb-active-name">{currentFile?.path ? currentFile.path.split('/').pop() : 'Untitled'}</span>
                           </span>
                         </div>
 
