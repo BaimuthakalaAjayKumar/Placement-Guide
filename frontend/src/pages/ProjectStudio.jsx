@@ -57,7 +57,7 @@ const ProjectStudio = () => {
   const [copiedSnippet, setCopiedSnippet] = useState(false);
 
   // Add Member State
-  const [showMemberModal, setShowMemberModal] = useState(false);
+  const [showMemberForm, setShowMemberForm] = useState(false);
   const [memberForm, setMemberForm] = useState({
     name: '',
     rollNumber: '',
@@ -126,6 +126,9 @@ const ProjectStudio = () => {
           title: 'Untitled Capstone Project',
           description: '',
           goals: '',
+          academicYear: user?.academicYear || user?.year || 'Final Year',
+          branch: user?.branch || '',
+          section: user?.section || '',
           technologies: [],
           teamMembers: [],
           deploymentUrl: '',
@@ -216,6 +219,9 @@ const ProjectStudio = () => {
         title: title.trim() || 'Untitled Project',
         description,
         goals,
+        academicYear: project.academicYear || user?.academicYear || user?.year || 'Final Year',
+        branch: project.branch || user?.branch || '',
+        section: project.section || user?.section || '',
         technologies,
         teamMembers,
         deploymentUrl: deploymentUrl.trim(),
@@ -277,7 +283,7 @@ const ProjectStudio = () => {
     setTeamMembers(updatedMembers);
     setProject(prev => ({ ...prev, teamMembers: updatedMembers }));
     setMemberForm({ name: '', rollNumber: '', email: '', role: 'Developer', contribution: '' });
-    setShowMemberModal(false);
+    setShowMemberForm(false);
     setMessage(`Added team member: ${newMemberItem.name}`);
   };
 
@@ -377,46 +383,92 @@ const ProjectStudio = () => {
             <p>Loading projects and files...</p>
           </div>
         ) : (
-          <div className="project-studio-layout">
-            <aside className="project-list glass-card">
-              <div className="project-list-header">
-                <h3>Your Projects</h3>
-                <span className="badge-counter">{projects.length}</span>
+          <div className="project-studio-container">
+            {/* 1. FIRST: YOUR PROJECTS SECTION */}
+            <section className="your-projects-top-section glass-card">
+              <div className="your-projects-header">
+                <div className="your-projects-header-info">
+                  <div className="title-with-badge">
+                    <h3>📁 Your Projects</h3>
+                    <span className="badge-counter">{projects.length}</span>
+                  </div>
+                  <p className="section-subtitle">
+                    Select a project to work on its source code, manage teammates, test in the sandbox, or submit for faculty review.
+                  </p>
+                </div>
+                <button className="btn btn-primary btn-sm" type="button" onClick={createProject} disabled={saving}>
+                  + New Project
+                </button>
               </div>
-              {projects.length === 0 && (
+
+              {projects.length === 0 ? (
                 <div className="no-projects-notice">
-                  <p className="text-secondary">No projects created yet.</p>
-                  <button className="btn btn-primary btn-sm mt-10" type="button" onClick={createProject}>Create One</button>
+                  <p className="text-secondary">No projects created yet. Start by creating your first academic project.</p>
+                  <button className="btn btn-primary btn-sm mt-10" type="button" onClick={createProject}>Create One Now</button>
+                </div>
+              ) : (
+                <div className="your-projects-grid">
+                  {projects.map(item => {
+                    const isSelected = project?._id === item._id;
+                    const studentScope = item.academicYear || item.student?.academicYear || user?.academicYear || user?.year;
+                    const studentBranch = item.branch || item.student?.branch || user?.branch;
+                    const studentSection = item.section || item.student?.section || user?.section;
+                    return (
+                      <div
+                        key={item._id}
+                        className={`your-project-card ${isSelected ? 'active' : ''}`}
+                        onClick={() => selectProject(item)}
+                        role="button"
+                        tabIndex={0}
+                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') selectProject(item); }}
+                      >
+                        <div className="card-top-row">
+                          <span className="project-card-icon">⚡</span>
+                          <span className={`status-pill-mini ${item.status || 'draft'}`}>
+                            {(item.status || 'draft').replace('_', ' ')}
+                          </span>
+                          {isSelected && <span className="active-indicator-pill">● Active Selection</span>}
+                        </div>
+                        <h4 className="project-card-title" title={item.title || 'Untitled Project'}>
+                          {item.title || 'Untitled Project'}
+                        </h4>
+                        {item.description && (
+                          <p className="project-card-desc">
+                            {item.description.length > 85 ? `${item.description.substring(0, 85)}...` : item.description}
+                          </p>
+                        )}
+                        <div className="project-card-meta-tags">
+                          <span className="meta-tag">
+                            👥 {item.teamMembers?.length > 0 ? `${item.teamMembers.length + 1} Members` : 'Individual'}
+                          </span>
+                          {(item.deploymentUrl || item.previewUrl) && (
+                            <span className="meta-tag live-tag">🚀 Deployed</span>
+                          )}
+                          {item.grade !== null && item.grade !== undefined && (
+                            <span className="meta-tag grade-tag">★ {item.grade}/100</span>
+                          )}
+                          {studentScope && (
+                            <span className="meta-tag scope-tag" title="Assigned Academic Year">
+                              🎓 {studentScope}
+                            </span>
+                          )}
+                          {studentBranch && (
+                            <span className="meta-tag branch-tag" title="Branch & Section">
+                              🏫 {studentBranch}{studentSection ? ` (${studentSection})` : ''}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
-              <div className="project-list-items">
-                {projects.map(item => (
-                  <button
-                    key={item._id}
-                    type="button"
-                    className={`project-list-item ${project?._id === item._id ? 'active' : ''}`}
-                    onClick={() => selectProject(item)}
-                  >
-                    <div className="item-title-row">
-                      <strong>{item.title || 'Untitled'}</strong>
-                      <span className={`status-pill-mini ${item.status}`}>{item.status?.replace('_', ' ')}</span>
-                    </div>
-                    <div className="item-meta-row">
-                      {item.teamMembers?.length > 0 && (
-                        <span className="meta-tag">👥 {item.teamMembers.length + 1} Members</span>
-                      )}
-                      {(item.deploymentUrl || item.previewUrl) && (
-                        <span className="meta-tag live-tag">🚀 Deployed</span>
-                      )}
-                      {item.grade !== null && item.grade !== undefined && (
-                        <span className="meta-tag grade-tag">★ {item.grade}</span>
-                      )}
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </aside>
+            </section>
 
+            {/* 2. THEN GIVE SOME SPACE */}
+            <div className="studio-section-spacer"></div>
+
+            {/* 3. LATER AFTER THAT SHOW THE NEXT SECTION */}
             {project ? (
               <section className="project-editor-shell glass-card">
                 {/* STUDIO NAVIGATION TABS */}
@@ -629,6 +681,22 @@ const ProjectStudio = () => {
                       />
                     </div>
 
+                    {/* ACADEMIC EVALUATION SCOPE */}
+                    <div className="project-scope-banner mt-16">
+                      <div className="scope-banner-header">
+                        <span className="scope-badge-icon">🎓</span>
+                        <div>
+                          <strong>Assigned Academic Scope</strong>
+                          <p className="text-secondary">Faculties assigned to this Year, Branch, and Section can view, test, and evaluate this submission.</p>
+                        </div>
+                      </div>
+                      <div className="scope-chips-row">
+                        <span className="scope-chip">🎓 <strong>Year:</strong> {project.academicYear || user?.academicYear || user?.year || 'Final Year'}</span>
+                        <span className="scope-chip">🏫 <strong>Branch:</strong> {project.branch || user?.branch || 'General'}</span>
+                        <span className="scope-chip">📍 <strong>Section:</strong> Sec {project.section || user?.section || '—'}</span>
+                      </div>
+                    </div>
+
                     {/* TECHNOLOGIES USED */}
                     <div className="form-group mt-20">
                       <label className="form-label">Technologies & Frameworks Used</label>
@@ -690,13 +758,112 @@ const ProjectStudio = () => {
                         <p className="card-desc">If this project is built by multiple students, add all team members with their roll numbers, emails, and roles.</p>
                       </div>
                       <button
-                        className="btn btn-accent btn-sm"
+                        className={`btn ${showMemberForm ? 'btn-secondary' : 'btn-accent'} btn-sm`}
                         type="button"
-                        onClick={() => setShowMemberModal(true)}
+                        onClick={() => setShowMemberForm(prev => !prev)}
                       >
-                        + Add Team Member
+                        {showMemberForm ? '✕ Close Form' : '+ Add Team Member'}
                       </button>
                     </div>
+
+                    {/* IN-TAB EXPANDABLE ADD MEMBER FORM - FITS DIRECTLY IN TAB SPACE */}
+                    {showMemberForm && (
+                      <div className="in-tab-member-card animate-fade mt-16">
+                        <div className="in-tab-member-header">
+                          <div className="in-tab-member-title">
+                            <span className="in-tab-icon-chip">👥</span>
+                            <div>
+                              <h4>Add Team Member</h4>
+                              <p className="in-tab-member-sub">Add collaborating teammates with their college roll number & role</p>
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            className="in-tab-close-btn"
+                            onClick={() => setShowMemberForm(false)}
+                            title="Close form"
+                          >
+                            ×
+                          </button>
+                        </div>
+
+                        <form onSubmit={handleAddMember} className="in-tab-member-form">
+                          <div className="in-tab-form-grid">
+                            <div className="form-group">
+                              <label className="form-label">Full Name *</label>
+                              <input
+                                className="form-control"
+                                required
+                                value={memberForm.name}
+                                onChange={e => setMemberForm({ ...memberForm, name: e.target.value })}
+                                placeholder="Teammate's full name"
+                                autoFocus
+                              />
+                            </div>
+                            <div className="form-group">
+                              <label className="form-label">Student Roll Number / ID</label>
+                              <input
+                                className="form-control"
+                                value={memberForm.rollNumber}
+                                onChange={e => setMemberForm({ ...memberForm, rollNumber: e.target.value })}
+                                placeholder="e.g. 23241A12K0"
+                              />
+                            </div>
+                            <div className="form-group">
+                              <label className="form-label">Email Address</label>
+                              <input
+                                type="email"
+                                className="form-control"
+                                value={memberForm.email}
+                                onChange={e => setMemberForm({ ...memberForm, email: e.target.value })}
+                                placeholder="teammate@grietcollege.com"
+                              />
+                            </div>
+                            <div className="form-group">
+                              <label className="form-label">Contribution Role</label>
+                              <select
+                                className="form-control"
+                                value={memberForm.role}
+                                onChange={e => setMemberForm({ ...memberForm, role: e.target.value })}
+                              >
+                                <option value="Developer">Developer</option>
+                                <option value="Frontend Lead">Frontend Lead</option>
+                                <option value="Backend Developer">Backend Developer</option>
+                                <option value="Full Stack Engineer">Full Stack Engineer</option>
+                                <option value="AI / ML Engineer">AI / ML Engineer</option>
+                                <option value="UI / UX Designer">UI / UX Designer</option>
+                                <option value="QA & Testing">QA & Testing</option>
+                                <option value="DevOps & Deployment">DevOps & Deployment</option>
+                                <option value="Documentation & Research">Documentation & Research</option>
+                              </select>
+                            </div>
+                          </div>
+
+                          <div className="form-group mt-12">
+                            <label className="form-label">Contribution / Key Responsibilities</label>
+                            <input
+                              className="form-control"
+                              value={memberForm.contribution}
+                              onChange={e => setMemberForm({ ...memberForm, contribution: e.target.value })}
+                              placeholder="e.g. Backend API development, Database modeling, Testing"
+                            />
+                          </div>
+
+                          <div className="in-tab-actions mt-16">
+                            <button
+                              type="button"
+                              className="btn btn-secondary btn-sm"
+                              onClick={() => setShowMemberForm(false)}
+                            >
+                              Cancel
+                            </button>
+                            <button type="submit" className="btn btn-primary btn-sm">
+                              ➕ Add Team Member
+                            </button>
+                          </div>
+                        </form>
+                      </div>
+                    )}
 
                     <div className="team-members-list mt-20">
                       {/* Project Lead (Owner) */}
@@ -764,7 +931,7 @@ const ProjectStudio = () => {
                           <button
                             type="button"
                             className="btn btn-secondary btn-sm mt-10"
-                            onClick={() => setShowMemberModal(true)}
+                            onClick={() => setShowMemberForm(true)}
                           >
                             Add Teammates
                           </button>
@@ -777,80 +944,6 @@ const ProjectStudio = () => {
                         {saving ? 'Saving...' : '💾 Save Team Changes'}
                       </button>
                     </div>
-
-                    {/* ADD MEMBER MODAL */}
-                    {showMemberModal && (
-                      <div className="modal-overlay" onClick={() => setShowMemberModal(false)}>
-                        <div className="modal-content" onClick={e => e.stopPropagation()}>
-                          <div className="modal-header">
-                            <h3>Add Team Member</h3>
-                            <button className="close-btn" type="button" onClick={() => setShowMemberModal(false)}>×</button>
-                          </div>
-                          <form onSubmit={handleAddMember} className="member-form">
-                            <div className="form-group">
-                              <label className="form-label">Full Name *</label>
-                              <input
-                                className="form-control"
-                                required
-                                value={memberForm.name}
-                                onChange={e => setMemberForm({ ...memberForm, name: e.target.value })}
-                                placeholder="Teammate's full name"
-                              />
-                            </div>
-                            <div className="form-group">
-                              <label className="form-label">Student Roll Number / ID</label>
-                              <input
-                                className="form-control"
-                                value={memberForm.rollNumber}
-                                onChange={e => setMemberForm({ ...memberForm, rollNumber: e.target.value })}
-                                placeholder="e.g. 21241A0501"
-                              />
-                            </div>
-                            <div className="form-group">
-                              <label className="form-label">Email Address</label>
-                              <input
-                                type="email"
-                                className="form-control"
-                                value={memberForm.email}
-                                onChange={e => setMemberForm({ ...memberForm, email: e.target.value })}
-                                placeholder="teammate@grietcollege.com"
-                              />
-                            </div>
-                            <div className="form-group">
-                              <label className="form-label">Contribution Role</label>
-                              <select
-                                className="form-control"
-                                value={memberForm.role}
-                                onChange={e => setMemberForm({ ...memberForm, role: e.target.value })}
-                              >
-                                <option value="Developer">Developer</option>
-                                <option value="Frontend Lead">Frontend Lead</option>
-                                <option value="Backend Developer">Backend Developer</option>
-                                <option value="Full Stack Engineer">Full Stack Engineer</option>
-                                <option value="AI / ML Engineer">AI / ML Engineer</option>
-                                <option value="UI / UX Designer">UI / UX Designer</option>
-                                <option value="QA & Testing">QA & Testing</option>
-                                <option value="DevOps & Deployment">DevOps & Deployment</option>
-                                <option value="Documentation & Research">Documentation & Research</option>
-                              </select>
-                            </div>
-                            <div className="form-group">
-                              <label className="form-label">Contribution / Key Responsibilities</label>
-                              <input
-                                className="form-control"
-                                value={memberForm.contribution}
-                                onChange={e => setMemberForm({ ...memberForm, contribution: e.target.value })}
-                                placeholder="e.g. Frontend React UI, API integration, testing"
-                              />
-                            </div>
-                            <div className="modal-actions mt-20">
-                              <button type="button" className="btn btn-secondary" onClick={() => setShowMemberModal(false)}>Cancel</button>
-                              <button type="submit" className="btn btn-primary">Add Member</button>
-                            </div>
-                          </form>
-                        </div>
-                      </div>
-                    )}
                   </div>
                 )}
 

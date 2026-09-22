@@ -59,6 +59,16 @@ const ProjectSchema = new mongoose.Schema({
     required: true,
     trim: true
   },
+  branch: {
+    type: String,
+    default: '',
+    trim: true
+  },
+  section: {
+    type: String,
+    default: '',
+    trim: true
+  },
   title: { type: String, required: true, trim: true },
   description: { type: String, default: '' },
   goals: { type: String, default: '' },
@@ -90,6 +100,7 @@ const ProjectSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 ProjectSchema.index({ student: 1, academicYear: 1, updatedAt: -1 });
+ProjectSchema.index({ academicYear: 1, branch: 1, section: 1 });
 ProjectSchema.index({ 'teamMembers.email': 1 });
 ProjectSchema.index({ 'teamMembers.rollNumber': 1 });
 

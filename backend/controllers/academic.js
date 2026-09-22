@@ -12,19 +12,27 @@ const canManageYear = (user, academicYear) => {
   return user.managedAcademicYears.some(y => !y || y.trim().toLowerCase() === 'all' || y.trim().toLowerCase() === targetYear || targetYear.includes(y.trim().toLowerCase()) || y.trim().toLowerCase().includes(targetYear));
 };
 
-const canManageScope = (user, academicYear, branch = '') => {
+const canManageScope = (user, academicYear, branch = '', section = '') => {
   if (user.role === 'admin') return true;
   if (user.role !== 'faculty') return false;
-  if (!user.managedScopes || user.managedScopes.length === 0) return true;
+  if (!user.managedScopes || user.managedScopes.length === 0) {
+    if (user.managedAcademicYears && user.managedAcademicYears.length > 0) {
+      return canManageYear(user, academicYear);
+    }
+    return true;
+  }
   return user.managedScopes.some(scope => {
     const sYear = (scope.academicYear || '').trim().toLowerCase();
     const sBranch = (scope.branch || '').trim().toLowerCase();
+    const sSection = (scope.section || '').trim().toLowerCase();
     const reqYear = (academicYear || '').trim().toLowerCase();
     const reqBranch = (branch || '').trim().toLowerCase();
+    const reqSection = (section || '').trim().toLowerCase();
+
     const yearMatch = !sYear || sYear === 'all' || !reqYear || sYear === reqYear || reqYear.includes(sYear) || sYear.includes(reqYear);
     const branchMatch = !sBranch || sBranch === 'all' || !reqBranch || sBranch === reqBranch;
-    // Academic preparation subjects are scoped by Year and Branch only (no section requirement)
-    return yearMatch && branchMatch;
+    const sectionMatch = !reqSection || !sSection || sSection === 'all' || sSection === reqSection || reqSection === `section ${sSection}` || `section ${reqSection}` === sSection;
+    return yearMatch && branchMatch && sectionMatch;
   });
 };
 
@@ -444,23 +452,120 @@ exports.getProjects = async (req, res, next) => {
         { 'teamMembers.email': new RegExp(`^${userEmail}$`, 'i') },
         ...(userRoll ? [{ 'teamMembers.rollNumber': new RegExp(`^${userRoll}$`, 'i') }] : [])
       ];
-    } else if (req.user.role === 'faculty' && !req.query.academicYear) {
-      if (req.user.managedAcademicYears && req.user.managedAcademicYears.length > 0 && !req.user.managedAcademicYears.includes('All')) {
+    } else if (req.user.role === 'faculty') {
+      const escapeRegexStr = (str) => (str || '').replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&');
+
+      if (req.user.managedScopes && req.user.managedScopes.length > 0) {
+        // Build conditions to find all students belonging to the faculty's assigned scopes (Year, Branch, Section)
+        const orStudentConditions = req.user.managedScopes.map(scope => {
+          const condList = [{ role: 'student' }];
+          const sYear = String(scope.academicYear || '').trim();
+          const sBranch = String(scope.branch || '').trim();
+          const sSection = String(scope.section || '').trim();
+
+          if (sYear && sYear.toLowerCase() !== 'all') {
+            const escapedYear = escapeRegexStr(sYear);
+            const yearPatterns = [new RegExp(`^${escapedYear}$`, 'i'), new RegExp(escapedYear, 'i')];
+            const digits = sYear.match(/\d+/);
+            if (digits) yearPatterns.push(new RegExp(`^${digits[0]}$`, 'i'));
+            if (/4th|final|IV|^4$/i.test(sYear)) yearPatterns.push(/4th|final|IV|^4$/i);
+            else if (/3rd|III|^3$/i.test(sYear)) yearPatterns.push(/3rd|III|^3$/i);
+            else if (/2nd|II|^2$/i.test(sYear)) yearPatterns.push(/2nd|II|^2$/i);
+            else if (/1st|I|^1$/i.test(sYear)) yearPatterns.push(/1st|I|^1$/i);
+
+            condList.push({
+              $or: [
+                { academicYear: { $in: yearPatterns } },
+                { year: { $in: yearPatterns } }
+              ]
+            });
+          }
+
+          if (sBranch && sBranch.toLowerCase() !== 'all') {
+            const escapedBranch = escapeRegexStr(sBranch);
+            const branchPatterns = [new RegExp(`^${escapedBranch}$`, 'i')];
+            const cleanBranch = sBranch.split('(')[0].trim();
+            if (cleanBranch && cleanBranch.toLowerCase() !== sBranch.toLowerCase()) {
+              branchPatterns.push(new RegExp(`^${escapeRegexStr(cleanBranch)}$`, 'i'));
+            }
+            const acronyms = ['CSE', 'IT', 'ECE', 'EEE', 'MECH', 'CIVIL', 'CSD', 'CSM', 'CSBS', 'AIDS'];
+            for (const acr of acronyms) {
+              if (new RegExp(`\\b${acr}\\b`, 'i').test(sBranch)) {
+                branchPatterns.push(new RegExp(`^${acr}$`, 'i'));
+              }
+            }
+            condList.push({ branch: { $in: branchPatterns } });
+          }
+
+          if (sSection && sSection.toLowerCase() !== 'all') {
+            condList.push({
+              section: new RegExp(`^(?:Section\\s*)?${escapeRegexStr(sSection)}$`, 'i')
+            });
+          }
+
+          return { $and: condList };
+        });
+
+        // 1. Find all student IDs in these assigned scopes
+        const scopedStudents = await User.find({ $or: orStudentConditions }).select('_id');
+        const scopedStudentIds = scopedStudents.map(s => s._id);
+
+        // 2. Build direct project scope conditions
+        const orProjectConditions = req.user.managedScopes.map(scope => {
+          const cond = {};
+          const sYear = String(scope.academicYear || '').trim();
+          const sBranch = String(scope.branch || '').trim();
+          const sSection = String(scope.section || '').trim();
+
+          if (sYear && sYear.toLowerCase() !== 'all') {
+            cond.academicYear = new RegExp(escapeRegexStr(sYear), 'i');
+          }
+          if (sBranch && sBranch.toLowerCase() !== 'all') {
+            cond.branch = new RegExp(`^${escapeRegexStr(sBranch)}$`, 'i');
+          }
+          if (sSection && sSection.toLowerCase() !== 'all') {
+            cond.section = new RegExp(`^(?:Section\\s*)?${escapeRegexStr(sSection)}$`, 'i');
+          }
+          return cond;
+        });
+
+        query.$or = [
+          { student: { $in: scopedStudentIds } },
+          ...orProjectConditions
+        ];
+      } else if (req.user.managedAcademicYears && req.user.managedAcademicYears.length > 0 && !req.user.managedAcademicYears.includes('All')) {
         query.academicYear = { $in: req.user.managedAcademicYears };
       }
-    } else if (req.query.academicYear) {
-      if (!canManageScope(req.user, req.query.academicYear, req.query.branch || '', req.query.section || '')) {
-        return res.status(403).json({ success: false, error: 'You are not assigned to manage this academic year.' });
-      }
-      query.academicYear = req.query.academicYear;
+    }
+
+    // Optional query parameter filters (for faculty dashboard filtering by year, branch, section)
+    if (req.query.academicYear && req.query.academicYear !== 'all') {
+      query.academicYear = new RegExp(req.query.academicYear.trim(), 'i');
+    }
+    if (req.query.branch && req.query.branch !== 'all') {
+      query.branch = new RegExp(`^${req.query.branch.trim()}$`, 'i');
+    }
+    if (req.query.section && req.query.section !== 'all') {
+      query.section = new RegExp(`^(?:Section\\s*)?${req.query.section.trim()}$`, 'i');
     }
 
     const projects = await Project.find(query)
-      .populate('student', 'name email rollNumber branch year academicYear')
+      .populate('student', 'name email rollNumber branch year academicYear section')
       .populate('reviewedBy', 'name email')
       .sort({ updatedAt: -1 });
 
-    res.status(200).json({ success: true, count: projects.length, data: projects });
+    // Sync branch and section from populated student record if missing on legacy project documents
+    const sanitizedProjects = projects.map(p => {
+      const obj = p.toObject();
+      if (!obj.branch && obj.student?.branch) obj.branch = obj.student.branch;
+      if (!obj.section && obj.student?.section) obj.section = obj.student.section;
+      if (!obj.academicYear && (obj.student?.academicYear || obj.student?.year)) {
+        obj.academicYear = obj.student.academicYear || obj.student.year;
+      }
+      return obj;
+    });
+
+    res.status(200).json({ success: true, count: sanitizedProjects.length, data: sanitizedProjects });
   } catch (err) {
     next(err);
   }
@@ -468,7 +573,9 @@ exports.getProjects = async (req, res, next) => {
 
 exports.createProject = async (req, res, next) => {
   try {
-    const academicYear = req.body.academicYear || req.user.academicYear || req.user.year || 'Final Year';
+    const academicYear = (req.body.academicYear || req.user.academicYear || req.user.year || 'Final Year').trim();
+    const branch = (req.body.branch || req.user.branch || '').trim();
+    const section = (req.body.section || req.user.section || '').trim();
 
     const deploymentUrl = req.body.deploymentUrl || req.body.previewUrl || '';
     const previewUrl = req.body.previewUrl || deploymentUrl;
@@ -499,6 +606,8 @@ exports.createProject = async (req, res, next) => {
       milestones: Array.isArray(req.body.milestones) ? req.body.milestones : [],
       student: req.user.id,
       academicYear,
+      branch,
+      section,
       status: 'draft',
       lastUpdatedBy: req.user.id,
       lastUpdatedByName: req.user.name || 'Student',
@@ -523,7 +632,11 @@ exports.updateProject = async (req, res, next) => {
       (m.rollNumber && userRoll && m.rollNumber.trim().toLowerCase() === userRoll)
     );
     const canEditProject = isOwner || isTeamMember;
-    const canReview = ['admin', 'faculty'].includes(req.user.role) && canManageYear(req.user, project.academicYear);
+    const canReview = ['admin', 'faculty'].includes(req.user.role) && (
+      req.user.role === 'admin' ||
+      canManageScope(req.user, project.academicYear, project.branch, project.section) ||
+      canManageYear(req.user, project.academicYear)
+    );
 
     if (!canEditProject && !canReview) {
       return res.status(403).json({ success: false, error: 'Not authorized to update this project.' });
@@ -531,7 +644,8 @@ exports.updateProject = async (req, res, next) => {
 
     const studentFields = [
       'title', 'description', 'goals', 'technologies', 'teamMembers',
-      'files', 'repositoryUrl', 'previewUrl', 'deploymentUrl', 'milestones'
+      'files', 'repositoryUrl', 'previewUrl', 'deploymentUrl', 'milestones',
+      'academicYear', 'branch', 'section'
     ];
 
     if (canEditProject) {
@@ -553,6 +667,10 @@ exports.updateProject = async (req, res, next) => {
           project[field] = req.body[field];
         }
       });
+
+      // Synchronize student branch and section if missing
+      if (!project.branch && req.user.branch) project.branch = req.user.branch;
+      if (!project.section && req.user.section) project.section = req.user.section;
 
       // Synchronize previewUrl and deploymentUrl
       if (req.body.deploymentUrl !== undefined && !project.previewUrl) {

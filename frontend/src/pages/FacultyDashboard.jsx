@@ -86,6 +86,12 @@ const FacultyDashboard = () => {
     const [studentSearch, setStudentSearch] = useState('');
     const [branchFilter, setBranchFilter] = useState('');
 
+    // Filters for projects (Year, Branch, Section)
+    const [projectSearch, setProjectSearch] = useState('');
+    const [projectBranchFilter, setProjectBranchFilter] = useState('');
+    const [projectSectionFilter, setProjectSectionFilter] = useState('');
+    const [projectYearFilter, setProjectYearFilter] = useState('');
+
     // Lab Reports state
     const [labReports, setLabReports] = useState([]);
     const [loadingReports, setLoadingReports] = useState(false);
@@ -784,6 +790,8 @@ const FacultyDashboard = () => {
             'Lead Student Email',
             'Roll Number',
             'Academic Year',
+            'Branch',
+            'Section',
             'Lead Individual Grade',
             'Lead Contribution',
             'Teammates & Individual Grades',
@@ -806,7 +814,9 @@ const FacultyDashboard = () => {
                 p.student?.name || '',
                 p.student?.email || '',
                 p.student?.rollNumber || '',
-                p.academicYear || '',
+                p.academicYear || p.student?.academicYear || p.student?.year || '',
+                p.branch || p.student?.branch || '',
+                p.section || p.student?.section || '',
                 p.leadStudentGrade ?? p.grade ?? 'N/A',
                 p.leadStudentContribution || '',
                 teamDetails || 'Individual Project',
@@ -2013,6 +2023,29 @@ const FacultyDashboard = () => {
 
     const uniqueBranches = [...new Set(students.map(s => s.branch).filter(Boolean))];
 
+    // Filter projects (Year, Branch, Section, Search)
+    const filteredProjects = projects.filter(p => {
+        const titleMatch = (p.title || '').toLowerCase().includes(projectSearch.toLowerCase());
+        const studentNameMatch = (p.student?.name || '').toLowerCase().includes(projectSearch.toLowerCase());
+        const studentRollMatch = (p.student?.rollNumber || '').toLowerCase().includes(projectSearch.toLowerCase());
+        const searchMatches = !projectSearch.trim() || titleMatch || studentNameMatch || studentRollMatch;
+
+        const pBranch = p.branch || p.student?.branch || '';
+        const branchMatches = !projectBranchFilter || pBranch.toLowerCase() === projectBranchFilter.toLowerCase();
+
+        const pSection = p.section || p.student?.section || '';
+        const sectionMatches = !projectSectionFilter || pSection.toLowerCase() === projectSectionFilter.toLowerCase();
+
+        const pYear = p.academicYear || p.student?.academicYear || p.student?.year || '';
+        const yearMatches = !projectYearFilter || pYear.toLowerCase().includes(projectYearFilter.toLowerCase());
+
+        return searchMatches && branchMatches && sectionMatches && yearMatches;
+    });
+
+    const uniqueProjectBranches = [...new Set(projects.map(p => p.branch || p.student?.branch).filter(Boolean))];
+    const uniqueProjectSections = [...new Set(projects.map(p => p.section || p.student?.section).filter(Boolean))];
+    const uniqueProjectYears = [...new Set(projects.map(p => p.academicYear || p.student?.academicYear || p.student?.year).filter(Boolean))];
+
     return (
         <>
             <Header title="Faculty Management Dashboard" />
@@ -3098,6 +3131,50 @@ const FacultyDashboard = () => {
                                 </div>
                             </div>
 
+                            {/* PROJECT SCOPE FILTER TOOLBAR */}
+                            <div className="section-toolbar mt-16" style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(15, 23, 42, 0.4)', padding: '14px 16px', borderRadius: '10px', border: '1px solid rgba(255, 255, 255, 0.08)' }}>
+                                <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', flex: 1, minWidth: '240px' }}>
+                                    <input
+                                        type="text"
+                                        className="form-control"
+                                        style={{ maxWidth: '280px', height: '36px', fontSize: '13px' }}
+                                        placeholder="Search by project or student..."
+                                        value={projectSearch}
+                                        onChange={e => setProjectSearch(e.target.value)}
+                                    />
+                                    <select
+                                        className="form-control"
+                                        style={{ width: 'auto', minWidth: '130px', height: '36px', fontSize: '13px' }}
+                                        value={projectYearFilter}
+                                        onChange={e => setProjectYearFilter(e.target.value)}
+                                    >
+                                        <option value="">All Academic Years</option>
+                                        {uniqueProjectYears.map(y => <option key={y} value={y}>{y}</option>)}
+                                    </select>
+                                    <select
+                                        className="form-control"
+                                        style={{ width: 'auto', minWidth: '120px', height: '36px', fontSize: '13px' }}
+                                        value={projectBranchFilter}
+                                        onChange={e => setProjectBranchFilter(e.target.value)}
+                                    >
+                                        <option value="">All Branches</option>
+                                        {uniqueProjectBranches.map(br => <option key={br} value={br}>{br}</option>)}
+                                    </select>
+                                    <select
+                                        className="form-control"
+                                        style={{ width: 'auto', minWidth: '120px', height: '36px', fontSize: '13px' }}
+                                        value={projectSectionFilter}
+                                        onChange={e => setProjectSectionFilter(e.target.value)}
+                                    >
+                                        <option value="">All Sections</option>
+                                        {uniqueProjectSections.map(sec => <option key={sec} value={sec}>Section {sec}</option>)}
+                                    </select>
+                                </div>
+                                <div style={{ fontSize: '12.5px', color: '#94a3b8' }}>
+                                    Showing <strong>{filteredProjects.length}</strong> of {projects.length} scoped projects
+                                </div>
+                            </div>
+
                             {/* IN-TAB STUDENT PROJECT CODE VIEWER */}
                             {renderInTabProjectCodeViewer()}
 
@@ -3121,9 +3198,12 @@ const FacultyDashboard = () => {
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            {projects.map(p => {
+                                            {filteredProjects.map(p => {
                                                 const hasTeam = p.teamMembers && p.teamMembers.length > 0;
                                                 const liveUrl = p.deploymentUrl || p.previewUrl;
+                                                const pYear = p.academicYear || p.student?.academicYear || p.student?.year;
+                                                const pBranch = p.branch || p.student?.branch;
+                                                const pSection = p.section || p.student?.section;
                                                 return (
                                                     <tr key={p._id} className={`${viewingCodeProject?._id === p._id ? 'row-viewing-code' : ''} ${selectedProject?._id === p._id ? 'row-reviewing-project' : ''}`}>
                                                         <td>
@@ -3167,6 +3247,24 @@ const FacultyDashboard = () => {
                                                                     {p.student?.email}
                                                                     {p.student?.rollNumber && ` · ${p.student.rollNumber}`}
                                                                 </span>
+                                                                {/* Scope Badges */}
+                                                                <div style={{ marginTop: '4px', display: 'flex', gap: '5px', flexWrap: 'wrap' }}>
+                                                                    {pYear && (
+                                                                        <span className="code-pill" style={{ fontSize: '11px', background: 'rgba(99, 102, 241, 0.12)', color: '#c7d2fe', border: '1px solid rgba(99, 102, 241, 0.25)' }}>
+                                                                            🎓 {pYear}
+                                                                        </span>
+                                                                    )}
+                                                                    {pBranch && (
+                                                                        <span className="code-pill" style={{ fontSize: '11px', background: 'rgba(16, 185, 129, 0.12)', color: '#6ee7b7', border: '1px solid rgba(16, 185, 129, 0.25)' }}>
+                                                                            🏫 {pBranch}
+                                                                        </span>
+                                                                    )}
+                                                                    {pSection && (
+                                                                        <span className="code-pill" style={{ fontSize: '11px', background: 'rgba(56, 189, 248, 0.15)', color: '#38bdf8', border: '1px solid rgba(56, 189, 248, 0.35)', fontWeight: 600 }}>
+                                                                            Sec {pSection}
+                                                                        </span>
+                                                                    )}
+                                                                </div>
                                                                 {hasTeam && (
                                                                     <details className="teammates-collapsible mt-4">
                                                                         <summary className="teammates-summary">
@@ -3284,10 +3382,10 @@ const FacultyDashboard = () => {
                                                     </tr>
                                                 );
                                             })}
-                                            {!projects.length && (
+                                            {!filteredProjects.length && (
                                                 <tr>
                                                     <td colSpan="7" style={{ textAlign: 'center', padding: '30px', color: '#94a3b8' }}>
-                                                        No student project submissions yet.
+                                                        {projects.length ? 'No student projects match current scope filter criteria.' : 'No student project submissions found in your assigned scope.'}
                                                     </td>
                                                 </tr>
                                             )}
