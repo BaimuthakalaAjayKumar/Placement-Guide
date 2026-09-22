@@ -184,16 +184,16 @@
 
 /* Light Theme overrides for Auth pages */
 [data-theme="light"] .auth-logo {
-  color: #0f172a;
+  color: #000000 !important;
 }
 [data-theme="light"] .auth-header h2 {
-  color: #0f172a;
+  color: #000000 !important;
 }
 [data-theme="light"] .auth-header p {
-  color: #475569;
+  color: #000000 !important;
 }
 [data-theme="light"] .auth-footer {
-  color: #475569;
+  color: #000000 !important;
 }
 [data-theme="light"] .auth-error-alert {
   background: #fef2f2;
@@ -201,9 +201,9 @@
   color: #991b1b;
 }
 [data-theme="light"] .role-option {
-  color: #334155;
+  color: #000000 !important;
   background: #f8fafc;
-  border-color: #e2e8f0;
+  border-color: #cbd5e1;
 }
 [data-theme="light"] .role-option.active {
   background: var(--primary);

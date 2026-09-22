@@ -59,6 +59,9 @@ export const AuthProvider = ({ children }) => {
 
       if (data.success) {
         localStorage.setItem('token', data.token);
+        localStorage.setItem('app_theme_pref', 'dark');
+        localStorage.setItem('app_theme', 'dark');
+        window.dispatchEvent(new CustomEvent('account_opened', { detail: 'dark' }));
         setToken(data.token);
         setUser(data.user);
         return { success: true, user: data.user };
@@ -96,6 +99,9 @@ export const AuthProvider = ({ children }) => {
 
       if (data.success) {
         localStorage.setItem('token', data.token);
+        localStorage.setItem('app_theme_pref', 'dark');
+        localStorage.setItem('app_theme', 'dark');
+        window.dispatchEvent(new CustomEvent('account_opened', { detail: 'dark' }));
         setToken(data.token);
         setUser(data.user);
         return { success: true, user: data.user };
@@ -161,6 +167,9 @@ export const AuthProvider = ({ children }) => {
 
       if (data.success) {
         localStorage.setItem('token', data.token);
+        localStorage.setItem('app_theme_pref', 'dark');
+        localStorage.setItem('app_theme', 'dark');
+        window.dispatchEvent(new CustomEvent('account_opened', { detail: 'dark' }));
         setToken(data.token);
         setUser(data.user);
         return { success: true, user: data.user };

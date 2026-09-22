@@ -280,3 +280,47 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* Light Theme Overrides for Profile & Account Settings */
+[data-theme="light"] .student-info-card h2,
+[data-theme="light"] .meta-value,
+[data-theme="light"] .linked-platforms-status h3,
+[data-theme="light"] .section-header h3,
+[data-theme="light"] .student-email,
+[data-theme="light"] .meta-label,
+[data-theme="light"] .section-desc,
+[data-theme="light"] .field-help,
+[data-theme="light"] .platform-name,
+[data-theme="light"] .profile-role-pill,
+[data-theme="light"] .skill-badge-preview,
+[data-theme="light"] .platform-label,
+[data-theme="light"] .status-item span {
+  color: #000000 !important;
+}
+
+[data-theme="light"] .student-info-card,
+[data-theme="light"] .form-section-card {
+  background: #ffffff !important;
+  border-color: #cbd5e1 !important;
+}
+
+[data-theme="light"] .profile-divider-horizontal {
+  background: #e2e8f0 !important;
+}
+
+[data-theme="light"] .skills-preview-list {
+  background: #f8fafc !important;
+  border-color: #cbd5e1 !important;
+}
+
+[data-theme="light"] .skill-badge-preview {
+  background: #e2e8f0 !important;
+  border-color: #cbd5e1 !important;
+  color: #000000 !important;
+}
+
+[data-theme="light"] .status-badge.unlinked {
+  background: #f1f5f9 !important;
+  border-color: #cbd5e1 !important;
+  color: #000000 !important;
+}

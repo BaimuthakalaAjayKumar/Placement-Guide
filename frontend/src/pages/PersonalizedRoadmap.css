@@ -1638,33 +1638,33 @@
 }
 
 [data-theme="light"] .rm-card-title {
-  color: #111827 !important;
+  color: #000000 !important;
 }
 
 [data-theme="light"] .rm-card-desc {
-  color: #4b5563 !important;
+  color: #000000 !important;
 }
 
 [data-theme="light"] .rm-tracker-strip,
 [data-theme="light"] .rm-active-tracker-bar {
   background: #ffffff !important;
-  border-color: #e5e7eb !important;
+  border-color: #cbd5e1 !important;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05) !important;
 }
 
 [data-theme="light"] .rm-tracker-title {
-  color: #111827 !important;
+  color: #000000 !important;
 }
 
 [data-theme="light"] .rm-todo-container {
   background: #ffffff !important;
-  border-color: #e5e7eb !important;
+  border-color: #cbd5e1 !important;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05) !important;
 }
 
 [data-theme="light"] .rm-todo-row {
   background: #f9fafb !important;
-  border-color: #e5e7eb !important;
+  border-color: #cbd5e1 !important;
 }
 
 [data-theme="light"] .rm-todo-row:hover {
@@ -1672,31 +1672,31 @@
 }
 
 [data-theme="light"] .rm-todo-text {
-  color: #111827 !important;
+  color: #000000 !important;
 }
 
 [data-theme="light"] .rm-todo-row.completed .rm-todo-text {
-  color: #9ca3af !important;
+  color: #64748b !important;
 }
 
 [data-theme="light"] .rm-todo-input {
   background: #ffffff !important;
-  border: 1px solid #d1d5db !important;
-  color: #111827 !important;
+  border: 1px solid #cbd5e1 !important;
+  color: #000000 !important;
 }
 
 [data-theme="light"] .rm-modal-box {
   background: #ffffff !important;
-  border-color: #e5e7eb !important;
+  border-color: #cbd5e1 !important;
 }
 
 [data-theme="light"] .rm-modal-header {
   background: #f9fafb !important;
-  border-bottom-color: #e5e7eb !important;
+  border-bottom-color: #cbd5e1 !important;
 }
 
 [data-theme="light"] .rm-modal-title {
-  color: #111827 !important;
+  color: #000000 !important;
 }
 
 

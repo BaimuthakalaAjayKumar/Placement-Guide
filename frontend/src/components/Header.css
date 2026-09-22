@@ -204,16 +204,31 @@
 }
 
 [data-theme="light"] .main-header {
-  background: rgba(255, 255, 255, 0.92);
-  border-color: #e2e8f0;
+  background: rgba(255, 255, 255, 0.96);
+  border-color: #cbd5e1;
 }
 
-[data-theme="light"] .header-title h1 { color: #0f172a; }
+[data-theme="light"] .header-title h1 { color: #000000 !important; }
+[data-theme="light"] .header-subtitle { color: #000000 !important; }
 [data-theme="light"] .header-date,
 [data-theme="light"] .header-theme-btn {
   background: #f8fafc;
-  border-color: #e2e8f0;
-  color: #475569;
+  border-color: #cbd5e1;
+  color: #000000 !important;
+}
+[data-theme="light"] .notification-popover {
+  background: #ffffff;
+  border-color: #cbd5e1;
+  color: #000000 !important;
+}
+[data-theme="light"] .notification-popover-header,
+[data-theme="light"] .notification-item {
+  color: #000000 !important;
+  border-color: #cbd5e1;
+}
+[data-theme="light"] .notification-popover-header span,
+[data-theme="light"] .notification-item small {
+  color: #000000 !important;
 }
 [data-theme="light"] .profile-role-badge {
   color: #4338ca;

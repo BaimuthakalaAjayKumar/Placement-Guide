@@ -236,15 +236,15 @@
 
 [data-theme="light"] .admin-tab-btn {
   background: #f8fafc;
-  border-color: #e2e8f0;
-  color: #334155;
+  border-color: #cbd5e1;
+  color: #000000 !important;
 }
 
 [data-theme="light"] .admin-tab-btn:hover {
   background: #eef2ff;
   border-color: #818cf8;
   box-shadow: 0 8px 18px rgba(79, 70, 229, 0.15);
-  color: #312e81;
+  color: #000000 !important;
 }
 
 /* Modal Windows styling */

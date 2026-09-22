@@ -41,11 +41,11 @@
   --bg-dark: #f7f8fa;
   --bg-card: #ffffff;
   --bg-sidebar: #ffffff;
-  --border-color: #e5e7eb;
-  --border-hover: #cbd5e1;
-  --text-primary: #262626;
-  --text-secondary: #595959;
-  --text-muted: #8c8c8c;
+  --border-color: #cbd5e1;
+  --border-hover: #94a3b8;
+  --text-primary: #000000;
+  --text-secondary: #000000;
+  --text-muted: #000000;
   --primary: #ffa116;
   --primary-hover: #e28a00;
   --primary-glow: rgba(255, 161, 22, 0.2);
@@ -110,7 +110,7 @@ body[data-theme="dark"] {
 body[data-theme="light"] {
   background-color: #f7f8fa !important;
   background-image: none !important;
-  color: #262626 !important;
+  color: #000000 !important;
 }
 
 /* Animations */
@@ -154,13 +154,13 @@ body[data-theme="light"] {
 
 [data-theme="light"] .glass-card {
   background: #ffffff !important;
-  border-color: #e5e7eb !important;
+  border-color: #cbd5e1 !important;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.03) !important;
-  color: #262626 !important;
+  color: #000000 !important;
 }
 
 [data-theme="light"] .glass-card:hover {
-  border-color: #cbd5e1 !important;
+  border-color: #94a3b8 !important;
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08) !important;
 }
 
@@ -168,18 +168,19 @@ body[data-theme="light"] {
 [data-theme="light"] h2,
 [data-theme="light"] h3,
 [data-theme="light"] h4,
-[data-theme="light"] h5 {
-  color: #1f2937 !important;
+[data-theme="light"] h5,
+[data-theme="light"] h6 {
+  color: #000000 !important;
 }
 
 [data-theme="light"] .form-label {
-  color: #4b5563;
+  color: #000000 !important;
 }
 
 [data-theme="light"] .form-control {
   background: #ffffff !important;
-  border: 1px solid #d1d5db !important;
-  color: #1f2937 !important;
+  border: 1px solid #cbd5e1 !important;
+  color: #000000 !important;
 }
 
 [data-theme="light"] .form-control:focus {
@@ -189,15 +190,15 @@ body[data-theme="light"] {
 }
 
 [data-theme="light"] .btn-secondary {
-  background: #f3f4f6 !important;
-  border: 1px solid #d1d5db !important;
-  color: #1f2937 !important;
+  background: #ffffff !important;
+  border: 1px solid #cbd5e1 !important;
+  color: #000000 !important;
 }
 
 [data-theme="light"] .btn-secondary:hover {
-  background: #e5e7eb !important;
-  border-color: #9ca3af !important;
-  color: #111827 !important;
+  background: #f1f5f9 !important;
+  border-color: #94a3b8 !important;
+  color: #000000 !important;
 }
 
 [data-theme="light"] ::-webkit-scrollbar-thumb {
@@ -342,7 +343,7 @@ h1, h2, h3, h4, h5 {
 [data-theme="light"] body {
   background-color: #ffffff !important;
   background-image: none !important;
-  color: #0f172a !important;
+  color: #000000 !important;
 }
 
 /* Headings and titles across all pages */
@@ -352,12 +353,12 @@ h1, h2, h3, h4, h5 {
 [data-theme="light"] h4:not(.btn *):not(.btn):not([class*="gradient"]):not([class*="-gradient"]),
 [data-theme="light"] h5:not(.btn *):not(.btn),
 [data-theme="light"] h6:not(.btn *):not(.btn) {
-  color: #0f172a !important;
+  color: #000000 !important;
 }
 
 /* Descriptions and paragraphs */
 [data-theme="light"] p:not(.btn *):not(.badge):not([class*="badge"]):not([class*="tag"]):not([class*="alert"]) {
-  color: #334155 !important;
+  color: #000000 !important;
 }
 
 /* Universal text elements that had hardcoded white in dark mode */
@@ -393,7 +394,7 @@ h1, h2, h3, h4, h5 {
 [data-theme="light"] .sidebar-logo,
 [data-theme="light"] .question-text,
 [data-theme="light"] .header-title h1 {
-  color: #0f172a !important;
+  color: #000000 !important;
 }
 
 /* Secondary labels and descriptions */
@@ -412,7 +413,7 @@ h1, h2, h3, h4, h5 {
 [data-theme="light"] .user-role,
 [data-theme="light"] .stat-meta-label,
 [data-theme="light"] .streak-record-badge {
-  color: #475569 !important;
+  color: #000000 !important;
 }
 
 /* Cards, containers, modals */
@@ -422,14 +423,14 @@ h1, h2, h3, h4, h5 {
 [data-theme="light"] [class*="-modal"],
 [data-theme="light"] .modal-content {
   background-color: #ffffff;
-  border-color: #e2e8f0;
+  border-color: #cbd5e1;
   box-shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.05), 0 2px 6px -1px rgba(15, 23, 42, 0.02);
-  color: #0f172a;
+  color: #000000 !important;
 }
 
 /* Inputs and forms */
 [data-theme="light"] .form-label {
-  color: #1e293b;
+  color: #000000 !important;
   font-weight: 600;
 }
 
@@ -439,7 +440,7 @@ h1, h2, h3, h4, h5 {
 [data-theme="light"] textarea {
   background: #ffffff !important;
   border-color: #cbd5e1 !important;
-  color: #0f172a !important;
+  color: #000000 !important;
 }
 
 [data-theme="light"] .form-control:focus,
@@ -454,7 +455,7 @@ h1, h2, h3, h4, h5 {
 [data-theme="light"] .form-control::placeholder,
 [data-theme="light"] input::placeholder,
 [data-theme="light"] textarea::placeholder {
-  color: #94a3b8;
+  color: #64748b;
 }
 
 /* Error and alert banners */
@@ -467,17 +468,17 @@ h1, h2, h3, h4, h5 {
 
 /* Tables across all pages */
 [data-theme="light"] table {
-  color: #0f172a;
+  color: #000000 !important;
 }
 
 [data-theme="light"] th {
   background: #f8fafc;
-  color: #475569;
-  border-bottom: 1px solid #e2e8f0;
+  color: #000000 !important;
+  border-bottom: 1px solid #cbd5e1;
 }
 
 [data-theme="light"] td {
-  color: #0f172a;
+  color: #000000 !important;
   border-bottom: 1px solid #e2e8f0;
 }
 
@@ -500,8 +501,8 @@ h1, h2, h3, h4, h5 {
 [data-theme="light"] .qb-tab-btn:not(.active),
 [data-theme="light"] .qb-card:not(.active) {
   background: #f8fafc;
-  border-color: #e2e8f0;
-  color: #0f172a;
+  border-color: #cbd5e1;
+  color: #000000 !important;
 }
 
 [data-theme="light"] .activity-item:hover,
@@ -512,44 +513,44 @@ h1, h2, h3, h4, h5 {
 [data-theme="light"] .test-tab-button:hover:not(.active),
 [data-theme="light"] .qb-card:hover:not(.active) {
   background: #f1f5f9;
-  border-color: #cbd5e1;
+  border-color: #94a3b8;
 }
 
 /* Question explanation & examples */
 [data-theme="light"] .example-box,
 [data-theme="light"] .question-explanation-box {
   background: #f8fafc;
-  border-color: #e2e8f0;
-  color: #1e293b;
+  border-color: #cbd5e1;
+  color: #000000 !important;
 }
 
 /* Select elements */
 [data-theme="light"] select,
 [data-theme="light"] .cp-select,
 [data-theme="light"] .leaderboard-filter-select {
-  background: #f8fafc;
+  background: #ffffff;
   border-color: #cbd5e1;
-  color: #0f172a;
+  color: #000000 !important;
 }
 
 [data-theme="light"] select option,
 [data-theme="light"] .cp-select option,
 [data-theme="light"] .leaderboard-filter-select option {
   background: #ffffff;
-  color: #0f172a;
+  color: #000000 !important;
 }
 
 /* Tags and Pills */
 [data-theme="light"] .tag-pill,
 [data-theme="light"] .skill-badge {
   background: #f1f5f9;
-  border-color: #e2e8f0;
-  color: #334155;
+  border-color: #cbd5e1;
+  color: #000000 !important;
 }
 
 [data-theme="light"] .skill-badge:hover {
   background: var(--primary);
-  color: #ffffff;
+  color: #ffffff !important;
 }
 
 /* BUTTONS WITH SOLID/VIBRANT BACKGROUNDS MUST KEEP WHITE TEXT */
@@ -622,7 +623,7 @@ h1, h2, h3, h4, h5 {
    AND inline JSX styles) that individual component overrides miss.
    ============================================================ */
 
-/* ---- 1. Global catch-all: every element defaults to dark text ---- */
+/* ---- 1. Global catch-all: every element defaults to pure black text ---- */
 [data-theme="light"] *:not(.btn-primary):not(.btn-primary *)
                       :not(.btn-accent):not(.btn-accent *)
                       :not(.btn-danger):not(.btn-danger *)
@@ -636,13 +637,23 @@ h1, h2, h3, h4, h5 {
                       :not(.state-tag-option.correct):not(.state-tag-option.wrong)
                       :not(.role-option.active)
                       :not(.stage-number)
+                      :not(.difficulty-lbl)
                       :not([class*="gradient"]):not([class*="-gradient"]) {
-  color: #0f172a;
+  color: #000000;
 }
 
 /* ---- 2. Secondary / muted text (descriptions, labels, meta) ---- */
 [data-theme="light"] p,
 [data-theme="light"] small,
+[data-theme="light"] span:not(.btn-primary *):not(.btn-accent *):not(.btn-danger *):not(.nav-link.active *):not(.filter-tab-btn.active *):not(.test-tab-button.active *):not(.qb-tab-btn.active *):not(.state-tag-option *):not(.role-option.active *):not(.difficulty-lbl),
+[data-theme="light"] label,
+[data-theme="light"] li,
+[data-theme="light"] dt,
+[data-theme="light"] dd,
+[data-theme="light"] strong,
+[data-theme="light"] b,
+[data-theme="light"] em,
+[data-theme="light"] i,
 [data-theme="light"] .text-muted,
 [data-theme="light"] [class*="-desc"],
 [data-theme="light"] [class*="-description"],
@@ -651,17 +662,27 @@ h1, h2, h3, h4, h5 {
 [data-theme="light"] [class*="-meta"],
 [data-theme="light"] [class*="-label"]:not(.form-label),
 [data-theme="light"] [class*="-footer-text"],
-[data-theme="light"] [class*="-secondary"] {
-  color: #475569 !important;
+[data-theme="light"] [class*="-secondary"],
+[data-theme="light"] [class*="-info"],
+[data-theme="light"] [class*="-text"] {
+  color: #000000 !important;
 }
 
 /* ---- 3. Override inline style="color: white / #fff / #f8fafc" in JSX ---- */
-[data-theme="light"] [style*="color: white"]:not(.btn-primary):not(.btn-accent):not(.btn-danger):not(.btn-stage):not(.btn-take-test):not(.btn-code):not(.stage-number):not(.difficulty-lbl),
-[data-theme="light"] [style*="color: #fff"]:not(.btn-primary):not(.btn-accent):not(.btn-danger):not(.btn-stage):not(.btn-take-test):not(.btn-code):not(.stage-number):not(.difficulty-lbl),
-[data-theme="light"] [style*="color: '#fff"]:not(.btn-primary):not(.btn-accent):not(.btn-danger):not(.btn-stage):not(.btn-take-test):not(.btn-code):not(.stage-number):not(.difficulty-lbl),
-[data-theme="light"] [style*="color:'white"]:not(.btn-primary):not(.btn-accent):not(.btn-danger):not(.btn-stage):not(.btn-take-test):not(.btn-code):not(.stage-number):not(.difficulty-lbl),
-[data-theme="light"] [style*="color: 'white"]:not(.btn-primary):not(.btn-accent):not(.btn-danger):not(.btn-stage):not(.btn-take-test):not(.btn-code):not(.stage-number):not(.difficulty-lbl) {
-  color: #0f172a !important;
+[data-theme="light"] [style*="color: white"]:not(.btn-primary):not(.btn-primary *):not(.btn-accent):not(.btn-accent *):not(.btn-danger):not(.btn-danger *):not(.btn-stage):not(.btn-stage *):not(.btn-take-test):not(.btn-take-test *):not(.btn-code):not(.btn-code *):not(.stage-number):not(.difficulty-lbl),
+[data-theme="light"] [style*="color: #fff"]:not(.btn-primary):not(.btn-primary *):not(.btn-accent):not(.btn-accent *):not(.btn-danger):not(.btn-danger *):not(.btn-stage):not(.btn-stage *):not(.btn-take-test):not(.btn-take-test *):not(.btn-code):not(.btn-code *):not(.stage-number):not(.difficulty-lbl),
+[data-theme="light"] [style*="color: '#fff"]:not(.btn-primary):not(.btn-primary *):not(.btn-accent):not(.btn-accent *):not(.btn-danger):not(.btn-danger *):not(.btn-stage):not(.btn-stage *):not(.btn-take-test):not(.btn-take-test *):not(.btn-code):not(.btn-code *):not(.stage-number):not(.difficulty-lbl),
+[data-theme="light"] [style*="color:'white"]:not(.btn-primary):not(.btn-primary *):not(.btn-accent):not(.btn-accent *):not(.btn-danger):not(.btn-danger *):not(.btn-stage):not(.btn-stage *):not(.btn-take-test):not(.btn-take-test *):not(.btn-code):not(.btn-code *):not(.stage-number):not(.difficulty-lbl),
+[data-theme="light"] [style*="color: 'white"]:not(.btn-primary):not(.btn-primary *):not(.btn-accent):not(.btn-accent *):not(.btn-danger):not(.btn-danger *):not(.btn-stage):not(.btn-stage *):not(.btn-take-test):not(.btn-take-test *):not(.btn-code):not(.btn-code *):not(.stage-number):not(.difficulty-lbl),
+[data-theme="light"] [style*="color: #94a3b8"],
+[data-theme="light"] [style*="color: #64748b"],
+[data-theme="light"] [style*="color: #475569"],
+[data-theme="light"] [style*="color: #334155"],
+[data-theme="light"] [style*="color: #0f172a"],
+[data-theme="light"] [style*="color: #262626"],
+[data-theme="light"] [style*="color: #8a8a8a"],
+[data-theme="light"] [style*="color: #595959"] {
+  color: #000000 !important;
 }
 
 /* ---- 4. Inline-styled inputs / selects / textareas (dark-bg inline) ---- */
@@ -673,7 +694,7 @@ h1, h2, h3, h4, h5 {
 [data-theme="light"] [style*="background:#1e293b"] {
   background: #ffffff !important;
   border-color: #cbd5e1 !important;
-  color: #0f172a !important;
+  color: #000000 !important;
 }
 
 /* ---- 5. Preserve white text on colored/gradient backgrounds ---- */
@@ -713,20 +734,20 @@ h1, h2, h3, h4, h5 {
 
 /* ---- 7. SVG strokes that were white ---- */
 [data-theme="light"] svg:not(.btn-primary svg):not(.btn-accent svg) {
-  --icon-color: #334155;
+  --icon-color: #000000;
 }
 [data-theme="light"] .query-arrow-icon {
-  stroke: #64748b !important;
+  stroke: #000000 !important;
 }
 
 /* ---- 8. Placeholder text ---- */
 [data-theme="light"] ::placeholder {
-  color: #94a3b8 !important;
+  color: #64748b !important;
 }
 
 /* ---- 9. Code / monospace areas keep dark bg in light mode ---- */
 [data-theme="light"] .modal-loading-wrapper {
-  color: #0f172a !important;
+  color: #000000 !important;
 }
 
 /* Grid & Layout Wrappers */

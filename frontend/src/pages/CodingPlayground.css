@@ -56,31 +56,31 @@
    LIGHT THEME OVERRIDES (Dark theme remains 100% as usual)
    ============================================================ */
 [data-theme="light"] .playground-label {
-  color: #1e293b !important;
+  color: #000000 !important;
 }
 
 [data-theme="light"] .playground-select {
   background: #ffffff !important;
   border-color: #cbd5e1 !important;
-  color: #0f172a !important;
+  color: #000000 !important;
 }
 
 [data-theme="light"] .playground-heading {
-  color: #0f172a !important;
+  color: #000000 !important;
 }
 
 [data-theme="light"] .playground-textarea {
   background: #ffffff !important;
   border-color: #cbd5e1 !important;
-  color: #0f172a !important;
+  color: #000000 !important;
 }
 
 [data-theme="light"] .playground-editor-wrap {
-  border-color: #e2e8f0 !important;
+  border-color: #cbd5e1 !important;
 }
 
 [data-theme="light"] .playground-pre {
   background: #f8fafc !important;
-  border-color: #e2e8f0 !important;
-  color: #0f172a !important;
+  border-color: #cbd5e1 !important;
+  color: #000000 !important;
 }

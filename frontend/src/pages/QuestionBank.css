@@ -464,22 +464,22 @@ body.qb-dragging-active {
    LIGHT THEME OVERRIDES (Dark theme remains 100% as usual)
    ============================================================ */
 [data-theme="light"] .qb-pane-header h2 {
-  color: #0f172a !important;
+  color: #000000 !important;
 }
 
 [data-theme="light"] .qb-pane-header p {
-  color: #475569 !important;
+  color: #000000 !important;
 }
 
 [data-theme="light"] .qb-card {
   background: #ffffff !important;
-  border-color: #e2e8f0 !important;
+  border-color: #cbd5e1 !important;
   box-shadow: 0 2px 6px rgba(15, 23, 42, 0.04) !important;
 }
 
 [data-theme="light"] .qb-card:hover {
   background: #f8fafc !important;
-  border-color: #cbd5e1 !important;
+  border-color: #94a3b8 !important;
 }
 
 [data-theme="light"] .qb-card.active {
@@ -488,48 +488,48 @@ body.qb-dragging-active {
 }
 
 [data-theme="light"] .qb-card-title {
-  color: #0f172a !important;
+  color: #000000 !important;
 }
 
 [data-theme="light"] .tag-pill {
   background: #f1f5f9 !important;
-  color: #334155 !important;
-  border-color: #e2e8f0 !important;
+  color: #000000 !important;
+  border-color: #cbd5e1 !important;
 }
 
 [data-theme="light"] .qb-problem-title-section h2 {
-  color: #0f172a !important;
+  color: #000000 !important;
 }
 
 [data-theme="light"] .qb-problem-meta {
-  color: #475569 !important;
+  color: #000000 !important;
 }
 
 [data-theme="light"] .problem-description-text {
-  color: #1e293b !important;
+  color: #000000 !important;
 }
 
 [data-theme="light"] .problem-section-title {
-  color: #0f172a !important;
+  color: #000000 !important;
 }
 
 [data-theme="light"] .example-box {
   background: #f8fafc !important;
-  color: #0f172a !important;
-  border-color: #e2e8f0 !important;
+  color: #000000 !important;
+  border-color: #cbd5e1 !important;
 }
 
 [data-theme="light"] .coding-editor-container {
   background: #f8fafc !important;
-  border-color: #e2e8f0 !important;
+  border-color: #cbd5e1 !important;
 }
 
 [data-theme="light"] .editor-header-bar {
-  border-bottom-color: #e2e8f0 !important;
+  border-bottom-color: #cbd5e1 !important;
 }
 
 [data-theme="light"] .editor-header-title {
-  color: #475569 !important;
+  color: #000000 !important;
 }
 
 [data-theme="light"] .editor-textarea-wrapper {
@@ -540,31 +540,31 @@ body.qb-dragging-active {
 [data-theme="light"] .editor-line-numbers {
   background: #f1f5f9 !important;
   color: #64748b !important;
-  border-right-color: #e2e8f0 !important;
+  border-right-color: #cbd5e1 !important;
 }
 
 [data-theme="light"] .editor-textarea {
-  color: #0f172a !important;
+  color: #000000 !important;
 }
 
 [data-theme="light"] .submission-report-table th {
-  color: #475569 !important;
-  border-bottom-color: #e2e8f0 !important;
+  color: #000000 !important;
+  border-bottom-color: #cbd5e1 !important;
 }
 
 [data-theme="light"] .submission-report-table td {
-  color: #0f172a !important;
-  border-bottom-color: #e2e8f0 !important;
+  color: #000000 !important;
+  border-bottom-color: #cbd5e1 !important;
 }
 
 [data-theme="light"] .qb-tab-btn {
-  color: #475569 !important;
+  color: #000000 !important;
 }
 
 [data-theme="light"] .qb-tab-btn:hover {
-  color: #0f172a !important;
+  color: #000000 !important;
 }
 
 [data-theme="light"] .qb-tab-btn.active {
-  color: #4338ca !important;
+  color: #000000 !important;
 }

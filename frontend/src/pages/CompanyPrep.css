@@ -197,20 +197,20 @@
 }
 
 [data-theme="light"] .company-header-section p {
-    color: #475569 !important;
+    color: #000000 !important;
     font-weight: 500;
 }
 
 [data-theme="light"] .company-card {
     background-color: #ffffff !important;
-    border: 1px solid #e2e8f0 !important;
+    border: 1px solid #cbd5e1 !important;
     border-top: 4px solid #94a3b8 !important;
     box-shadow: 0 2px 8px rgba(15, 23, 42, 0.05) !important;
 }
 
 [data-theme="light"] .company-card:hover {
     background-color: #f8fafc !important;
-    border-color: #cbd5e1 !important;
+    border-color: #94a3b8 !important;
     box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08) !important;
 }
 
@@ -227,32 +227,32 @@
 [data-theme="light"] .company-card.border-green-400 { border-top-color: #22c55e !important; }
 
 [data-theme="light"] .company-card h3 {
-    color: #0f172a !important;
+    color: #000000 !important;
     font-weight: 700;
 }
 
 [data-theme="light"] .company-badge {
     background-color: #f1f5f9 !important;
-    color: #334155 !important;
-    border: 1px solid #e2e8f0 !important;
+    color: #000000 !important;
+    border: 1px solid #cbd5e1 !important;
     font-weight: 600;
 }
 
 [data-theme="light"] .company-logo-stub {
     background-color: #f1f5f9 !important;
-    color: #0f172a !important;
-    border: 1px solid #e2e8f0 !important;
+    color: #000000 !important;
+    border: 1px solid #cbd5e1 !important;
 }
 
 [data-theme="light"] .company-details-panel {
     background-color: #ffffff !important;
-    border-color: #e2e8f0 !important;
+    border-color: #cbd5e1 !important;
     box-shadow: 0 4px 20px rgba(15, 23, 42, 0.06) !important;
 }
 
 [data-theme="light"] .company-details-panel h2 {
-    color: #0f172a !important;
-    border-bottom-color: #e2e8f0 !important;
+    color: #000000 !important;
+    border-bottom-color: #cbd5e1 !important;
 }
 
 [data-theme="light"] .stage-card {
@@ -261,12 +261,12 @@
 }
 
 [data-theme="light"] .stage-card h4 {
-    color: #0f172a !important;
+    color: #000000 !important;
     font-weight: 700;
 }
 
 [data-theme="light"] .stage-card p {
-    color: #475569 !important;
+    color: #000000 !important;
 }
 
 [data-theme="light"] .btn-stage {

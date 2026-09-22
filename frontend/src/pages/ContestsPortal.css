@@ -1307,49 +1307,49 @@
 }
 
 [data-theme="light"] .leetcode-briefing-card h2 {
-  color: #111827 !important;
+  color: #000000 !important;
 }
 
 [data-theme="light"] .disclaimer-desc {
-  color: #4b5563 !important;
+  color: #000000 !important;
 }
 
 [data-theme="light"] .lc-meta-item {
   background: #f3f4f6 !important;
-  border-color: #e5e7eb !important;
-  color: #4b5563 !important;
+  border-color: #cbd5e1 !important;
+  color: #000000 !important;
 }
 
 [data-theme="light"] .lc-meta-item strong {
-  color: #111827 !important;
+  color: #000000 !important;
 }
 
 [data-theme="light"] .lc-problem-card {
-  background: #f9fafb !important;
-  border-color: #e5e7eb !important;
+  background: #ffffff !important;
+  border-color: #cbd5e1 !important;
 }
 
 [data-theme="light"] .lc-problem-card:hover {
-  background: #ffffff !important;
+  background: #f8fafc !important;
   border-color: #ffa116 !important;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
 }
 
 [data-theme="light"] .lc-prob-title {
-  color: #111827 !important;
+  color: #000000 !important;
 }
 
 [data-theme="light"] .lc-rule-item {
-  background: #f9fafb !important;
-  border-color: #e5e7eb !important;
+  background: #f8fafc !important;
+  border-color: #cbd5e1 !important;
 }
 
 [data-theme="light"] .lc-rule-item strong {
-  color: #111827 !important;
+  color: #000000 !important;
 }
 
 [data-theme="light"] .lc-rule-item p {
-  color: #4b5563 !important;
+  color: #000000 !important;
 }
 
 [data-theme="light"] .lc-agreements-box {
@@ -1366,7 +1366,7 @@
 }
 
 [data-theme="light"] .lc-checkbox-row strong {
-  color: #111827 !important;
+  color: #000000 !important;
 }
 
 /* Contest Workspace Light Theme */
@@ -1376,77 +1376,77 @@
 
 [data-theme="light"] .workspace-header {
   background: #ffffff !important;
-  border-bottom-color: #e5e7eb !important;
+  border-bottom-color: #cbd5e1 !important;
 }
 
 [data-theme="light"] .exam-title {
-  color: #111827 !important;
+  color: #000000 !important;
 }
 
 [data-theme="light"] .timer-box {
   background: #f3f4f6 !important;
-  border-color: #e5e7eb !important;
+  border-color: #cbd5e1 !important;
 }
 
 [data-theme="light"] .timer-value {
-  color: #111827 !important;
+  color: #000000 !important;
 }
 
 [data-theme="light"] .left-panel {
   background: #ffffff !important;
-  border-right-color: #e5e7eb !important;
+  border-right-color: #cbd5e1 !important;
 }
 
 [data-theme="light"] .questions-nav-tabs {
   background: #f9fafb !important;
-  border-bottom-color: #e5e7eb !important;
+  border-bottom-color: #cbd5e1 !important;
 }
 
 [data-theme="light"] .q-tab-btn {
-  color: #6b7280 !important;
+  color: #000000 !important;
 }
 
 [data-theme="light"] .q-tab-btn.active {
   background: #ffffff !important;
-  color: #111827 !important;
+  color: #000000 !important;
   border-bottom: 2px solid #ffa116 !important;
 }
 
 [data-theme="light"] .question-content h2,
 [data-theme="light"] .question-content h3 {
-  color: #111827 !important;
+  color: #000000 !important;
 }
 
 [data-theme="light"] .description-text,
 [data-theme="light"] .question-body p {
-  color: #374151 !important;
+  color: #000000 !important;
 }
 
 [data-theme="light"] .constraints-block,
 [data-theme="light"] .code-block {
   background: #f3f4f6 !important;
-  border-color: #e5e7eb !important;
-  color: #111827 !important;
+  border-color: #cbd5e1 !important;
+  color: #000000 !important;
 }
 
 [data-theme="light"] .editor-header {
   background: #f9fafb !important;
-  border-bottom-color: #e5e7eb !important;
+  border-bottom-color: #cbd5e1 !important;
 }
 
 [data-theme="light"] .panel-title {
-  color: #111827 !important;
+  color: #000000 !important;
 }
 
 [data-theme="light"] .lang-select {
   background: #ffffff !important;
-  border-color: #d1d5db !important;
-  color: #111827 !important;
+  border-color: #cbd5e1 !important;
+  color: #000000 !important;
 }
 
 [data-theme="light"] .testcases-panel {
   background: #ffffff !important;
-  border-top-color: #e5e7eb !important;
+  border-top-color: #cbd5e1 !important;
 }
 
 /* Contest Report & Plagiarism Light Theme */
@@ -1456,68 +1456,68 @@
 
 [data-theme="light"] .report-table th {
   background: #f9fafb !important;
-  color: #4b5563 !important;
-  border-bottom-color: #e5e7eb !important;
+  color: #000000 !important;
+  border-bottom-color: #cbd5e1 !important;
 }
 
 [data-theme="light"] .report-table td {
   background: #ffffff !important;
-  color: #111827 !important;
-  border-bottom-color: #e5e7eb !important;
+  color: #000000 !important;
+  border-bottom-color: #cbd5e1 !important;
 }
 
 [data-theme="light"] .summary-card-item {
   background: #ffffff !important;
-  border-color: #e5e7eb !important;
+  border-color: #cbd5e1 !important;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05) !important;
 }
 
 [data-theme="light"] .summary-card-item h3 {
-  color: #6b7280 !important;
+  color: #000000 !important;
 }
 
 [data-theme="light"] .summary-val {
-  color: #111827 !important;
+  color: #000000 !important;
 }
 
 [data-theme="light"] .summary-sub {
-  color: #6b7280 !important;
+  color: #000000 !important;
 }
 
 [data-theme="light"] .report-nav-btn {
-  color: #6b7280 !important;
+  color: #000000 !important;
 }
 
 [data-theme="light"] .report-nav-btn.active {
   background: #ffffff !important;
-  color: #111827 !important;
+  color: #000000 !important;
   border-bottom-color: #ffa116 !important;
 }
 
 [data-theme="light"] .plagiarism-incident-card {
   background: #ffffff !important;
-  border-color: #e5e7eb !important;
+  border-color: #cbd5e1 !important;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04) !important;
 }
 
 [data-theme="light"] .incident-description {
-  color: #374151 !important;
+  color: #000000 !important;
 }
 
 [data-theme="light"] .code-box {
   background: #f9fafb !important;
-  border-color: #e5e7eb !important;
+  border-color: #cbd5e1 !important;
 }
 
 [data-theme="light"] .code-title {
   background: #f3f4f6 !important;
-  color: #374151 !important;
-  border-bottom-color: #e5e7eb !important;
+  color: #000000 !important;
+  border-bottom-color: #cbd5e1 !important;
 }
 
 [data-theme="light"] .code-block-report {
   background: #ffffff !important;
-  color: #111827 !important;
+  color: #000000 !important;
 }
 
 
