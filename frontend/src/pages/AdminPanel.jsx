@@ -71,6 +71,10 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
   const [jobExp, setJobExp] = useState('');
   const [jobApply, setJobApply] = useState('');
   const [jobTargetBatch, setJobTargetBatch] = useState('All');
+  const [jobTargetRoles, setJobTargetRoles] = useState([]);
+  const [jobCustomRole, setJobCustomRole] = useState('');
+  const [jobTargetBatches, setJobTargetBatches] = useState(['All']);
+  const [jobTargetBranches, setJobTargetBranches] = useState(['All']);
   const [submittingJob, setSubmittingJob] = useState(false);
 
   // Admin creation form states
@@ -804,7 +808,300 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
   };
 
   const handlePrintApplicationsReport = () => {
-    window.print();
+    if (!applicationsReport || applicationsReport.length === 0) {
+      setError('No applications available to print.');
+      return;
+    }
+
+    const printWindow = window.open('', '_blank', 'width=1150,height=850');
+    if (!printWindow) {
+      window.print();
+      return;
+    }
+
+    const dateStr = new Date().toLocaleString('en-US', {
+      weekday: 'short',
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+
+    const getStatusBadgeHtml = (st) => {
+      const s = String(st || 'applied').toLowerCase().trim().replace(/\s+/g, '_');
+      let color = '#475569';
+      let bg = '#f1f5f9';
+      let label = 'Applied';
+      if (s === 'under_review') { color = '#b45309'; bg = '#fef3c7'; label = 'Under Review'; }
+      else if (s === 'interviewing') { color = '#0284c7'; bg = '#e0f2fe'; label = 'Interviewing'; }
+      else if (s === 'offered') { color = '#15803d'; bg = '#dcfce7'; label = 'Offered'; }
+      else if (s === 'rejected') { color = '#b91c1c'; bg = '#fee2e2'; label = 'Rejected'; }
+      else if (s === 'withdrawn') { color = '#64748b'; bg = '#f1f5f9'; label = 'Withdrawn'; }
+      return `<span style="display:inline-block;padding:3px 8px;border-radius:4px;font-size:10.5px;font-weight:700;color:${color};background:${bg};border:1px solid ${color}40;text-transform:uppercase;">${label}</span>`;
+    };
+
+    const tableRowsHtml = applicationsReport.map((app, idx) => `
+      <tr>
+        <td style="text-align:center;font-weight:600;color:#64748b;">${idx + 1}</td>
+        <td>
+          <div style="font-weight:700;color:#0f172a;font-size:12px;">${app.studentName || 'N/A'}</div>
+          <div style="font-size:11px;color:#64748b;">${app.studentEmail || ''}</div>
+          <div style="font-size:10.5px;color:#475569;font-family:monospace;">Roll: ${app.studentRollNumber || 'N/A'}</div>
+        </td>
+        <td>
+          <div style="font-weight:600;color:#1e293b;font-size:12px;">${app.studentBranch || 'N/A'}</div>
+          <div style="font-size:11px;color:#64748b;">${app.studentAcademicYear || ''} ${app.studentSection && app.studentSection !== 'N/A' ? `• Sec ${app.studentSection}` : ''}</div>
+        </td>
+        <td style="text-align:center;">
+          <span style="font-weight:700;color:${(app.studentReadiness || 0) >= 70 ? '#15803d' : (app.studentReadiness || 0) >= 40 ? '#b45309' : '#b91c1c'};font-size:12px;">
+            ${app.studentReadiness || 0}%
+          </span>
+        </td>
+        <td>
+          <div style="font-weight:700;color:#0f172a;font-size:12px;">${app.jobTitle || 'N/A'}</div>
+          <div style="font-size:11px;color:#4f46e5;font-weight:600;">🏢 ${app.jobCompany || 'N/A'}</div>
+          <div style="font-size:10.5px;color:#059669;">💰 ${app.jobSalary || 'Not Specified'}</div>
+        </td>
+        <td style="font-size:11.5px;color:#475569;">
+          ${app.appliedAt ? new Date(app.appliedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'N/A'}
+        </td>
+        <td style="text-align:center;">
+          ${getStatusBadgeHtml(app.status)}
+        </td>
+      </tr>
+    `).join('');
+
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>GRIET Placement Applied Jobs Report - ${new Date().toISOString().slice(0, 10)}</title>
+        <meta charset="utf-8" />
+        <style>
+          @page {
+            size: A4 landscape;
+            margin: 12mm 10mm 15mm 10mm;
+          }
+          * {
+            box-sizing: border-box;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
+          body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            color: #0f172a;
+            background: #ffffff;
+            margin: 0;
+            padding: 24px;
+            font-size: 12px;
+          }
+          .report-header {
+            border-bottom: 2px solid #4f46e5;
+            padding-bottom: 12px;
+            margin-bottom: 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+          }
+          .college-title {
+            font-size: 18px;
+            font-weight: 800;
+            color: #1e1b4b;
+            margin: 0 0 4px 0;
+            letter-spacing: -0.2px;
+          }
+          .report-title {
+            font-size: 13.5px;
+            font-weight: 700;
+            color: #4f46e5;
+            margin: 0 0 4px 0;
+          }
+          .report-meta {
+            font-size: 11px;
+            color: #64748b;
+          }
+          .stats-strip {
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            gap: 10px;
+            margin-bottom: 16px;
+          }
+          .stat-box {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            padding: 8px 10px;
+            text-align: center;
+          }
+          .stat-box .num {
+            font-size: 17px;
+            font-weight: 800;
+            color: #0f172a;
+            display: block;
+          }
+          .stat-box .lbl {
+            font-size: 10px;
+            font-weight: 600;
+            color: #64748b;
+            text-transform: uppercase;
+          }
+          table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+          }
+          th {
+            background: #f1f5f9;
+            color: #1e293b;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            padding: 8px 10px;
+            border: 1px solid #cbd5e1;
+            text-align: left;
+          }
+          td {
+            padding: 8px 10px;
+            border: 1px solid #e2e8f0;
+            vertical-align: middle;
+            font-size: 11.5px;
+          }
+          tr:nth-child(even) td {
+            background-color: #f8fafc;
+          }
+          tr {
+            page-break-inside: avoid;
+          }
+          .report-footer {
+            margin-top: 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            padding-top: 20px;
+            border-top: 1px dashed #cbd5e1;
+            page-break-inside: avoid;
+          }
+          .sig-box {
+            text-align: center;
+            width: 180px;
+          }
+          .sig-line {
+            border-top: 1px solid #64748b;
+            margin-bottom: 6px;
+          }
+          .print-actions {
+            margin-bottom: 16px;
+            display: flex;
+            gap: 10px;
+          }
+          @media print {
+            .print-actions { display: none !important; }
+            body { padding: 0; }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="print-actions">
+          <button onclick="window.print()" style="background:#4f46e5;color:white;border:none;padding:8px 18px;border-radius:6px;font-weight:bold;cursor:pointer;font-size:13px;">
+            🖨️ Print / Save as PDF
+          </button>
+          <button onclick="window.close()" style="background:#64748b;color:white;border:none;padding:8px 16px;border-radius:6px;font-weight:bold;cursor:pointer;font-size:13px;">
+            ✕ Close
+          </button>
+        </div>
+
+        <div class="report-header">
+          <div>
+            <h1 class="college-title">Gokaraju Rangaraju Institute of Engineering and Technology</h1>
+            <div class="report-title">Training & Placement Cell • Student Applied Jobs Report</div>
+            <div class="report-meta">
+              Generated on: ${dateStr} • Filtered Candidates: ${applicationsReport.length}
+            </div>
+          </div>
+          <div style="text-align:right;">
+            <div style="font-size:11px;font-weight:700;color:#4f46e5;">Official Placement Record</div>
+            <div style="font-size:10.5px;color:#64748b;">Academic Batch: ${appReportYearFilter !== 'all' ? appReportYearFilter : 'All Batches'}</div>
+            <div style="font-size:10.5px;color:#64748b;">Branch: ${appReportBranchFilter !== 'all' ? appReportBranchFilter : 'All Branches'}</div>
+          </div>
+        </div>
+
+        <div class="stats-strip">
+          <div class="stat-box">
+            <span class="num">${applicationsStats.totalApplications || applicationsReport.length}</span>
+            <span class="lbl">Total Applied</span>
+          </div>
+          <div class="stat-box">
+            <span class="num" style="color:#0284c7;">${applicationsStats.uniqueStudents || 0}</span>
+            <span class="lbl">Candidates</span>
+          </div>
+          <div class="stat-box">
+            <span class="num" style="color:#b45309;">${applicationsStats.underReviewCount || 0}</span>
+            <span class="lbl">Under Review</span>
+          </div>
+          <div class="stat-box">
+            <span class="num" style="color:#7c3aed;">${applicationsStats.interviewingCount || 0}</span>
+            <span class="lbl">Interviewing</span>
+          </div>
+          <div class="stat-box">
+            <span class="num" style="color:#15803d;">${applicationsStats.offeredCount || 0}</span>
+            <span class="lbl">Offered</span>
+          </div>
+          <div class="stat-box">
+            <span class="num" style="color:#b91c1c;">${applicationsStats.rejectedCount || 0}</span>
+            <span class="lbl">Rejected</span>
+          </div>
+        </div>
+
+        <table>
+          <thead>
+            <tr>
+              <th style="width:40px;text-align:center;">#</th>
+              <th>Student Details</th>
+              <th>Branch & Batch</th>
+              <th style="width:80px;text-align:center;">PRI Score</th>
+              <th>Job Opportunity</th>
+              <th style="width:105px;">Applied Date</th>
+              <th style="width:125px;text-align:center;">Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${tableRowsHtml}
+          </tbody>
+        </table>
+
+        <div class="report-footer">
+          <div style="font-size:11px;color:#64748b;">
+            <div>* PRI: Placement Readiness Index calculated across academic and technical metrics.</div>
+            <div>Official document for GRIET Training and Placement Cell internal administration.</div>
+          </div>
+          <div style="display:flex;gap:30px;">
+            <div class="sig-box">
+              <div class="sig-line"></div>
+              <div style="font-size:11px;font-weight:700;color:#1e293b;">Placement Officer</div>
+            </div>
+            <div class="sig-box">
+              <div class="sig-line"></div>
+              <div style="font-size:11px;font-weight:700;color:#1e293b;">Dean, TPO Cell</div>
+            </div>
+          </div>
+        </div>
+
+        <script>
+          window.onload = function() {
+            setTimeout(function() {
+              window.print();
+            }, 350);
+          };
+        </script>
+      </body>
+      </html>
+    `;
+
+    printWindow.document.open();
+    printWindow.document.write(htmlContent);
+    printWindow.document.close();
   };
 
   const uniqueBranches = React.useMemo(() => {
@@ -1081,7 +1378,10 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
           salary: jobSalary || 'Not Specified',
           experienceLevel: jobExp || 'Entry Level',
           applyLink: jobApply,
-          targetBatch: jobTargetBatch
+          targetBatch: jobTargetBatches.join(', '),
+          targetBatches: jobTargetBatches,
+          targetBranches: jobTargetBranches,
+          targetRoles: jobTargetRoles
         })
       });
 
@@ -1097,6 +1397,10 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
         setJobExp('');
         setJobApply('');
         setJobTargetBatch('All');
+        setJobTargetRoles([]);
+        setJobCustomRole('');
+        setJobTargetBatches(['All']);
+        setJobTargetBranches(['All']);
         fetchJobs();
       } else {
         setError(data.error || 'Failed to create job posting.');
@@ -1105,6 +1409,67 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
       setError('Could not connect to job creation backend.');
     } finally {
       setSubmittingJob(false);
+    }
+  };
+
+  const AVAILABLE_TARGET_ROLES = [
+    'Software Engineer', 'Full Stack Developer', 'Frontend Developer', 'Backend Developer',
+    'Data Scientist / Analyst', 'AI/ML Engineer', 'Cloud / DevOps Engineer',
+    'QA / Automation Engineer', 'Cybersecurity Analyst', 'Product / Business Analyst', 'Core Engineering'
+  ];
+  const AVAILABLE_BATCHES = ['All', '2024', '2025', '2026', '2027', '2028'];
+  const AVAILABLE_BRANCHES = ['All', 'CSE', 'IT', 'CSBS', 'AIML', 'DS', 'ECE', 'EEE', 'MECH', 'CIVIL'];
+
+  const toggleTargetBatch = (batch) => {
+    if (batch === 'All') {
+      setJobTargetBatches(['All']);
+      return;
+    }
+    setJobTargetBatches((prev) => {
+      const filtered = prev.filter((b) => b !== 'All');
+      if (filtered.includes(batch)) {
+        const next = filtered.filter((b) => b !== batch);
+        return next.length === 0 ? ['All'] : next;
+      } else {
+        return [...filtered, batch];
+      }
+    });
+  };
+
+  const toggleTargetBranch = (branch) => {
+    if (branch === 'All') {
+      setJobTargetBranches(['All']);
+      return;
+    }
+    setJobTargetBranches((prev) => {
+      const filtered = prev.filter((b) => b !== 'All');
+      if (filtered.includes(branch)) {
+        const next = filtered.filter((b) => b !== branch);
+        return next.length === 0 ? ['All'] : next;
+      } else {
+        return [...filtered, branch];
+      }
+    });
+  };
+
+  const toggleTargetRole = (role) => {
+    setJobTargetRoles((prev) => {
+      if (prev.includes(role)) {
+        return prev.filter((r) => r !== role);
+      } else {
+        return [...prev, role];
+      }
+    });
+  };
+
+  const handleAddCustomRole = (e) => {
+    if (e) e.preventDefault();
+    if (jobCustomRole && jobCustomRole.trim()) {
+      const trimmed = jobCustomRole.trim();
+      if (!jobTargetRoles.includes(trimmed)) {
+        setJobTargetRoles((prev) => [...prev, trimmed]);
+      }
+      setJobCustomRole('');
     }
   };
 
@@ -2790,14 +3155,32 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
 
       <div className="content-wrapper admin-content animate-fade">
         {error && (
-          <div className="error-banner">
+          <div className="error-banner" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span>{error}</span>
+            <button
+              type="button"
+              className="banner-close-btn"
+              onClick={() => setError('')}
+              title="Dismiss error"
+              aria-label="Dismiss error"
+            >
+              ×
+            </button>
           </div>
         )}
 
         {success && (
-          <div className="success-banner">
+          <div className="success-banner" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span>{success}</span>
+            <button
+              type="button"
+              className="banner-close-btn"
+              onClick={() => setSuccess('')}
+              title="Dismiss notification"
+              aria-label="Dismiss notification"
+            >
+              ×
+            </button>
           </div>
         )}
 
@@ -3249,33 +3632,144 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
                             </div>
                           </div>
 
-                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                            <div className="form-group" style={{ marginBottom: 0 }}>
-                              <label className="form-label" htmlFor="apply">External Apply URL</label>
-                              <input
-                                type="url"
-                                id="apply"
-                                className="form-control"
-                                placeholder="https://careers.company.com/apply"
-                                value={jobApply}
-                                onChange={(e) => setJobApply(e.target.value)}
-                              />
+                          <div className="form-group">
+                            <label className="form-label" htmlFor="apply">
+                              🔗 External Apply URL (Attached Job Portal Link)
+                            </label>
+                            <input
+                              type="url"
+                              id="apply"
+                              className="form-control"
+                              placeholder="https://careers.company.com/apply-job-role"
+                              value={jobApply}
+                              onChange={(e) => setJobApply(e.target.value)}
+                            />
+                            <small style={{ color: '#94a3b8', fontSize: '11.5px', marginTop: '4px', display: 'block' }}>
+                              When students click &quot;Apply Now&quot; in the Jobs Portal, they will be directly redirected to this URL in a new tab.
+                            </small>
+                          </div>
+
+                          {/* Targeted Job Roles */}
+                          <div className="form-group" style={{ background: 'rgba(255, 255, 255, 0.02)', padding: '14px', borderRadius: '8px', border: '1px solid rgba(255, 255, 255, 0.08)' }}>
+                            <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <span>🎯 Targeted Job Roles</span>
+                              <span style={{ fontSize: '11.5px', color: '#94a3b8' }}>
+                                {jobTargetRoles.length === 0 ? 'Any Role / General' : `${jobTargetRoles.length} selected`}
+                              </span>
+                            </label>
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '10px' }}>
+                              {AVAILABLE_TARGET_ROLES.map((role) => {
+                                const isSelected = jobTargetRoles.includes(role);
+                                return (
+                                  <button
+                                    key={role}
+                                    type="button"
+                                    onClick={() => toggleTargetRole(role)}
+                                    style={{
+                                      padding: '5px 12px',
+                                      borderRadius: '16px',
+                                      fontSize: '12px',
+                                      fontWeight: 600,
+                                      cursor: 'pointer',
+                                      border: isSelected ? '1px solid #6366f1' : '1px solid rgba(255, 255, 255, 0.15)',
+                                      background: isSelected ? 'rgba(99, 102, 241, 0.25)' : 'rgba(255, 255, 255, 0.04)',
+                                      color: isSelected ? '#a5b4fc' : '#94a3b8',
+                                      transition: 'all 0.15s ease'
+                                    }}
+                                  >
+                                    {isSelected ? '✓ ' : '+ '} {role}
+                                  </button>
+                                );
+                              })}
                             </div>
-                            <div className="form-group" style={{ marginBottom: 0 }}>
-                              <label className="form-label" htmlFor="targetBatch">Target Batch Year</label>
-                              <select
-                                id="targetBatch"
+                            <div style={{ display: 'flex', gap: '8px' }}>
+                              <input
+                                type="text"
                                 className="form-control"
-                                value={jobTargetBatch}
-                                onChange={(e) => setJobTargetBatch(e.target.value)}
+                                placeholder="Add custom role (e.g. SRE / Mobile Lead)..."
+                                value={jobCustomRole}
+                                onChange={(e) => setJobCustomRole(e.target.value)}
+                                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddCustomRole(e); } }}
+                                style={{ fontSize: '12.5px', padding: '6px 12px' }}
+                              />
+                              <button
+                                type="button"
+                                className="btn btn-secondary btn-sm"
+                                onClick={handleAddCustomRole}
+                                style={{ whiteSpace: 'nowrap' }}
                               >
-                                <option value="All">All Batches (Email All)</option>
-                                <option value="2024">2024 Batch</option>
-                                <option value="2025">2025 Batch</option>
-                                <option value="2026">2026 Batch</option>
-                                <option value="2027">2027 Batch</option>
-                                <option value="2028">2028 Batch</option>
-                              </select>
+                                + Add
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Target Batches */}
+                          <div className="form-group" style={{ background: 'rgba(255, 255, 255, 0.02)', padding: '14px', borderRadius: '8px', border: '1px solid rgba(255, 255, 255, 0.08)' }}>
+                            <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <span>🎓 Target Batches (Graduation Years)</span>
+                              <span style={{ fontSize: '11.5px', color: '#818cf8', fontWeight: 600 }}>
+                                {jobTargetBatches.includes('All') ? 'All Batches (Email All)' : jobTargetBatches.join(', ')}
+                              </span>
+                            </label>
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                              {AVAILABLE_BATCHES.map((b) => {
+                                const isSelected = jobTargetBatches.includes(b);
+                                return (
+                                  <button
+                                    key={b}
+                                    type="button"
+                                    onClick={() => toggleTargetBatch(b)}
+                                    style={{
+                                      padding: '5px 14px',
+                                      borderRadius: '16px',
+                                      fontSize: '12px',
+                                      fontWeight: 600,
+                                      cursor: 'pointer',
+                                      border: isSelected ? '1px solid #818cf8' : '1px solid rgba(255, 255, 255, 0.15)',
+                                      background: isSelected ? 'rgba(129, 140, 248, 0.25)' : 'rgba(255, 255, 255, 0.04)',
+                                      color: isSelected ? '#c7d2fe' : '#94a3b8',
+                                      transition: 'all 0.15s ease'
+                                    }}
+                                  >
+                                    {b === 'All' ? '🌐 All Batches' : `${b} Batch`}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+
+                          {/* Target Branches */}
+                          <div className="form-group" style={{ background: 'rgba(255, 255, 255, 0.02)', padding: '14px', borderRadius: '8px', border: '1px solid rgba(255, 255, 255, 0.08)' }}>
+                            <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <span>🏛️ Specific One or More Target Branches</span>
+                              <span style={{ fontSize: '11.5px', color: '#38bdf8', fontWeight: 600 }}>
+                                {jobTargetBranches.includes('All') ? 'All Branches' : jobTargetBranches.join(', ')}
+                              </span>
+                            </label>
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                              {AVAILABLE_BRANCHES.map((br) => {
+                                const isSelected = jobTargetBranches.includes(br);
+                                return (
+                                  <button
+                                    key={br}
+                                    type="button"
+                                    onClick={() => toggleTargetBranch(br)}
+                                    style={{
+                                      padding: '5px 14px',
+                                      borderRadius: '16px',
+                                      fontSize: '12px',
+                                      fontWeight: 600,
+                                      cursor: 'pointer',
+                                      border: isSelected ? '1px solid #38bdf8' : '1px solid rgba(255, 255, 255, 0.15)',
+                                      background: isSelected ? 'rgba(56, 189, 248, 0.25)' : 'rgba(255, 255, 255, 0.04)',
+                                      color: isSelected ? '#bae6fd' : '#94a3b8',
+                                      transition: 'all 0.15s ease'
+                                    }}
+                                  >
+                                    {br === 'All' ? '🌐 All Branches' : br}
+                                  </button>
+                                );
+                              })}
                             </div>
                           </div>
 
@@ -3508,14 +4002,27 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
 
                 <div className="glass-card admin-summary-card">
                   <div className="summary-card-header">
-                    <span className="summary-title">Under Review / Pending</span>
+                    <span className="summary-title">Under Review</span>
                     <span className="summary-icon">⏳</span>
+                  </div>
+                  <div className="summary-value" style={{ color: '#fbbf24' }}>
+                    {applicationsStats.underReviewCount || 0}
+                  </div>
+                  <div className="summary-footer">
+                    <span>Candidates undergoing evaluation</span>
+                  </div>
+                </div>
+
+                <div className="glass-card admin-summary-card">
+                  <div className="summary-card-header">
+                    <span className="summary-title">Applied (Initial)</span>
+                    <span className="summary-icon">📝</span>
                   </div>
                   <div className="summary-value" style={{ color: '#94a3b8' }}>
                     {applicationsStats.appliedCount || 0}
                   </div>
                   <div className="summary-footer">
-                    <span>Awaiting initial resume screening</span>
+                    <span>Fresh applications submitted</span>
                   </div>
                 </div>
               </div>
@@ -3568,11 +4075,12 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
                       style={{ fontSize: '13px', padding: '8px 12px' }}
                     >
                       <option value="all">All Application Statuses</option>
-                      <option value="applied">Applied / Under Review</option>
-                      <option value="interviewing">Interviewing</option>
-                      <option value="offered">Offered</option>
-                      <option value="rejected">Rejected</option>
-                      <option value="withdrawn">Withdrawn</option>
+                      <option value="applied">📝 Applied</option>
+                      <option value="under_review">⏳ Under Review</option>
+                      <option value="interviewing">🎙️ Interviewing</option>
+                      <option value="offered">🎉 Offered</option>
+                      <option value="rejected">❌ Rejected</option>
+                      <option value="withdrawn">↩️ Withdrawn</option>
                     </select>
                   </div>
 
@@ -3653,8 +4161,20 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
                     <button
                       type="button"
                       className="btn btn-secondary btn-sm"
+                      onClick={handlePrintApplicationsReport}
+                      disabled={applicationsReport.length === 0}
+                      title="Open print preview and export to PDF"
+                      style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                    >
+                      🖨️ Print PDF ({applicationsReport.length})
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-sm"
                       onClick={handleDownloadApplicationsCsv}
                       disabled={downloadingCsv || applicationsReport.length === 0}
+                      title="Download as CSV spreadsheet"
+                      style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
                     >
                       📥 Export CSV ({applicationsReport.length})
                     </button>
@@ -3756,23 +4276,32 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
                                       background:
                                         (app.status || 'applied') === 'offered'
                                           ? 'rgba(16, 185, 129, 0.2)'
-                                          : (app.status || 'applied') === 'interviewing'
+                                          : (app.status || 'applied') === 'under_review'
                                           ? 'rgba(245, 158, 11, 0.2)'
+                                          : (app.status || 'applied') === 'interviewing'
+                                          ? 'rgba(56, 189, 248, 0.2)'
                                           : (app.status || 'applied') === 'rejected'
                                           ? 'rgba(239, 68, 68, 0.2)'
+                                          : (app.status || 'applied') === 'withdrawn'
+                                          ? 'rgba(148, 163, 184, 0.2)'
                                           : 'rgba(99, 102, 241, 0.2)',
                                       color:
                                         (app.status || 'applied') === 'offered'
                                           ? '#34d399'
-                                          : (app.status || 'applied') === 'interviewing'
+                                          : (app.status || 'applied') === 'under_review'
                                           ? '#fbbf24'
+                                          : (app.status || 'applied') === 'interviewing'
+                                          ? '#38bdf8'
                                           : (app.status || 'applied') === 'rejected'
                                           ? '#f87171'
+                                          : (app.status || 'applied') === 'withdrawn'
+                                          ? '#94a3b8'
                                           : '#818cf8',
                                       border: '1px solid currentColor'
                                     }}
                                   >
-                                    <option value="applied" style={{ background: '#0f172a', color: '#fff' }}>⏳ Under Review</option>
+                                    <option value="applied" style={{ background: '#0f172a', color: '#fff' }}>📝 Applied</option>
+                                    <option value="under_review" style={{ background: '#0f172a', color: '#fff' }}>⏳ Under Review</option>
                                     <option value="interviewing" style={{ background: '#0f172a', color: '#fff' }}>🎙️ Interviewing</option>
                                     <option value="offered" style={{ background: '#0f172a', color: '#fff' }}>🎉 Offered</option>
                                     <option value="rejected" style={{ background: '#0f172a', color: '#fff' }}>❌ Rejected</option>
@@ -5652,8 +6181,17 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
             </div>
 
             {metaSuccess && (
-              <div className="success-banner">
+              <div className="success-banner" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span>{metaSuccess}</span>
+                <button
+                  type="button"
+                  className="banner-close-btn"
+                  onClick={() => setMetaSuccess('')}
+                  title="Dismiss notification"
+                  aria-label="Dismiss notification"
+                >
+                  ×
+                </button>
               </div>
             )}
 
@@ -6862,8 +7400,17 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
             </div>
             <div className="modal-body">
               {practiceBulkError && (
-                <div className="error-banner" style={{ marginBottom: '15px' }}>
+                <div className="error-banner" style={{ marginBottom: '15px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span>{practiceBulkError}</span>
+                  <button
+                    type="button"
+                    className="banner-close-btn"
+                    onClick={() => setPracticeBulkError('')}
+                    title="Dismiss error"
+                    aria-label="Dismiss error"
+                  >
+                    ×
+                  </button>
                 </div>
               )}
               <div className="form-group">
@@ -7454,8 +8001,9 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
 
                 <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                   {[
-                    { key: 'applied', label: '⏳ Under Review', color: '#818cf8', bg: 'rgba(99, 102, 241, 0.2)' },
-                    { key: 'interviewing', label: '🎙️ Interviewing', color: '#fbbf24', bg: 'rgba(245, 158, 11, 0.2)' },
+                    { key: 'applied', label: '📝 Applied', color: '#818cf8', bg: 'rgba(99, 102, 241, 0.2)' },
+                    { key: 'under_review', label: '⏳ Under Review', color: '#fbbf24', bg: 'rgba(245, 158, 11, 0.2)' },
+                    { key: 'interviewing', label: '🎙️ Interviewing', color: '#38bdf8', bg: 'rgba(56, 189, 248, 0.2)' },
                     { key: 'offered', label: '🎉 Offered', color: '#34d399', bg: 'rgba(16, 185, 129, 0.2)' },
                     { key: 'rejected', label: '❌ Rejected', color: '#f87171', bg: 'rgba(239, 68, 68, 0.2)' },
                     { key: 'withdrawn', label: '↩️ Withdrawn', color: '#94a3b8', bg: 'rgba(148, 163, 184, 0.2)' }

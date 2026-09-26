@@ -131,6 +131,10 @@ exports.getJobRecommendations = async (req, res, next) => {
         salary: job.salary,
         experienceLevel: job.experienceLevel,
         applyLink: job.applyLink,
+        targetBatch: job.targetBatch,
+        targetBatches: job.targetBatches || [],
+        targetBranches: job.targetBranches || [],
+        targetRoles: job.targetRoles || [],
         expiresAt: job.expiresAt,
         matchPercentage: matchPercent,
         matchedSkills: matchedSkillsDisplay,
@@ -218,22 +222,55 @@ exports.updateJobExpiry = async (req, res, next) => {
 // @access  Private/Admin
 exports.createJob = async (req, res, next) => {
   try {
-    const job = await Job.create(req.body);
+    const jobData = { ...req.body };
 
-    // Filter students by graduation/batch year if specified
-    const query = { role: 'student' };
-    if (job.targetBatch && job.targetBatch !== 'All') {
-      query.year = job.targetBatch.trim();
+    // Format targetBatches if provided
+    if (typeof jobData.targetBatches === 'string') {
+      jobData.targetBatches = jobData.targetBatches.split(',').map(s => s.trim()).filter(Boolean);
     }
+    // Format targetBranches if provided
+    if (typeof jobData.targetBranches === 'string') {
+      jobData.targetBranches = jobData.targetBranches.split(',').map(s => s.trim()).filter(Boolean);
+    }
+    // Format targetRoles if provided
+    if (typeof jobData.targetRoles === 'string') {
+      jobData.targetRoles = jobData.targetRoles.split(',').map(s => s.trim()).filter(Boolean);
+    }
+
+    if (Array.isArray(jobData.targetBatches) && jobData.targetBatches.length > 0) {
+      jobData.targetBatch = jobData.targetBatches.join(', ');
+    }
+
+    const job = await Job.create(jobData);
+
+    // Filter students by graduation/batch year and branches if specified
+    const query = { role: 'student' };
+
+    const batchFilters = Array.isArray(job.targetBatches) && job.targetBatches.length > 0 && !job.targetBatches.includes('All')
+      ? job.targetBatches
+      : (job.targetBatch && job.targetBatch !== 'All' ? [job.targetBatch.trim()] : []);
+
+    if (batchFilters.length > 0) {
+      query.$or = [
+        { year: { $in: batchFilters } },
+        { academicYear: { $in: batchFilters } }
+      ];
+    }
+
+    if (Array.isArray(job.targetBranches) && job.targetBranches.length > 0 && !job.targetBranches.includes('All')) {
+      query.branch = { $in: job.targetBranches };
+    }
+
     const students = await User.find(query);
 
     console.log("==================================");
-    console.log(`Students Found for Batch (${job.targetBatch || 'All'}):`, students.length);
+    console.log(`Students Found for Batch (${job.targetBatch || 'All'}) & Branches (${(job.targetBranches || []).join(', ') || 'All'}):`, students.length);
     console.log(
       students.map(student => ({
         name: student.name,
         email: student.email,
         role: student.role,
+        branch: student.branch,
         year: student.year
       }))
     );
@@ -487,14 +524,31 @@ exports.getAppliedJobs = async (req, res, next) => {
   }
 };
 
-// @desc    Update application status (Admin only)
+// @desc    Update application status (Admin/Faculty, or Student updating own application)
 // @route   PUT /api/jobs/:id/status
-// @access  Private/Admin
+// @access  Private
 exports.updateApplicationStatus = async (req, res, next) => {
   try {
-    const { studentId, status } = req.body;
-    if (!studentId || !status) {
-      return res.status(400).json({ success: false, error: 'Please provide studentId and status' });
+    let { studentId, status } = req.body;
+    if (!status) {
+      return res.status(400).json({ success: false, error: 'Please provide status' });
+    }
+
+    // Role check: if student, they can only update their own status
+    if (req.user.role === 'student') {
+      studentId = req.user.id;
+    } else if (!studentId) {
+      return res.status(400).json({ success: false, error: 'Please provide studentId' });
+    }
+
+    // Normalize status: replace spaces with underscores and lowercase
+    let normalizedStatus = status.toLowerCase().trim().replace(/\s+/g, '_');
+    const validStatuses = ['applied', 'under_review', 'interviewing', 'offered', 'rejected', 'withdrawn'];
+    if (!validStatuses.includes(normalizedStatus)) {
+      return res.status(400).json({
+        success: false,
+        error: `Invalid status "${status}". Allowed values: ${validStatuses.join(', ')}`
+      });
     }
 
     const student = await User.findById(studentId);
@@ -507,27 +561,30 @@ exports.updateApplicationStatus = async (req, res, next) => {
       return res.status(404).json({ success: false, error: 'Application not found' });
     }
 
-    application.status = status;
+    application.status = normalizedStatus;
     await student.save();
 
-    // Notify student about application status change
-    try {
-      const job = await Job.findById(req.params.id);
-      const jobTitle = job ? `${job.title} at ${job.company}` : 'Job Application';
-      await Notification.create({
-        user: student._id,
-        title: `Job Application Status: ${status.toUpperCase()}`,
-        message: `Your application for ${jobTitle} has been marked as "${status.toUpperCase()}". Check your dashboard for details.`,
-        type: 'job',
-        link: '/jobs'
-      });
-    } catch (notifErr) {
-      console.warn('Could not dispatch notification for job status update:', notifErr.message);
+    // If updated by Admin/Faculty, notify the student
+    if (req.user.role !== 'student') {
+      try {
+        const job = await Job.findById(req.params.id);
+        const jobTitle = job ? `${job.title} at ${job.company}` : 'Job Application';
+        const displayStatus = normalizedStatus.replace('_', ' ').toUpperCase();
+        await Notification.create({
+          user: student._id,
+          title: `Job Application Status: ${displayStatus}`,
+          message: `Your application for ${jobTitle} has been updated to "${displayStatus}". Check your dashboard for details.`,
+          type: 'job',
+          link: '/jobs'
+        });
+      } catch (notifErr) {
+        console.warn('Could not dispatch notification for job status update:', notifErr.message);
+      }
     }
 
     res.status(200).json({
       success: true,
-      message: 'Application status updated successfully',
+      message: `Application status updated to "${normalizedStatus.replace('_', ' ').toUpperCase()}" successfully`,
       data: student.appliedJobs
     });
   } catch (err) {
@@ -569,9 +626,15 @@ exports.getAppliedJobsReport = async (req, res, next) => {
           return;
         }
 
+        // Normalize status
+        const appStatus = (app.status || 'applied').toLowerCase().trim().replace(/\s+/g, '_');
+
         // Filter by status
-        if (status && status !== 'all' && app.status !== status) {
-          return;
+        if (status && status !== 'all') {
+          const filterStatus = status.toLowerCase().trim().replace(/\s+/g, '_');
+          if (appStatus !== filterStatus) {
+            return;
+          }
         }
 
         // Search filter
@@ -605,7 +668,8 @@ exports.getAppliedJobsReport = async (req, res, next) => {
           jobLocation: app.job.location || 'Remote',
           jobSalary: app.job.salary || 'Not Specified',
           jobTargetBatch: app.job.targetBatch || 'All',
-          status: app.status || 'applied',
+          jobApplyLink: app.job.applyLink || '',
+          status: appStatus,
           appliedAt: app.appliedAt || new Date()
         });
       });
@@ -617,6 +681,7 @@ exports.getAppliedJobsReport = async (req, res, next) => {
     const totalApplications = applications.length;
     const uniqueStudents = new Set(applications.map((a) => a.studentId.toString())).size;
     const appliedCount = applications.filter((a) => a.status === 'applied').length;
+    const underReviewCount = applications.filter((a) => a.status === 'under_review').length;
     const interviewingCount = applications.filter((a) => a.status === 'interviewing').length;
     const offeredCount = applications.filter((a) => a.status === 'offered').length;
     const rejectedCount = applications.filter((a) => a.status === 'rejected').length;
@@ -629,6 +694,7 @@ exports.getAppliedJobsReport = async (req, res, next) => {
         totalApplications,
         uniqueStudents,
         appliedCount,
+        underReviewCount,
         interviewingCount,
         offeredCount,
         rejectedCount,
@@ -664,7 +730,11 @@ exports.exportAppliedJobsCsv = async (req, res, next) => {
       student.appliedJobs.forEach((app) => {
         if (!app || !app.job) return;
         if (jobId && jobId !== 'all' && app.job._id.toString() !== jobId.toString()) return;
-        if (status && status !== 'all' && app.status !== status) return;
+        const appStatus = (app.status || 'applied').toLowerCase().trim().replace(/\s+/g, '_');
+        if (status && status !== 'all') {
+          const filterStatus = status.toLowerCase().trim().replace(/\s+/g, '_');
+          if (appStatus !== filterStatus) return;
+        }
 
         if (search && search.trim()) {
           const s = search.trim().toLowerCase();
@@ -691,7 +761,7 @@ exports.exportAppliedJobsCsv = async (req, res, next) => {
           location: app.job.location || 'Remote',
           salary: app.job.salary || 'Not Specified',
           targetBatch: app.job.targetBatch || 'All',
-          status: (app.status || 'applied').toUpperCase(),
+          status: appStatus.toUpperCase(),
           appliedDate: app.appliedAt ? new Date(app.appliedAt).toLocaleString() : 'N/A'
         });
       });

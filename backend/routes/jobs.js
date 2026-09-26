@@ -37,7 +37,7 @@ router.post('/', authorize('admin'), createJob);
 router.post('/bulk', authorize('admin'), bulkCreateJobs);
 router.put('/:id/expiry', authorize('admin'), updateJobExpiry);
 router.delete('/:id', authorize('admin'), deleteJob);
-router.put('/:id/status', authorize('admin'), updateApplicationStatus);
+router.put('/:id/status', updateApplicationStatus);
 
 module.exports = router;
 

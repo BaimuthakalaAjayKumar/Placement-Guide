@@ -39,6 +39,18 @@ const JobSchema = new mongoose.Schema({
     type: String,
     default: 'All'
   },
+  targetBatches: {
+    type: [String],
+    default: []
+  },
+  targetBranches: {
+    type: [String],
+    default: []
+  },
+  targetRoles: {
+    type: [String],
+    default: []
+  },
   expiresAt: {
     type: Date,
     default: null

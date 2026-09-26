@@ -2093,8 +2093,32 @@ const FacultyDashboard = () => {
                     </div>
 
                     {/* Alerts */}
-                    {error && <div className="error-alert">{error}</div>}
-                    {successMsg && <div className="success-alert">{successMsg}</div>}
+                    {error && (
+                        <div className="error-alert" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span>{error}</span>
+                            <button
+                                type="button"
+                                className="banner-close-btn"
+                                onClick={() => setError('')}
+                                title="Dismiss error"
+                            >
+                                ×
+                            </button>
+                        </div>
+                    )}
+                    {successMsg && (
+                        <div className="success-alert" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span>{successMsg}</span>
+                            <button
+                                type="button"
+                                className="banner-close-btn"
+                                onClick={() => setSuccessMsg('')}
+                                title="Dismiss notification"
+                            >
+                                ×
+                            </button>
+                        </div>
+                    )}
 
                     {/* TAB 1: STUDENT MONITORING */}
                     {activeTab === 'students' && (

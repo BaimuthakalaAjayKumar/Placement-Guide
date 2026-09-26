@@ -581,8 +581,17 @@ const Dashboard = () => {
 
       <div className="content-wrapper dashboard-content animate-fade">
         {error && (
-          <div className="error-banner">
+          <div className="error-banner" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span>{error}</span>
+            <button
+              type="button"
+              className="banner-close-btn"
+              onClick={() => setError('')}
+              title="Dismiss error"
+              aria-label="Dismiss error"
+            >
+              ×
+            </button>
           </div>
         )}
 

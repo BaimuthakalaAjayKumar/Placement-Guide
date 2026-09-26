@@ -43,6 +43,31 @@ const Header = ({ title }) => {
     }
   };
 
+  const dismissNotification = async (e, notificationId) => {
+    e.stopPropagation();
+    try {
+      await fetch(`${API_URL}/notifications/${notificationId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setNotifications(prev => prev.filter(n => n._id !== notificationId));
+    } catch (err) {
+      console.error('Failed to dismiss notification:', err);
+    }
+  };
+
+  const markAllNotificationsRead = async () => {
+    try {
+      await fetch(`${API_URL}/notifications/read-all`, {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
+    } catch (err) {
+      console.error('Failed to mark all notifications read:', err);
+    }
+  };
+
   const unreadCount = notifications.filter(notification => !notification.isRead).length;
 
   if (!user) return null;
@@ -77,22 +102,72 @@ const Header = ({ title }) => {
           {showNotifications && (
             <div className="notification-popover">
               <div className="notification-popover-header">
-                <strong>Notifications</strong>
-                <span>{unreadCount} unread</span>
+                <div>
+                  <strong>Notifications</strong>
+                  <span style={{ marginLeft: '8px' }}>{unreadCount} unread</span>
+                </div>
+                {unreadCount > 0 && (
+                  <button
+                    type="button"
+                    onClick={markAllNotificationsRead}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: '#818cf8',
+                      fontSize: '11px',
+                      cursor: 'pointer',
+                      padding: 0,
+                      fontWeight: 600
+                    }}
+                  >
+                    Mark read
+                  </button>
+                )}
               </div>
               {notifications.length === 0 ? (
                 <p className="notification-empty">No notifications yet.</p>
               ) : (
-                notifications.slice(0, 6).map(notification => (
-                  <button
-                    type="button"
+                notifications.slice(0, 8).map(notification => (
+                  <div
                     className={`notification-item ${notification.isRead ? 'read' : ''}`}
                     key={notification._id}
                     onClick={() => markNotificationRead(notification._id)}
+                    style={{
+                      display: 'flex',
+                      flexDirection: 'row',
+                      justifyContent: 'space-between',
+                      alignItems: 'flex-start',
+                      width: '100%',
+                      cursor: 'pointer'
+                    }}
                   >
-                    <span>{notification.message}</span>
-                    <small>{new Date(notification.createdAt).toLocaleDateString()}</small>
-                  </button>
+                    <div style={{ flex: 1, paddingRight: '8px' }}>
+                      <span style={{ display: 'block', fontSize: '12.5px', lineHeight: '1.4' }}>{notification.message}</span>
+                      <small style={{ display: 'block', marginTop: '4px', color: '#94a3b8' }}>
+                        {new Date(notification.createdAt).toLocaleDateString()}
+                      </small>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={(e) => dismissNotification(e, notification._id)}
+                      title="Dismiss notification"
+                      style={{
+                        background: 'transparent',
+                        border: 'none',
+                        color: '#94a3b8',
+                        cursor: 'pointer',
+                        fontSize: '16px',
+                        lineHeight: 1,
+                        padding: '2px 6px',
+                        borderRadius: '4px',
+                        flexShrink: 0
+                      }}
+                      onMouseEnter={(e) => e.currentTarget.style.color = '#ef4444'}
+                      onMouseLeave={(e) => e.currentTarget.style.color = '#94a3b8'}
+                    >
+                      ×
+                    </button>
+                  </div>
                 ))
               )}
             </div>

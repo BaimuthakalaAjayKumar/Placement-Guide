@@ -152,7 +152,7 @@ const UserSchema = new mongoose.Schema({
     },
     status: {
       type: String,
-      enum: ['applied', 'interviewing', 'offered', 'rejected', 'withdrawn'],
+      enum: ['applied', 'under_review', 'under review', 'interviewing', 'offered', 'rejected', 'withdrawn'],
       default: 'applied'
     },
     appliedAt: {
