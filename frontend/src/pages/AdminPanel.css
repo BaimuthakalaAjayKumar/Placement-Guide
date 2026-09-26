@@ -969,3 +969,40 @@
   color: #f59e0b;
   letter-spacing: 0.02em;
 }
+
+/* Applied Jobs Report Styles */
+.applied-jobs-report-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+@media print {
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+  }
+  .admin-tabs-nav,
+  .btn,
+  .close-btn,
+  .modal-backdrop,
+  header,
+  .sidebar,
+  .nav-tabs {
+    display: none !important;
+  }
+  .glass-card {
+    background: #ffffff !important;
+    border: 1px solid #cbd5e1 !important;
+    color: #000000 !important;
+    box-shadow: none !important;
+  }
+  .student-roster-table th {
+    background: #f1f5f9 !important;
+    color: #000000 !important;
+  }
+  .student-roster-table td {
+    color: #000000 !important;
+    border-bottom: 1px solid #e2e8f0 !important;
+  }
+}

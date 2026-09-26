@@ -270,6 +270,28 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
   });
   const [savingAcademics, setSavingAcademics] = useState(false);
 
+  // Applied Jobs & Candidate Placement Report states
+  const [applicationsReport, setApplicationsReport] = useState([]);
+  const [applicationsStats, setApplicationsStats] = useState({
+    totalApplications: 0,
+    uniqueStudents: 0,
+    appliedCount: 0,
+    interviewingCount: 0,
+    offeredCount: 0,
+    rejectedCount: 0,
+    withdrawnCount: 0
+  });
+  const [loadingApplicationsReport, setLoadingApplicationsReport] = useState(false);
+  const [appReportStatusFilter, setAppReportStatusFilter] = useState('all');
+  const [appReportJobFilter, setAppReportJobFilter] = useState('all');
+  const [appReportBranchFilter, setAppReportBranchFilter] = useState('all');
+  const [appReportYearFilter, setAppReportYearFilter] = useState('all');
+  const [appReportSearch, setAppReportSearch] = useState('');
+  const [selectedAppForModal, setSelectedAppForModal] = useState(null);
+  const [updatingAppStatusId, setUpdatingAppStatusId] = useState(null);
+  const [downloadingCsv, setDownloadingCsv] = useState(false);
+
+
   const fetchStudents = async () => {
     try {
       setLoading(true);
@@ -643,6 +665,173 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
     }
   };
 
+  const fetchApplicationsReport = async () => {
+    try {
+      setLoadingApplicationsReport(true);
+      const params = new URLSearchParams();
+      if (appReportStatusFilter && appReportStatusFilter !== 'all') params.append('status', appReportStatusFilter);
+      if (appReportJobFilter && appReportJobFilter !== 'all') params.append('jobId', appReportJobFilter);
+      if (appReportBranchFilter && appReportBranchFilter !== 'all') params.append('branch', appReportBranchFilter);
+      if (appReportYearFilter && appReportYearFilter !== 'all') params.append('academicYear', appReportYearFilter);
+      if (appReportSearch && appReportSearch.trim()) params.append('search', appReportSearch.trim());
+
+      const res = await fetch(`${API_URL}/jobs/admin/applications-report?${params.toString()}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (data.success) {
+        setApplicationsReport(data.data || []);
+        if (data.stats) setApplicationsStats(data.stats);
+      } else {
+        setError(data.error || 'Failed to fetch applied jobs report.');
+      }
+    } catch (err) {
+      console.error('Error fetching applications report:', err);
+      setError('Could not connect to applied jobs reporting service.');
+    } finally {
+      setLoadingApplicationsReport(false);
+    }
+  };
+
+  const handleDownloadApplicationsCsv = async () => {
+    try {
+      setDownloadingCsv(true);
+      setError('');
+      setSuccess('');
+      const params = new URLSearchParams();
+      if (appReportStatusFilter && appReportStatusFilter !== 'all') params.append('status', appReportStatusFilter);
+      if (appReportJobFilter && appReportJobFilter !== 'all') params.append('jobId', appReportJobFilter);
+      if (appReportBranchFilter && appReportBranchFilter !== 'all') params.append('branch', appReportBranchFilter);
+      if (appReportYearFilter && appReportYearFilter !== 'all') params.append('academicYear', appReportYearFilter);
+      if (appReportSearch && appReportSearch.trim()) params.append('search', appReportSearch.trim());
+
+      const res = await fetch(`${API_URL}/jobs/admin/applications-report/export-csv?${params.toString()}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      if (!res.ok) throw new Error('Failed to generate CSV export from server.');
+
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `GRIET_Placement_Applied_Jobs_Report_${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+      setSuccess('Applied jobs report CSV downloaded successfully!');
+    } catch (err) {
+      console.error('CSV export error:', err);
+      // Client-side fallback if backend download encounters an issue
+      if (applicationsReport.length > 0) {
+        const headers = [
+          'Student Name', 'Roll Number', 'Email', 'Branch', 'Section', 'Academic Year',
+          'Readiness Score (%)', 'Job Title', 'Company', 'Location', 'Salary', 'Target Batch', 'Status', 'Applied Date'
+        ];
+        const escapeCsv = (val) => `"${String(val || '').replace(/"/g, '""')}"`;
+        const rows = applicationsReport.map((r) => [
+          escapeCsv(r.studentName),
+          escapeCsv(r.studentRollNumber),
+          escapeCsv(r.studentEmail),
+          escapeCsv(r.studentBranch),
+          escapeCsv(r.studentSection),
+          escapeCsv(r.studentAcademicYear),
+          escapeCsv(r.studentReadiness),
+          escapeCsv(r.jobTitle),
+          escapeCsv(r.jobCompany),
+          escapeCsv(r.jobLocation),
+          escapeCsv(r.jobSalary),
+          escapeCsv(r.jobTargetBatch),
+          escapeCsv((r.status || 'applied').toUpperCase()),
+          escapeCsv(r.appliedAt ? new Date(r.appliedAt).toLocaleString() : 'N/A')
+        ].join(','));
+        const csvContent = [headers.join(','), ...rows].join('\r\n');
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `GRIET_Applied_Jobs_Report_Fallback_${new Date().toISOString().slice(0, 10)}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+        setSuccess('Downloaded CSV report successfully!');
+      } else {
+        setError('No applications available to download.');
+      }
+    } finally {
+      setDownloadingCsv(false);
+    }
+  };
+
+  const handleUpdateCandidateStatus = async (studentId, jobId, newStatus) => {
+    try {
+      setUpdatingAppStatusId(`${studentId}_${jobId}`);
+      setError('');
+      setSuccess('');
+      const res = await fetch(`${API_URL}/jobs/${jobId}/status`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ studentId, status: newStatus })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setSuccess(`Updated candidate status to "${newStatus.toUpperCase()}"! Notification dispatched.`);
+        setApplicationsReport((prev) =>
+          prev.map((app) => {
+            if (app.studentId === studentId && app.jobId === jobId) {
+              return { ...app, status: newStatus };
+            }
+            return app;
+          })
+        );
+        if (selectedAppForModal && selectedAppForModal.studentId === studentId && selectedAppForModal.jobId === jobId) {
+          setSelectedAppForModal((prev) => ({ ...prev, status: newStatus }));
+        }
+      } else {
+        setError(data.error || 'Failed to update candidate status.');
+      }
+    } catch (err) {
+      console.error(err);
+      setError('Could not connect to status update service.');
+    } finally {
+      setUpdatingAppStatusId(null);
+    }
+  };
+
+  const handlePrintApplicationsReport = () => {
+    window.print();
+  };
+
+  const uniqueBranches = React.useMemo(() => {
+    const set = new Set();
+    applicationsReport.forEach((a) => {
+      if (a.studentBranch && a.studentBranch !== 'N/A') set.add(a.studentBranch);
+    });
+    students.forEach((s) => {
+      if (s.branch) set.add(s.branch);
+    });
+    ['CSE', 'IT', 'CSIT', 'AIML', 'AIDS', 'ECE', 'EEE', 'MECH', 'CIVIL'].forEach((b) => set.add(b));
+    return Array.from(set).sort();
+  }, [applicationsReport, students]);
+
+  const uniqueAcademicYears = React.useMemo(() => {
+    const set = new Set();
+    applicationsReport.forEach((a) => {
+      if (a.studentAcademicYear && a.studentAcademicYear !== 'N/A') set.add(a.studentAcademicYear);
+    });
+    students.forEach((s) => {
+      if (s.academicYear) set.add(s.academicYear);
+      else if (s.year) set.add(s.year);
+    });
+    ['2022-2026', '2023-2027', '2024-2028', '2025-2029', '4th Year', '3rd Year'].forEach((y) => set.add(y));
+    return Array.from(set).sort();
+  }, [applicationsReport, students]);
+
   useEffect(() => {
     if (token) {
       // Always pre-load staff records so staff dropdowns & counts are always available
@@ -652,6 +841,9 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
         fetchStudents();
       } else if (activeTab === 'job-opportunities' || activeTab === 'jobs' || activeTab === 'job-postings') {
         fetchJobs();
+      } else if (activeTab === 'applied-jobs' || activeTab === 'job-applications') {
+        fetchJobs();
+        fetchApplicationsReport();
       } else if (activeTab === 'interviews') {
         fetchMockInterviewReports();
       } else if (activeTab === 'question-bank') {
@@ -666,8 +858,10 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
       } else if (activeTab === 'aptitude') {
         fetchAptitudeTests();
         fetch(`${API_URL}/academic/subjects`, { headers: { Authorization: `Bearer ${token}` } })
-          .then(response => response.json())
-          .then(data => { if (data.success) setAcademicSubjects(data.data); })
+          .then((response) => response.json())
+          .then((data) => {
+            if (data.success) setAcademicSubjects(data.data);
+          })
           .catch(() => {});
       } else if (activeTab === 'interview-settings') {
         fetchStaff();
@@ -683,6 +877,13 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
       }
     }
   }, [token, activeTab]);
+
+  useEffect(() => {
+    if (token && (activeTab === 'applied-jobs' || activeTab === 'job-applications')) {
+      fetchApplicationsReport();
+    }
+  }, [appReportStatusFilter, appReportJobFilter, appReportBranchFilter, appReportYearFilter]);
+
 
   // Core CSE Subjects Handlers
   const openAdminNotesModal = async (subject) => {
@@ -2625,6 +2826,16 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
             💼 Job Opportunities
           </button>
           <button
+            className={`admin-tab-btn ${activeTab === 'applied-jobs' || activeTab === 'job-applications' ? 'active' : ''}`}
+            onClick={() => {
+              setActiveTab('applied-jobs');
+              fetchJobs();
+              fetchApplicationsReport();
+            }}
+          >
+            📋 Applied Jobs Report
+          </button>
+          <button
             className={`admin-tab-btn ${activeTab === 'interviews' ? 'active' : ''}`}
             onClick={() => setActiveTab('interviews')}
           >
@@ -2834,6 +3045,17 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
                     </span>
                     <button type="button" className="btn btn-secondary btn-sm" onClick={fetchJobs} title="Refresh Jobs">
                       🔄 Refresh Listings
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-primary btn-sm"
+                      onClick={() => {
+                        setActiveTab('applied-jobs');
+                        fetchApplicationsReport();
+                      }}
+                      title="View all students who applied for jobs"
+                    >
+                      📋 Applied Jobs Report ({applicationsStats.totalApplications || 0}) →
                     </button>
                   </div>
                 </div>
@@ -3174,6 +3396,418 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
                       </>
                     )}
                   </div>
+                </div>
+              </div>
+            </div>
+          )
+        }
+
+        {
+          (activeTab === 'applied-jobs' || activeTab === 'job-applications') && (
+            <div className="applied-jobs-report-wrapper animate-fade">
+              {/* Header Card */}
+              <div className="glass-card" style={{ marginBottom: '24px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
+                  <div>
+                    <h3 style={{ margin: '0 0 6px 0', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <span>📋</span>
+                      <span>Student Applied Jobs & Placement Report</span>
+                    </h3>
+                    <p className="card-desc" style={{ margin: 0 }}>
+                      Complete tracking of campus recruitment drives, student job applications, interview stages, and offers.
+                    </p>
+                  </div>
+                  <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+                    <button
+                      type="button"
+                      className="btn btn-primary"
+                      onClick={handleDownloadApplicationsCsv}
+                      disabled={downloadingCsv}
+                      style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}
+                      title="Download complete report as CSV"
+                    >
+                      {downloadingCsv ? '⏳ Generating CSV...' : '📥 Download Report (CSV)'}
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-sm"
+                      onClick={handlePrintApplicationsReport}
+                      title="Print or Save PDF report"
+                    >
+                      🖨️ Print / PDF
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-sm"
+                      onClick={fetchApplicationsReport}
+                      title="Refresh application data"
+                    >
+                      🔄 Refresh
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* KPI Summary Cards */}
+              <div className="admin-stats-summary-grid" style={{ marginBottom: '24px' }}>
+                <div className="glass-card admin-summary-card">
+                  <div className="summary-card-header">
+                    <span className="summary-title">Total Applications</span>
+                    <span className="summary-icon">📝</span>
+                  </div>
+                  <div className="summary-value" style={{ color: '#818cf8' }}>
+                    {applicationsStats.totalApplications || 0}
+                  </div>
+                  <div className="summary-footer">
+                    <span>Submitted across all active drives</span>
+                  </div>
+                </div>
+
+                <div className="glass-card admin-summary-card">
+                  <div className="summary-card-header">
+                    <span className="summary-title">Unique Students</span>
+                    <span className="summary-icon">👥</span>
+                  </div>
+                  <div className="summary-value" style={{ color: '#38bdf8' }}>
+                    {applicationsStats.uniqueStudents || 0}
+                  </div>
+                  <div className="summary-footer">
+                    <span>Candidates participating in drives</span>
+                  </div>
+                </div>
+
+                <div className="glass-card admin-summary-card">
+                  <div className="summary-card-header">
+                    <span className="summary-title">In Interview Stage</span>
+                    <span className="summary-icon">🎙️</span>
+                  </div>
+                  <div className="summary-value" style={{ color: '#fbbf24' }}>
+                    {applicationsStats.interviewingCount || 0}
+                  </div>
+                  <div className="summary-footer">
+                    <span>Shortlisted for technical / HR rounds</span>
+                  </div>
+                </div>
+
+                <div className="glass-card admin-summary-card">
+                  <div className="summary-card-header">
+                    <span className="summary-title">Job Offers Secured</span>
+                    <span className="summary-icon">🎉</span>
+                  </div>
+                  <div className="summary-value" style={{ color: '#34d399' }}>
+                    {applicationsStats.offeredCount || 0}
+                  </div>
+                  <div className="summary-footer">
+                    <span>
+                      {applicationsStats.totalApplications > 0
+                        ? `${Math.round((applicationsStats.offeredCount / applicationsStats.totalApplications) * 100)}% Conversion Rate`
+                        : '0% Conversion Rate'}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="glass-card admin-summary-card">
+                  <div className="summary-card-header">
+                    <span className="summary-title">Under Review / Pending</span>
+                    <span className="summary-icon">⏳</span>
+                  </div>
+                  <div className="summary-value" style={{ color: '#94a3b8' }}>
+                    {applicationsStats.appliedCount || 0}
+                  </div>
+                  <div className="summary-footer">
+                    <span>Awaiting initial resume screening</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Filters & Search Bar */}
+              <div className="glass-card" style={{ marginBottom: '24px', padding: '18px 20px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '14px', alignItems: 'flex-end' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#94a3b8', marginBottom: '6px' }}>
+                      🔍 Search Candidate / Company / Role
+                    </label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      placeholder="Name, Roll No, Email, Role..."
+                      value={appReportSearch}
+                      onChange={(e) => setAppReportSearch(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') fetchApplicationsReport(); }}
+                      style={{ fontSize: '13px', padding: '8px 12px' }}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#94a3b8', marginBottom: '6px' }}>
+                      🏢 Filter by Job Opportunity
+                    </label>
+                    <select
+                      className="form-control"
+                      value={appReportJobFilter}
+                      onChange={(e) => setAppReportJobFilter(e.target.value)}
+                      style={{ fontSize: '13px', padding: '8px 12px' }}
+                    >
+                      <option value="all">All Job Listings ({jobs.length})</option>
+                      {jobs.map((j) => (
+                        <option key={j._id} value={j._id}>
+                          {j.title} • {j.company}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#94a3b8', marginBottom: '6px' }}>
+                      📌 Filter by Status
+                    </label>
+                    <select
+                      className="form-control"
+                      value={appReportStatusFilter}
+                      onChange={(e) => setAppReportStatusFilter(e.target.value)}
+                      style={{ fontSize: '13px', padding: '8px 12px' }}
+                    >
+                      <option value="all">All Application Statuses</option>
+                      <option value="applied">Applied / Under Review</option>
+                      <option value="interviewing">Interviewing</option>
+                      <option value="offered">Offered</option>
+                      <option value="rejected">Rejected</option>
+                      <option value="withdrawn">Withdrawn</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#94a3b8', marginBottom: '6px' }}>
+                      🎓 Filter by Branch
+                    </label>
+                    <select
+                      className="form-control"
+                      value={appReportBranchFilter}
+                      onChange={(e) => setAppReportBranchFilter(e.target.value)}
+                      style={{ fontSize: '13px', padding: '8px 12px' }}
+                    >
+                      <option value="all">All Branches</option>
+                      {uniqueBranches.map((b) => (
+                        <option key={b} value={b}>{b}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#94a3b8', marginBottom: '6px' }}>
+                      📅 Academic Year / Batch
+                    </label>
+                    <select
+                      className="form-control"
+                      value={appReportYearFilter}
+                      onChange={(e) => setAppReportYearFilter(e.target.value)}
+                      style={{ fontSize: '13px', padding: '8px 12px' }}
+                    >
+                      <option value="all">All Academic Years</option>
+                      {uniqueAcademicYears.map((y) => (
+                        <option key={y} value={y}>{y}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <button
+                      type="button"
+                      className="btn btn-primary btn-sm"
+                      onClick={fetchApplicationsReport}
+                      style={{ flex: 1, height: '38px', justifyContent: 'center' }}
+                    >
+                      Apply Filter
+                    </button>
+                    {(appReportSearch || appReportJobFilter !== 'all' || appReportStatusFilter !== 'all' || appReportBranchFilter !== 'all' || appReportYearFilter !== 'all') && (
+                      <button
+                        type="button"
+                        className="btn btn-secondary btn-sm"
+                        onClick={() => {
+                          setAppReportSearch('');
+                          setAppReportJobFilter('all');
+                          setAppReportStatusFilter('all');
+                          setAppReportBranchFilter('all');
+                          setAppReportYearFilter('all');
+                        }}
+                        style={{ height: '38px' }}
+                        title="Reset all filters"
+                      >
+                        Reset
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Applications Roster Table */}
+              <div className="glass-card" style={{ padding: 0, overflow: 'hidden' }}>
+                <div style={{ padding: '18px 24px', borderBottom: '1px solid rgba(255, 255, 255, 0.08)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+                  <div>
+                    <h3 style={{ margin: 0, fontSize: '1.1rem' }}>Candidate Applications Roster</h3>
+                    <span style={{ fontSize: '12.5px', color: '#94a3b8' }}>
+                      Showing {applicationsReport.length} candidate applications matching current filters
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', gap: '10px' }}>
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-sm"
+                      onClick={handleDownloadApplicationsCsv}
+                      disabled={downloadingCsv || applicationsReport.length === 0}
+                    >
+                      📥 Export CSV ({applicationsReport.length})
+                    </button>
+                  </div>
+                </div>
+
+                <div className="table-responsive-wrapper">
+                  <table className="student-roster-table" style={{ width: '100%' }}>
+                    <thead>
+                      <tr>
+                        <th>Candidate Details</th>
+                        <th>Branch & Year</th>
+                        <th style={{ textAlign: 'center' }}>PRI Score</th>
+                        <th>Job Opportunity</th>
+                        <th>Applied On</th>
+                        <th style={{ minWidth: '160px' }}>Application Status</th>
+                        <th style={{ textAlign: 'center' }}>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {loadingApplicationsReport ? (
+                        <tr>
+                          <td colSpan="7" className="table-empty-msg" style={{ padding: '40px' }}>
+                            <span className="spinner-loader" style={{ margin: '0 auto 12px' }}></span>
+                            <p style={{ margin: 0, color: '#94a3b8' }}>Loading student applied jobs report...</p>
+                          </td>
+                        </tr>
+                      ) : applicationsReport.length > 0 ? (
+                        applicationsReport.map((app) => {
+                          const isUpdating = updatingAppStatusId === `${app.studentId}_${app.jobId}`;
+                          return (
+                            <tr key={app.applicationId || `${app.studentId}_${app.jobId}`}>
+                              <td>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                  <div style={{
+                                    width: '36px',
+                                    height: '36px',
+                                    borderRadius: '50%',
+                                    background: 'linear-gradient(135deg, #6366f1, #a855f7)',
+                                    color: '#fff',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    fontWeight: 700,
+                                    fontSize: '14px',
+                                    flexShrink: 0
+                                  }}>
+                                    {(app.studentName || 'U').charAt(0).toUpperCase()}
+                                  </div>
+                                  <div>
+                                    <strong style={{ color: '#f8fafc', fontSize: '13.5px' }}>{app.studentName}</strong>
+                                    <div style={{ color: '#94a3b8', fontSize: '12px' }}>{app.studentEmail}</div>
+                                    <div style={{ color: '#64748b', fontSize: '11px', fontFamily: 'monospace' }}>Roll: {app.studentRollNumber}</div>
+                                  </div>
+                                </div>
+                              </td>
+                              <td>
+                                <div style={{ fontWeight: 600, color: '#cbd5e1' }}>{app.studentBranch}</div>
+                                <div style={{ color: '#94a3b8', fontSize: '12px' }}>
+                                  {app.studentAcademicYear} {app.studentSection && app.studentSection !== 'N/A' ? `• Sec ${app.studentSection}` : ''}
+                                </div>
+                              </td>
+                              <td style={{ textAlign: 'center' }}>
+                                <span style={{
+                                  display: 'inline-block',
+                                  padding: '4px 10px',
+                                  borderRadius: '12px',
+                                  fontSize: '12px',
+                                  fontWeight: 700,
+                                  background: (app.studentReadiness || 0) >= 75 ? 'rgba(34, 197, 94, 0.15)' : (app.studentReadiness || 0) >= 50 ? 'rgba(234, 179, 8, 0.15)' : 'rgba(239, 68, 68, 0.15)',
+                                  color: (app.studentReadiness || 0) >= 75 ? '#86efac' : (app.studentReadiness || 0) >= 50 ? '#fde047' : '#fca5a5',
+                                  border: `1px solid ${(app.studentReadiness || 0) >= 75 ? 'rgba(34, 197, 94, 0.3)' : (app.studentReadiness || 0) >= 50 ? 'rgba(234, 179, 8, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`
+                                }}>
+                                  {app.studentReadiness || 0}%
+                                </span>
+                              </td>
+                              <td>
+                                <div style={{ fontWeight: 600, color: '#f1f5f9' }}>{app.jobTitle}</div>
+                                <div style={{ color: '#a5b4fc', fontSize: '12px' }}>🏢 {app.jobCompany}</div>
+                                <div style={{ color: '#34d399', fontSize: '11.5px', marginTop: '2px' }}>💰 {app.jobSalary}</div>
+                              </td>
+                              <td>
+                                <span style={{ fontSize: '12.5px', color: '#94a3b8' }}>
+                                  {app.appliedAt ? new Date(app.appliedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'N/A'}
+                                </span>
+                              </td>
+                              <td>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                  <select
+                                    value={app.status || 'applied'}
+                                    disabled={isUpdating}
+                                    onChange={(e) => handleUpdateCandidateStatus(app.studentId, app.jobId, e.target.value)}
+                                    style={{
+                                      padding: '5px 10px',
+                                      borderRadius: '6px',
+                                      fontSize: '12px',
+                                      fontWeight: 600,
+                                      cursor: isUpdating ? 'wait' : 'pointer',
+                                      background:
+                                        (app.status || 'applied') === 'offered'
+                                          ? 'rgba(16, 185, 129, 0.2)'
+                                          : (app.status || 'applied') === 'interviewing'
+                                          ? 'rgba(245, 158, 11, 0.2)'
+                                          : (app.status || 'applied') === 'rejected'
+                                          ? 'rgba(239, 68, 68, 0.2)'
+                                          : 'rgba(99, 102, 241, 0.2)',
+                                      color:
+                                        (app.status || 'applied') === 'offered'
+                                          ? '#34d399'
+                                          : (app.status || 'applied') === 'interviewing'
+                                          ? '#fbbf24'
+                                          : (app.status || 'applied') === 'rejected'
+                                          ? '#f87171'
+                                          : '#818cf8',
+                                      border: '1px solid currentColor'
+                                    }}
+                                  >
+                                    <option value="applied" style={{ background: '#0f172a', color: '#fff' }}>⏳ Under Review</option>
+                                    <option value="interviewing" style={{ background: '#0f172a', color: '#fff' }}>🎙️ Interviewing</option>
+                                    <option value="offered" style={{ background: '#0f172a', color: '#fff' }}>🎉 Offered</option>
+                                    <option value="rejected" style={{ background: '#0f172a', color: '#fff' }}>❌ Rejected</option>
+                                    <option value="withdrawn" style={{ background: '#0f172a', color: '#fff' }}>↩️ Withdrawn</option>
+                                  </select>
+                                  {isUpdating && <span className="spinner-mini" style={{ width: '14px', height: '14px' }}></span>}
+                                </div>
+                              </td>
+                              <td style={{ textAlign: 'center' }}>
+                                <button
+                                  type="button"
+                                  className="btn btn-secondary btn-sm"
+                                  onClick={() => setSelectedAppForModal(app)}
+                                  title="View full application details"
+                                  style={{ fontSize: '12px', padding: '4px 10px' }}
+                                >
+                                  👁️ Details
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })
+                      ) : (
+                        <tr>
+                          <td colSpan="7" className="table-empty-msg" style={{ padding: '40px 20px', textAlign: 'center' }}>
+                            <div style={{ fontSize: '2rem', marginBottom: '8px' }}>🔍</div>
+                            <h4 style={{ margin: '0 0 6px 0', color: '#f1f5f9' }}>No student applications found</h4>
+                            <p style={{ margin: 0, color: '#94a3b8', fontSize: '13px' }}>
+                              Try clearing filters or search terms. When students apply from the Job Board, their submissions will appear here instantly.
+                            </p>
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
                 </div>
               </div>
             </div>
@@ -6710,6 +7344,151 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
                   setSelectedStudentPracticeReport(null);
                   setViewingCodeSnippet(null);
                 }}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Candidate Application Details Modal */}
+      {selectedAppForModal && (
+        <div className="modal-backdrop" onClick={() => setSelectedAppForModal(null)}>
+          <div
+            className="modal-content glass-card"
+            style={{ maxWidth: '640px', width: '90%', padding: 0, overflow: 'hidden' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ padding: '20px 24px', borderBottom: '1px solid rgba(255,255,255,0.08)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <span style={{ fontSize: '1.5rem' }}>📄</span>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '1.15rem', color: '#f8fafc' }}>Candidate Application Dossier</h3>
+                  <span style={{ fontSize: '12px', color: '#94a3b8' }}>Application ID: {selectedAppForModal.applicationId}</span>
+                </div>
+              </div>
+              <button
+                type="button"
+                className="close-btn"
+                onClick={() => setSelectedAppForModal(null)}
+                style={{ background: 'transparent', border: 'none', color: '#94a3b8', fontSize: '1.4rem', cursor: 'pointer' }}
+              >
+                &times;
+              </button>
+            </div>
+
+            <div style={{ padding: '24px', maxHeight: '70vh', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              {/* Student Info Box */}
+              <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '10px', padding: '16px 20px' }}>
+                <span style={{ fontSize: '12px', fontWeight: 700, color: '#818cf8', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Candidate Profile</span>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px', marginTop: '10px' }}>
+                  <div>
+                    <span style={{ fontSize: '11.5px', color: '#94a3b8', display: 'block' }}>Full Name</span>
+                    <strong style={{ color: '#f1f5f9', fontSize: '14px' }}>{selectedAppForModal.studentName}</strong>
+                  </div>
+                  <div>
+                    <span style={{ fontSize: '11.5px', color: '#94a3b8', display: 'block' }}>Email Address</span>
+                    <span style={{ color: '#cbd5e1', fontSize: '13px' }}>{selectedAppForModal.studentEmail}</span>
+                  </div>
+                  <div>
+                    <span style={{ fontSize: '11.5px', color: '#94a3b8', display: 'block' }}>Roll Number</span>
+                    <span style={{ color: '#cbd5e1', fontSize: '13px', fontFamily: 'monospace' }}>{selectedAppForModal.studentRollNumber}</span>
+                  </div>
+                  <div>
+                    <span style={{ fontSize: '11.5px', color: '#94a3b8', display: 'block' }}>Branch & Section</span>
+                    <span style={{ color: '#cbd5e1', fontSize: '13px' }}>{selectedAppForModal.studentBranch} (Sec {selectedAppForModal.studentSection})</span>
+                  </div>
+                  <div>
+                    <span style={{ fontSize: '11.5px', color: '#94a3b8', display: 'block' }}>Academic Batch</span>
+                    <span style={{ color: '#cbd5e1', fontSize: '13px' }}>{selectedAppForModal.studentAcademicYear}</span>
+                  </div>
+                  <div>
+                    <span style={{ fontSize: '11.5px', color: '#94a3b8', display: 'block' }}>Placement Readiness Score</span>
+                    <span style={{ color: '#34d399', fontSize: '14px', fontWeight: 700 }}>{selectedAppForModal.studentReadiness}% Ready</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Job Info Box */}
+              <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '10px', padding: '16px 20px' }}>
+                <span style={{ fontSize: '12px', fontWeight: 700, color: '#38bdf8', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Job Opportunity</span>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px', marginTop: '10px' }}>
+                  <div>
+                    <span style={{ fontSize: '11.5px', color: '#94a3b8', display: 'block' }}>Job Role</span>
+                    <strong style={{ color: '#f1f5f9', fontSize: '14px' }}>{selectedAppForModal.jobTitle}</strong>
+                  </div>
+                  <div>
+                    <span style={{ fontSize: '11.5px', color: '#94a3b8', display: 'block' }}>Hiring Company</span>
+                    <span style={{ color: '#cbd5e1', fontSize: '13px' }}>{selectedAppForModal.jobCompany}</span>
+                  </div>
+                  <div>
+                    <span style={{ fontSize: '11.5px', color: '#94a3b8', display: 'block' }}>Location</span>
+                    <span style={{ color: '#cbd5e1', fontSize: '13px' }}>{selectedAppForModal.jobLocation}</span>
+                  </div>
+                  <div>
+                    <span style={{ fontSize: '11.5px', color: '#94a3b8', display: 'block' }}>Salary / Compensation</span>
+                    <span style={{ color: '#34d399', fontSize: '13px', fontWeight: 600 }}>{selectedAppForModal.jobSalary}</span>
+                  </div>
+                  <div>
+                    <span style={{ fontSize: '11.5px', color: '#94a3b8', display: 'block' }}>Eligible Batch</span>
+                    <span style={{ color: '#cbd5e1', fontSize: '13px' }}>{selectedAppForModal.jobTargetBatch}</span>
+                  </div>
+                  <div>
+                    <span style={{ fontSize: '11.5px', color: '#94a3b8', display: 'block' }}>Applied On</span>
+                    <span style={{ color: '#cbd5e1', fontSize: '13px' }}>
+                      {selectedAppForModal.appliedAt ? new Date(selectedAppForModal.appliedAt).toLocaleString() : 'N/A'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Status Update Controls */}
+              <div style={{ background: 'rgba(99, 102, 241, 0.06)', border: '1px solid rgba(99, 102, 241, 0.25)', borderRadius: '10px', padding: '16px 20px' }}>
+                <span style={{ fontSize: '12px', fontWeight: 700, color: '#a5b4fc', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                  Update Application Status
+                </span>
+                <p style={{ margin: '4px 0 12px 0', fontSize: '12px', color: '#94a3b8' }}>
+                  Selecting a status immediately updates student placement analytics and sends a notification to the student's dashboard.
+                </p>
+
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                  {[
+                    { key: 'applied', label: '⏳ Under Review', color: '#818cf8', bg: 'rgba(99, 102, 241, 0.2)' },
+                    { key: 'interviewing', label: '🎙️ Interviewing', color: '#fbbf24', bg: 'rgba(245, 158, 11, 0.2)' },
+                    { key: 'offered', label: '🎉 Offered', color: '#34d399', bg: 'rgba(16, 185, 129, 0.2)' },
+                    { key: 'rejected', label: '❌ Rejected', color: '#f87171', bg: 'rgba(239, 68, 68, 0.2)' },
+                    { key: 'withdrawn', label: '↩️ Withdrawn', color: '#94a3b8', bg: 'rgba(148, 163, 184, 0.2)' }
+                  ].map((st) => (
+                    <button
+                      key={st.key}
+                      type="button"
+                      disabled={updatingAppStatusId === `${selectedAppForModal.studentId}_${selectedAppForModal.jobId}`}
+                      onClick={() => handleUpdateCandidateStatus(selectedAppForModal.studentId, selectedAppForModal.jobId, st.key)}
+                      style={{
+                        padding: '8px 14px',
+                        borderRadius: '6px',
+                        fontSize: '12.5px',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        border: selectedAppForModal.status === st.key ? `2px solid ${st.color}` : '1px solid rgba(255,255,255,0.1)',
+                        background: selectedAppForModal.status === st.key ? st.bg : 'rgba(255,255,255,0.04)',
+                        color: selectedAppForModal.status === st.key ? st.color : '#94a3b8',
+                        transition: 'all 0.2s ease'
+                      }}
+                    >
+                      {st.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div style={{ padding: '16px 24px', borderTop: '1px solid rgba(255,255,255,0.08)', display: 'flex', justifyContent: 'flex-end', gap: '10px', background: 'rgba(255,255,255,0.02)' }}>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => setSelectedAppForModal(null)}
               >
                 Close
               </button>

@@ -13,6 +13,9 @@ const Dashboard = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [curriculumSubjects, setCurriculumSubjects] = useState([]);
+  const [appliedJobs, setAppliedJobs] = useState([]);
+  const [loadingAppliedJobs, setLoadingAppliedJobs] = useState(false);
+  const [appliedJobsFilter, setAppliedJobsFilter] = useState('all');
 
   // History Modal states
   const [selectedHistoryCategory, setSelectedHistoryCategory] = useState(null);
@@ -381,6 +384,72 @@ const Dashboard = () => {
     }
   };
 
+  const fetchAppliedJobs = async () => {
+    try {
+      setLoadingAppliedJobs(true);
+      const res = await fetch(`${API_URL}/jobs/applied`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (data.success) {
+        setAppliedJobs(data.data || []);
+      }
+    } catch (err) {
+      console.error('Failed to fetch student applied jobs:', err);
+    } finally {
+      setLoadingAppliedJobs(false);
+    }
+  };
+
+  const handleDownloadMyApplicationsCsv = () => {
+    if (!appliedJobs || appliedJobs.length === 0) {
+      alert('You have no applied jobs to download.');
+      return;
+    }
+
+    const headers = [
+      'Job Title',
+      'Company',
+      'Location',
+      'Salary / Package',
+      'Experience Level',
+      'Target Batch',
+      'Application Status',
+      'Applied Date'
+    ];
+
+    const escapeCsv = (val) => {
+      if (val === null || val === undefined) return '""';
+      const str = String(val).replace(/"/g, '""');
+      return `"${str}"`;
+    };
+
+    const rows = appliedJobs.map((item) => {
+      const j = item.job || {};
+      return [
+        escapeCsv(j.title || 'N/A'),
+        escapeCsv(j.company || 'N/A'),
+        escapeCsv(j.location || 'Remote'),
+        escapeCsv(j.salary || 'Not Specified'),
+        escapeCsv(j.experienceLevel || 'Entry Level'),
+        escapeCsv(j.targetBatch || 'All'),
+        escapeCsv((item.status || 'applied').toUpperCase()),
+        escapeCsv(item.appliedAt ? new Date(item.appliedAt).toLocaleString() : 'N/A')
+      ].join(',');
+    });
+
+    const csvContent = [headers.map(escapeCsv).join(','), ...rows].join('\r\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `My_Applied_Jobs_Report_${(user?.name || 'Student').replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  };
+
   useEffect(() => {
     if (token) {
       fetchDashboardStats();
@@ -388,6 +457,7 @@ const Dashboard = () => {
       fetchLeaderboard();
       fetchPracticeStats();
       fetchCurriculumSubjects();
+      fetchAppliedJobs();
     }
   }, [token]);
 
@@ -1102,6 +1172,183 @@ const Dashboard = () => {
                   )}
                 </div>
               </div>
+            </div>
+
+            {/* Applied Jobs & Placement Report Card */}
+            <div className="glass-card applied-jobs-dashboard-card animate-fade">
+              <div className="applied-jobs-header">
+                <div className="applied-jobs-title-box">
+                  <h3>
+                    <span>💼</span>
+                    <span>Applied Jobs & Placement Report</span>
+                  </h3>
+                  <p className="card-desc" style={{ margin: 0 }}>
+                    Track your active applications, drive status, interviews, and offers in real time.
+                  </p>
+                </div>
+
+                <div className="applied-jobs-actions">
+                  <span className="badge" style={{ backgroundColor: 'rgba(99, 102, 241, 0.15)', color: '#818cf8', border: '1px solid rgba(99, 102, 241, 0.3)', padding: '6px 12px', borderRadius: '6px', fontSize: '13px', fontWeight: 600 }}>
+                    {appliedJobs.length} {appliedJobs.length === 1 ? 'Application' : 'Applications'}
+                  </span>
+                  {appliedJobs.length > 0 && (
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-sm"
+                      onClick={handleDownloadMyApplicationsCsv}
+                      title="Download your job applications report as CSV"
+                    >
+                      📥 Download My Report (CSV)
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    className="btn btn-primary btn-sm"
+                    onClick={() => navigate('/jobs')}
+                  >
+                    Explore Job Board ↗
+                  </button>
+                </div>
+              </div>
+
+              {appliedJobs.length > 0 ? (
+                <>
+                  {/* Summary Metric Counters */}
+                  <div className="applied-metrics-strip">
+                    <div className="applied-metric-badge">
+                      <span className="metric-label">Total Applied</span>
+                      <span className="metric-val" style={{ color: '#818cf8' }}>{appliedJobs.length}</span>
+                    </div>
+                    <div className="applied-metric-badge">
+                      <span className="metric-label">Under Review</span>
+                      <span className="metric-val" style={{ color: '#60a5fa' }}>
+                        {appliedJobs.filter(a => (a.status || 'applied') === 'applied').length}
+                      </span>
+                    </div>
+                    <div className="applied-metric-badge">
+                      <span className="metric-label">Interviewing</span>
+                      <span className="metric-val" style={{ color: '#fbbf24' }}>
+                        {appliedJobs.filter(a => a.status === 'interviewing').length}
+                      </span>
+                    </div>
+                    <div className="applied-metric-badge">
+                      <span className="metric-label">Offers Received</span>
+                      <span className="metric-val" style={{ color: '#34d399' }}>
+                        {appliedJobs.filter(a => a.status === 'offered').length}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Filter Pills */}
+                  <div style={{ display: 'flex', gap: '8px', marginBottom: '14px', flexWrap: 'wrap' }}>
+                    {['all', 'applied', 'interviewing', 'offered', 'rejected'].map(filterKey => {
+                      const count = filterKey === 'all'
+                        ? appliedJobs.length
+                        : appliedJobs.filter(a => (a.status || 'applied') === filterKey).length;
+                      return (
+                        <button
+                          key={filterKey}
+                          type="button"
+                          className="btn btn-sm"
+                          style={{
+                            background: appliedJobsFilter === filterKey ? 'var(--primary)' : 'rgba(255,255,255,0.05)',
+                            color: appliedJobsFilter === filterKey ? '#ffffff' : '#94a3b8',
+                            border: '1px solid ' + (appliedJobsFilter === filterKey ? 'var(--primary)' : 'rgba(255,255,255,0.1)'),
+                            padding: '4px 12px',
+                            fontSize: '12px',
+                            textTransform: 'capitalize'
+                          }}
+                          onClick={() => setAppliedJobsFilter(filterKey)}
+                        >
+                          {filterKey === 'applied' ? 'Under Review' : filterKey} ({count})
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Table of Applied Jobs */}
+                  <div className="applied-jobs-table-wrapper">
+                    <table className="applied-jobs-table">
+                      <thead>
+                        <tr>
+                          <th>Role & Company</th>
+                          <th>Location</th>
+                          <th>Package / Stipend</th>
+                          <th>Applied Date</th>
+                          <th>Application Status</th>
+                          <th style={{ textAlign: 'right' }}>Action</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {appliedJobs
+                          .filter(a => appliedJobsFilter === 'all' || (a.status || 'applied') === appliedJobsFilter)
+                          .map((appItem, idx) => {
+                            const job = appItem.job || {};
+                            const status = appItem.status || 'applied';
+                            return (
+                              <tr key={idx}>
+                                <td>
+                                  <div>
+                                    <strong style={{ color: '#f1f5f9', fontSize: '14px' }}>{job.title || 'Untitled Role'}</strong>
+                                    <div style={{ color: '#94a3b8', fontSize: '12px', marginTop: '2px' }}>
+                                      🏢 {job.company || 'Unknown Company'}
+                                    </div>
+                                  </div>
+                                </td>
+                                <td>
+                                  <span style={{ color: '#cbd5e1' }}>📍 {job.location || 'Remote'}</span>
+                                </td>
+                                <td>
+                                  <span style={{ color: '#34d399', fontWeight: 600 }}>{job.salary || 'Not Specified'}</span>
+                                </td>
+                                <td>
+                                  <span style={{ color: '#94a3b8', fontSize: '12.5px' }}>
+                                    {appItem.appliedAt ? new Date(appItem.appliedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Recently'}
+                                  </span>
+                                </td>
+                                <td>
+                                  <span className={`status-tag ${status}`}>
+                                    {status === 'offered' && '🎉 OFFERED'}
+                                    {status === 'interviewing' && '🎙️ INTERVIEWING'}
+                                    {status === 'applied' && '⏳ UNDER REVIEW'}
+                                    {status === 'rejected' && '❌ NOT SELECTED'}
+                                    {status === 'withdrawn' && '↩️ WITHDRAWN'}
+                                  </span>
+                                </td>
+                                <td style={{ textAlign: 'right' }}>
+                                  <button
+                                    type="button"
+                                    className="btn btn-secondary btn-sm"
+                                    onClick={() => navigate('/jobs')}
+                                    style={{ fontSize: '12px', padding: '4px 10px' }}
+                                  >
+                                    View in Board →
+                                  </button>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
+              ) : !loadingAppliedJobs ? (
+                <div className="empty-applied-card">
+                  <div style={{ fontSize: '2.5rem', marginBottom: '4px' }}>💼</div>
+                  <h4 style={{ margin: 0, color: '#f1f5f9' }}>No Job Applications Submitted Yet</h4>
+                  <p style={{ margin: 0, color: '#94a3b8', fontSize: '13px', maxWidth: '480px' }}>
+                    Discover placement drives, internships, and high-paying developer roles curated specifically for your batch. Apply with one click and track everything here.
+                  </p>
+                  <button
+                    type="button"
+                    className="btn btn-primary btn-sm"
+                    style={{ marginTop: '8px' }}
+                    onClick={() => navigate('/jobs')}
+                  >
+                    Browse Job Opportunities →
+                  </button>
+                </div>
+              ) : null}
             </div>
           </div>
 

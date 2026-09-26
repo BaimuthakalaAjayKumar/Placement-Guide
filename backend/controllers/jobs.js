@@ -510,6 +510,21 @@ exports.updateApplicationStatus = async (req, res, next) => {
     application.status = status;
     await student.save();
 
+    // Notify student about application status change
+    try {
+      const job = await Job.findById(req.params.id);
+      const jobTitle = job ? `${job.title} at ${job.company}` : 'Job Application';
+      await Notification.create({
+        user: student._id,
+        title: `Job Application Status: ${status.toUpperCase()}`,
+        message: `Your application for ${jobTitle} has been marked as "${status.toUpperCase()}". Check your dashboard for details.`,
+        type: 'job',
+        link: '/jobs'
+      });
+    } catch (notifErr) {
+      console.warn('Could not dispatch notification for job status update:', notifErr.message);
+    }
+
     res.status(200).json({
       success: true,
       message: 'Application status updated successfully',
@@ -519,3 +534,223 @@ exports.updateApplicationStatus = async (req, res, next) => {
     next(err);
   }
 };
+
+// @desc    Get all students' applied jobs report (Admin/Faculty)
+// @route   GET /api/jobs/admin/applications-report
+// @access  Private/Admin,Faculty
+exports.getAppliedJobsReport = async (req, res, next) => {
+  try {
+    const { status, jobId, branch, academicYear, search } = req.query;
+
+    const query = {
+      'appliedJobs.0': { $exists: true }
+    };
+
+    if (branch && branch !== 'all') {
+      query.branch = branch;
+    }
+    if (academicYear && academicYear !== 'all') {
+      query.academicYear = academicYear;
+    }
+
+    const students = await User.find(query)
+      .select('name email rollNumber branch section year academicYear readinessScore appliedJobs')
+      .populate('appliedJobs.job');
+
+    const applications = [];
+
+    students.forEach((student) => {
+      if (!Array.isArray(student.appliedJobs)) return;
+      student.appliedJobs.forEach((app) => {
+        if (!app || !app.job) return;
+
+        // Filter by jobId
+        if (jobId && jobId !== 'all' && app.job._id.toString() !== jobId.toString()) {
+          return;
+        }
+
+        // Filter by status
+        if (status && status !== 'all' && app.status !== status) {
+          return;
+        }
+
+        // Search filter
+        if (search && search.trim()) {
+          const s = search.trim().toLowerCase();
+          const matchStudent =
+            (student.name && student.name.toLowerCase().includes(s)) ||
+            (student.email && student.email.toLowerCase().includes(s)) ||
+            (student.rollNumber && student.rollNumber.toLowerCase().includes(s)) ||
+            (student.branch && student.branch.toLowerCase().includes(s));
+          const matchJob =
+            (app.job.title && app.job.title.toLowerCase().includes(s)) ||
+            (app.job.company && app.job.company.toLowerCase().includes(s)) ||
+            (app.job.location && app.job.location.toLowerCase().includes(s));
+          if (!matchStudent && !matchJob) return;
+        }
+
+        applications.push({
+          applicationId: `${student._id}_${app.job._id}`,
+          studentId: student._id,
+          studentName: student.name,
+          studentEmail: student.email,
+          studentRollNumber: student.rollNumber || 'N/A',
+          studentBranch: student.branch || 'N/A',
+          studentSection: student.section || 'N/A',
+          studentAcademicYear: student.academicYear || student.year || 'N/A',
+          studentReadiness: student.readinessScore || 0,
+          jobId: app.job._id,
+          jobTitle: app.job.title,
+          jobCompany: app.job.company,
+          jobLocation: app.job.location || 'Remote',
+          jobSalary: app.job.salary || 'Not Specified',
+          jobTargetBatch: app.job.targetBatch || 'All',
+          status: app.status || 'applied',
+          appliedAt: app.appliedAt || new Date()
+        });
+      });
+    });
+
+    // Sort by appliedAt descending
+    applications.sort((a, b) => new Date(b.appliedAt) - new Date(a.appliedAt));
+
+    const totalApplications = applications.length;
+    const uniqueStudents = new Set(applications.map((a) => a.studentId.toString())).size;
+    const appliedCount = applications.filter((a) => a.status === 'applied').length;
+    const interviewingCount = applications.filter((a) => a.status === 'interviewing').length;
+    const offeredCount = applications.filter((a) => a.status === 'offered').length;
+    const rejectedCount = applications.filter((a) => a.status === 'rejected').length;
+    const withdrawnCount = applications.filter((a) => a.status === 'withdrawn').length;
+
+    res.status(200).json({
+      success: true,
+      count: applications.length,
+      stats: {
+        totalApplications,
+        uniqueStudents,
+        appliedCount,
+        interviewingCount,
+        offeredCount,
+        rejectedCount,
+        withdrawnCount
+      },
+      data: applications
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// @desc    Export applied jobs report as CSV (Admin/Faculty)
+// @route   GET /api/jobs/admin/applications-report/export-csv
+// @access  Private/Admin,Faculty
+exports.exportAppliedJobsCsv = async (req, res, next) => {
+  try {
+    const { status, jobId, branch, academicYear, search } = req.query;
+
+    const query = {
+      'appliedJobs.0': { $exists: true }
+    };
+    if (branch && branch !== 'all') query.branch = branch;
+    if (academicYear && academicYear !== 'all') query.academicYear = academicYear;
+
+    const students = await User.find(query)
+      .select('name email rollNumber branch section year academicYear readinessScore appliedJobs')
+      .populate('appliedJobs.job');
+
+    const rows = [];
+    students.forEach((student) => {
+      if (!Array.isArray(student.appliedJobs)) return;
+      student.appliedJobs.forEach((app) => {
+        if (!app || !app.job) return;
+        if (jobId && jobId !== 'all' && app.job._id.toString() !== jobId.toString()) return;
+        if (status && status !== 'all' && app.status !== status) return;
+
+        if (search && search.trim()) {
+          const s = search.trim().toLowerCase();
+          const matchStudent =
+            (student.name && student.name.toLowerCase().includes(s)) ||
+            (student.email && student.email.toLowerCase().includes(s)) ||
+            (student.rollNumber && student.rollNumber.toLowerCase().includes(s));
+          const matchJob =
+            (app.job.title && app.job.title.toLowerCase().includes(s)) ||
+            (app.job.company && app.job.company.toLowerCase().includes(s));
+          if (!matchStudent && !matchJob) return;
+        }
+
+        rows.push({
+          studentName: student.name,
+          rollNumber: student.rollNumber || 'N/A',
+          email: student.email,
+          branch: student.branch || 'N/A',
+          section: student.section || 'N/A',
+          academicYear: student.academicYear || student.year || 'N/A',
+          readiness: student.readinessScore || 0,
+          jobTitle: app.job.title,
+          company: app.job.company,
+          location: app.job.location || 'Remote',
+          salary: app.job.salary || 'Not Specified',
+          targetBatch: app.job.targetBatch || 'All',
+          status: (app.status || 'applied').toUpperCase(),
+          appliedDate: app.appliedAt ? new Date(app.appliedAt).toLocaleString() : 'N/A'
+        });
+      });
+    });
+
+    rows.sort((a, b) => new Date(b.appliedDate) - new Date(a.appliedDate));
+
+    // Build CSV
+    const headers = [
+      'Student Name',
+      'Roll Number',
+      'Email',
+      'Branch',
+      'Section',
+      'Academic Year',
+      'Readiness Score (%)',
+      'Job Title',
+      'Company',
+      'Location',
+      'Salary / Package',
+      'Target Batch',
+      'Application Status',
+      'Applied Date'
+    ];
+
+    const escapeCsv = (val) => {
+      if (val === null || val === undefined) return '""';
+      const str = String(val).replace(/"/g, '""');
+      return `"${str}"`;
+    };
+
+    const csvContent = [
+      headers.map(escapeCsv).join(','),
+      ...rows.map((r) =>
+        [
+          escapeCsv(r.studentName),
+          escapeCsv(r.rollNumber),
+          escapeCsv(r.email),
+          escapeCsv(r.branch),
+          escapeCsv(r.section),
+          escapeCsv(r.academicYear),
+          escapeCsv(r.readiness),
+          escapeCsv(r.jobTitle),
+          escapeCsv(r.company),
+          escapeCsv(r.location),
+          escapeCsv(r.salary),
+          escapeCsv(r.targetBatch),
+          escapeCsv(r.status),
+          escapeCsv(r.appliedDate)
+        ].join(',')
+      )
+    ].join('\r\n');
+
+    const filename = `griet_applied_jobs_report_${new Date().toISOString().slice(0, 10)}.csv`;
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    return res.status(200).send(csvContent);
+  } catch (err) {
+    next(err);
+  }
+};
+

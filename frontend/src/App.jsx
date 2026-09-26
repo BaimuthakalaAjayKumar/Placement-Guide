@@ -256,6 +256,14 @@ const AppRoutes = () => {
         }
       />
       <Route
+        path="/applied-jobs-report"
+        element={
+          <PrivateRoute allowedRoles={['admin', 'faculty']}>
+            <AdminPanel defaultTab="applied-jobs" />
+          </PrivateRoute>
+        }
+      />
+      <Route
         path="/job-postings"
         element={
           <PrivateRoute allowedRoles={['admin']}>

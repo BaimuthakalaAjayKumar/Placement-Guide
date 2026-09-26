@@ -110,11 +110,15 @@ export const AuthProvider = ({ children }) => {
       }
     } catch (err) {
       const isConnectionError = err.message?.includes('Failed to fetch') || err.name === 'TypeError';
+      const isProduction = typeof window !== 'undefined' && (window.location.protocol === 'https:' || window.location.hostname.includes('vercel.app'));
+      const errorMsg = isConnectionError
+        ? (isProduction
+            ? 'Cannot connect to backend server. Render cloud servers spin down after inactivity and take ~30-50s to wake up on first request. Please wait a few moments and click Sign In again.'
+            : 'Cannot connect to backend server. Please ensure the backend is running on http://localhost:5000 (run "npm run dev" in the backend directory or run start.bat).')
+        : (err.message || 'Network error. Please try again later.');
       return {
         success: false,
-        error: isConnectionError
-          ? 'Network error. Could not connect to backend server. Please try again later.'
-          : (err.message || 'Network error. Please try again later.')
+        error: errorMsg
       };
     } finally {
       setLoading(false);

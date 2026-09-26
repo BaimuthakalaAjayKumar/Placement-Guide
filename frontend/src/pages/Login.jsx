@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { checkBackendHealth, API_URL } from '../config/api';
 import './Auth.css';
 
 const Login = () => {
@@ -15,9 +16,24 @@ const Login = () => {
   });
   const [error, setError] = useState('');
   const [localLoading, setLocalLoading] = useState(false);
+  const [checkingServer, setCheckingServer] = useState(false);
+  const [serverStatusMsg, setServerStatusMsg] = useState('');
 
   const { login } = useAuth();
   const navigate = useNavigate();
+
+  const handleTestConnection = async () => {
+    setCheckingServer(true);
+    setServerStatusMsg('Testing connection to backend...');
+    const isAlive = await checkBackendHealth();
+    setCheckingServer(false);
+    if (isAlive) {
+      setServerStatusMsg('Backend is online and reachable! You can sign in now.');
+      setError('');
+    } else {
+      setServerStatusMsg(`Unable to reach backend at ${API_URL}. Please ensure backend server is started.`);
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -72,11 +88,48 @@ const Login = () => {
         </div>
 
         {error && (
-          <div className="auth-error-alert">
-            <svg viewBox="0 0 24 24" className="alert-icon"><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></svg>
-            <span>{error}</span>
+          <div className="auth-error-alert" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+              <svg viewBox="0 0 24 24" className="alert-icon" style={{ flexShrink: 0, marginTop: '2px' }}><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></svg>
+              <span style={{ fontSize: '13px', lineHeight: '1.4' }}>{error}</span>
+            </div>
+            {error.toLowerCase().includes('connect') && (
+              <div style={{ marginTop: '4px', display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <button
+                  type="button"
+                  onClick={handleTestConnection}
+                  disabled={checkingServer}
+                  style={{
+                    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+                    border: '1px solid rgba(255, 255, 255, 0.25)',
+                    color: '#fff',
+                    borderRadius: '4px',
+                    padding: '4px 10px',
+                    fontSize: '12px',
+                    cursor: checkingServer ? 'wait' : 'pointer'
+                  }}
+                >
+                  {checkingServer ? '🔄 Checking Server...' : '🔄 Test Connection'}
+                </button>
+              </div>
+            )}
           </div>
         )}
+
+        {serverStatusMsg && (
+          <div style={{
+            padding: '10px 14px',
+            borderRadius: '6px',
+            fontSize: '12.5px',
+            marginBottom: '16px',
+            backgroundColor: serverStatusMsg.includes('online') ? 'rgba(34, 197, 94, 0.15)' : 'rgba(239, 68, 68, 0.15)',
+            border: `1px solid ${serverStatusMsg.includes('online') ? 'rgba(34, 197, 94, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`,
+            color: serverStatusMsg.includes('online') ? '#86efac' : '#fca5a5'
+          }}>
+            {serverStatusMsg}
+          </div>
+        )}
+
 
         <form onSubmit={handleSubmit} className="auth-form">
           <div className="form-group">
