@@ -93,6 +93,15 @@ exports.deleteNotification = async (req, res, next) => {
 
         await notification.deleteOne();
 
+        res.status(200).json({
+            success: true,
+            data: {}
+        });
+    } catch (err) {
+        next(err);
+    }
+};
+
 // @desc    Get dynamic, role-specific intelligent smart alerts
 // @route   GET /api/notifications/smart-alerts
 // @access  Private
