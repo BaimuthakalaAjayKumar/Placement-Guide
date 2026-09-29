@@ -183,6 +183,9 @@ const aiChatRoutes = require('./routes/aiChat');
 const academicRoutes = require('./routes/academic');
 const labRoutes = require('./routes/labs');
 const auditRoutes = require('./routes/audit');
+const placementDriveRoutes = require('./routes/placementDrives');
+const placementEventRoutes = require('./routes/placementEvents');
+const atRiskRoutes = require('./routes/atRisk');
 
 // ============================================================
 // MOUNT API ROUTES
@@ -205,6 +208,9 @@ app.use('/api/ai', aiChatRoutes);
 app.use('/api/academic', academicRoutes);
 app.use('/api/labs', labRoutes);
 app.use('/api/audit', auditRoutes);
+app.use('/api/placement-drives', placementDriveRoutes);
+app.use('/api/placement-events', placementEventRoutes);
+app.use('/api/at-risk', atRiskRoutes);
 
 // ============================================================
 // HEALTH CHECK

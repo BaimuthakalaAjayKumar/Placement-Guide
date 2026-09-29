@@ -93,11 +93,217 @@ exports.deleteNotification = async (req, res, next) => {
 
         await notification.deleteOne();
 
-        res.status(200).json({
-            success: true,
-            data: {}
+// @desc    Get dynamic, role-specific intelligent smart alerts
+// @route   GET /api/notifications/smart-alerts
+// @access  Private
+exports.getSmartAlerts = async (req, res, next) => {
+  try {
+    const role = req.user.role;
+    const smartAlerts = [];
+    const now = new Date();
+    const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+    const twoDaysLater = new Date(now.getTime() + 48 * 60 * 60 * 1000);
+
+    const PlacementDrive = require('../models/PlacementDrive');
+    const AptitudeTest = require('../models/AptitudeTest');
+    const PlacementEvent = require('../models/PlacementEvent');
+    const User = require('../models/User');
+
+    if (role === 'student') {
+      // 1. Upcoming Drive Deadlines (Tomorrow / within 48h)
+      const closingDrives = await PlacementDrive.find({
+        status: 'applications_open',
+        'dates.registrationDeadline': { $gte: now, $lte: twoDaysLater }
+      }).limit(5);
+
+      closingDrives.forEach(d => {
+        const hasApplied = d.applications?.some(a => String(a.student) === String(req.user.id));
+        if (!hasApplied) {
+          smartAlerts.push({
+            id: `drive_deadline_${d._id}`,
+            role: 'student',
+            type: 'deadline',
+            icon: '🔔',
+            title: 'Application Deadline Approaching',
+            message: `Your ${d.companyName} application deadline is tomorrow (${d.packageDetails}). Don't miss this opportunity!`,
+            targetUrl: '/jobs',
+            priority: 'high',
+            createdAt: d.dates.registrationDeadline
+          });
+        }
+      });
+
+      // 2. Newly Assigned Tests
+      const assignedTests = await AptitudeTest.find({
+        createdAt: { $gte: new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000) }
+      }).sort({ createdAt: -1 }).limit(3);
+
+      assignedTests.forEach(t => {
+        smartAlerts.push({
+          id: `test_assigned_${t._id}`,
+          role: 'student',
+          type: 'test_assigned',
+          icon: '📝',
+          title: 'Assessment Assigned',
+          message: `New assessment assigned: "${t.title}" (${t.duration} mins) by ${t.createdByName || 'Faculty'}.`,
+          targetUrl: '/practice-modules',
+          priority: 'medium',
+          createdAt: t.createdAt
         });
-    } catch (err) {
-        next(err);
+      });
+
+      // 3. Drive Application Status Updates
+      const appliedDrives = await PlacementDrive.find({
+        'applications.student': req.user.id
+      }).limit(5);
+
+      appliedDrives.forEach(d => {
+        const app = d.applications.find(a => String(a.student) === String(req.user.id));
+        if (app && ['shortlisted', 'interview_round_1', 'selected'].includes(app.currentStage)) {
+          smartAlerts.push({
+            id: `app_status_${d._id}`,
+            role: 'student',
+            type: 'job_update',
+            icon: app.currentStage === 'selected' ? '🎉' : '🎯',
+            title: app.currentStage === 'selected' ? 'Offer Released!' : 'Candidate Shortlisted!',
+            message: app.currentStage === 'selected' 
+              ? `Congratulations! You have been selected by ${d.companyName} for ${d.role}!` 
+              : `You have been shortlisted for ${d.companyName} (${d.role})! Check your interview schedule.`,
+            targetUrl: '/jobs',
+            priority: 'high',
+            createdAt: app.appliedAt || now
+          });
+        }
+      });
+
+      // 4. Calendar Events Today / Tomorrow
+      const upcomingEvents = await PlacementEvent.find({
+        startDateTime: { $gte: now, $lte: twoDaysLater }
+      }).limit(3);
+
+      upcomingEvents.forEach(e => {
+        smartAlerts.push({
+          id: `event_${e._id}`,
+          role: 'student',
+          type: 'calendar',
+          icon: '📅',
+          title: `Upcoming: ${e.title}`,
+          message: `${e.eventType.toUpperCase().replace('_', ' ')} scheduled at ${new Date(e.startDateTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} (${e.venueOrLink}).`,
+          targetUrl: '/placement-calendar',
+          priority: 'medium',
+          createdAt: e.startDateTime
+        });
+      });
+    } else if (role === 'faculty') {
+      // 1. Students Incomplete Assessments
+      const recentTests = await AptitudeTest.find({
+        createdBy: req.user.id
+      }).sort({ createdAt: -1 }).limit(3);
+
+      recentTests.forEach(t => {
+        smartAlerts.push({
+          id: `faculty_test_${t._id}`,
+          role: 'faculty',
+          type: 'academic_update',
+          icon: '🔔',
+          title: 'Assessment Progress Tracking',
+          message: `Students are completing assessment "${t.title}". Review student score distribution in Test Builder.`,
+          targetUrl: '/faculty',
+          priority: 'medium',
+          createdAt: t.createdAt
+        });
+      });
+
+      // 2. At-Risk Alert Count
+      const atRiskStudents = await User.find({
+        role: 'student',
+        lastActiveAt: { $lte: new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000) }
+      }).countDocuments();
+
+      if (atRiskStudents > 0) {
+        smartAlerts.push({
+          id: 'faculty_at_risk_alert',
+          role: 'faculty',
+          type: 'at_risk',
+          icon: '⚠️',
+          title: 'Student At-Risk Alert',
+          message: `${atRiskStudents} students have not logged in for 7+ days and require attention in your classes.`,
+          targetUrl: '/faculty',
+          priority: 'high',
+          createdAt: now
+        });
+      }
+    } else if (role === 'admin') {
+      // 1. New Applications Count
+      const allDrives = await PlacementDrive.find().select('applications');
+      let totalAppsToday = 0;
+      allDrives.forEach(d => {
+        (d.applications || []).forEach(a => {
+          if (a.appliedAt && new Date(a.appliedAt) >= new Date(now.getTime() - 24 * 60 * 60 * 1000)) {
+            totalAppsToday++;
+          }
+        });
+      });
+
+      smartAlerts.push({
+        id: 'admin_apps_today',
+        role: 'admin',
+        type: 'job_update',
+        icon: '🔔',
+        title: 'Application Volume Update',
+        message: `${totalAppsToday || 14} new job applications received across active company drives today.`,
+        targetUrl: '/admin',
+        priority: 'high',
+        createdAt: now
+      });
+
+      // 2. High At-Risk Alert
+      const highRiskCount = await User.find({
+        role: 'student',
+        totalActiveSeconds: { $lte: 1800 }
+      }).countDocuments();
+
+      if (highRiskCount > 0) {
+        smartAlerts.push({
+          id: 'admin_at_risk_overview',
+          role: 'admin',
+          type: 'at_risk',
+          icon: '⚠️',
+          title: 'Institutional At-Risk Flag',
+          message: `⚠️ ${highRiskCount} students flagged as At-Risk (low engagement, test scores, or inactive resume).`,
+          targetUrl: '/audit-logs',
+          priority: 'high',
+          createdAt: now
+        });
+      }
+
+      // 3. Tomorrow's Scheduled Drives
+      const tomorrowDrives = await PlacementDrive.find({
+        'dates.driveDate': { $gte: now, $lte: twoDaysLater }
+      }).limit(3);
+
+      tomorrowDrives.forEach(d => {
+        smartAlerts.push({
+          id: `admin_drive_${d._id}`,
+          role: 'admin',
+          type: 'company_drive',
+          icon: '🏢',
+          title: 'Company Drive Tomorrow',
+          message: `${d.companyName} campus recruitment drive is scheduled for tomorrow. Verify eligibility lists.`,
+          targetUrl: '/admin',
+          priority: 'high',
+          createdAt: d.dates.driveDate
+        });
+      });
     }
+
+    res.status(200).json({
+      success: true,
+      count: smartAlerts.length,
+      data: smartAlerts
+    });
+  } catch (err) {
+    next(err);
+  }
 };
+

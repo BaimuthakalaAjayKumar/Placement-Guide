@@ -94,32 +94,94 @@ exports.getJobs = async (req, res, next) => {
 exports.getJobRecommendations = async (req, res, next) => {
   try {
     const user = await User.findById(req.user.id);
-    const userSkills = user.skills.map(s => s.toLowerCase());
+    const userSkills = (user.skills || []).map(s => s.toLowerCase());
+    const userBranch = (user.branch || '').toLowerCase();
+    const userCgpa = Number(user.cgpa) || 0;
+    const userProjects = user.projects || [];
+    const hasResume = Boolean(user.resume || (user.placementReadinessIndex && user.placementReadinessIndex > 20));
 
     const jobs = await Job.find({
       $or: [{ expiresAt: null }, { expiresAt: { $gt: new Date() } }]
     });
 
     const recommendedJobs = jobs.map(job => {
-      const jobReqs = job.requirements.map(r => r.toLowerCase());
+      const jobReqs = (job.requirements || []).map(r => r.toLowerCase());
+      const whyYouMatch = [];
+      const whatYouAreMissing = [];
 
-      // Calculate matching skills
+      // 1. Skills Evaluation (Weight: 35%)
       const matchedSkills = jobReqs.filter(reqSkill =>
         userSkills.some(userSkill => userSkill.includes(reqSkill) || reqSkill.includes(userSkill))
       );
-
-      const matchPercent = jobReqs.length > 0
-        ? Math.round((matchedSkills.length / jobReqs.length) * 100)
-        : 0;
-
-      // Map display matched skills
-      const matchedSkillsDisplay = job.requirements.filter(reqSkill =>
+      const matchedSkillsDisplay = (job.requirements || []).filter(reqSkill =>
         userSkills.some(userSkill => userSkill.includes(reqSkill.toLowerCase()) || reqSkill.toLowerCase().includes(userSkill))
       );
-
-      const missingSkills = job.requirements.filter(reqSkill =>
+      const missingSkills = (job.requirements || []).filter(reqSkill =>
         !matchedSkillsDisplay.includes(reqSkill)
       );
+      const skillsScore = jobReqs.length > 0
+        ? Math.round((matchedSkills.length / jobReqs.length) * 35)
+        : 35;
+
+      if (matchedSkills.length > 0) {
+        whyYouMatch.push(`🎯 Matched ${matchedSkills.length}/${jobReqs.length} core required skills: ${matchedSkillsDisplay.slice(0, 4).join(', ')}`);
+      }
+      if (missingSkills.length > 0) {
+        whatYouAreMissing.push(`⚠️ Missing skill requirements: ${missingSkills.slice(0, 3).join(', ')}`);
+      }
+
+      // 2. CGPA Evaluation (Weight: 25%)
+      const minCgpa = Number(job.minCgpa) || 6.5;
+      let cgpaScore = 0;
+      if (userCgpa >= minCgpa) {
+        cgpaScore = 25;
+        whyYouMatch.push(`🎓 Academic CGPA (${userCgpa.toFixed(2)}) meets or exceeds requirement (>= ${minCgpa})`);
+      } else if (userCgpa > 0) {
+        cgpaScore = Math.round((userCgpa / minCgpa) * 20);
+        whatYouAreMissing.push(`⚠️ CGPA (${userCgpa.toFixed(2)}) is below preferred cutoff of ${minCgpa}`);
+      } else {
+        cgpaScore = 15;
+      }
+
+      // 3. Branch / Department Evaluation (Weight: 20%)
+      const targetBranches = (job.targetBranches || []).map(b => b.toLowerCase());
+      let branchScore = 20;
+      if (targetBranches.length > 0) {
+        const isBranchMatch = targetBranches.some(b => b.includes(userBranch) || userBranch.includes(b) || b === 'all');
+        if (isBranchMatch) {
+          branchScore = 20;
+          whyYouMatch.push(`🏛️ Branch eligibility satisfied: ${user.branch || 'General'} is directly eligible`);
+        } else {
+          branchScore = 5;
+          whatYouAreMissing.push(`⚠️ Priority branch preference for: ${job.targetBranches.join(', ')}`);
+        }
+      } else {
+        whyYouMatch.push(`🏛️ Open to all institutional branches and streams`);
+      }
+
+      // 4. Projects Alignment (Weight: 10%)
+      let projectsScore = 5;
+      if (userProjects.length >= 2) {
+        projectsScore = 10;
+        whyYouMatch.push(`📁 Portfolio contains ${userProjects.length} completed projects demonstrating practical implementation`);
+      } else if (userProjects.length === 1) {
+        projectsScore = 8;
+        whyYouMatch.push(`📁 1 practical project documented on candidate profile`);
+      } else {
+        whatYouAreMissing.push(`⚠️ Minimal project portfolio. Adding 1-2 domain projects increases placement call probability.`);
+      }
+
+      // 5. Resume Verification (Weight: 10%)
+      let resumeScore = 0;
+      if (hasResume) {
+        resumeScore = 10;
+        whyYouMatch.push(`📄 Candidate resume is verified and structured with ATS keywords`);
+      } else {
+        resumeScore = 2;
+        whatYouAreMissing.push(`⚠️ Incomplete resume on file. Complete AI Resume Builder to boost ATS screening.`);
+      }
+
+      const totalMatch = Math.min(100, Math.max(15, skillsScore + cgpaScore + branchScore + projectsScore + resumeScore));
 
       return {
         _id: job._id,
@@ -136,9 +198,20 @@ exports.getJobRecommendations = async (req, res, next) => {
         targetBranches: job.targetBranches || [],
         targetRoles: job.targetRoles || [],
         expiresAt: job.expiresAt,
-        matchPercentage: matchPercent,
+        matchPercentage: totalMatch,
         matchedSkills: matchedSkillsDisplay,
-        missingSkills
+        missingSkills,
+        matchAnalysis: {
+          whyYouMatch,
+          whatYouAreMissing,
+          breakdown: {
+            skills: skillsScore,
+            cgpa: cgpaScore,
+            branch: branchScore,
+            projects: projectsScore,
+            resume: resumeScore
+          }
+        }
       };
     });
 

@@ -1,0 +1,541 @@
+/* ==========================================================================
+   PLACEMENT MANAGEMENT SYSTEM (PMS) - COMPANY DRIVE MODULE STYLES
+   ========================================================================== */
+
+.company-pms-container {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+/* Header */
+.pms-header-banner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: rgba(18, 24, 38, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-left: 4px solid #10B981;
+  border-radius: 16px;
+  padding: 1.4rem 1.8rem;
+  backdrop-filter: blur(12px);
+  flex-wrap: wrap;
+  gap: 1.2rem;
+}
+
+.pms-header-left {
+  display: flex;
+  align-items: center;
+  gap: 1.2rem;
+  max-width: 820px;
+}
+
+.pms-icon-box {
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+  background: rgba(16, 185, 129, 0.15);
+  border: 1px solid rgba(16, 185, 129, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2rem;
+  flex-shrink: 0;
+}
+
+.pms-title {
+  margin: 0;
+  font-size: 1.35rem;
+  font-weight: 800;
+  color: #FFFFFF;
+}
+
+.pms-sub {
+  margin: 0.35rem 0 0 0;
+  font-size: 0.86rem;
+  color: #94A3B8;
+  line-height: 1.4;
+}
+
+.btn-create-drive {
+  background: linear-gradient(135deg, #10B981, #059669);
+  border: none;
+  color: #FFFFFF;
+  font-weight: 700;
+  font-size: 0.9rem;
+  padding: 0.7rem 1.4rem;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 14px rgba(16, 185, 129, 0.3);
+}
+
+.btn-create-drive:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px rgba(16, 185, 129, 0.45);
+}
+
+.pms-alert-chip {
+  padding: 0.8rem 1.2rem;
+  border-radius: 10px;
+  font-weight: 600;
+  font-size: 0.88rem;
+}
+
+.pms-alert-chip.success {
+  background: rgba(16, 185, 129, 0.15);
+  border: 1px solid rgba(16, 185, 129, 0.4);
+  color: #6EE7B7;
+}
+
+/* Selection Bar */
+.drives-selection-bar {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  background: rgba(18, 24, 38, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 14px;
+  padding: 0.8rem 1.2rem;
+}
+
+.selection-label {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #CBD5E1;
+  text-transform: uppercase;
+}
+
+.drives-pills-row {
+  display: flex;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.drive-chip {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: #CBD5E1;
+  padding: 0.45rem 0.9rem;
+  border-radius: 10px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.84rem;
+  transition: all 0.2s ease;
+}
+
+.drive-chip:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.drive-chip.active {
+  background: rgba(16, 185, 129, 0.2);
+  border-color: rgba(16, 185, 129, 0.5);
+  color: #FFFFFF;
+}
+
+.drive-co {
+  font-weight: 700;
+}
+
+.drive-pkg {
+  color: #FCD34D;
+  font-size: 0.76rem;
+  font-weight: 600;
+}
+
+.drive-count {
+  font-size: 0.74rem;
+  color: #94A3B8;
+}
+
+/* Drive Dossier */
+.drive-dossier-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.drive-overview-card {
+  background: rgba(18, 24, 38, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  padding: 1.6rem;
+  backdrop-filter: blur(12px);
+}
+
+.drive-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 1.2rem;
+  flex-wrap: wrap;
+  gap: 1.2rem;
+}
+
+.co-tag {
+  font-size: 0.76rem;
+  font-weight: 800;
+  color: #10B981;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.drive-name {
+  margin: 0.2rem 0 0.3rem 0;
+  font-size: 1.4rem;
+  font-weight: 800;
+  color: #FFFFFF;
+}
+
+.role-tag {
+  font-size: 0.86rem;
+  color: #94A3B8;
+}
+
+.drive-kpis {
+  display: flex;
+  gap: 1rem;
+}
+
+.kpi-mini {
+  background: rgba(11, 15, 25, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
+  padding: 0.6rem 1rem;
+  text-align: center;
+  min-width: 90px;
+}
+
+.kpi-mini .val {
+  display: block;
+  font-size: 1.2rem;
+  font-weight: 800;
+  color: #FFFFFF;
+}
+
+.kpi-mini .lbl {
+  font-size: 0.7rem;
+  color: #64748B;
+  text-transform: uppercase;
+}
+
+.eligibility-rules-strip {
+  display: flex;
+  gap: 1.2rem;
+  flex-wrap: wrap;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  padding-top: 1rem;
+}
+
+.rule-item {
+  font-size: 0.82rem;
+  color: #94A3B8;
+}
+
+.rule-item strong {
+  color: #E2E8F0;
+  margin-left: 0.3rem;
+}
+
+/* Kanban / Pipeline */
+.pipeline-lifecycle-section {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.pipeline-header h4 {
+  margin: 0;
+  font-size: 1.15rem;
+  color: #FFFFFF;
+}
+
+.pipeline-hint {
+  font-size: 0.82rem;
+  color: #64748B;
+}
+
+.stages-columns-wrapper {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1rem;
+  overflow-x: auto;
+  padding-bottom: 0.8rem;
+}
+
+.stage-column {
+  background: rgba(18, 24, 38, 0.65);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 14px;
+  display: flex;
+  flex-direction: column;
+  min-height: 380px;
+  max-height: 520px;
+}
+
+.stage-column-top {
+  border-top: 3px solid #6366F1;
+  padding: 0.8rem 1rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: rgba(11, 15, 25, 0.4);
+  border-radius: 14px 14px 0 0;
+}
+
+.stage-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.stage-text {
+  font-size: 0.84rem;
+  font-weight: 700;
+  color: #FFFFFF;
+}
+
+.stage-count-badge {
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: #FFFFFF;
+  padding: 0.15rem 0.5rem;
+  border-radius: 10px;
+}
+
+.stage-candidates-list {
+  padding: 0.8rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.empty-stage-drop {
+  text-align: center;
+  padding: 2.5rem 0.5rem;
+  color: #475569;
+  font-size: 0.8rem;
+}
+
+.candidate-ticket-card {
+  background: rgba(26, 34, 52, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  padding: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  transition: all 0.15s ease;
+}
+
+.candidate-ticket-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(99, 102, 241, 0.4);
+}
+
+.ticket-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.ticket-name {
+  font-size: 0.86rem;
+  font-weight: 700;
+  color: #FFFFFF;
+}
+
+.ticket-cgpa {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #34D399;
+}
+
+.ticket-email {
+  font-size: 0.74rem;
+  color: #94A3B8;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ticket-meta-pills {
+  display: flex;
+  gap: 0.3rem;
+  margin: 0.2rem 0;
+}
+
+.ticket-meta-pills .pill {
+  font-size: 0.68rem;
+  background: rgba(255, 255, 255, 0.05);
+  padding: 0.1rem 0.4rem;
+  border-radius: 4px;
+  color: #CBD5E1;
+}
+
+.ticket-actions {
+  margin-top: 0.3rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.ticket-actions label {
+  font-size: 0.68rem;
+  color: #64748B;
+  text-transform: uppercase;
+}
+
+.ticket-actions select {
+  background: rgba(11, 15, 25, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #E2E8F0;
+  font-size: 0.74rem;
+  padding: 0.3rem 0.5rem;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+/* Modals */
+.pms-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(5, 8, 15, 0.8);
+  backdrop-filter: blur(10px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 1.5rem;
+}
+
+.pms-modal-window {
+  background: #111827;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 20px;
+  width: 100%;
+  max-width: 680px;
+  max-height: 90vh;
+  overflow-y: auto;
+  padding: 1.8rem;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6);
+}
+
+.modal-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.4rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  padding-bottom: 1rem;
+}
+
+.modal-head h3 {
+  margin: 0;
+  color: #FFFFFF;
+  font-size: 1.25rem;
+}
+
+.btn-close {
+  background: transparent;
+  border: none;
+  color: #94A3B8;
+  font-size: 1.2rem;
+  cursor: pointer;
+}
+
+.pms-modal-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.2rem;
+}
+
+.form-grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+.form-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.form-item.full-width {
+  grid-column: 1 / -1;
+}
+
+.form-item label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #CBD5E1;
+}
+
+.form-item input,
+.form-item select,
+.form-item textarea {
+  background: rgba(18, 24, 38, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #FFFFFF;
+  padding: 0.6rem 0.8rem;
+  border-radius: 8px;
+  font-size: 0.88rem;
+  font-family: inherit;
+}
+
+.form-item input:focus,
+.form-item select:focus,
+.form-item textarea:focus {
+  outline: none;
+  border-color: #10B981;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.8rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding-top: 1.2rem;
+}
+
+.btn-cancel {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #CBD5E1;
+  padding: 0.6rem 1.2rem;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btn-submit {
+  background: linear-gradient(135deg, #10B981, #059669);
+  border: none;
+  color: #FFFFFF;
+  padding: 0.6rem 1.4rem;
+  border-radius: 8px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.no-drives-placeholder {
+  text-align: center;
+  padding: 4rem 1.5rem;
+  color: #64748B;
+  background: rgba(18, 24, 38, 0.5);
+  border: 1px dashed rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+}
+
+.no-drives-placeholder span {
+  font-size: 3rem;
+  display: block;
+  margin-bottom: 0.8rem;
+}

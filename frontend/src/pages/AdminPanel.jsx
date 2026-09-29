@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import Header from '../components/Header';
+import CompanyPlacementManager from '../components/CompanyPlacementManager';
+import AtRiskDetectionModule from '../components/AtRiskDetectionModule';
 import { API_URL } from '../config/api';
 import './AdminPanel.css';
 
@@ -3509,6 +3511,18 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
             📋 Applied Jobs Report
           </button>
           <button
+            className={`admin-tab-btn ${activeTab === 'company-drives' ? 'active' : ''}`}
+            onClick={() => setActiveTab('company-drives')}
+          >
+            🏢 Company Drives &amp; PMS
+          </button>
+          <button
+            className={`admin-tab-btn ${activeTab === 'at-risk' ? 'active' : ''}`}
+            onClick={() => setActiveTab('at-risk')}
+          >
+            ⚠️ At-Risk Detection
+          </button>
+          <button
             className={`admin-tab-btn ${activeTab === 'interviews' ? 'active' : ''}`}
             onClick={() => setActiveTab('interviews')}
           >
@@ -4204,6 +4218,18 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
                 </div>
               </div>
             </div>
+          )
+        }
+
+        {
+          activeTab === 'company-drives' && (
+            <CompanyPlacementManager />
+          )
+        }
+
+        {
+          activeTab === 'at-risk' && (
+            <AtRiskDetectionModule userRole="admin" />
           )
         }
 

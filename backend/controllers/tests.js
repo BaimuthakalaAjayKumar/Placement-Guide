@@ -519,17 +519,32 @@ exports.createTest = async (req, res, next) => {
 
     const test = await AptitudeTest.create(req.body);
 
-    // Notify matching students in the assigned scope (Year, Branch, Section)
+    // Notify matching students in the assigned scope (Year, Branch, Section, or custom assignmentScope)
     try {
-      const studentQuery = { role: 'student' };
-      if (test.academicYear && test.academicYear !== 'All' && test.academicYear !== 'All Years') {
-        studentQuery.$or = [{ academicYear: test.academicYear }, { year: test.academicYear }];
-      }
-      if (test.branch && test.branch !== 'All' && test.branch !== 'All Branches') {
-        studentQuery.branch = new RegExp(`^${test.branch}$`, 'i');
-      }
-      if (test.section && test.section !== 'All' && test.section !== 'All Sections') {
-        studentQuery.section = new RegExp(`^(?:Section\\s*)?${test.section.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i');
+      let studentQuery = { role: 'student' };
+      if (test.assignmentScope && test.assignmentScope.targetType) {
+        const { targetType, targetValues } = test.assignmentScope;
+        if (targetType === 'students' && targetValues && targetValues.length > 0) {
+          studentQuery._id = { $in: targetValues };
+        } else if (targetType === 'branch' && targetValues && targetValues.length > 0) {
+          studentQuery.branch = { $in: targetValues.map(b => new RegExp(`^${b}$`, 'i')) };
+        } else if (targetType === 'batch' && targetValues && targetValues.length > 0) {
+          studentQuery.$or = [{ batch: { $in: targetValues } }, { academicYear: { $in: targetValues } }];
+        } else if (targetType === 'department' && targetValues && targetValues.length > 0) {
+          studentQuery.branch = { $in: targetValues.map(d => new RegExp(`^${d}$`, 'i')) };
+        } else if (targetType === 'class' && targetValues && targetValues.length > 0) {
+          studentQuery.$or = [{ section: { $in: targetValues } }, { academicYear: { $in: targetValues } }];
+        }
+      } else {
+        if (test.academicYear && test.academicYear !== 'All' && test.academicYear !== 'All Years') {
+          studentQuery.$or = [{ academicYear: test.academicYear }, { year: test.academicYear }];
+        }
+        if (test.branch && test.branch !== 'All' && test.branch !== 'All Branches') {
+          studentQuery.branch = new RegExp(`^${test.branch}$`, 'i');
+        }
+        if (test.section && test.section !== 'All' && test.section !== 'All Sections') {
+          studentQuery.section = new RegExp(`^(?:Section\\s*)?${test.section.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i');
+        }
       }
 
       const students = await User.find(studentQuery).select('_id');

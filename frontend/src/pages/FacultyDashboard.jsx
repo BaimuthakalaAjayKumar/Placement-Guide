@@ -4,6 +4,8 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { API_URL } from '../config/api';
 import Header from '../components/Header';
+import AtRiskDetectionModule from '../components/AtRiskDetectionModule';
+import FacultyTestBuilder from '../components/FacultyTestBuilder';
 import './FacultyDashboard.css';
 
 const LAB_LANGUAGES = [
@@ -17,11 +19,30 @@ const LAB_LANGUAGES = [
 
 const FacultyDashboard = () => {
     const { user } = useAuth();
-    const [activeTab, setActiveTab] = useState('students'); // 'students' | 'subjects' | 'projects' | 'labs'
+    const [activeTab, setActiveTab] = useState('students'); // 'students' | 'subjects' | 'projects' | 'labs' | 'at-risk' | 'test-builder'
+    const [atRiskBannerCount, setAtRiskBannerCount] = useState(0);
     const [students, setStudents] = useState([]);
     const [subjects, setSubjects] = useState([]);
     const [projects, setProjects] = useState([]);
     const [labTasks, setLabTasks] = useState([]);
+
+    useEffect(() => {
+        const fetchRiskBanner = async () => {
+            try {
+                const token = localStorage.getItem('token');
+                if (!token) return;
+                const res = await axios.get(`${API_URL}/at-risk/summary`, {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                if (res.data?.success && res.data.stats?.atRiskCount !== undefined) {
+                    setAtRiskBannerCount(res.data.stats.atRiskCount);
+                }
+            } catch (err) {
+                // Non-blocking
+            }
+        };
+        fetchRiskBanner();
+    }, []);
 
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -2175,6 +2196,56 @@ const FacultyDashboard = () => {
             <div className="content-wrapper faculty-dashboard-content animate-fade">
                 <div className="faculty-content">
 
+                    {/* Student At-Risk Detection Alert Banner */}
+                    {atRiskBannerCount > 0 && (
+                        <div
+                            className="at-risk-banner-alert"
+                            style={{
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                alignItems: 'center',
+                                background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.2), rgba(239, 68, 68, 0.15))',
+                                border: '1px solid rgba(245, 158, 11, 0.45)',
+                                borderLeft: '5px solid #F59E0B',
+                                borderRadius: '14px',
+                                padding: '14px 20px',
+                                marginBottom: '18px',
+                                cursor: 'pointer',
+                                transition: 'all 0.2s ease',
+                                boxShadow: '0 8px 24px rgba(245, 158, 11, 0.15)'
+                            }}
+                            onClick={() => { setActiveTab('at-risk'); setError(null); setSuccessMsg(''); }}
+                        >
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                                <span style={{ fontSize: '26px' }}>⚠️</span>
+                                <div>
+                                    <div style={{ color: '#FCD34D', fontWeight: '800', fontSize: '15px' }}>
+                                        ⚠️ {atRiskBannerCount} students require attention
+                                    </div>
+                                    <div style={{ color: '#E2E8F0', fontSize: '13px', marginTop: '2px' }}>
+                                        Automated detection flagged high inactivity, test score decline, low coding activity, or incomplete resumes.
+                                    </div>
+                                </div>
+                            </div>
+                            <button
+                                type="button"
+                                style={{
+                                    background: 'linear-gradient(135deg, #F59E0B, #D97706)',
+                                    border: 'none',
+                                    color: '#FFFFFF',
+                                    fontWeight: '700',
+                                    fontSize: '13px',
+                                    padding: '8px 16px',
+                                    borderRadius: '10px',
+                                    cursor: 'pointer',
+                                    boxShadow: '0 4px 12px rgba(245, 158, 11, 0.3)'
+                                }}
+                            >
+                                View At-Risk Students →
+                            </button>
+                        </div>
+                    )}
+
                     <div
                         className="faculty-tabs-nav"
                         onWheel={(e) => {
@@ -2188,6 +2259,19 @@ const FacultyDashboard = () => {
                             onClick={() => { setActiveTab('students'); setError(null); setSuccessMsg(''); }}
                         >
                             👥 Student Progress & PRI
+                        </button>
+                        <button
+                            className={`faculty-tab-btn ${activeTab === 'at-risk' ? 'active' : ''}`}
+                            style={activeTab === 'at-risk' ? { borderColor: '#F59E0B', color: '#FCD34D' } : {}}
+                            onClick={() => { setActiveTab('at-risk'); setError(null); setSuccessMsg(''); }}
+                        >
+                            ⚠️ At-Risk Students {atRiskBannerCount > 0 ? `(${atRiskBannerCount})` : ''}
+                        </button>
+                        <button
+                            className={`faculty-tab-btn ${activeTab === 'test-builder' ? 'active' : ''}`}
+                            onClick={() => { setActiveTab('test-builder'); setError(null); setSuccessMsg(''); }}
+                        >
+                            🛠️ Faculty Test Builder
                         </button>
                         <button
                             className={`faculty-tab-btn ${activeTab === 'subjects' ? 'active' : ''}`}
@@ -2247,6 +2331,25 @@ const FacultyDashboard = () => {
                                 ×
                             </button>
                         </div>
+                    )}
+
+                    {/* TAB: AT-RISK STUDENTS */}
+                    {activeTab === 'at-risk' && (
+                        <AtRiskDetectionModule
+                            userRole="faculty"
+                            onSelectStudent={(student) => {
+                                const found = students.find(s => String(s._id) === String(student.studentId));
+                                if (found) {
+                                    setActiveTab('students');
+                                    viewProgress(found);
+                                }
+                            }}
+                        />
+                    )}
+
+                    {/* TAB: FACULTY TEST BUILDER */}
+                    {activeTab === 'test-builder' && (
+                        <FacultyTestBuilder />
                     )}
 
                     {/* TAB 1: STUDENT MONITORING */}

@@ -1,6 +1,7 @@
 const express = require('express');
 const {
     getNotifications,
+    getSmartAlerts,
     markAsRead,
     markAllAsRead,
     deleteNotification
@@ -12,6 +13,7 @@ const { protect } = require('../middleware/auth');
 
 router.use(protect); // All notification routes require auth
 
+router.get('/smart-alerts', getSmartAlerts);
 router.get('/', getNotifications);
 router.put('/read-all', markAllAsRead);
 router.put('/:id/read', markAsRead);

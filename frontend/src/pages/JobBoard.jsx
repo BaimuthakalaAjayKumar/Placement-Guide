@@ -21,6 +21,7 @@ const JobBoard = () => {
   const [actionLoading, setActionLoading] = useState(false);
   const [updatingJobId, setUpdatingJobId] = useState(null);
   const [appliedViewMode, setAppliedViewMode] = useState('columns'); // 'columns' or 'list'
+  const [selectedMatchJob, setSelectedMatchJob] = useState(null);
 
   const STAGES = [
     { key: 'applied', label: 'Applied', icon: '📝', color: '#818cf8', bg: 'rgba(99, 102, 241, 0.15)' },
@@ -355,10 +356,29 @@ const JobBoard = () => {
                       </div>
                     </div>
 
-                    <div className="job-matching-grade-box">
-                      <div className="match-percentage-badge" data-match={job.matchPercentage >= 70 ? 'high' : job.matchPercentage >= 40 ? 'medium' : 'low'}>
-                        {job.matchPercentage}% Match
+                    <div className="job-matching-grade-box" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '6px' }}>
+                      <div className="match-percentage-badge" data-match={job.matchPercentage >= 70 ? 'high' : job.matchPercentage >= 40 ? 'medium' : 'low'} style={{ fontSize: '14px', fontWeight: '800' }}>
+                        🎯 {job.matchPercentage}% Match — {job.title}
                       </div>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedMatchJob(job)}
+                        style={{
+                          background: 'rgba(99, 102, 241, 0.15)',
+                          border: '1px solid rgba(99, 102, 241, 0.35)',
+                          color: '#A5B4FC',
+                          padding: '4px 10px',
+                          borderRadius: '8px',
+                          fontSize: '11px',
+                          fontWeight: '700',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px'
+                        }}
+                      >
+                        🔍 Why You Match &amp; What's Missing
+                      </button>
                     </div>
                   </div>
 
@@ -707,6 +727,144 @@ const JobBoard = () => {
                 )}
               </div>
             )}
+          </div>
+        )}
+        {/* Match Percentage Diagnostic Modal */}
+        {selectedMatchJob && (
+          <div
+            className="job-match-modal-backdrop"
+            style={{
+              position: 'fixed',
+              inset: 0,
+              background: 'rgba(5, 8, 15, 0.8)',
+              backdropFilter: 'blur(10px)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 1100,
+              padding: '1.5rem'
+            }}
+            onClick={() => setSelectedMatchJob(null)}
+          >
+            <div
+              className="job-match-modal-window"
+              style={{
+                background: '#111827',
+                border: '1px solid rgba(255, 255, 255, 0.12)',
+                borderRadius: '20px',
+                width: '100%',
+                maxWidth: '680px',
+                padding: '2rem',
+                boxShadow: '0 24px 60px rgba(0, 0, 0, 0.7)',
+                color: '#E2E8F0',
+                maxHeight: '90vh',
+                overflowY: 'auto'
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.5rem', borderBottom: '1px solid rgba(255, 255, 255, 0.08)', paddingBottom: '1rem' }}>
+                <div>
+                  <div style={{ display: 'inline-block', fontSize: '12px', fontWeight: '800', background: 'rgba(99, 102, 241, 0.2)', color: '#A5B4FC', padding: '3px 8px', borderRadius: '6px', marginBottom: '6px' }}>
+                    JOB / INTERNSHIP MATCHING ENGINE
+                  </div>
+                  <h3 style={{ margin: 0, fontSize: '1.3rem', color: '#FFFFFF' }}>
+                    🎯 {selectedMatchJob.matchPercentage}% Match — {selectedMatchJob.title}
+                  </h3>
+                  <span style={{ fontSize: '0.85rem', color: '#94A3B8' }}>{selectedMatchJob.company} • {selectedMatchJob.location}</span>
+                </div>
+                <button
+                  type="button"
+                  style={{ background: 'transparent', border: 'none', color: '#94A3B8', fontSize: '1.3rem', cursor: 'pointer' }}
+                  onClick={() => setSelectedMatchJob(null)}
+                >
+                  ✕
+                </button>
+              </div>
+
+              {/* Requirement to Profile Flowchart */}
+              <div style={{ background: 'rgba(18, 24, 38, 0.8)', border: '1px solid rgba(255, 255, 255, 0.06)', borderRadius: '12px', padding: '1rem', marginBottom: '1.5rem' }}>
+                <div style={{ fontSize: '11px', textTransform: 'uppercase', color: '#64748B', fontWeight: '800', marginBottom: '8px', letterSpacing: '0.05em' }}>
+                  System Matching Flow
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px', fontSize: '12px' }}>
+                  <div style={{ background: 'rgba(255, 255, 255, 0.05)', padding: '6px 12px', borderRadius: '8px', border: '1px solid rgba(255, 255, 255, 0.08)' }}>
+                    🏢 Job Requirements
+                  </div>
+                  <span style={{ color: '#6366F1', fontWeight: '800' }}>➔</span>
+                  <div style={{ background: 'rgba(99, 102, 241, 0.15)', padding: '6px 12px', borderRadius: '8px', border: '1px solid rgba(99, 102, 241, 0.3)', color: '#A5B4FC' }}>
+                    👤 Student Profile
+                    <div style={{ fontSize: '10px', color: '#94A3B8' }}>Skills • CGPA • Branch • Projects • Resume</div>
+                  </div>
+                  <span style={{ color: '#6366F1', fontWeight: '800' }}>➔</span>
+                  <div style={{ background: 'rgba(16, 185, 129, 0.2)', padding: '6px 12px', borderRadius: '8px', border: '1px solid rgba(16, 185, 129, 0.4)', color: '#6EE7B7', fontWeight: '800' }}>
+                    🎯 {selectedMatchJob.matchPercentage}% Match
+                  </div>
+                </div>
+              </div>
+
+              {/* Why You're A Match */}
+              <div style={{ marginBottom: '1.4rem' }}>
+                <h4 style={{ color: '#34D399', fontSize: '1rem', margin: '0 0 0.8rem 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span>✓</span>
+                  <span>Why You're a Match</span>
+                </h4>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {selectedMatchJob.matchAnalysis?.whyYouMatch && selectedMatchJob.matchAnalysis.whyYouMatch.length > 0 ? (
+                    selectedMatchJob.matchAnalysis.whyYouMatch.map((reason, idx) => (
+                      <div key={idx} style={{ background: 'rgba(16, 185, 129, 0.08)', border: '1px solid rgba(16, 185, 129, 0.2)', padding: '8px 12px', borderRadius: '8px', fontSize: '0.86rem', color: '#D1FAE5' }}>
+                        {reason}
+                      </div>
+                    ))
+                  ) : (
+                    <div style={{ background: 'rgba(16, 185, 129, 0.08)', border: '1px solid rgba(16, 185, 129, 0.2)', padding: '8px 12px', borderRadius: '8px', fontSize: '0.86rem', color: '#D1FAE5' }}>
+                      🎯 Matched core domain requirements based on active profile credentials.
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* What You're Missing */}
+              <div style={{ marginBottom: '1.5rem' }}>
+                <h4 style={{ color: '#F87171', fontSize: '1rem', margin: '0 0 0.8rem 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span>⚠️</span>
+                  <span>What You're Missing &amp; Recommended Steps</span>
+                </h4>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {selectedMatchJob.matchAnalysis?.whatYouAreMissing && selectedMatchJob.matchAnalysis.whatYouAreMissing.length > 0 ? (
+                    selectedMatchJob.matchAnalysis.whatYouAreMissing.map((miss, idx) => (
+                      <div key={idx} style={{ background: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.2)', padding: '8px 12px', borderRadius: '8px', fontSize: '0.86rem', color: '#FCA5A5' }}>
+                        {miss}
+                      </div>
+                    ))
+                  ) : (
+                    <div style={{ background: 'rgba(16, 185, 129, 0.08)', border: '1px solid rgba(16, 185, 129, 0.2)', padding: '8px 12px', borderRadius: '8px', fontSize: '0.86rem', color: '#6EE7B7' }}>
+                      🎉 Excellent! You satisfy all primary benchmark prerequisites for this opportunity.
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', borderTop: '1px solid rgba(255, 255, 255, 0.08)', paddingTop: '1.2rem' }}>
+                <button
+                  type="button"
+                  style={{ background: 'rgba(255, 255, 255, 0.08)', border: 'none', color: '#CBD5E1', padding: '8px 16px', borderRadius: '8px', cursor: 'pointer', fontWeight: '600' }}
+                  onClick={() => setSelectedMatchJob(null)}
+                >
+                  Close Analysis
+                </button>
+                <button
+                  type="button"
+                  style={{ background: 'linear-gradient(135deg, #6366F1, #8B5CF6)', border: 'none', color: '#FFFFFF', padding: '8px 20px', borderRadius: '8px', cursor: 'pointer', fontWeight: '700' }}
+                  onClick={() => {
+                    handleApplyJob(selectedMatchJob);
+                    setSelectedMatchJob(null);
+                  }}
+                >
+                  Apply to {selectedMatchJob.company} →
+                </button>
+              </div>
+            </div>
           </div>
         )}
       </div>

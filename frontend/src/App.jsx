@@ -38,6 +38,7 @@ import CodingPlayground from './pages/CodingPlayground';
 import ProjectStudio from './pages/ProjectStudio';
 import ChangePassword from './pages/ChangePassword';
 import LabPractice from './pages/LabPractice';
+import PlacementCalendar from './pages/PlacementCalendar';
 
 // Private Route Wrapper
 const PrivateRoute = ({ children, allowedRoles }) => {
@@ -339,6 +340,14 @@ const AppRoutes = () => {
         element={
           <PrivateRoute allowedRoles={['student', 'faculty', 'admin']}>
             <Contests />
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/placement-calendar"
+        element={
+          <PrivateRoute allowedRoles={['student', 'faculty', 'admin']}>
+            <PlacementCalendar />
           </PrivateRoute>
         }
       />

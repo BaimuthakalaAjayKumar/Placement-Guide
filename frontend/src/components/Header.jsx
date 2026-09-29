@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import LeetCodeThemeToggle from './LeetCodeThemeToggle';
@@ -8,7 +9,9 @@ import './Header.css';
 const Header = ({ title }) => {
   const { user, token } = useAuth();
   const { theme, toggleTheme } = useTheme();
+  const navigate = useNavigate();
   const [notifications, setNotifications] = useState([]);
+  const [smartAlerts, setSmartAlerts] = useState([]);
   const [showNotifications, setShowNotifications] = useState(false);
   
   useEffect(() => {
@@ -16,11 +19,20 @@ const Header = ({ title }) => {
 
     const fetchNotifications = async () => {
       try {
-        const res = await fetch(`${API_URL}/notifications`, {
+        const res = await fetch(`${API_URL}/notifications/smart-alerts`, {
           headers: { Authorization: `Bearer ${token}` }
         });
         const data = await res.json();
-        if (data.success) setNotifications(data.data);
+        if (data.success) {
+          setSmartAlerts(data.smartAlerts || []);
+          setNotifications(data.storedNotifications || []);
+        } else {
+          const fRes = await fetch(`${API_URL}/notifications`, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          const fData = await fRes.json();
+          if (fData.success) setNotifications(fData.data || []);
+        }
       } catch (err) {
         console.error('Failed to fetch notifications:', err);
       }
@@ -68,7 +80,7 @@ const Header = ({ title }) => {
     }
   };
 
-  const unreadCount = notifications.filter(notification => !notification.isRead).length;
+  const unreadCount = smartAlerts.length + notifications.filter(notification => !notification.isRead).length;
 
   if (!user) return null;
 
@@ -124,7 +136,44 @@ const Header = ({ title }) => {
                   </button>
                 )}
               </div>
-              {notifications.length === 0 ? (
+
+              {/* Role-Specific Smart Alerts Section */}
+              {smartAlerts.length > 0 && (
+                <div className="smart-alerts-section" style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.08)', paddingBottom: '8px', marginBottom: '8px' }}>
+                  <div style={{ padding: '6px 12px', fontSize: '10.5px', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#6366f1', fontWeight: '800' }}>
+                    ⚡ Role Smart Alerts ({user.role})
+                  </div>
+                  {smartAlerts.map(alert => (
+                    <div
+                      key={alert.id}
+                      className="smart-alert-item"
+                      style={{
+                        padding: '8px 12px',
+                        background: alert.urgency === 'critical' ? 'rgba(239, 68, 68, 0.12)' : 'rgba(99, 102, 241, 0.1)',
+                        borderLeft: `3px solid ${alert.urgency === 'critical' ? '#ef4444' : '#6366f1'}`,
+                        marginBottom: '4px',
+                        cursor: 'pointer',
+                        borderRadius: '0 6px 6px 0',
+                        transition: 'background 0.2s'
+                      }}
+                      onClick={() => {
+                        setShowNotifications(false);
+                        if (alert.actionLink) navigate(alert.actionLink);
+                      }}
+                    >
+                      <div style={{ fontSize: '12.5px', color: '#ffffff', fontWeight: '600', lineHeight: '1.3' }}>
+                        {alert.message}
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px', fontSize: '11px', color: '#a5b4fc' }}>
+                        <span>Take Action ➔</span>
+                        <span style={{ color: '#64748b' }}>Just now</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {notifications.length === 0 && smartAlerts.length === 0 ? (
                 <p className="notification-empty">No notifications yet.</p>
               ) : (
                 notifications.slice(0, 8).map(notification => (
