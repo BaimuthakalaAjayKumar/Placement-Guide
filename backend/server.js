@@ -182,6 +182,7 @@ const discussionRoutes = require('./routes/discussions');
 const aiChatRoutes = require('./routes/aiChat');
 const academicRoutes = require('./routes/academic');
 const labRoutes = require('./routes/labs');
+const auditRoutes = require('./routes/audit');
 
 // ============================================================
 // MOUNT API ROUTES
@@ -203,6 +204,7 @@ app.use('/api/discussions', discussionRoutes);
 app.use('/api/ai', aiChatRoutes);
 app.use('/api/academic', academicRoutes);
 app.use('/api/labs', labRoutes);
+app.use('/api/audit', auditRoutes);
 
 // ============================================================
 // HEALTH CHECK

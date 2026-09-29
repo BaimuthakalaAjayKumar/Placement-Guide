@@ -288,6 +288,22 @@ const AppRoutes = () => {
         }
       />
       <Route
+        path="/audit-logs"
+        element={
+          <PrivateRoute allowedRoles={['admin']}>
+            <AdminPanel defaultTab="audit-logs" />
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/admin/discussions"
+        element={
+          <PrivateRoute allowedRoles={['admin']}>
+            <AdminPanel defaultTab="subject-discussions" />
+          </PrivateRoute>
+        }
+      />
+      <Route
         path="/faculty"
         element={
           <PrivateRoute allowedRoles={['faculty', 'admin']}>

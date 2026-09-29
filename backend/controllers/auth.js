@@ -2,6 +2,7 @@ const User = require('../models/User');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const sendEmail = require('../utils/sendEmail');
+const { logActivity, extractClientIp, extractUserAgent } = require('../utils/auditLogger');
 
 // Helper to generate and send token
 const sendTokenResponse = (user, statusCode, res) => {
@@ -149,6 +150,30 @@ exports.login = async (req, res, next) => {
       });
     }
 
+    // Extract client network IP and browser agent
+    const clientIp = extractClientIp(req);
+    const userAgent = extractUserAgent(req);
+
+    // Update session tracking & login statistics
+    user.loginCount = (user.loginCount || 0) + 1;
+    user.lastLoginAt = new Date();
+    user.lastActiveAt = new Date();
+    user.currentSessionStartedAt = new Date();
+    user.lastIpAddress = clientIp;
+    user.lastLoginIp = clientIp;
+    user.userAgent = userAgent;
+    await user.save({ validateBeforeSave: false });
+
+    // Log Activity for Admin Audit Trail with IP
+    await logActivity({
+      user,
+      action: 'LOGIN',
+      category: 'Authentication & Sessions',
+      description: `${user.name} (${user.role.toUpperCase()}) logged into system from IP ${clientIp}`,
+      details: { role: user.role, email: user.email, ipAddress: clientIp, userAgent },
+      req
+    });
+
     sendTokenResponse(user, 200, res);
   } catch (err) {
     next(err);
@@ -231,6 +256,23 @@ exports.getMe = async (req, res, next) => {
         );
       } catch (err) {
         console.warn(`HackerRank auto-sync skipped during getMe: ${err.message}`);
+      }
+    }
+
+    if (user) {
+      const clientIp = extractClientIp(req);
+      const updates = {};
+      if (!user.loginCount || user.loginCount === 0) {
+        updates.loginCount = 1;
+      }
+      if (!user.lastIpAddress || user.lastIpAddress === '127.0.0.1') {
+        updates.lastIpAddress = clientIp;
+      }
+      if (!user.lastLoginIp) {
+        updates.lastLoginIp = clientIp;
+      }
+      if (Object.keys(updates).length > 0) {
+        user = await User.findByIdAndUpdate(user._id, { $set: updates }, { new: true });
       }
     }
 
@@ -513,3 +555,27 @@ exports.resetPassword = async (req, res, next) => {
     next(err);
   }
 };
+
+// @desc    Log user out & record audit event
+// @route   POST /api/auth/logout
+// @access  Private
+exports.logout = async (req, res, next) => {
+  try {
+    if (req.user) {
+      await logActivity({
+        user: req.user,
+        action: 'LOGOUT',
+        category: 'Authentication & Sessions',
+        description: `${req.user.name} logged out from the portal`,
+        req
+      });
+    }
+    res.status(200).json({
+      success: true,
+      message: 'Logged out successfully'
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+

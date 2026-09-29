@@ -7,6 +7,7 @@ const PracticeQuestion = require('../models/PracticeQuestion');
 const User = require('../models/User');
 const UserSolution = require('../models/UserSolution');
 const Notification = require('../models/Notification');
+const { logActivity } = require('../utils/auditLogger');
 
 // Seed practice questions from frontend data files if database has none
 const seedPracticeQuestions = async () => {
@@ -418,13 +419,32 @@ exports.submitTestAttempt = async (req, res, next) => {
       });
     }
 
+    const percentage = totalQuestions > 0 ? Math.round((correctAnswers / totalQuestions) * 100) : 0;
+
+    // Log Activity for Audit Trail
+    await logActivity({
+      user: req.user,
+      action: 'TEST_ATTEMPT',
+      category: 'Assessments',
+      description: `Completed practice test: "${test.title}" — Score: ${correctAnswers}/${totalQuestions} (${percentage}%)`,
+      details: {
+        testId: test._id,
+        testTitle: test.title,
+        category: test.category,
+        score: correctAnswers,
+        totalQuestions,
+        percentage
+      },
+      req
+    });
+
     res.status(201).json({
       success: true,
       data: {
         attemptId: attempt._id,
         score: correctAnswers,
         totalQuestions,
-        percentage: Math.round((correctAnswers / totalQuestions) * 100),
+        percentage,
         breakdown: questionsBreakdown
       }
     });

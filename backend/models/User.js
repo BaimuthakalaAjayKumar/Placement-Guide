@@ -160,6 +160,42 @@ const UserSchema = new mongoose.Schema({
       default: Date.now
     }
   }],
+  totalActiveSeconds: {
+    type: Number,
+    default: 0
+  },
+  lastActiveAt: {
+    type: Date,
+    default: Date.now
+  },
+  lastLoginAt: {
+    type: Date,
+    default: Date.now
+  },
+  loginCount: {
+    type: Number,
+    default: 0
+  },
+  lastIpAddress: {
+    type: String,
+    default: '127.0.0.1'
+  },
+  lastLoginIp: {
+    type: String,
+    default: '127.0.0.1'
+  },
+  currentPage: {
+    type: String,
+    default: ''
+  },
+  currentDevice: {
+    type: String,
+    default: ''
+  },
+  currentSessionStartedAt: {
+    type: Date,
+    default: Date.now
+  },
   resetPasswordToken: String,
   resetPasswordExpire: Date,
   createdAt: {

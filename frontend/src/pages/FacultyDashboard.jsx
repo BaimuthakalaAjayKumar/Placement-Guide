@@ -180,6 +180,19 @@ const FacultyDashboard = () => {
         setTimeout(() => setCopiedLang(false), 2000);
     };
 
+    // Subject Discussions states
+    const [facultyDiscussions, setFacultyDiscussions] = useState([]);
+    const [loadingDiscussions, setLoadingDiscussions] = useState(false);
+    const [selectedDiscussionSubject, setSelectedDiscussionSubject] = useState('');
+    const [discussionSearch, setDiscussionSearch] = useState('');
+    const [showCreateDiscussionForm, setShowCreateDiscussionForm] = useState(false);
+    const [discussionForm, setDiscussionForm] = useState({ title: '', content: '', subjectId: '', academicYear: '', branch: '', section: '' });
+    const [submittingDiscussion, setSubmittingDiscussion] = useState(false);
+    const [activeDiscussionCommentId, setActiveDiscussionCommentId] = useState(null);
+    const [discussionCommentText, setDiscussionCommentText] = useState('');
+    const [activeDiscussionReplyId, setActiveDiscussionReplyId] = useState(null);
+    const [discussionReplyText, setDiscussionReplyText] = useState('');
+
     const navigate = useNavigate();
 
     const getAuthHeaders = () => {
@@ -256,8 +269,118 @@ const FacultyDashboard = () => {
             fetchLabTasks();
             fetchSubjects();
             fetchRepoTests();
+        } else if (activeTab === 'discussions') {
+            fetchSubjects();
+            fetchFacultyDiscussions();
         }
     }, [activeTab]);
+
+    const fetchFacultyDiscussions = async (subjId = selectedDiscussionSubject) => {
+        try {
+            setLoadingDiscussions(true);
+            let url = `${API_URL}/discussions?forumType=subject`;
+            if (subjId) {
+                url += `&subjectId=${encodeURIComponent(subjId)}`;
+            }
+            if (discussionSearch.trim()) {
+                url += `&search=${encodeURIComponent(discussionSearch.trim())}`;
+            }
+            const res = await axios.get(url, getAuthHeaders());
+            setFacultyDiscussions(res.data?.data || []);
+        } catch (err) {
+            console.error('Failed to load faculty subject discussions', err);
+        } finally {
+            setLoadingDiscussions(false);
+        }
+    };
+
+    const handleCreateFacultyDiscussion = async (e) => {
+        e.preventDefault();
+        if (!discussionForm.title.trim() || !discussionForm.content.trim()) return;
+        if (!discussionForm.subjectId) {
+            alert('Please select an assigned academic subject for this discussion.');
+            return;
+        }
+
+        try {
+            setSubmittingDiscussion(true);
+            const foundSubj = subjects.find(s => s._id === discussionForm.subjectId);
+            const payload = {
+                title: discussionForm.title.trim(),
+                content: discussionForm.content.trim(),
+                forumType: 'subject',
+                subjectId: discussionForm.subjectId,
+                academicYear: discussionForm.academicYear || foundSubj?.academicYear || '',
+                branch: discussionForm.branch || foundSubj?.branch || '',
+                section: discussionForm.section || foundSubj?.section || ''
+            };
+
+            const res = await axios.post(`${API_URL}/discussions`, payload, getAuthHeaders());
+            if (res.data?.success) {
+                setFacultyDiscussions(prev => [res.data.data, ...prev]);
+                setDiscussionForm({ title: '', content: '', subjectId: '', academicYear: '', branch: '', section: '' });
+                setShowCreateDiscussionForm(false);
+                setSuccessMsg('Academic subject discussion started successfully!');
+                setTimeout(() => setSuccessMsg(''), 4000);
+            }
+        } catch (err) {
+            setError(err.response?.data?.error || 'Failed to start subject discussion.');
+        } finally {
+            setSubmittingDiscussion(false);
+        }
+    };
+
+    const handleFacultyLike = async (postId) => {
+        try {
+            const res = await axios.post(`${API_URL}/discussions/${postId}/like`, {}, getAuthHeaders());
+            if (res.data?.success) {
+                setFacultyDiscussions(prev => prev.map(p => p._id === postId ? res.data.data : p));
+            }
+        } catch (err) {
+            console.error(err);
+        }
+    };
+
+    const handleFacultyComment = async (postId) => {
+        if (!discussionCommentText.trim()) return;
+        try {
+            const res = await axios.post(`${API_URL}/discussions/${postId}/comment`, { text: discussionCommentText.trim() }, getAuthHeaders());
+            if (res.data?.success) {
+                setFacultyDiscussions(prev => prev.map(p => p._id === postId ? res.data.data : p));
+                setDiscussionCommentText('');
+            }
+        } catch (err) {
+            console.error(err);
+        }
+    };
+
+    const handleFacultyReply = async (postId, commentId) => {
+        if (!discussionReplyText.trim()) return;
+        try {
+            const res = await axios.post(`${API_URL}/discussions/${postId}/comment/${commentId}/reply`, { text: discussionReplyText.trim() }, getAuthHeaders());
+            if (res.data?.success) {
+                setFacultyDiscussions(prev => prev.map(p => p._id === postId ? res.data.data : p));
+                setDiscussionReplyText('');
+                setActiveDiscussionReplyId(null);
+            }
+        } catch (err) {
+            console.error(err);
+        }
+    };
+
+    const handleFacultyDeletePost = async (postId) => {
+        if (!window.confirm('Delete this discussion thread permanently?')) return;
+        try {
+            const res = await axios.delete(`${API_URL}/discussions/${postId}`, getAuthHeaders());
+            if (res.data?.success) {
+                setFacultyDiscussions(prev => prev.filter(p => p._id !== postId));
+                setSuccessMsg('Discussion removed successfully.');
+                setTimeout(() => setSuccessMsg(''), 3000);
+            }
+        } catch (err) {
+            setError('Failed to delete discussion.');
+        }
+    };
 
     const fetchRepoTests = async () => {
         try {
@@ -2089,6 +2212,12 @@ const FacultyDashboard = () => {
                             onClick={() => { setActiveTab('repository'); setError(null); setSuccessMsg(''); }}
                         >
                             🗃️ Records & Academic Repository
+                        </button>
+                        <button
+                            className={`faculty-tab-btn ${activeTab === 'discussions' ? 'active' : ''}`}
+                            onClick={() => { setActiveTab('discussions'); setError(null); setSuccessMsg(''); }}
+                        >
+                            💬 Subject Discussions
                         </button>
                     </div>
 
@@ -4586,8 +4715,365 @@ const FacultyDashboard = () => {
                         );
                     })()}
 
+                    {/* TAB: SUBJECT DISCUSSIONS */}
+                    {activeTab === 'discussions' && (
+                        <div className="faculty-discussions-tab-content animate-fade">
+                            {/* Header Banner */}
+                            <div className="glass-card" style={{ padding: '22px', marginBottom: '22px', borderLeft: '4px solid #10b981' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '14px' }}>
+                                    <div>
+                                        <h3 style={{ margin: '0 0 6px 0', color: 'white', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                            <span>💬</span>
+                                            <span>Subject-Wise Academic Discussions (Scope Allocated)</span>
+                                        </h3>
+                                        <p style={{ margin: 0, color: '#94a3b8', fontSize: '13px', maxWidth: '750px' }}>
+                                            Academic discussions tied directly to your assigned teaching subjects and academic scope. Students in your classes can post questions, discuss syllabus concepts, and receive direct faculty guidance.
+                                        </p>
+                                    </div>
+                                    <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+                                        <button
+                                            type="button"
+                                            className="btn btn-primary"
+                                            onClick={() => setShowCreateDiscussionForm(!showCreateDiscussionForm)}
+                                        >
+                                            {showCreateDiscussionForm ? '✕ Close Form' : '➕ Start Subject Discussion'}
+                                        </button>
+                                        <button
+                                            type="button"
+                                            className="btn btn-secondary"
+                                            onClick={() => navigate('/discussion-forum')}
+                                            title="Open full campus discussion forum"
+                                        >
+                                            🌐 Open Full Forum
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
 
+                            {/* Create Discussion Form */}
+                            {showCreateDiscussionForm && (
+                                <div className="glass-card animate-fade" style={{ padding: '22px', marginBottom: '24px', border: '1px solid rgba(16, 185, 129, 0.4)' }}>
+                                    <h4 style={{ color: 'white', margin: '0 0 16px 0' }}>Post a New Academic Discussion Thread</h4>
+                                    <form onSubmit={handleCreateFacultyDiscussion}>
+                                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '14px', marginBottom: '16px' }}>
+                                            <div>
+                                                <label className="form-label" style={{ fontWeight: 600 }}>Target Subject *</label>
+                                                <select
+                                                    className="form-control"
+                                                    value={discussionForm.subjectId}
+                                                    onChange={(e) => {
+                                                        const sId = e.target.value;
+                                                        const sDoc = subjects.find(s => s._id === sId);
+                                                        setDiscussionForm({
+                                                            ...discussionForm,
+                                                            subjectId: sId,
+                                                            academicYear: sDoc?.academicYear || '',
+                                                            branch: sDoc?.branch || '',
+                                                            section: sDoc?.section || ''
+                                                        });
+                                                    }}
+                                                    required
+                                                    style={{ background: '#0f172a', color: 'white', border: '1px solid #334155' }}
+                                                >
+                                                    <option value="">-- Select Allocated Subject ({subjects.length}) --</option>
+                                                    {subjects.map(s => (
+                                                        <option key={s._id} value={s._id}>
+                                                            [{s.code || 'CODE'}] {s.name} {s.branch ? `(${s.branch})` : ''}
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                            </div>
 
+                                            <div>
+                                                <label className="form-label">Academic Year</label>
+                                                <input
+                                                    type="text"
+                                                    className="form-control"
+                                                    placeholder="e.g. 3rd Year / 2026"
+                                                    value={discussionForm.academicYear}
+                                                    onChange={e => setDiscussionForm({ ...discussionForm, academicYear: e.target.value })}
+                                                    style={{ background: '#0f172a', color: 'white', border: '1px solid #334155' }}
+                                                />
+                                            </div>
+
+                                            <div>
+                                                <label className="form-label">Branch & Section</label>
+                                                <div style={{ display: 'flex', gap: '8px' }}>
+                                                    <input
+                                                        type="text"
+                                                        className="form-control"
+                                                        placeholder="Branch (CSE)"
+                                                        value={discussionForm.branch}
+                                                        onChange={e => setDiscussionForm({ ...discussionForm, branch: e.target.value })}
+                                                        style={{ background: '#0f172a', color: 'white', border: '1px solid #334155', flex: 1 }}
+                                                    />
+                                                    <input
+                                                        type="text"
+                                                        className="form-control"
+                                                        placeholder="Sec A"
+                                                        value={discussionForm.section}
+                                                        onChange={e => setDiscussionForm({ ...discussionForm, section: e.target.value })}
+                                                        style={{ background: '#0f172a', color: 'white', border: '1px solid #334155', width: '80px' }}
+                                                    />
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div className="form-group" style={{ marginBottom: '14px' }}>
+                                            <label className="form-label" style={{ fontWeight: 600 }}>Discussion Title *</label>
+                                            <input
+                                                type="text"
+                                                className="form-control"
+                                                placeholder="e.g. Unit 3: Dynamic Programming practice problems and common gotchas"
+                                                value={discussionForm.title}
+                                                onChange={e => setDiscussionForm({ ...discussionForm, title: e.target.value })}
+                                                required
+                                                style={{ background: '#0f172a', color: 'white', border: '1px solid #334155' }}
+                                            />
+                                        </div>
+
+                                        <div className="form-group" style={{ marginBottom: '16px' }}>
+                                            <label className="form-label" style={{ fontWeight: 600 }}>Post Content *</label>
+                                            <textarea
+                                                className="form-control"
+                                                rows="5"
+                                                placeholder="Write detailed instructions, discussion questions, or learning tips for students..."
+                                                value={discussionForm.content}
+                                                onChange={e => setDiscussionForm({ ...discussionForm, content: e.target.value })}
+                                                required
+                                                style={{ background: '#0f172a', color: 'white', border: '1px solid #334155' }}
+                                            />
+                                        </div>
+
+                                        <div style={{ display: 'flex', gap: '10px' }}>
+                                            <button type="submit" className="btn btn-primary" disabled={submittingDiscussion}>
+                                                {submittingDiscussion ? 'Publishing Discussion...' : '🚀 Publish Discussion'}
+                                            </button>
+                                            <button type="button" className="btn btn-secondary" onClick={() => setShowCreateDiscussionForm(false)}>
+                                                Cancel
+                                            </button>
+                                        </div>
+                                    </form>
+                                </div>
+                            )}
+
+                            {/* Filters Bar */}
+                            <div style={{ display: 'flex', gap: '12px', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap' }}>
+                                <select
+                                    className="form-control"
+                                    style={{ maxWidth: '280px', padding: '9px 14px', background: '#0f172a', color: 'white', border: '1px solid #334155', borderRadius: '8px', fontSize: '13px' }}
+                                    value={selectedDiscussionSubject}
+                                    onChange={(e) => {
+                                        setSelectedDiscussionSubject(e.target.value);
+                                        fetchFacultyDiscussions(e.target.value);
+                                    }}
+                                >
+                                    <option value="">📚 All My Allocated Subjects ({subjects.length})</option>
+                                    {subjects.map(s => (
+                                        <option key={s._id} value={s._id}>
+                                            [{s.code}] {s.name}
+                                        </option>
+                                    ))}
+                                </select>
+
+                                <input
+                                    type="text"
+                                    placeholder="Search discussions by title or content..."
+                                    className="form-control"
+                                    value={discussionSearch}
+                                    onChange={e => setDiscussionSearch(e.target.value)}
+                                    onKeyDown={e => { if (e.key === 'Enter') fetchFacultyDiscussions(); }}
+                                    style={{ flex: 1, minWidth: '220px', padding: '9px 14px', background: '#1e293b', color: 'white', border: '1px solid #334155', borderRadius: '8px', fontSize: '13px' }}
+                                />
+
+                                <button
+                                    type="button"
+                                    className="btn btn-secondary"
+                                    onClick={() => fetchFacultyDiscussions()}
+                                    style={{ padding: '9px 16px', fontSize: '13px' }}
+                                >
+                                    🔍 Search
+                                </button>
+                            </div>
+
+                            {/* Discussions Stream */}
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+                                {loadingDiscussions ? (
+                                    <div className="glass-card" style={{ padding: '40px', textAlign: 'center', color: '#94a3b8' }}>
+                                        <div className="spinner-loader" style={{ margin: '0 auto 12px' }}></div>
+                                        <p>Loading subject discussions...</p>
+                                    </div>
+                                ) : facultyDiscussions.length > 0 ? (
+                                    facultyDiscussions.map(post => (
+                                        <div key={post._id} className="glass-card" style={{ padding: '22px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.08)' }}>
+                                            {/* Header */}
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px', gap: '10px' }}>
+                                                <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                                                    <span style={{ background: 'rgba(16, 185, 129, 0.15)', color: '#34d399', border: '1px solid rgba(16, 185, 129, 0.3)', padding: '2px 9px', borderRadius: '6px', fontSize: '12px', fontWeight: 600 }}>
+                                                        📖 {post.subjectCode ? `[${post.subjectCode}] ` : ''}{post.subjectName || 'Subject Discussion'}
+                                                    </span>
+                                                    {(post.academicYear || post.branch) && (
+                                                        <span style={{ background: 'rgba(56, 189, 248, 0.12)', color: '#38bdf8', border: '1px solid rgba(56, 189, 248, 0.25)', padding: '2px 8px', borderRadius: '6px', fontSize: '11px' }}>
+                                                            🎯 {post.academicYear || ''}{post.branch ? ` • ${post.branch}` : ''}{post.section ? ` Sec ${post.section}` : ''}
+                                                        </span>
+                                                    )}
+                                                    <span style={{
+                                                        background: post.userRole === 'faculty' ? 'rgba(16, 185, 129, 0.15)' : post.userRole === 'admin' ? 'rgba(239, 68, 68, 0.15)' : 'rgba(99, 102, 241, 0.15)',
+                                                        color: post.userRole === 'faculty' ? '#34d399' : post.userRole === 'admin' ? '#f87171' : '#818cf8',
+                                                        border: '1px solid currentColor',
+                                                        padding: '1px 7px',
+                                                        borderRadius: '10px',
+                                                        fontSize: '11px',
+                                                        fontWeight: 600
+                                                    }}>
+                                                        {post.userRole === 'faculty' ? '👨‍🏫 Faculty' : post.userRole === 'admin' ? '🛡️ Admin' : '🎓 Student'}
+                                                    </span>
+                                                </div>
+
+                                                <button
+                                                    onClick={() => handleFacultyDeletePost(post._id)}
+                                                    style={{ background: 'transparent', border: 'none', color: '#ef4444', fontSize: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '3px' }}
+                                                    title="Delete this discussion thread"
+                                                >
+                                                    🗑️ Delete
+                                                </button>
+                                            </div>
+
+                                            <h3 style={{ margin: '0 0 6px 0', color: '#f8fafc', fontSize: '16.5px' }}>{post.title}</h3>
+                                            <div style={{ fontSize: '12px', color: '#64748b', marginBottom: '12px' }}>
+                                                <span>Posted by <strong>{post.userName}</strong></span>
+                                                {post.userRollNumber && <span> ({post.userRollNumber})</span>}
+                                                <span> • {new Date(post.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+                                            </div>
+
+                                            <p style={{ margin: '0 0 16px 0', color: '#cbd5e1', fontSize: '14px', lineHeight: '1.65', whiteSpace: 'pre-wrap' }}>
+                                                {post.content}
+                                            </p>
+
+                                            {/* Action Bar */}
+                                            <div style={{ display: 'flex', gap: '16px', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '12px', alignItems: 'center' }}>
+                                                <button
+                                                    onClick={() => handleFacultyLike(post._id)}
+                                                    style={{ background: 'transparent', border: 'none', color: post.likes?.includes(user?.id) ? '#38bdf8' : '#94a3b8', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', fontSize: '13px' }}
+                                                >
+                                                    👍 {(post.likes || []).length} Like{(post.likes || []).length === 1 ? '' : 's'}
+                                                </button>
+
+                                                <button
+                                                    onClick={() => setActiveDiscussionCommentId(activeDiscussionCommentId === post._id ? null : post._id)}
+                                                    style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', fontSize: '13px' }}
+                                                >
+                                                    💬 {(post.comments || []).length} Comment{(post.comments || []).length === 1 ? '' : 's'}
+                                                </button>
+                                            </div>
+
+                                            {/* Comments Panel */}
+                                            {activeDiscussionCommentId === post._id && (
+                                                <div style={{ marginTop: '16px', background: 'rgba(15, 23, 42, 0.7)', borderRadius: '8px', padding: '16px', border: '1px solid rgba(255,255,255,0.06)' }}>
+                                                    <h4 style={{ color: 'white', margin: '0 0 12px 0', fontSize: '13.5px' }}>
+                                                        Comments & Student Doubts ({(post.comments || []).length})
+                                                    </h4>
+
+                                                    <div style={{ display: 'flex', gap: '8px', marginBottom: '14px' }}>
+                                                        <input
+                                                            type="text"
+                                                            placeholder="Write an answer or guidance for students..."
+                                                            className="form-control"
+                                                            value={discussionCommentText}
+                                                            onChange={e => setDiscussionCommentText(e.target.value)}
+                                                            onKeyDown={e => { if (e.key === 'Enter') handleFacultyComment(post._id); }}
+                                                            style={{ flex: 1, padding: '7px 12px', background: '#0f172a', color: 'white', border: '1px solid #334155', borderRadius: '4px', fontSize: '13px' }}
+                                                        />
+                                                        <button className="btn btn-accent btn-sm" onClick={() => handleFacultyComment(post._id)}>
+                                                            Send Guidance
+                                                        </button>
+                                                    </div>
+
+                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                                        {(post.comments || []).map(comment => (
+                                                            <div key={comment._id} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)', paddingBottom: '10px' }}>
+                                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3px' }}>
+                                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                                        <strong style={{ color: '#818cf8', fontSize: '13px' }}>{comment.userName}</strong>
+                                                                        <span style={{ fontSize: '10.5px', color: comment.userRole === 'faculty' ? '#34d399' : '#94a3b8' }}>
+                                                                            ({comment.userRole || 'student'})
+                                                                        </span>
+                                                                    </div>
+                                                                    <span style={{ fontSize: '11px', color: '#64748b' }}>
+                                                                        {new Date(comment.createdAt).toLocaleDateString()}
+                                                                    </span>
+                                                                </div>
+
+                                                                <p style={{ margin: '3px 0 6px 0', color: '#cbd5e1', fontSize: '13px' }}>
+                                                                    {comment.text}
+                                                                </p>
+
+                                                                {/* Replies */}
+                                                                <div style={{ marginLeft: '20px', borderLeft: '2px solid rgba(16, 185, 129, 0.4)', paddingLeft: '10px', marginTop: '8px' }}>
+                                                                    {(comment.replies || []).map(reply => (
+                                                                        <div key={reply._id} style={{ marginBottom: '6px' }}>
+                                                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                                                <strong style={{ color: '#f59e0b', fontSize: '12px' }}>{reply.userName}</strong>
+                                                                                <span style={{ fontSize: '10px', color: '#64748b' }}>{new Date(reply.createdAt).toLocaleDateString()}</span>
+                                                                            </div>
+                                                                            <p style={{ margin: '1px 0 0 0', color: '#94a3b8', fontSize: '12px' }}>{reply.text}</p>
+                                                                        </div>
+                                                                    ))}
+
+                                                                    {activeDiscussionReplyId === comment._id ? (
+                                                                        <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+                                                                            <input
+                                                                                type="text"
+                                                                                placeholder="Write a reply..."
+                                                                                className="form-control"
+                                                                                value={discussionReplyText}
+                                                                                onChange={e => setDiscussionReplyText(e.target.value)}
+                                                                                onKeyDown={e => { if (e.key === 'Enter') handleFacultyReply(post._id, comment._id); }}
+                                                                                style={{ flex: 1, padding: '5px 8px', background: '#0f172a', color: 'white', border: '1px solid #334155', borderRadius: '4px', fontSize: '12px' }}
+                                                                            />
+                                                                            <button className="btn btn-secondary btn-sm" onClick={() => handleFacultyReply(post._id, comment._id)} style={{ padding: '3px 8px', fontSize: '12px' }}>
+                                                                                Reply
+                                                                            </button>
+                                                                            <button onClick={() => setActiveDiscussionReplyId(null)} style={{ background: 'transparent', border: 'none', color: '#f87171', cursor: 'pointer', fontSize: '12px' }}>
+                                                                                Cancel
+                                                                            </button>
+                                                                        </div>
+                                                                    ) : (
+                                                                        <button
+                                                                            onClick={() => setActiveDiscussionReplyId(comment._id)}
+                                                                            style={{ background: 'transparent', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: '11.5px', marginTop: '4px', padding: 0 }}
+                                                                        >
+                                                                            ↳ Reply as Faculty
+                                                                        </button>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                        </div>
+                                    ))
+                                ) : (
+                                    <div className="glass-card" style={{ padding: '50px 20px', textAlign: 'center', color: '#94a3b8', borderRadius: '12px' }}>
+                                        <span style={{ fontSize: '36px', display: 'block', marginBottom: '12px' }}>📚</span>
+                                        <h4 style={{ color: 'white', marginBottom: '8px' }}>No Subject Discussions Found</h4>
+                                        <p style={{ maxWidth: '480px', margin: '0 auto 16px', fontSize: '13.5px' }}>
+                                            No active discussion threads have been created for your allocated subjects yet. Post a topic or announcement to start the discussion!
+                                        </p>
+                                        <button
+                                            type="button"
+                                            className="btn btn-primary"
+                                            onClick={() => setShowCreateDiscussionForm(true)}
+                                        >
+                                            ➕ Start First Subject Discussion
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
 
                 </div>
             </div>

@@ -295,6 +295,290 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
   const [updatingAppStatusId, setUpdatingAppStatusId] = useState(null);
   const [downloadingCsv, setDownloadingCsv] = useState(false);
 
+  // Student Audit Logs & Active Session Time Monitoring States
+  const [auditStats, setAuditStats] = useState(null);
+  const [auditSessions, setAuditSessions] = useState([]);
+  const [auditLogs, setAuditLogs] = useState([]);
+  const [loadingAudit, setLoadingAudit] = useState(false);
+  const [auditSubTab, setAuditSubTab] = useState('sessions'); // 'sessions' | 'timeline'
+  const [auditSearch, setAuditSearch] = useState('');
+  const [auditBranchFilter, setAuditBranchFilter] = useState('All');
+  const [auditYearFilter, setAuditYearFilter] = useState('All');
+  const [auditCategoryFilter, setAuditCategoryFilter] = useState('All');
+  const [auditActionFilter, setAuditActionFilter] = useState('All');
+  const [auditOnlineOnly, setAuditOnlineOnly] = useState(true);
+  const [selectedStudentForTimeline, setSelectedStudentForTimeline] = useState(null);
+  const [studentTimelineData, setStudentTimelineData] = useState(null);
+  const [loadingTimeline, setLoadingTimeline] = useState(false);
+
+  // Admin Subject Discussions States
+  const [adminDiscussions, setAdminDiscussions] = useState([]);
+  const [loadingAdminDiscussions, setLoadingAdminDiscussions] = useState(false);
+  const [adminDiscussionSubjectFilter, setAdminDiscussionSubjectFilter] = useState('');
+  const [adminDiscussionSearch, setAdminDiscussionSearch] = useState('');
+  const [adminActiveCommentPostId, setAdminActiveCommentPostId] = useState(null);
+  const [adminCommentText, setAdminCommentText] = useState('');
+  const [adminActiveReplyCommentId, setAdminActiveReplyCommentId] = useState(null);
+  const [adminReplyText, setAdminReplyText] = useState('');
+  const [showAdminCreateDiscussion, setShowAdminCreateDiscussion] = useState(false);
+  const [adminDiscussionForm, setAdminDiscussionForm] = useState({ title: '', content: '', subjectId: '', academicYear: '', branch: '', section: '' });
+  const [submittingAdminDiscussion, setSubmittingAdminDiscussion] = useState(false);
+
+  const fetchAuditStats = async () => {
+    try {
+      const res = await fetch(`${API_URL}/audit/stats`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (data.success) {
+        setAuditStats(data.data);
+      }
+    } catch (err) {
+      console.error('Failed to load audit stats', err);
+    }
+  };
+
+  const fetchAuditSessions = async (overrideOnline = null) => {
+    try {
+      setLoadingAudit(true);
+      let url = `${API_URL}/audit/student-sessions?`;
+      const params = [];
+      if (auditBranchFilter && auditBranchFilter !== 'All') params.push(`branch=${encodeURIComponent(auditBranchFilter)}`);
+      if (auditYearFilter && auditYearFilter !== 'All') params.push(`academicYear=${encodeURIComponent(auditYearFilter)}`);
+      const targetOnline = overrideOnline !== null ? overrideOnline : auditOnlineOnly;
+      if (targetOnline) params.push(`onlineOnly=true`);
+      if (auditSearch.trim()) params.push(`search=${encodeURIComponent(auditSearch.trim())}`);
+      url += params.join('&');
+
+      const res = await fetch(url, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (data.success) {
+        setAuditSessions(data.data || []);
+      }
+    } catch (err) {
+      console.error('Failed to load student audit sessions', err);
+    } finally {
+      setLoadingAudit(false);
+    }
+  };
+
+  const fetchAuditLogs = async () => {
+    try {
+      setLoadingAudit(true);
+      let url = `${API_URL}/audit/logs?limit=100`;
+      const params = [];
+      if (auditCategoryFilter && auditCategoryFilter !== 'All') params.push(`category=${encodeURIComponent(auditCategoryFilter)}`);
+      if (auditActionFilter && auditActionFilter !== 'All') params.push(`action=${encodeURIComponent(auditActionFilter)}`);
+      if (auditBranchFilter && auditBranchFilter !== 'All') params.push(`branch=${encodeURIComponent(auditBranchFilter)}`);
+      if (auditYearFilter && auditYearFilter !== 'All') params.push(`academicYear=${encodeURIComponent(auditYearFilter)}`);
+      if (auditSearch.trim()) params.push(`search=${encodeURIComponent(auditSearch.trim())}`);
+      if (params.length > 0) url += `&${params.join('&')}`;
+
+      const res = await fetch(url, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (data.success) {
+        setAuditLogs(data.data || []);
+      }
+    } catch (err) {
+      console.error('Failed to load audit logs', err);
+    } finally {
+      setLoadingAudit(false);
+    }
+  };
+
+  const openStudentTimelineModal = async (student) => {
+    setSelectedStudentForTimeline(student);
+    setLoadingTimeline(true);
+    setStudentTimelineData(null);
+    try {
+      const res = await fetch(`${API_URL}/audit/student/${student._id}/timeline`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (data.success) {
+        setStudentTimelineData(data.data);
+      }
+    } catch (err) {
+      console.error('Failed to load student timeline', err);
+    } finally {
+      setLoadingTimeline(false);
+    }
+  };
+
+  const fetchAdminDiscussions = async (subjectId = adminDiscussionSubjectFilter) => {
+    try {
+      setLoadingAdminDiscussions(true);
+      let url = `${API_URL}/discussions?forumType=subject`;
+      if (subjectId && subjectId !== 'All') url += `&subjectId=${encodeURIComponent(subjectId)}`;
+      if (adminDiscussionSearch.trim()) url += `&search=${encodeURIComponent(adminDiscussionSearch.trim())}`;
+
+      const res = await fetch(url, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (data.success) {
+        setAdminDiscussions(data.data || []);
+      }
+    } catch (err) {
+      console.error('Failed to load admin discussions', err);
+    } finally {
+      setLoadingAdminDiscussions(false);
+    }
+  };
+
+  const handleAdminLikeDiscussion = async (postId) => {
+    try {
+      const res = await fetch(`${API_URL}/discussions/${postId}/like`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (data.success) {
+        setAdminDiscussions(prev => prev.map(p => p._id === postId ? data.data : p));
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleAdminAddComment = async (postId) => {
+    if (!adminCommentText.trim()) return;
+    try {
+      const res = await fetch(`${API_URL}/discussions/${postId}/comment`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ text: adminCommentText.trim() })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setAdminDiscussions(prev => prev.map(p => p._id === postId ? data.data : p));
+        setAdminCommentText('');
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleAdminAddReply = async (postId, commentId) => {
+    if (!adminReplyText.trim()) return;
+    try {
+      const res = await fetch(`${API_URL}/discussions/${postId}/comment/${commentId}/reply`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ text: adminReplyText.trim() })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setAdminDiscussions(prev => prev.map(p => p._id === postId ? data.data : p));
+        setAdminReplyText('');
+        setAdminActiveReplyCommentId(null);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleAdminDeleteDiscussion = async (postId) => {
+    if (!window.confirm('Delete this discussion thread as Administrator?')) return;
+    try {
+      const res = await fetch(`${API_URL}/discussions/${postId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (data.success) {
+        setAdminDiscussions(prev => prev.filter(p => p._id !== postId));
+        setSuccess('Discussion removed successfully.');
+        setTimeout(() => setSuccess(''), 3000);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleAdminCreateDiscussion = async (e) => {
+    e.preventDefault();
+    if (!adminDiscussionForm.title.trim() || !adminDiscussionForm.content.trim()) return;
+    if (!adminDiscussionForm.subjectId) {
+      alert('Please select an Academic Subject for this discussion.');
+      return;
+    }
+
+    try {
+      setSubmittingAdminDiscussion(true);
+      const sDoc = academicSubjects.find(s => s._id === adminDiscussionForm.subjectId);
+      const payload = {
+        title: adminDiscussionForm.title.trim(),
+        content: adminDiscussionForm.content.trim(),
+        forumType: 'subject',
+        subjectId: adminDiscussionForm.subjectId,
+        academicYear: adminDiscussionForm.academicYear || sDoc?.academicYear || '',
+        branch: adminDiscussionForm.branch || sDoc?.branch || '',
+        section: adminDiscussionForm.section || sDoc?.section || ''
+      };
+
+      const res = await fetch(`${API_URL}/discussions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (data.success) {
+        setAdminDiscussions(prev => [data.data, ...prev]);
+        setAdminDiscussionForm({ title: '', content: '', subjectId: '', academicYear: '', branch: '', section: '' });
+        setShowAdminCreateDiscussion(false);
+        setSuccess('Subject discussion published successfully.');
+        setTimeout(() => setSuccess(''), 3000);
+      }
+    } catch (err) {
+      alert('Error creating discussion');
+    } finally {
+      setSubmittingAdminDiscussion(false);
+    }
+  };
+
+  const handleExportAuditCsv = () => {
+    if (auditSessions.length === 0) return alert('No student session records to export.');
+    const headers = ['Roll Number', 'Name', 'Email', 'Branch', 'Section', 'Academic Year', 'Total Active Time', 'Total Active Seconds', 'Total Logins', 'Last Login', 'Last Active', 'Online Status', 'Total Activities'];
+    const rows = auditSessions.map(s => [
+      `"${s.rollNumber || ''}"`,
+      `"${s.name || ''}"`,
+      `"${s.email || ''}"`,
+      `"${s.branch || ''}"`,
+      `"${s.section || ''}"`,
+      `"${s.academicYear || ''}"`,
+      `"${s.totalActiveFormatted || ''}"`,
+      s.totalActiveSeconds || 0,
+      s.loginCount || 0,
+      s.lastLoginAt ? `"${new Date(s.lastLoginAt).toLocaleString()}"` : 'N/A',
+      s.lastActiveAt ? `"${new Date(s.lastActiveAt).toLocaleString()}"` : 'N/A',
+      s.isOnline ? 'ONLINE' : 'OFFLINE',
+      s.activityCount || 0
+    ]);
+
+    const csvContent = "\uFEFF" + [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `student_activity_audit_logs_${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   const fetchStudents = async () => {
     try {
@@ -1171,6 +1455,12 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
       } else if (activeTab === 'settings') {
         fetchStaff();
         fetchAcademicContent();
+      } else if (activeTab === 'audit-logs') {
+        fetchAuditStats();
+        fetchAuditSessions(auditOnlineOnly);
+        fetchAuditLogs();
+      } else if (activeTab === 'subject-discussions' || activeTab === 'discussions') {
+        fetchAdminDiscussions();
       }
     }
   }, [token, activeTab]);
@@ -3290,6 +3580,27 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
             }}
           >
             🎯 Interview Settings
+          </button>
+          <button
+            className={`admin-tab-btn ${activeTab === 'audit-logs' || activeTab === 'student-audit-logs' ? 'active' : ''}`}
+            onClick={() => {
+              setActiveTab('audit-logs');
+              fetchAuditStats();
+              fetchAuditSessions();
+              fetchAuditLogs();
+            }}
+          >
+            📜 Student Audit Logs & Active Time
+          </button>
+          <button
+            className={`admin-tab-btn ${activeTab === 'subject-discussions' ? 'active' : ''}`}
+            onClick={() => {
+              setActiveTab('subject-discussions');
+              fetchAcademicContent();
+              fetchAdminDiscussions();
+            }}
+          >
+            💬 Subject Discussions Forum
           </button>
           <button
             className={`admin-tab-btn ${activeTab === 'settings' ? 'active' : ''}`}
@@ -6587,7 +6898,1037 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
             </div>
           </div>
         )}
+
+        {/* ========================================================================= */}
+        {/* TAB: STUDENT AUDIT LOGS & TIME TRACKING                                  */}
+        {/* ========================================================================= */}
+        {(activeTab === 'audit-logs' || activeTab === 'student-audit-logs') && (
+          <div className="admin-audit-logs-wrapper animate-fade">
+            {/* Top KPI Cards */}
+            <div className="admin-stats-summary-grid" style={{ marginBottom: '22px' }}>
+              <div className="glass-card admin-summary-card">
+                <span className="summary-title" style={{ color: '#38bdf8' }}>⏱️ Total Student Active Time</span>
+                <span className="admin-stat-number" style={{ color: '#38bdf8' }}>
+                  {auditStats?.totalHours || '0.0'} hrs
+                </span>
+                <p className="admin-stat-sub">
+                  Cumulative student engagement ({auditStats?.totalActiveTimeFormatted || '0s'})
+                </p>
+              </div>
+
+              <div className="glass-card admin-summary-card">
+                <span className="summary-title" style={{ color: '#34d399' }}>🟢 Currently Online</span>
+                <span className="admin-stat-number" style={{ color: '#34d399' }}>
+                  {auditStats?.onlineNowCount ?? 0}
+                </span>
+                <p className="admin-stat-sub">Students active in the last 3 minutes</p>
+              </div>
+
+              <div className="glass-card admin-summary-card">
+                <span className="summary-title" style={{ color: '#fbbf24' }}>📅 Active Today</span>
+                <span className="admin-stat-number" style={{ color: '#fbbf24' }}>
+                  {auditStats?.activeTodayCount ?? 0}
+                </span>
+                <p className="admin-stat-sub">Unique candidates logged in today</p>
+              </div>
+
+              <div className="glass-card admin-summary-card">
+                <span className="summary-title" style={{ color: '#818cf8' }}>📊 Total Logged Activities</span>
+                <span className="admin-stat-number" style={{ color: '#818cf8' }}>
+                  {auditStats?.totalActivitiesLogged ?? 0}
+                </span>
+                <p className="admin-stat-sub">Tests, labs, discussions & sessions tracked</p>
+              </div>
+            </div>
+
+            {/* Header & Sub-Nav Switcher */}
+            <div className="glass-card" style={{ padding: '20px', marginBottom: '20px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '14px', marginBottom: '16px' }}>
+                <div>
+                  <h3 style={{ margin: '0 0 6px 0', color: 'white', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <span>📜</span>
+                    <span>Student Activity Audit Trail & Active Session Tracking</span>
+                  </h3>
+                  <p style={{ margin: 0, color: '#94a3b8', fontSize: '13px' }}>
+                    Detailed institutional audit logs tracking how much time students spend on the website, when they log in, and all activities they perform.
+                  </p>
+                </div>
+
+                <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    onClick={handleExportAuditCsv}
+                    title="Export student session data as CSV"
+                    style={{ fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px' }}
+                  >
+                    📥 Export Audit Report (CSV)
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    onClick={() => {
+                      fetchAuditStats();
+                      fetchAuditSessions();
+                      fetchAuditLogs();
+                    }}
+                    title="Refresh latest student audit data"
+                    style={{ fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px' }}
+                  >
+                    🔄 Refresh Data
+                  </button>
+                </div>
+              </div>
+
+              {/* Sub-view Switcher Tabs */}
+              <div style={{ display: 'flex', gap: '10px', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '12px' }}>
+                <button
+                  type="button"
+                  onClick={() => setAuditSubTab('sessions')}
+                  style={{
+                    padding: '8px 16px',
+                    background: auditSubTab === 'sessions' ? '#6366f1' : 'transparent',
+                    color: auditSubTab === 'sessions' ? '#ffffff' : '#94a3b8',
+                    border: '1px solid',
+                    borderColor: auditSubTab === 'sessions' ? '#6366f1' : '#334155',
+                    borderRadius: '6px',
+                    fontWeight: 600,
+                    fontSize: '13px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  👥 Student Time & Engagement Roster ({auditSessions.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAuditSubTab('timeline')}
+                  style={{
+                    padding: '8px 16px',
+                    background: auditSubTab === 'timeline' ? '#6366f1' : 'transparent',
+                    color: auditSubTab === 'timeline' ? '#ffffff' : '#94a3b8',
+                    border: '1px solid',
+                    borderColor: auditSubTab === 'timeline' ? '#6366f1' : '#334155',
+                    borderRadius: '6px',
+                    fontWeight: 600,
+                    fontSize: '13px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  📜 Real-Time Activity Audit Trail ({auditLogs.length})
+                </button>
+              </div>
+
+              {/* Search & Filter Controls */}
+              <div style={{ display: 'flex', gap: '12px', alignItems: 'center', marginTop: '16px', flexWrap: 'wrap' }}>
+                <input
+                  type="text"
+                  placeholder="Search student by name, email, roll number, or activity..."
+                  className="form-control"
+                  value={auditSearch}
+                  onChange={(e) => setAuditSearch(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      fetchAuditSessions();
+                      fetchAuditLogs();
+                    }
+                  }}
+                  style={{ flex: 1, minWidth: '220px', padding: '9px 14px', background: '#0f172a', color: 'white', border: '1px solid #334155', borderRadius: '6px', fontSize: '13px' }}
+                />
+
+                <select
+                  className="form-control"
+                  style={{ maxWidth: '160px', padding: '9px 12px', background: '#0f172a', color: 'white', border: '1px solid #334155', borderRadius: '6px', fontSize: '13px' }}
+                  value={auditBranchFilter}
+                  onChange={(e) => {
+                    setAuditBranchFilter(e.target.value);
+                  }}
+                >
+                  <option value="All">All Branches</option>
+                  {[...new Set(students.map(s => s.branch).filter(Boolean))].map(br => (
+                    <option key={br} value={br}>{br}</option>
+                  ))}
+                </select>
+
+                <select
+                  className="form-control"
+                  style={{ maxWidth: '160px', padding: '9px 12px', background: '#0f172a', color: 'white', border: '1px solid #334155', borderRadius: '6px', fontSize: '13px' }}
+                  value={auditYearFilter}
+                  onChange={(e) => {
+                    setAuditYearFilter(e.target.value);
+                  }}
+                >
+                  <option value="All">All Years</option>
+                  {[...new Set(students.map(s => s.academicYear || s.year).filter(Boolean))].map(yr => (
+                    <option key={yr} value={yr}>{yr}</option>
+                  ))}
+                </select>
+
+                {auditSubTab === 'timeline' && (
+                  <select
+                    className="form-control"
+                    style={{ maxWidth: '180px', padding: '9px 12px', background: '#0f172a', color: 'white', border: '1px solid #334155', borderRadius: '6px', fontSize: '13px' }}
+                    value={auditCategoryFilter}
+                    onChange={(e) => setAuditCategoryFilter(e.target.value)}
+                  >
+                    <option value="All">All Categories</option>
+                    <option value="Authentication & Sessions">Auth & Sessions</option>
+                    <option value="Assessments">Assessments</option>
+                    <option value="Lab Practice">Lab Practice</option>
+                    <option value="Discussions">Discussions</option>
+                    <option value="General">General</option>
+                  </select>
+                )}
+
+                {auditSubTab === 'sessions' && (
+                  <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
+                    <button
+                      type="button"
+                      className={`btn btn-sm ${auditOnlineOnly ? 'btn-primary' : 'btn-secondary'}`}
+                      style={{ fontSize: '12px', padding: '6px 12px', display: 'inline-flex', alignItems: 'center', gap: '6px', borderRadius: '20px' }}
+                      onClick={() => {
+                        setAuditOnlineOnly(true);
+                        fetchAuditSessions(true);
+                      }}
+                    >
+                      <span>🟢 Online Now Only</span>
+                      <span style={{ background: auditOnlineOnly ? 'rgba(0,0,0,0.3)' : 'rgba(16, 185, 129, 0.25)', color: auditOnlineOnly ? '#fff' : '#34d399', padding: '1px 6px', borderRadius: '10px', fontSize: '11px', fontWeight: 700 }}>
+                        {auditSessions.filter(s => s.isOnline).length || (auditStats?.onlineNowStudents || 0)}
+                      </span>
+                    </button>
+
+                    <button
+                      type="button"
+                      className={`btn btn-sm ${!auditOnlineOnly ? 'btn-primary' : 'btn-secondary'}`}
+                      style={{ fontSize: '12px', padding: '6px 12px', display: 'inline-flex', alignItems: 'center', gap: '6px', borderRadius: '20px' }}
+                      onClick={() => {
+                        setAuditOnlineOnly(false);
+                        fetchAuditSessions(false);
+                      }}
+                    >
+                      <span>👥 All Students</span>
+                      <span style={{ background: !auditOnlineOnly ? 'rgba(0,0,0,0.3)' : 'rgba(255,255,255,0.1)', padding: '1px 6px', borderRadius: '10px', fontSize: '11px', fontWeight: 700 }}>
+                        {auditSessions.length}
+                      </span>
+                    </button>
+                  </div>
+                )}
+
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => {
+                    fetchAuditSessions();
+                    fetchAuditLogs();
+                  }}
+                  style={{ padding: '9px 16px', fontSize: '13px' }}
+                >
+                  🔍 Filter
+                </button>
+              </div>
+            </div>
+
+            {/* SUB-VIEW 1: STUDENT SESSIONS & TIME SPENT ROSTER */}
+            {auditSubTab === 'sessions' && (() => {
+              const displayedSessions = auditOnlineOnly ? auditSessions.filter(s => s.isOnline) : auditSessions;
+
+              return (
+                <div className="glass-card" style={{ padding: '20px', borderRadius: '12px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap', gap: '8px' }}>
+                    <h4 style={{ color: 'white', margin: 0, fontSize: '15px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span>Student Session Roster ({displayedSessions.length} Candidates {auditOnlineOnly ? '· Online Only' : ''})</span>
+                    </h4>
+                    <span style={{ fontSize: '12px', color: '#94a3b8' }}>
+                      Sorted by most recent activity & total active engagement time
+                    </span>
+                  </div>
+
+                  {loadingAudit ? (
+                    <div style={{ padding: '40px', textAlign: 'center', color: '#94a3b8' }}>
+                      <div className="spinner-loader" style={{ margin: '0 auto 12px' }}></div>
+                      <p>Loading student session tracking records...</p>
+                    </div>
+                  ) : (
+                    <div style={{ overflowX: 'auto' }}>
+                      <table className="student-roster-table" style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+                        <thead>
+                          <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.1)', color: '#94a3b8', fontSize: '12px', textTransform: 'uppercase' }}>
+                            <th style={{ padding: '12px 10px' }}>Student Profile</th>
+                            <th style={{ padding: '12px 10px' }}>Roll Number</th>
+                            <th style={{ padding: '12px 10px' }}>Branch / Scope</th>
+                            <th style={{ padding: '12px 10px' }}>Current Status</th>
+                            <th style={{ padding: '12px 10px' }}>System Login IP</th>
+                            <th style={{ padding: '12px 10px' }}>Total Time Spent</th>
+                            <th style={{ padding: '12px 10px' }}>Logins</th>
+                            <th style={{ padding: '12px 10px' }}>Last Active</th>
+                            <th style={{ padding: '12px 10px' }}>Session Activities (What They Did)</th>
+                            <th style={{ padding: '12px 10px', textAlign: 'right' }}>Audit Inspection</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {displayedSessions.map(student => (
+                            <tr key={student._id} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)', fontSize: '13px' }}>
+                              <td style={{ padding: '12px 10px' }}>
+                                <strong style={{ color: '#f8fafc', display: 'block' }}>{student.name}</strong>
+                                <span style={{ fontSize: '12px', color: '#94a3b8' }}>{student.email}</span>
+                              </td>
+                              <td style={{ padding: '12px 10px' }}>
+                                <span style={{ fontFamily: 'monospace', color: '#c7d2fe', background: 'rgba(99, 102, 241, 0.1)', padding: '2px 6px', borderRadius: '4px' }}>
+                                  {student.rollNumber || 'N/A'}
+                                </span>
+                              </td>
+                              <td style={{ padding: '12px 10px' }}>
+                                <span className="code-pill" style={{ background: 'rgba(16, 185, 129, 0.12)', color: '#6ee7b7', fontSize: '11.5px' }}>
+                                  {student.branch || '—'} {student.section ? `Sec ${student.section}` : ''}
+                                </span>
+                                <div style={{ fontSize: '11px', color: '#64748b', marginTop: '2px' }}>{student.academicYear || 'General'}</div>
+                              </td>
+                              <td style={{ padding: '12px 10px' }}>
+                                {student.isOnline ? (
+                                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', color: '#34d399', fontWeight: 600, fontSize: '12px' }}>
+                                    <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#10b981', display: 'inline-block' }}></span>
+                                    Online Now
+                                  </span>
+                                ) : (
+                                  <span style={{ color: '#64748b', fontSize: '12px' }}>
+                                    Offline
+                                  </span>
+                                )}
+                              </td>
+                              <td style={{ padding: '12px 10px' }}>
+                                <div style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                                  <span style={{ fontSize: '12px' }}>🌐</span>
+                                  <span style={{ fontFamily: 'monospace', color: '#38bdf8', background: 'rgba(56, 189, 248, 0.12)', padding: '2px 6px', borderRadius: '4px', fontSize: '11.5px' }}>
+                                    {student.lastLoginIp || student.lastIpAddress || '127.0.0.1'}
+                                  </span>
+                                </div>
+                                {student.currentPage && (
+                                  <div style={{ fontSize: '10.5px', color: '#64748b', marginTop: '3px', maxWidth: '140px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={`Active page: ${student.currentPage}`}>
+                                    📍 {student.currentPage}
+                                  </div>
+                                )}
+                              </td>
+                              <td style={{ padding: '12px 10px' }}>
+                                <span style={{ background: 'rgba(56, 189, 248, 0.15)', color: '#38bdf8', padding: '3px 8px', borderRadius: '6px', fontWeight: 700, fontSize: '12.5px' }}>
+                                  ⏱️ {student.totalActiveFormatted || '0s'}
+                                </span>
+                              </td>
+                              <td style={{ padding: '12px 10px', color: '#e2e8f0', fontWeight: 600 }}>
+                                {student.loginCount || 0}
+                              </td>
+                              <td style={{ padding: '12px 10px', color: '#94a3b8', fontSize: '12px' }}>
+                                {student.lastActiveAt ? new Date(student.lastActiveAt).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Never'}
+                              </td>
+                              <td style={{ padding: '12px 10px', minWidth: '220px' }}>
+                                {student.sessionActivities && student.sessionActivities.length > 0 ? (
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                                    {student.sessionActivities.slice(0, 2).map((act, i) => (
+                                      <div key={i} style={{ fontSize: '11.5px', color: '#cbd5e1', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                        <span style={{
+                                          padding: '1px 5px',
+                                          borderRadius: '3px',
+                                          fontSize: '9.5px',
+                                          fontWeight: 700,
+                                          background: act.action === 'LOGIN' ? 'rgba(59, 130, 246, 0.2)' : act.action === 'TEST_ATTEMPT' ? 'rgba(245, 158, 11, 0.2)' : act.action === 'LAB_SUBMISSION' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(168, 85, 247, 0.2)',
+                                          color: act.action === 'LOGIN' ? '#60a5fa' : act.action === 'TEST_ATTEMPT' ? '#fbbf24' : act.action === 'LAB_SUBMISSION' ? '#34d399' : '#c084fc'
+                                        }}>
+                                          {act.action}
+                                        </span>
+                                        <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '160px' }} title={act.description}>
+                                          {act.description}
+                                        </span>
+                                      </div>
+                                    ))}
+                                    {student.sessionActivities.length > 2 && (
+                                      <span
+                                        style={{ fontSize: '10.5px', color: '#818cf8', cursor: 'pointer', marginTop: '1px' }}
+                                        onClick={() => openStudentTimelineModal(student)}
+                                      >
+                                        +{student.sessionActivities.length - 2} more session actions...
+                                      </span>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <div style={{ fontSize: '11.5px', color: '#94a3b8' }}>
+                                    {student.isOnline ? (
+                                      <span style={{ color: '#34d399', fontSize: '11px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                        <span>⚡</span> Active in session ({student.totalActiveFormatted || 'active'})
+                                      </span>
+                                    ) : (
+                                      <span style={{ color: '#64748b' }}>No recent session actions</span>
+                                    )}
+                                  </div>
+                                )}
+                              </td>
+                              <td style={{ padding: '12px 10px', textAlign: 'right' }}>
+                                <button
+                                  type="button"
+                                  className="btn btn-secondary btn-sm"
+                                  onClick={() => openStudentTimelineModal(student)}
+                                  style={{ padding: '4px 10px', fontSize: '12px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                                >
+                                  🔍 Inspect Activity Log
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+
+                          {displayedSessions.length === 0 && (
+                            <tr>
+                              <td colSpan="10" style={{ textAlign: 'center', padding: '36px', color: '#94a3b8' }}>
+                                {auditOnlineOnly 
+                                  ? 'No students are currently active online. Switch to "All Students" to view all records.' 
+                                  : 'No student session records found matching current criteria.'}
+                              </td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+
+            {/* SUB-VIEW 2: REAL-TIME ACTIVITY AUDIT TRAIL */}
+            {auditSubTab === 'timeline' && (
+              <div className="glass-card" style={{ padding: '20px', borderRadius: '12px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+                  <h4 style={{ color: 'white', margin: 0, fontSize: '15px' }}>
+                    Live Activity Stream ({auditLogs.length} Events)
+                  </h4>
+                  <span style={{ fontSize: '12px', color: '#94a3b8' }}>
+                    Chronological audit log tracking tests, labs, forum posts, and sign-ins
+                  </span>
+                </div>
+
+                {loadingAudit ? (
+                  <div style={{ padding: '40px', textAlign: 'center', color: '#94a3b8' }}>
+                    <div className="spinner-loader" style={{ margin: '0 auto 12px' }}></div>
+                    <p>Loading audit activity logs...</p>
+                  </div>
+                ) : (
+                  <div style={{ overflowX: 'auto' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '13px' }}>
+                      <thead>
+                        <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.1)', color: '#94a3b8', fontSize: '12px', textTransform: 'uppercase' }}>
+                          <th style={{ padding: '10px' }}>Timestamp</th>
+                          <th style={{ padding: '10px' }}>Student</th>
+                          <th style={{ padding: '10px' }}>Action Type</th>
+                          <th style={{ padding: '10px' }}>Category</th>
+                          <th style={{ padding: '10px' }}>Activity Description</th>
+                          <th style={{ padding: '10px' }}>Details / Client IP</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {auditLogs.map(log => {
+                          let catColor = '#818cf8';
+                          let catBg = 'rgba(99, 102, 241, 0.15)';
+                          if (log.category === 'Assessments') {
+                            catColor = '#fbbf24';
+                            catBg = 'rgba(245, 158, 11, 0.15)';
+                          } else if (log.category === 'Lab Practice') {
+                            catColor = '#34d399';
+                            catBg = 'rgba(16, 185, 129, 0.15)';
+                          } else if (log.category === 'Authentication & Sessions') {
+                            catColor = '#38bdf8';
+                            catBg = 'rgba(56, 189, 248, 0.15)';
+                          }
+
+                          return (
+                            <tr key={log._id} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                              <td style={{ padding: '10px', color: '#94a3b8', whiteSpace: 'nowrap', fontSize: '12px' }}>
+                                {new Date(log.createdAt).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                              </td>
+                              <td style={{ padding: '10px' }}>
+                                <strong style={{ color: '#f8fafc', display: 'block' }}>{log.userName}</strong>
+                                <span style={{ fontSize: '11px', color: '#64748b' }}>{log.rollNumber ? `ID: ${log.rollNumber}` : log.userEmail}</span>
+                              </td>
+                              <td style={{ padding: '10px' }}>
+                                <span className="code-pill" style={{ fontSize: '11px', background: 'rgba(255,255,255,0.06)', color: '#e2e8f0' }}>
+                                  {log.action}
+                                </span>
+                              </td>
+                              <td style={{ padding: '10px' }}>
+                                <span style={{ background: catBg, color: catColor, border: `1px solid ${catColor}40`, padding: '2px 8px', borderRadius: '10px', fontSize: '11px', fontWeight: 600 }}>
+                                  {log.category}
+                                </span>
+                              </td>
+                              <td style={{ padding: '10px', color: '#e2e8f0', maxWidth: '380px', lineHeight: '1.4' }}>
+                                {log.description}
+                              </td>
+                              <td style={{ padding: '10px', color: '#64748b', fontSize: '11.5px', whiteSpace: 'nowrap' }}>
+                                {log.ipAddress ? `IP: ${log.ipAddress}` : '—'}
+                              </td>
+                            </tr>
+                          );
+                        })}
+
+                        {auditLogs.length === 0 && (
+                          <tr>
+                            <td colSpan="6" style={{ textAlign: 'center', padding: '36px', color: '#94a3b8' }}>
+                              No activity logs found matching current criteria.
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ========================================================================= */}
+        {/* TAB: ADMIN SUBJECT DISCUSSIONS FORUM (Scope Oversight)                   */}
+        {/* ========================================================================= */}
+        {(activeTab === 'subject-discussions' || activeTab === 'discussions') && (
+          <div className="admin-subject-discussions-wrapper animate-fade">
+            <div className="glass-card" style={{ padding: '22px', marginBottom: '22px', borderLeft: '4px solid #818cf8' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '14px' }}>
+                <div>
+                  <h3 style={{ margin: '0 0 6px 0', color: 'white', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <span>💬</span>
+                    <span>Subject-Wise Discussions Management & Moderation</span>
+                  </h3>
+                  <p style={{ margin: 0, color: '#94a3b8', fontSize: '13px', maxWidth: '750px' }}>
+                    Full administrative oversight of all subject-wise academic discussions. Monitor questions between students and faculty, reply with official guidance, and moderate threads.
+                  </p>
+                </div>
+                <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    onClick={() => setShowAdminCreateDiscussion(!showAdminCreateDiscussion)}
+                  >
+                    {showAdminCreateDiscussion ? '✕ Close Form' : '➕ Create Subject Thread'}
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    onClick={() => fetchAdminDiscussions()}
+                  >
+                    🔄 Refresh Discussions
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Create Discussion Form for Admin */}
+            {showAdminCreateDiscussion && (
+              <div className="glass-card animate-fade" style={{ padding: '22px', marginBottom: '24px', border: '1px solid rgba(99, 102, 241, 0.4)' }}>
+                <h4 style={{ color: 'white', margin: '0 0 16px 0' }}>Post Subject Discussion as Administrator</h4>
+                <form onSubmit={handleAdminCreateDiscussion}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '14px', marginBottom: '16px' }}>
+                    <div>
+                      <label className="form-label" style={{ fontWeight: 600 }}>Target Academic Subject *</label>
+                      <select
+                        className="form-control"
+                        value={adminDiscussionForm.subjectId}
+                        onChange={(e) => {
+                          const sId = e.target.value;
+                          const sDoc = academicSubjects.find(s => s._id === sId);
+                          setAdminDiscussionForm({
+                            ...adminDiscussionForm,
+                            subjectId: sId,
+                            academicYear: sDoc?.academicYear || '',
+                            branch: sDoc?.branch || '',
+                            section: sDoc?.section || ''
+                          });
+                        }}
+                        required
+                        style={{ background: '#0f172a', color: 'white', border: '1px solid #334155' }}
+                      >
+                        <option value="">-- Select Subject ({academicSubjects.length}) --</option>
+                        {academicSubjects.map(s => (
+                          <option key={s._id} value={s._id}>
+                            [{s.code || 'CODE'}] {s.name} {s.branch ? `(${s.branch})` : ''}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="form-label">Academic Year</label>
+                      <input
+                        type="text"
+                        className="form-control"
+                        placeholder="e.g. 3rd Year / 2026"
+                        value={adminDiscussionForm.academicYear}
+                        onChange={e => setAdminDiscussionForm({ ...adminDiscussionForm, academicYear: e.target.value })}
+                        style={{ background: '#0f172a', color: 'white', border: '1px solid #334155' }}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="form-label">Branch & Section</label>
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        <input
+                          type="text"
+                          className="form-control"
+                          placeholder="Branch (CSE)"
+                          value={adminDiscussionForm.branch}
+                          onChange={e => setAdminDiscussionForm({ ...adminDiscussionForm, branch: e.target.value })}
+                          style={{ background: '#0f172a', color: 'white', border: '1px solid #334155', flex: 1 }}
+                        />
+                        <input
+                          type="text"
+                          className="form-control"
+                          placeholder="Sec A"
+                          value={adminDiscussionForm.section}
+                          onChange={e => setAdminDiscussionForm({ ...adminDiscussionForm, section: e.target.value })}
+                          style={{ background: '#0f172a', color: 'white', border: '1px solid #334155', width: '80px' }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="form-group" style={{ marginBottom: '14px' }}>
+                    <label className="form-label" style={{ fontWeight: 600 }}>Discussion Title *</label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      placeholder="e.g. Important Announcement: Lab Exam guidelines and syllabus clarification"
+                      value={adminDiscussionForm.title}
+                      onChange={e => setAdminDiscussionForm({ ...adminDiscussionForm, title: e.target.value })}
+                      required
+                      style={{ background: '#0f172a', color: 'white', border: '1px solid #334155' }}
+                    />
+                  </div>
+
+                  <div className="form-group" style={{ marginBottom: '16px' }}>
+                    <label className="form-label" style={{ fontWeight: 600 }}>Discussion Body *</label>
+                    <textarea
+                      className="form-control"
+                      rows="5"
+                      placeholder="Enter discussion content, announcements, or resources for students and faculty..."
+                      value={adminDiscussionForm.content}
+                      onChange={e => setAdminDiscussionForm({ ...adminDiscussionForm, content: e.target.value })}
+                      required
+                      style={{ background: '#0f172a', color: 'white', border: '1px solid #334155' }}
+                    />
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '10px' }}>
+                    <button type="submit" className="btn btn-primary" disabled={submittingAdminDiscussion}>
+                      {submittingAdminDiscussion ? 'Publishing Discussion...' : '🚀 Publish Discussion'}
+                    </button>
+                    <button type="button" className="btn btn-secondary" onClick={() => setShowAdminCreateDiscussion(false)}>
+                      Cancel
+                    </button>
+                  </div>
+                </form>
+              </div>
+            )}
+
+            {/* Filter Bar */}
+            <div style={{ display: 'flex', gap: '12px', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap' }}>
+              <select
+                className="form-control"
+                style={{ maxWidth: '280px', padding: '9px 14px', background: '#0f172a', color: 'white', border: '1px solid #334155', borderRadius: '8px', fontSize: '13px' }}
+                value={adminDiscussionSubjectFilter}
+                onChange={(e) => {
+                  setAdminDiscussionSubjectFilter(e.target.value);
+                  fetchAdminDiscussions(e.target.value);
+                }}
+              >
+                <option value="">📚 All Subjects Across College ({academicSubjects.length})</option>
+                {academicSubjects.map(s => (
+                  <option key={s._id} value={s._id}>
+                    [{s.code || 'CODE'}] {s.name} {s.branch ? `(${s.branch})` : ''}
+                  </option>
+                ))}
+              </select>
+
+              <input
+                type="text"
+                placeholder="Search subject discussions by keyword or author..."
+                className="form-control"
+                value={adminDiscussionSearch}
+                onChange={e => setAdminDiscussionSearch(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') fetchAdminDiscussions(); }}
+                style={{ flex: 1, minWidth: '220px', padding: '9px 14px', background: '#1e293b', color: 'white', border: '1px solid #334155', borderRadius: '8px', fontSize: '13px' }}
+              />
+
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => fetchAdminDiscussions()}
+                style={{ padding: '9px 16px', fontSize: '13px' }}
+              >
+                🔍 Search
+              </button>
+            </div>
+
+            {/* Discussions Stream */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+              {loadingAdminDiscussions ? (
+                <div className="glass-card" style={{ padding: '40px', textAlign: 'center', color: '#94a3b8' }}>
+                  <div className="spinner-loader" style={{ margin: '0 auto 12px' }}></div>
+                  <p>Loading subject discussions across departments...</p>
+                </div>
+              ) : adminDiscussions.length > 0 ? (
+                adminDiscussions.map(post => (
+                  <div key={post._id} className="glass-card" style={{ padding: '22px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.08)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px', gap: '10px' }}>
+                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                        <span style={{ background: 'rgba(16, 185, 129, 0.15)', color: '#34d399', border: '1px solid rgba(16, 185, 129, 0.3)', padding: '2px 9px', borderRadius: '6px', fontSize: '12px', fontWeight: 600 }}>
+                          📖 {post.subjectCode ? `[${post.subjectCode}] ` : ''}{post.subjectName || 'Subject Discussion'}
+                        </span>
+                        {(post.academicYear || post.branch) && (
+                          <span style={{ background: 'rgba(56, 189, 248, 0.12)', color: '#38bdf8', border: '1px solid rgba(56, 189, 248, 0.25)', padding: '2px 8px', borderRadius: '6px', fontSize: '11px' }}>
+                            🎯 {post.academicYear || ''}{post.branch ? ` • ${post.branch}` : ''}{post.section ? ` Sec ${post.section}` : ''}
+                          </span>
+                        )}
+                        <span style={{
+                          background: post.userRole === 'faculty' ? 'rgba(16, 185, 129, 0.15)' : post.userRole === 'admin' ? 'rgba(239, 68, 68, 0.15)' : 'rgba(99, 102, 241, 0.15)',
+                          color: post.userRole === 'faculty' ? '#34d399' : post.userRole === 'admin' ? '#f87171' : '#818cf8',
+                          border: '1px solid currentColor',
+                          padding: '1px 7px',
+                          borderRadius: '10px',
+                          fontSize: '11px',
+                          fontWeight: 600
+                        }}>
+                          {post.userRole === 'faculty' ? '👨‍🏫 Faculty' : post.userRole === 'admin' ? '🛡️ Admin' : '🎓 Student'}
+                        </span>
+                      </div>
+
+                      <button
+                        onClick={() => handleAdminDeleteDiscussion(post._id)}
+                        style={{ background: 'transparent', border: 'none', color: '#ef4444', fontSize: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '3px' }}
+                        title="Delete discussion thread as Admin"
+                      >
+                        🗑️ Delete Thread
+                      </button>
+                    </div>
+
+                    <h3 style={{ margin: '0 0 6px 0', color: '#f8fafc', fontSize: '16.5px' }}>{post.title}</h3>
+                    <div style={{ fontSize: '12px', color: '#64748b', marginBottom: '12px' }}>
+                      <span>Posted by <strong>{post.userName}</strong></span>
+                      {post.userRollNumber && <span> ({post.userRollNumber})</span>}
+                      <span> • {new Date(post.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+                    </div>
+
+                    <p style={{ margin: '0 0 16px 0', color: '#cbd5e1', fontSize: '14px', lineHeight: '1.65', whiteSpace: 'pre-wrap' }}>
+                      {post.content}
+                    </p>
+
+                    <div style={{ display: 'flex', gap: '16px', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '12px', alignItems: 'center' }}>
+                      <button
+                        onClick={() => handleAdminLikeDiscussion(post._id)}
+                        style={{ background: 'transparent', border: 'none', color: post.likes?.includes(user?.id) ? '#38bdf8' : '#94a3b8', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', fontSize: '13px' }}
+                      >
+                        👍 {(post.likes || []).length} Like{(post.likes || []).length === 1 ? '' : 's'}
+                      </button>
+
+                      <button
+                        onClick={() => setAdminActiveCommentPostId(adminActiveCommentPostId === post._id ? null : post._id)}
+                        style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', fontSize: '13px' }}
+                      >
+                        💬 {(post.comments || []).length} Comment{(post.comments || []).length === 1 ? '' : 's'}
+                      </button>
+                    </div>
+
+                    {/* Comments Panel */}
+                    {adminActiveCommentPostId === post._id && (
+                      <div style={{ marginTop: '16px', background: 'rgba(15, 23, 42, 0.7)', borderRadius: '8px', padding: '16px', border: '1px solid rgba(255,255,255,0.06)' }}>
+                        <h4 style={{ color: 'white', margin: '0 0 12px 0', fontSize: '13.5px' }}>
+                          Thread Comments ({(post.comments || []).length})
+                        </h4>
+
+                        <div style={{ display: 'flex', gap: '8px', marginBottom: '14px' }}>
+                          <input
+                            type="text"
+                            placeholder="Write an official administrative response..."
+                            className="form-control"
+                            value={adminCommentText}
+                            onChange={e => setAdminCommentText(e.target.value)}
+                            onKeyDown={e => { if (e.key === 'Enter') handleAdminAddComment(post._id); }}
+                            style={{ flex: 1, padding: '7px 12px', background: '#0f172a', color: 'white', border: '1px solid #334155', borderRadius: '4px', fontSize: '13px' }}
+                          />
+                          <button className="btn btn-accent btn-sm" onClick={() => handleAdminAddComment(post._id)}>
+                            Send as Admin
+                          </button>
+                        </div>
+
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                          {(post.comments || []).map(comment => (
+                            <div key={comment._id} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)', paddingBottom: '10px' }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                  <strong style={{ color: '#818cf8', fontSize: '13px' }}>{comment.userName}</strong>
+                                  <span style={{ fontSize: '10.5px', color: comment.userRole === 'admin' ? '#f87171' : comment.userRole === 'faculty' ? '#34d399' : '#94a3b8' }}>
+                                    ({comment.userRole || 'student'})
+                                  </span>
+                                </div>
+                                <span style={{ fontSize: '11px', color: '#64748b' }}>
+                                  {new Date(comment.createdAt).toLocaleDateString()}
+                                </span>
+                              </div>
+
+                              <p style={{ margin: '3px 0 6px 0', color: '#cbd5e1', fontSize: '13px' }}>
+                                {comment.text}
+                              </p>
+
+                              {/* Replies */}
+                              <div style={{ marginLeft: '20px', borderLeft: '2px solid rgba(99, 102, 241, 0.4)', paddingLeft: '10px', marginTop: '8px' }}>
+                                {(comment.replies || []).map(reply => (
+                                  <div key={reply._id} style={{ marginBottom: '6px' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                      <strong style={{ color: '#f59e0b', fontSize: '12px' }}>{reply.userName}</strong>
+                                      <span style={{ fontSize: '10px', color: '#64748b' }}>{new Date(reply.createdAt).toLocaleDateString()}</span>
+                                    </div>
+                                    <p style={{ margin: '1px 0 0 0', color: '#94a3b8', fontSize: '12px' }}>{reply.text}</p>
+                                  </div>
+                                ))}
+
+                                {adminActiveReplyCommentId === comment._id ? (
+                                  <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+                                    <input
+                                      type="text"
+                                      placeholder="Write reply as Admin..."
+                                      className="form-control"
+                                      value={adminReplyText}
+                                      onChange={e => setAdminReplyText(e.target.value)}
+                                      onKeyDown={e => { if (e.key === 'Enter') handleAdminAddReply(post._id, comment._id); }}
+                                      style={{ flex: 1, padding: '5px 8px', background: '#0f172a', color: 'white', border: '1px solid #334155', borderRadius: '4px', fontSize: '12px' }}
+                                    />
+                                    <button className="btn btn-secondary btn-sm" onClick={() => handleAdminAddReply(post._id, comment._id)} style={{ padding: '3px 8px', fontSize: '12px' }}>
+                                      Reply
+                                    </button>
+                                    <button onClick={() => setAdminActiveReplyCommentId(null)} style={{ background: 'transparent', border: 'none', color: '#f87171', cursor: 'pointer', fontSize: '12px' }}>
+                                      Cancel
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <button
+                                    onClick={() => setAdminActiveReplyCommentId(comment._id)}
+                                    style={{ background: 'transparent', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: '11.5px', marginTop: '4px', padding: 0 }}
+                                  >
+                                    ↳ Reply as Admin
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                  </div>
+                ))
+              ) : (
+                <div className="glass-card" style={{ padding: '50px 20px', textAlign: 'center', color: '#94a3b8', borderRadius: '12px' }}>
+                  <span style={{ fontSize: '36px', display: 'block', marginBottom: '12px' }}>📚</span>
+                  <h4 style={{ color: 'white', marginBottom: '8px' }}>No Subject Discussions Found</h4>
+                  <p style={{ maxWidth: '480px', margin: '0 auto 16px', fontSize: '13.5px' }}>
+                    No academic threads exist for the selected subject criteria. Create a thread as Admin or select another subject.
+                  </p>
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    onClick={() => setShowAdminCreateDiscussion(true)}
+                  >
+                    ➕ Start Subject Discussion
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div >
+
+      {/* STUDENT ACTIVITY TIMELINE & AUDIT DOSSIER MODAL */}
+      {selectedStudentForTimeline && (
+        <div className="modal-overlay" style={{ zIndex: 1200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '15px' }}>
+          <div
+            className="glass-card modal-content animate-fade"
+            style={{
+              maxWidth: '920px',
+              width: '100%',
+              maxHeight: '90vh',
+              display: 'flex',
+              flexDirection: 'column',
+              padding: 0,
+              overflow: 'hidden',
+              background: '#0f172a',
+              border: '1px solid rgba(99, 102, 241, 0.3)'
+            }}
+          >
+            {/* Modal Header */}
+            <div style={{ padding: '18px 24px', borderBottom: '1px solid rgba(255,255,255,0.08)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.02)' }}>
+              <div>
+                <h3 style={{ margin: 0, color: 'white', fontSize: '1.2rem', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <span>🔍</span>
+                  <span>Candidate Activity History & Session Dossier</span>
+                </h3>
+                <p style={{ margin: '4px 0 0', color: '#94a3b8', fontSize: '13px' }}>
+                  Student: <strong>{selectedStudentForTimeline.name}</strong> ({selectedStudentForTimeline.email}) · Roll: <code style={{ color: '#818cf8' }}>{selectedStudentForTimeline.rollNumber || 'N/A'}</code>
+                </p>
+              </div>
+              <button
+                type="button"
+                className="close-btn"
+                onClick={() => setSelectedStudentForTimeline(null)}
+                style={{ background: 'transparent', border: 'none', color: '#94a3b8', fontSize: '1.5rem', cursor: 'pointer' }}
+              >
+                &times;
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div style={{ padding: '24px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              {/* Summary Metrics Bar */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '14px', background: 'rgba(255,255,255,0.03)', padding: '16px', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.08)' }}>
+                <div>
+                  <span style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase', display: 'block' }}>Total Time On Platform</span>
+                  <strong style={{ color: '#38bdf8', fontSize: '16px' }}>⏱️ {studentTimelineData?.student?.totalActiveFormatted || selectedStudentForTimeline.totalActiveFormatted || '0s'}</strong>
+                </div>
+                <div>
+                  <span style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase', display: 'block' }}>System Login IP</span>
+                  <strong style={{ color: '#67e8f9', fontSize: '13.5px', fontFamily: 'monospace', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                    <span>🌐</span>
+                    <span>{studentTimelineData?.student?.systemLoginIp || selectedStudentForTimeline.lastLoginIp || selectedStudentForTimeline.lastIpAddress || '127.0.0.1'}</span>
+                  </strong>
+                </div>
+                <div>
+                  <span style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase', display: 'block' }}>Current Active Page</span>
+                  <strong style={{ color: '#f1f5f9', fontSize: '13px' }}>
+                    {studentTimelineData?.student?.currentPage || selectedStudentForTimeline.currentPage || 'Portal Overview'}
+                  </strong>
+                </div>
+                <div>
+                  <span style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase', display: 'block' }}>Total Logins Count</span>
+                  <strong style={{ color: '#f8fafc', fontSize: '15px' }}>🔑 {selectedStudentForTimeline.loginCount || 1} logins</strong>
+                </div>
+                <div>
+                  <span style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase', display: 'block' }}>Online Status</span>
+                  <strong style={{ color: selectedStudentForTimeline.isOnline ? '#34d399' : '#94a3b8', fontSize: '14px' }}>
+                    {selectedStudentForTimeline.isOnline ? '🟢 Online Now' : '⚪ Offline'}
+                  </strong>
+                </div>
+              </div>
+
+              {/* Login Session Activity Breakdown */}
+              <div style={{ background: 'rgba(56, 189, 248, 0.05)', border: '1px solid rgba(56, 189, 248, 0.2)', borderRadius: '10px', padding: '16px 18px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', flexWrap: 'wrap', gap: '6px' }}>
+                  <h4 style={{ margin: 0, color: '#38bdf8', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span>🕒</span>
+                    <span>What Student Did In That Time Period Of Login</span>
+                  </h4>
+                  <span style={{ fontSize: '11.5px', color: '#94a3b8' }}>
+                    Login IP: <strong style={{ color: '#67e8f9', fontFamily: 'monospace' }}>{studentTimelineData?.student?.systemLoginIp || selectedStudentForTimeline.lastLoginIp || '127.0.0.1'}</strong>
+                  </span>
+                </div>
+
+                {selectedStudentForTimeline.sessionActivities && selectedStudentForTimeline.sessionActivities.length > 0 ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {selectedStudentForTimeline.sessionActivities.map((act, idx) => (
+                      <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(15, 23, 42, 0.6)', padding: '8px 12px', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.04)' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span style={{
+                            padding: '2px 6px',
+                            borderRadius: '4px',
+                            fontSize: '10.5px',
+                            fontWeight: 700,
+                            background: act.action === 'LOGIN' ? 'rgba(59, 130, 246, 0.25)' : act.action === 'TEST_ATTEMPT' ? 'rgba(245, 158, 11, 0.25)' : act.action === 'LAB_SUBMISSION' ? 'rgba(16, 185, 129, 0.25)' : 'rgba(168, 85, 247, 0.25)',
+                            color: act.action === 'LOGIN' ? '#93c5fd' : act.action === 'TEST_ATTEMPT' ? '#fcd34d' : act.action === 'LAB_SUBMISSION' ? '#6ee7b7' : '#d8b4fe'
+                          }}>
+                            {act.action}
+                          </span>
+                          <span style={{ color: '#e2e8f0', fontSize: '12.5px' }}>{act.description}</span>
+                        </div>
+                        <div style={{ textAlign: 'right', fontSize: '11px', color: '#64748b' }}>
+                          <span>{new Date(act.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
+                          {act.ipAddress && <div style={{ fontSize: '10px', color: '#38bdf8' }}>IP: {act.ipAddress}</div>}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div style={{ color: '#94a3b8', fontSize: '12.5px', padding: '6px 0' }}>
+                    {selectedStudentForTimeline.isOnline ? (
+                      <span>🟢 Student is currently online and active on <strong>{selectedStudentForTimeline.currentPage || 'Portal'}</strong>. System login recorded from IP <code style={{ color: '#67e8f9' }}>{studentTimelineData?.student?.systemLoginIp || selectedStudentForTimeline.lastLoginIp || '127.0.0.1'}</code>.</span>
+                    ) : (
+                      <span>Student session closed. Recorded last active at {selectedStudentForTimeline.lastActiveAt ? new Date(selectedStudentForTimeline.lastActiveAt).toLocaleString() : 'N/A'}.</span>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Timeline Events List */}
+              <div>
+                <h4 style={{ color: 'white', margin: '0 0 14px 0', fontSize: '14.5px' }}>
+                  Chronological Activity Feed ({studentTimelineData?.logs?.length || 0} Events)
+                </h4>
+
+                {loadingTimeline ? (
+                  <div style={{ padding: '30px', textAlign: 'center', color: '#94a3b8' }}>
+                    <div className="spinner-loader" style={{ margin: '0 auto 10px' }}></div>
+                    <p>Fetching student activity timeline...</p>
+                  </div>
+                ) : studentTimelineData?.logs?.length > 0 ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    {studentTimelineData.logs.map((item, idx) => (
+                      <div
+                        key={item._id || idx}
+                        style={{
+                          background: 'rgba(255,255,255,0.03)',
+                          border: '1px solid rgba(255,255,255,0.06)',
+                          borderRadius: '8px',
+                          padding: '14px 16px',
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'flex-start',
+                          gap: '12px',
+                          flexWrap: 'wrap'
+                        }}
+                      >
+                        <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
+                          <span style={{ fontSize: '18px', marginTop: '2px' }}>
+                            {item.action === 'LOGIN' ? '🔑' : item.action === 'LOGOUT' ? '🚪' : item.action === 'TEST_ATTEMPT' ? '🧠' : item.action === 'LAB_SUBMISSION' ? '🔬' : item.action?.includes('DISCUSSION') ? '💬' : '⚡'}
+                          </span>
+                          <div>
+                            <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '4px' }}>
+                              <strong style={{ color: '#f8fafc', fontSize: '13.5px' }}>{item.action}</strong>
+                              <span style={{ background: 'rgba(99, 102, 241, 0.15)', color: '#818cf8', padding: '1px 6px', borderRadius: '4px', fontSize: '11px' }}>
+                                {item.category}
+                              </span>
+                            </div>
+                            <p style={{ margin: '2px 0 0', color: '#cbd5e1', fontSize: '13px', lineHeight: '1.4' }}>
+                              {item.description}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div style={{ textAlign: 'right', fontSize: '11.5px', color: '#64748b' }}>
+                          <span>{new Date(item.createdAt).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
+                          {item.ipAddress && <div style={{ marginTop: '2px' }}>IP: {item.ipAddress}</div>}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p style={{ color: '#94a3b8', fontSize: '13px', textAlign: 'center', padding: '24px 0' }}>
+                    No recorded activities yet for this student.
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div style={{ padding: '14px 24px', borderTop: '1px solid rgba(255,255,255,0.08)', display: 'flex', justifyContent: 'flex-end', background: 'rgba(255,255,255,0.02)' }}>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => setSelectedStudentForTimeline(null)}
+              >
+                Close Dossier
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* PRACTICE QUESTION FORM MODAL */}
       {

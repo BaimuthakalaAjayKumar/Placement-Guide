@@ -125,8 +125,66 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  // Student heartbeat tracking for active session duration and audit log
+  useEffect(() => {
+    if (!token || !user || user.role !== 'student') return;
+
+    const sendHeartbeat = async (seconds = 60) => {
+      if (document.visibilityState === 'hidden') return;
+      try {
+        await fetch(`${API_URL}/audit/heartbeat`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            durationSeconds: seconds,
+            currentPath: window.location.pathname,
+            pageTitle: document.title
+          })
+        });
+      } catch (e) {
+        // silent fail
+      }
+    };
+
+    // Initial ping
+    sendHeartbeat(30);
+
+    // Periodic heartbeat every 60 seconds
+    const interval = setInterval(() => {
+      sendHeartbeat(60);
+    }, 60000);
+
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        sendHeartbeat(30);
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+  }, [token, user?.role, user?._id]);
+
   // Logout User
-  const logout = () => {
+  const logout = async () => {
+    if (token) {
+      try {
+        await fetch(`${API_URL}/auth/logout`, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        });
+      } catch (e) {
+        // silent
+      }
+    }
     localStorage.removeItem('token');
     setToken(null);
     setUser(null);

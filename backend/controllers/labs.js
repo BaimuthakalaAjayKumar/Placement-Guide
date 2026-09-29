@@ -4,6 +4,7 @@ const Notification = require('../models/Notification');
 const User = require('../models/User');
 const { evaluateLabSubmission } = require('../services/labEvaluationService');
 const { checkLabTaskPlagiarism } = require('../services/plagiarismService');
+const { logActivity } = require('../utils/auditLogger');
 
 const studentYear = user => user.academicYear || user.year || '';
 const canManage = (user, task) => user.role === 'admin' || (
@@ -355,6 +356,23 @@ exports.submitAttempt = async (req, res, next) => {
         console.error('Error dispatching lab plagiarism notification:', notifyErr.message);
       }
     }
+
+    // Log Activity for Audit Trail
+    await logActivity({
+      user: req.user,
+      action: 'LAB_SUBMISSION',
+      category: 'Lab Practice',
+      description: `Submitted lab practice solution: "${task.title}" — Score: ${evalResult.score}/${task.maxScore || 100}`,
+      details: {
+        taskId: task._id,
+        taskTitle: task.title,
+        score: evalResult.score,
+        maxScore: task.maxScore || 100,
+        language: submittedLang,
+        plagiarismPercentage: plagResult.plagiarismPercentage
+      },
+      req
+    });
 
     res.status(200).json({
       success: true,
