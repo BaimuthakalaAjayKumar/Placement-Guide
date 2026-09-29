@@ -6,6 +6,8 @@ import { API_URL } from '../config/api';
 import Header from '../components/Header';
 import AtRiskDetectionModule from '../components/AtRiskDetectionModule';
 import FacultyTestBuilder from '../components/FacultyTestBuilder';
+import BatchComparison from '../components/BatchComparison';
+import PlacementStatsExport from '../components/PlacementStatsExport';
 import './FacultyDashboard.css';
 
 const LAB_LANGUAGES = [
@@ -2274,6 +2276,18 @@ const FacultyDashboard = () => {
                             🛠️ Faculty Test Builder
                         </button>
                         <button
+                            className={`faculty-tab-btn ${activeTab === 'batch-comparison' ? 'active' : ''}`}
+                            onClick={() => { setActiveTab('batch-comparison'); setError(null); setSuccessMsg(''); }}
+                        >
+                            📊 Batch Comparison
+                        </button>
+                        <button
+                            className={`faculty-tab-btn ${activeTab === 'placement-export' ? 'active' : ''}`}
+                            onClick={() => { setActiveTab('placement-export'); setError(null); setSuccessMsg(''); }}
+                        >
+                            📑 Stats &amp; Report Export
+                        </button>
+                        <button
                             className={`faculty-tab-btn ${activeTab === 'subjects' ? 'active' : ''}`}
                             onClick={() => { setActiveTab('subjects'); setError(null); setSuccessMsg(''); }}
                         >
@@ -2350,6 +2364,16 @@ const FacultyDashboard = () => {
                     {/* TAB: FACULTY TEST BUILDER */}
                     {activeTab === 'test-builder' && (
                         <FacultyTestBuilder />
+                    )}
+
+                    {/* TAB: BATCH COMPARISON */}
+                    {activeTab === 'batch-comparison' && (
+                        <BatchComparison />
+                    )}
+
+                    {/* TAB: PLACEMENT STATS EXPORT */}
+                    {activeTab === 'placement-export' && (
+                        <PlacementStatsExport />
                     )}
 
                     {/* TAB 1: STUDENT MONITORING */}

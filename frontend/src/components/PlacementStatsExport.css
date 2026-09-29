@@ -1,0 +1,146 @@
+/* ==========================================================================
+   PlacementStatsExport.css
+   ========================================================================== */
+
+.stats-export-container {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.export-header-banner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+  padding: 1.5rem 1.75rem;
+  border-left: 4px solid #6366f1;
+}
+
+.export-header-banner h2 {
+  margin: 0 0 0.35rem 0;
+  font-size: 1.35rem;
+  color: #f8fafc;
+}
+
+.export-header-banner p {
+  margin: 0;
+  color: #94a3b8;
+  font-size: 0.9rem;
+  max-width: 680px;
+}
+
+.recipient-pill {
+  background: rgba(99, 102, 241, 0.15);
+  border: 1px solid rgba(99, 102, 241, 0.35);
+  color: #c7d2fe;
+  padding: 0.5rem 1rem;
+  border-radius: 999px;
+  font-size: 0.85rem;
+}
+
+.export-controls-card {
+  padding: 1.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.export-controls-card h3 {
+  margin: 0;
+  font-size: 1.15rem;
+}
+
+.export-filters-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 1rem;
+}
+
+.export-buttons-row {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  padding-top: 0.5rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.export-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.75rem 1.4rem;
+  border-radius: 10px;
+  font-weight: 700;
+  font-size: 0.9rem;
+  cursor: pointer;
+  border: none;
+  transition: all 0.2s ease;
+}
+
+.export-btn:hover {
+  transform: translateY(-2px);
+}
+
+.export-btn.pdf {
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+  color: #fff;
+  box-shadow: 0 4px 15px rgba(239, 68, 68, 0.3);
+}
+
+.export-btn.excel {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: #fff;
+  box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3);
+}
+
+.export-btn.csv {
+  background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+  color: #fff;
+  box-shadow: 0 4px 15px rgba(99, 102, 241, 0.3);
+}
+
+.preview-table-card {
+  padding: 1.5rem;
+}
+
+.export-table-wrapper {
+  overflow-x: auto;
+}
+
+.export-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.export-table th {
+  background: rgba(255, 255, 255, 0.04);
+  padding: 0.85rem 1rem;
+  font-size: 0.8rem;
+  color: #94a3b8;
+  text-transform: uppercase;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  white-space: nowrap;
+}
+
+.export-table td {
+  padding: 0.85rem 1rem;
+  font-size: 0.88rem;
+  color: #e2e8f0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  white-space: nowrap;
+}
+
+.branch-tag {
+  background: rgba(255, 255, 255, 0.06);
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  font-weight: 600;
+  font-size: 0.78rem;
+}
+
+.status-text {
+  color: #cbd5e1;
+  font-size: 0.82rem;
+}

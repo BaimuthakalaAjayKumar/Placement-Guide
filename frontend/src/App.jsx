@@ -39,6 +39,7 @@ import ProjectStudio from './pages/ProjectStudio';
 import ChangePassword from './pages/ChangePassword';
 import LabPractice from './pages/LabPractice';
 import PlacementCalendar from './pages/PlacementCalendar';
+import PlacementSuitePage from './pages/PlacementSuitePage';
 
 // Private Route Wrapper
 const PrivateRoute = ({ children, allowedRoles }) => {
@@ -348,6 +349,14 @@ const AppRoutes = () => {
         element={
           <PrivateRoute allowedRoles={['student', 'faculty', 'admin']}>
             <PlacementCalendar />
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/placement-suite"
+        element={
+          <PrivateRoute allowedRoles={['student', 'faculty', 'admin']}>
+            <PlacementSuitePage />
           </PrivateRoute>
         }
       />

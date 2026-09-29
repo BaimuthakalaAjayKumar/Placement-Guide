@@ -595,6 +595,48 @@ const Dashboard = () => {
           </div>
         )}
 
+        <div className="placement-suite-banner-launcher" style={{
+          background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.15) 0%, rgba(168, 85, 247, 0.15) 100%)',
+          border: '1px solid rgba(168, 85, 247, 0.3)',
+          borderRadius: '16px',
+          padding: '1.25rem 1.75rem',
+          marginBottom: '1.5rem',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          gap: '1rem',
+          boxShadow: '0 10px 30px -10px rgba(0, 0, 0, 0.4)'
+        }}>
+          <div>
+            <h3 style={{ margin: '0 0 0.3rem 0', color: '#fff', fontSize: '1.2rem', display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+              <span>🏆</span> Placement Preparation & Readiness Suite
+            </h3>
+            <p style={{ margin: 0, color: '#cbd5e1', fontSize: '0.9rem' }}>
+              Access your Knowledge Heatmap, 15-Question Smart Revision Set, Daily Challenge streaks, and earn your official Completion Certificate.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => navigate('/placement-suite')}
+            style={{
+              background: 'linear-gradient(135deg, #6366f1 0%, #a855f7 100%)',
+              color: '#fff',
+              border: 'none',
+              padding: '0.7rem 1.4rem',
+              borderRadius: '10px',
+              fontWeight: '700',
+              fontSize: '0.9rem',
+              cursor: 'pointer',
+              boxShadow: '0 4px 15px rgba(168, 85, 247, 0.4)',
+              transition: 'all 0.2s ease',
+              whiteSpace: 'nowrap'
+            }}
+          >
+            Open Placement Suite →
+          </button>
+        </div>
+
         <div className="dashboard-grid-container">
 
           {/* Left Column: Core Stats */}

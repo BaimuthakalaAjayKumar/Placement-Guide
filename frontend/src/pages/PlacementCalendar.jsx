@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
+import Header from '../components/Header';
 import { API_URL } from '../config/api';
 import './PlacementCalendar.css';
 
@@ -189,7 +190,9 @@ const PlacementCalendar = () => {
   const todayStr = new Date().toISOString().slice(0, 10);
 
   return (
-    <div className="placement-calendar-page">
+    <>
+      <Header title="Placement & Training Calendar" />
+      <div className="content-wrapper placement-calendar-page animate-fade" style={{ padding: '2rem', overflowY: 'auto' }}>
       {/* Top Banner */}
       <div className="calendar-hero-card glass-card">
         <div className="calendar-hero-content">
@@ -657,7 +660,8 @@ const PlacementCalendar = () => {
           </div>
         </div>
       )}
-    </div>
+      </div>
+    </>
   );
 };
 

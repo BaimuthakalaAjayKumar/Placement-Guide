@@ -4,6 +4,8 @@ import { useAuth } from '../context/AuthContext';
 import Header from '../components/Header';
 import CompanyPlacementManager from '../components/CompanyPlacementManager';
 import AtRiskDetectionModule from '../components/AtRiskDetectionModule';
+import BatchComparison from '../components/BatchComparison';
+import PlacementStatsExport from '../components/PlacementStatsExport';
 import { API_URL } from '../config/api';
 import './AdminPanel.css';
 
@@ -3523,6 +3525,18 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
             ⚠️ At-Risk Detection
           </button>
           <button
+            className={`admin-tab-btn ${activeTab === 'batch-comparison' ? 'active' : ''}`}
+            onClick={() => setActiveTab('batch-comparison')}
+          >
+            📊 Batch Comparison
+          </button>
+          <button
+            className={`admin-tab-btn ${activeTab === 'placement-export' ? 'active' : ''}`}
+            onClick={() => setActiveTab('placement-export')}
+          >
+            📑 Stats &amp; Report Export
+          </button>
+          <button
             className={`admin-tab-btn ${activeTab === 'interviews' ? 'active' : ''}`}
             onClick={() => setActiveTab('interviews')}
           >
@@ -4677,6 +4691,18 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
                 </div>
               </div>
             </div>
+          )
+        }
+
+        {
+          activeTab === 'batch-comparison' && (
+            <BatchComparison />
+          )
+        }
+
+        {
+          activeTab === 'placement-export' && (
+            <PlacementStatsExport />
           )
         }
 

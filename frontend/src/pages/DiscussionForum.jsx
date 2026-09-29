@@ -2,6 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import Header from '../components/Header';
 import { API_URL } from '../config/api';
+import StudentDiscussionRooms from '../components/StudentDiscussionRooms';
+import InterviewExperienceRepo from '../components/InterviewExperienceRepo';
+import PeerMentorSystem from '../components/PeerMentorSystem';
 import './DiscussionForum.css';
 
 const GENERAL_CATEGORIES = ['All', 'Placement', 'Coding', 'Aptitude', 'Interview', 'Technical Subjects'];
@@ -340,14 +343,41 @@ const DiscussionForum = () => {
         <div className="forum-container">
 
           {/* Top-Level Forum Selector Tabs */}
-          <div className="forum-top-nav">
+          <div className="forum-top-nav" style={{ overflowX: 'auto', flexWrap: 'nowrap' }}>
+            <button
+              type="button"
+              className={`forum-nav-tab ${activeForumType === 'rooms' ? 'active' : ''}`}
+              onClick={() => setActiveForumType('rooms')}
+            >
+              <span>💬 Discussion Rooms</span>
+              <span className="tab-badge" style={{ background: 'rgba(99, 102, 241, 0.25)', color: '#818cf8' }}>6 Rooms</span>
+            </button>
+
+            <button
+              type="button"
+              className={`forum-nav-tab ${activeForumType === 'experiences' ? 'active' : ''}`}
+              onClick={() => setActiveForumType('experiences')}
+            >
+              <span>🏢 Interview Experiences</span>
+              <span className="tab-badge" style={{ background: 'rgba(168, 85, 247, 0.25)', color: '#c084fc' }}>Repo</span>
+            </button>
+
+            <button
+              type="button"
+              className={`forum-nav-tab ${activeForumType === 'mentors' ? 'active' : ''}`}
+              onClick={() => setActiveForumType('mentors')}
+            >
+              <span>🤝 Peer Mentors</span>
+              <span className="tab-badge" style={{ background: 'rgba(16, 185, 129, 0.25)', color: '#34d399' }}>Seniors</span>
+            </button>
+
             <button
               type="button"
               className={`forum-nav-tab ${activeForumType === 'general' ? 'active' : ''}`}
               onClick={() => handleSwitchForumType('general')}
             >
-              <span>🌐 Campus Placement Forum (General)</span>
-              <span className="tab-badge">{activeForumType === 'general' ? posts.length : 'All'}</span>
+              <span>🌐 General Forum</span>
+              <span className="tab-badge">{activeForumType === 'general' ? posts.length : 'Feed'}</span>
             </button>
 
             <button
@@ -355,13 +385,19 @@ const DiscussionForum = () => {
               className={`forum-nav-tab ${activeForumType === 'subject' ? 'active' : ''}`}
               onClick={() => handleSwitchForumType('subject')}
             >
-              <span>📚 Subject-wise Academic Forum (Scope Allocated)</span>
+              <span>📚 Subject Academic</span>
               <span className="tab-badge" style={{ background: 'rgba(16, 185, 129, 0.2)', color: '#34d399' }}>
                 {subjects.length} Subjects
               </span>
             </button>
           </div>
 
+          {activeForumType === 'rooms' && <StudentDiscussionRooms />}
+          {activeForumType === 'experiences' && <InterviewExperienceRepo />}
+          {activeForumType === 'mentors' && <PeerMentorSystem />}
+
+          {(activeForumType === 'general' || activeForumType === 'subject') && (
+            <>
           {/* Scope Explanation Banner */}
           {activeForumType === 'subject' ? (
             <div className="forum-scope-banner">
@@ -886,6 +922,8 @@ const DiscussionForum = () => {
               </div>
             )}
           </div>
+          </>
+          )}
 
         </div>
       </div>

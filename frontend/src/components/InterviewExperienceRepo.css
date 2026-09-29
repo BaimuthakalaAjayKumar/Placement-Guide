@@ -1,0 +1,328 @@
+/* ==========================================================================
+   InterviewExperienceRepo.css
+   ========================================================================== */
+
+.interview-repo-container {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.repo-header-banner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+  padding: 1.5rem 1.75rem;
+  border-left: 4px solid #a855f7;
+}
+
+.repo-header-banner h2 {
+  margin: 0 0 0.35rem 0;
+  font-size: 1.35rem;
+  color: #f8fafc;
+}
+
+.repo-header-banner p {
+  margin: 0;
+  color: #94a3b8;
+  font-size: 0.9rem;
+  max-width: 650px;
+}
+
+.repo-filter-bar {
+  padding: 1rem 1.25rem;
+}
+
+.experience-cards-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.experience-item-card {
+  padding: 1.5rem;
+  border-radius: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  transition: all 0.2s ease;
+}
+
+.exp-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.exp-company-block {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+}
+
+.exp-company-logo {
+  font-size: 2rem;
+  background: rgba(255, 255, 255, 0.04);
+  padding: 0.5rem;
+  border-radius: 10px;
+}
+
+.exp-title {
+  margin: 0 0 0.25rem 0;
+  font-size: 1.15rem;
+  color: #f8fafc;
+}
+
+.exp-sub {
+  font-size: 0.82rem;
+  color: #94a3b8;
+}
+
+.exp-badges-col {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.status-badge-pill {
+  padding: 0.25rem 0.65rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.status-badge-pill.selected {
+  background: rgba(16, 185, 129, 0.2);
+  color: #34d399;
+}
+
+.status-badge-pill.rejected {
+  background: rgba(239, 68, 68, 0.2);
+  color: #f87171;
+}
+
+.difficulty-badge {
+  background: rgba(255, 255, 255, 0.06);
+  color: #cbd5e1;
+  padding: 0.25rem 0.65rem;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.moderation-tag {
+  font-size: 0.7rem;
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.moderation-tag.pending { background: rgba(245, 158, 11, 0.2); color: #fbbf24; }
+.moderation-tag.approved { background: rgba(16, 185, 129, 0.2); color: #34d399; }
+.moderation-tag.rejected { background: rgba(239, 68, 68, 0.2); color: #f87171; }
+
+.exp-rounds-summary {
+  display: flex;
+  gap: 0.65rem;
+  flex-wrap: wrap;
+}
+
+.round-chip {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 0.4rem 0.8rem;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  display: flex;
+  gap: 0.35rem;
+}
+
+.round-chip strong {
+  color: #e2e8f0;
+}
+
+.round-chip span {
+  color: #94a3b8;
+}
+
+.exp-expanded-details {
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.rounds-vertical-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.round-detail-box {
+  background: rgba(255, 255, 255, 0.03);
+  border-left: 3px solid #818cf8;
+  padding: 1rem;
+  border-radius: 0 8px 8px 0;
+}
+
+.round-box-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.round-box-header h5 {
+  margin: 0;
+  font-size: 0.95rem;
+  color: #f1f5f9;
+}
+
+.round-diff-tag {
+  font-size: 0.75rem;
+  color: #94a3b8;
+}
+
+.round-summary-text {
+  font-size: 0.85rem;
+  color: #cbd5e1;
+  margin: 0 0 0.5rem 0;
+}
+
+.round-questions-bullets {
+  margin: 0.4rem 0 0 0;
+  padding-left: 1.25rem;
+  font-size: 0.88rem;
+  color: #94a3b8;
+  line-height: 1.5;
+}
+
+.prep-advice-box {
+  background: rgba(234, 179, 8, 0.1);
+  border: 1px solid rgba(234, 179, 8, 0.3);
+  padding: 0.85rem 1rem;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  color: #fef08a;
+}
+
+.prep-advice-box p {
+  margin: 0.25rem 0 0 0;
+  color: #fef9c3;
+}
+
+.exp-card-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  padding-top: 0.85rem;
+}
+
+.helpful-btn {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #cbd5e1;
+  padding: 0.4rem 0.85rem;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.helpful-btn:hover {
+  background: rgba(99, 102, 241, 0.2);
+  color: #a5b4fc;
+}
+
+.moderation-actions {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.btn-mod {
+  border: none;
+  padding: 0.35rem 0.75rem;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.btn-mod.approve { background: #10b981; color: #fff; }
+.btn-mod.reject { background: #ef4444; color: #fff; }
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(5px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 1rem;
+}
+
+.modal-card {
+  background: #0f172a;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 14px;
+  padding: 1.75rem;
+  max-height: 90vh;
+  overflow-y: auto;
+  color: #f8fafc;
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.25rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  padding-bottom: 0.75rem;
+}
+
+.modal-header h3 {
+  margin: 0;
+  font-size: 1.2rem;
+}
+
+.close-btn {
+  background: transparent;
+  border: none;
+  color: #94a3b8;
+  font-size: 1.4rem;
+  cursor: pointer;
+}
+
+.exp-form-body {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.form-grid-3-col {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.75rem;
+}
+
+.modal-actions-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}

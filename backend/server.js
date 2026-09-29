@@ -186,6 +186,9 @@ const auditRoutes = require('./routes/audit');
 const placementDriveRoutes = require('./routes/placementDrives');
 const placementEventRoutes = require('./routes/placementEvents');
 const atRiskRoutes = require('./routes/atRisk');
+const placementSuiteRoutes = require('./routes/placementSuite');
+const peerMentorRoutes = require('./routes/peerMentors');
+const interviewExperienceRoutes = require('./routes/interviewExperiences');
 
 // ============================================================
 // MOUNT API ROUTES
@@ -211,6 +214,9 @@ app.use('/api/audit', auditRoutes);
 app.use('/api/placement-drives', placementDriveRoutes);
 app.use('/api/placement-events', placementEventRoutes);
 app.use('/api/at-risk', atRiskRoutes);
+app.use('/api/placement-suite', placementSuiteRoutes);
+app.use('/api/peer-mentors', peerMentorRoutes);
+app.use('/api/interview-experiences', interviewExperienceRoutes);
 
 // ============================================================
 // HEALTH CHECK
