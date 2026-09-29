@@ -1,150 +1,212 @@
 /* ==========================================================================
-   PLACEMENT CALENDAR - STYLESHEET
-   Aligned perfectly with sidebar layout via .content-wrapper
+   PLACEMENT CALENDAR - MODERN MOBILE SCREENSHOT REPLICA & SPATIAL AGENDA
+   Aesthetic: Pitch-black background (#000000), big "2026 / 9" header,
+   blue weekends, vibrant blue capsule for day 30, stacked dark-blue pills,
+   spacious Agenda Grid with generous spacing between each card, and mobile dock.
    ========================================================================== */
 
 .placement-calendar-page {
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
+  gap: 1.75rem;
   color: #E2E8F0;
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   width: 100%;
+  padding: 1.5rem 2rem 5rem 2rem; /* Bottom padding so bottom dock doesn't cover content */
+  box-sizing: border-box;
 }
 
-/* Hero / Top Header Card */
-.calendar-hero-card {
+/* ==========================================================================
+   1. TOP MINIMALIST HEADER (Matching Screenshot: 2026 / 9, + and ⋮ icons)
+   ========================================================================== */
+.mobile-calendar-header-bar {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  background: rgba(18, 24, 38, 0.75);
+  background: #000000;
   border: 1px solid rgba(255, 255, 255, 0.08);
-  border-left: 4px solid #6366F1;
-  border-radius: 16px;
-  padding: 1.5rem 1.8rem;
-  backdrop-filter: blur(14px);
+  border-radius: 18px;
+  padding: 1.25rem 2rem;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7);
+}
+
+.header-left-cluster {
+  display: flex;
+  align-items: baseline;
+  gap: 1.25rem;
   flex-wrap: wrap;
-  gap: 1.2rem;
 }
 
-.calendar-hero-content {
-  max-width: 780px;
-}
-
-.calendar-title-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  background: rgba(99, 102, 241, 0.15);
-  border: 1px solid rgba(99, 102, 241, 0.35);
-  color: #A5B4FC;
-  padding: 0.25rem 0.65rem;
-  border-radius: 8px;
-  font-size: 0.78rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  margin-bottom: 0.5rem;
-}
-
-.calendar-heading {
-  margin: 0 0 0.35rem 0;
-  font-size: 1.6rem;
+/* Large Screenshot Title: "2026 / 9" */
+.screenshot-big-month-title {
+  margin: 0;
+  font-size: 2.5rem;
   font-weight: 800;
   color: #FFFFFF;
+  letter-spacing: 0.03em;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
 
-.calendar-subtitle {
-  margin: 0;
-  font-size: 0.88rem;
-  color: #94A3B8;
-  line-height: 1.45;
-}
-
-.calendar-hero-actions {
+.month-sub-indicator {
   display: flex;
   align-items: center;
-  gap: 0.8rem;
-  flex-wrap: wrap;
+  gap: 0.85rem;
 }
 
-.view-mode-toggle {
+.month-name-text {
+  font-size: 1.15rem;
+  font-weight: 600;
+  color: #94A3B8;
+  text-transform: capitalize;
+}
+
+.month-quick-steppers {
   display: flex;
-  background: rgba(11, 15, 25, 0.6);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  padding: 0.25rem;
-  border-radius: 12px;
+  align-items: center;
+  gap: 0.35rem;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 2px 4px;
 }
 
-.view-mode-btn {
+.stepper-arrow-btn,
+.stepper-today-btn {
   background: transparent;
   border: none;
-  color: #94A3B8;
-  padding: 0.5rem 1rem;
-  border-radius: 9px;
+  color: #CBD5E1;
+  font-size: 0.82rem;
   font-weight: 600;
-  font-size: 0.85rem;
+  padding: 0.35rem 0.65rem;
+  border-radius: 6px;
   cursor: pointer;
   transition: all 0.2s ease;
 }
 
-.view-mode-btn.active {
-  background: linear-gradient(135deg, #6366F1, #8B5CF6);
+.stepper-arrow-btn:hover,
+.stepper-today-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
   color: #FFFFFF;
-  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
 }
 
-.schedule-event-btn {
-  background: linear-gradient(135deg, #6366F1, #8B5CF6);
-  border: none;
-  color: #FFFFFF;
+.stepper-today-btn {
+  color: #60A5FA;
   font-weight: 700;
-  font-size: 0.88rem;
-  padding: 0.65rem 1.25rem;
+}
+
+/* Header Right: + and ⋮ Icons */
+.header-right-cluster {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  position: relative;
+}
+
+.icon-action-button {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #FFFFFF;
+  width: 44px;
+  height: 44px;
   border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   cursor: pointer;
   transition: all 0.2s ease;
-  box-shadow: 0 4px 14px rgba(99, 102, 241, 0.3);
 }
 
-.schedule-event-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 18px rgba(99, 102, 241, 0.45);
+.icon-action-button:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(59, 130, 246, 0.5);
+  transform: translateY(-1px);
 }
 
-/* Category Legend Bar */
+.icon-plus-symbol {
+  font-size: 1.8rem;
+  font-weight: 300;
+  line-height: 1;
+}
+
+.icon-dots-symbol {
+  font-size: 1.5rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+/* Quick Action Menu Dropdown */
+.menu-dropdown-wrapper {
+  position: relative;
+}
+
+.quick-action-menu {
+  position: absolute;
+  top: 52px;
+  right: 0;
+  background: #0D1322;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 14px;
+  padding: 0.5rem;
+  width: 240px;
+  z-index: 100;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.7);
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.menu-option-item {
+  background: transparent;
+  border: none;
+  color: #E2E8F0;
+  text-align: left;
+  padding: 0.65rem 0.9rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.menu-option-item:hover {
+  background: rgba(59, 130, 246, 0.18);
+  color: #60A5FA;
+}
+
+/* ==========================================================================
+   2. CATEGORY FILTER BAR
+   ========================================================================== */
 .calendar-legend-bar {
   display: flex;
   align-items: center;
   gap: 0.5rem;
   flex-wrap: wrap;
-  background: rgba(18, 24, 38, 0.65);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: #000000;
+  border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 14px;
-  padding: 0.8rem 1.2rem;
-  backdrop-filter: blur(10px);
+  padding: 0.75rem 1.25rem;
 }
 
 .legend-label {
   font-size: 0.8rem;
   font-weight: 700;
-  color: #CBD5E1;
+  color: #94A3B8;
   text-transform: uppercase;
-  margin-right: 0.4rem;
+  margin-right: 0.3rem;
 }
 
 .legend-pill {
   border: 1px solid rgba(255, 255, 255, 0.1);
   background: rgba(255, 255, 255, 0.03);
   color: #94A3B8;
-  padding: 0.4rem 0.8rem;
+  padding: 0.35rem 0.75rem;
   border-radius: 20px;
-  font-size: 0.8rem;
+  font-size: 0.78rem;
   font-weight: 600;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
-  gap: 0.45rem;
+  gap: 0.4rem;
   transition: all 0.2s ease;
 }
 
@@ -153,427 +215,976 @@
 }
 
 .legend-pill.active {
-  border-color: #6366F1;
-  background: rgba(99, 102, 241, 0.2);
+  border-color: #3B82F6;
+  background: rgba(59, 130, 246, 0.2);
   color: #FFFFFF;
 }
 
 .legend-count-badge {
   font-size: 0.7rem;
   font-weight: 700;
-  padding: 0.1rem 0.45rem;
+  padding: 0.1rem 0.4rem;
   border-radius: 10px;
 }
 
-/* Main Calendar Card */
-.calendar-grid-card {
-  background: rgba(18, 24, 38, 0.75);
+/* ==========================================================================
+   3. MONTH GRID (Exact Replica of User Mobile Screenshot)
+   Pitch-black background (#000000), 7 Columns: SUN MON TUE WED THU FRI SAT,
+   Blue Saturday/Sunday numbers, White weekday numbers, Capsule Today badge (day 30),
+   Stacked dark-blue event pills.
+   ========================================================================== */
+.pure-black-month-container {
+  background: #000000;
   border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 18px;
-  padding: 1.5rem;
-  backdrop-filter: blur(14px);
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.35);
+  border-radius: 20px;
+  padding: 1.5rem 1.75rem 2.5rem 1.75rem;
+  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.8);
 }
 
-.calendar-nav-bar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 1.4rem;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-  padding-bottom: 1rem;
-}
-
-.month-year-display {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-}
-
-.month-year-display h3 {
-  margin: 0;
-  font-size: 1.4rem;
-  font-weight: 800;
-  color: #FFFFFF;
-}
-
-.events-count-chip {
-  font-size: 0.75rem;
-  font-weight: 600;
-  background: rgba(99, 102, 241, 0.15);
-  color: #A5B4FC;
-  padding: 0.2rem 0.6rem;
-  border-radius: 8px;
-}
-
-.nav-controls {
-  display: flex;
-  gap: 0.4rem;
-}
-
-.nav-controls .btn-sm {
-  padding: 0.4rem 0.8rem;
-  font-size: 0.82rem;
-  border-radius: 8px;
-}
-
-/* Weekday Matrix */
-.calendar-weekday-headers {
+/* Weekday Strip: SUN MON TUE WED THU FRI SAT */
+.weekdays-strip {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
   gap: 8px;
-  margin-bottom: 8px;
+  margin-bottom: 1.25rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
 }
 
-.weekday-header {
+.weekday-col-label {
   text-align: center;
-  font-size: 0.82rem;
+  font-size: 0.85rem;
   font-weight: 700;
-  color: #64748B;
+  color: #94A3B8;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
-  padding: 0.4rem 0;
 }
 
-.calendar-days-grid {
+.weekday-col-label.weekend-col {
+  color: #60A5FA;
+}
+
+/* Days Grid: 7 Columns */
+.month-cells-grid {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
   gap: 8px;
+  row-gap: 22px; /* Generous vertical spacing between calendar week rows */
 }
 
-.calendar-day-cell {
-  min-height: 120px;
-  background: rgba(26, 34, 52, 0.45);
-  border: 1px solid rgba(255, 255, 255, 0.04);
-  border-radius: 12px;
-  padding: 0.6rem;
+/* Day Cell Slot */
+.day-cell-slot {
+  min-height: 100px;
   display: flex;
   flex-direction: column;
-  gap: 0.3rem;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  align-items: center;
+  border-radius: 10px;
+  padding: 4px 3px;
+  transition: all 0.2s ease;
   position: relative;
 }
 
-.calendar-day-cell:hover {
-  background: rgba(30, 41, 64, 0.7);
-  border-color: rgba(99, 102, 241, 0.35);
-  transform: translateY(-2px);
+.day-cell-slot.blank-slot {
+  visibility: hidden;
 }
 
-.calendar-day-cell.empty {
-  background: rgba(15, 20, 32, 0.25);
-  border-color: transparent;
-  pointer-events: none;
+.day-cell-slot.active-day-slot {
+  cursor: pointer;
 }
 
-.calendar-day-cell.today {
-  background: rgba(99, 102, 241, 0.12);
-  border-color: rgba(99, 102, 241, 0.45);
-  box-shadow: inset 0 0 16px rgba(99, 102, 241, 0.15);
+.day-cell-slot.active-day-slot:hover {
+  background: rgba(255, 255, 255, 0.03);
 }
 
-.day-cell-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 0.2rem;
-}
-
-.day-number {
-  font-size: 0.9rem;
-  font-weight: 700;
-  color: #CBD5E1;
-  width: 24px;
-  height: 24px;
+/* Top Date Number */
+.date-number-wrapper {
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 50%;
+  width: 100%;
+  height: 44px;
+  margin-bottom: 6px;
 }
 
-.calendar-day-cell.today .day-number {
-  background: #6366F1;
+.date-number-label {
+  font-size: 1.25rem;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+/* Saturday & Sunday Date Numbers are Vibrant Blue */
+.date-number-label.weekend-blue {
+  color: #3B82F6;
+  font-weight: 800;
+}
+
+/* Monday to Friday Date Numbers are White */
+.date-number-label.weekday-white {
   color: #FFFFFF;
 }
 
-.today-pill {
-  font-size: 0.64rem;
+/* Capsule Badge for Today / Active Day (e.g. Day 30 in Screenshot) */
+.today-capsule-badge {
+  background: #3B82F6;
+  color: #FFFFFF;
+  border-radius: 12px;
+  width: 44px;
+  height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   font-weight: 800;
-  background: rgba(99, 102, 241, 0.25);
-  color: #A5B4FC;
-  padding: 0.1rem 0.4rem;
-  border-radius: 6px;
-  text-transform: uppercase;
+  font-size: 1.25rem;
+  line-height: 1;
+  box-shadow: 0 4px 18px rgba(59, 130, 246, 0.5);
 }
 
-.day-events-list {
+.today-capsule-badge.sm-badge {
+  width: 32px;
+  height: 30px;
+  font-size: 0.95rem;
+  border-radius: 8px;
+}
+
+/* Stacked Event Pills Container */
+.stacked-event-pills-container {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  overflow: hidden;
+  gap: 3px;
+  width: 100%;
 }
 
-.day-event-chip {
-  font-size: 0.74rem;
+/* Dark-Blue Compact Pill matching Screenshot */
+.screenshot-pill {
+  background: #172A4A; /* Dark navy blue from screenshot */
+  border: 1px solid rgba(59, 130, 246, 0.25);
+  color: #BFDBFE;
+  border-radius: 5px;
+  padding: 3px 5px;
+  font-size: 0.72rem;
   font-weight: 600;
-  padding: 0.25rem 0.5rem;
-  border-radius: 6px;
-  white-space: nowrap;
+  text-align: center;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
   cursor: pointer;
+  transition: all 0.15s ease;
+  box-sizing: border-box;
+}
+
+.screenshot-pill:hover {
+  background: #1E3A8A;
+  color: #FFFFFF;
+  transform: translateY(-1px);
+}
+
+.pill-text-truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: block;
+}
+
+/* More Count Pill (e.g. +2, +4, +8) */
+.more-count-pill {
+  color: #60A5FA;
+  background: rgba(59, 130, 246, 0.12);
+  border: 1px solid rgba(59, 130, 246, 0.2);
+  border-radius: 4px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-align: center;
+  padding: 2px 4px;
+  cursor: pointer;
+  letter-spacing: 0.03em;
+  transition: all 0.15s ease;
+}
+
+.more-count-pill:hover {
+  background: rgba(59, 130, 246, 0.25);
+  color: #93C5FD;
+}
+
+/* ==========================================================================
+   4. SPATIAL AGENDA GRID (Generous Space Between Each Grid Card)
+   "When it Comes to Agenda Grid make sure Keep some Space Between Each grid"
+   ========================================================================== */
+.spacious-agenda-wrapper {
+  background: #000000;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 20px;
+  padding: 2rem 2.25rem;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
+}
+
+.agenda-banner-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2.25rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  flex-wrap: wrap;
+  gap: 1.5rem;
+}
+
+.agenda-title-group {
+  max-width: 650px;
+}
+
+.agenda-kicker-tag {
+  display: inline-block;
+  font-size: 0.75rem;
+  font-weight: 800;
+  color: #60A5FA;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-bottom: 0.35rem;
+}
+
+.agenda-main-title {
+  margin: 0 0 0.4rem 0;
+  font-size: 1.55rem;
+  font-weight: 800;
+  color: #FFFFFF;
+}
+
+.agenda-main-desc {
+  margin: 0;
+  font-size: 0.88rem;
+  color: #94A3B8;
+  line-height: 1.5;
+}
+
+.agenda-action-controls {
   display: flex;
   align-items: center;
-  gap: 0.35rem;
-  transition: all 0.15s ease;
-  line-height: 1.2;
-}
-
-.day-event-chip:hover {
-  filter: brightness(1.2);
-  transform: scale(1.02);
-}
-
-.chip-icon {
-  font-size: 0.7rem;
-}
-
-.chip-title {
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.more-events-indicator {
-  font-size: 0.68rem;
-  color: #94A3B8;
-  font-weight: 700;
-  padding: 0.15rem 0.4rem;
-  background: rgba(255, 255, 255, 0.05);
-  border-radius: 6px;
-  width: fit-content;
-}
-
-/* Agenda View */
-.agenda-view-container {
-  display: flex;
-  flex-direction: column;
   gap: 1rem;
+  flex-wrap: wrap;
 }
 
-.agenda-event-card {
+.agenda-search-box {
   display: flex;
-  gap: 1.4rem;
-  background: rgba(26, 34, 52, 0.45);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  border-radius: 16px;
-  padding: 1.2rem 1.6rem;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 0.45rem 0.85rem;
+  gap: 0.5rem;
+  width: 260px;
+}
+
+.agenda-search-input {
+  background: transparent;
+  border: none;
+  color: #FFFFFF;
+  font-size: 0.85rem;
+  width: 100%;
+  outline: none;
+}
+
+.clear-search-btn {
+  background: transparent;
+  border: none;
+  color: #94A3B8;
+  cursor: pointer;
+  padding: 0;
+  font-size: 0.85rem;
+}
+
+.agenda-layout-toggle {
+  display: flex;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 0.25rem;
+  border-radius: 12px;
+}
+
+.layout-btn {
+  background: transparent;
+  border: none;
+  color: #94A3B8;
+  padding: 0.45rem 0.85rem;
+  border-radius: 9px;
+  font-size: 0.82rem;
+  font-weight: 600;
   cursor: pointer;
   transition: all 0.2s ease;
 }
 
-.agenda-event-card:hover {
-  background: rgba(30, 41, 64, 0.7);
-  border-color: rgba(99, 102, 241, 0.35);
-  transform: translateX(4px);
+.layout-btn.active {
+  background: #3B82F6;
+  color: #FFFFFF;
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.4);
 }
 
-.agenda-date-badge {
+/* ==========================================================================
+   AGENDA GRID LAYOUT - GENEROUS 2.25rem (36px) SPACE BETWEEN EACH CARD!
+   ========================================================================== */
+.agenda-cards-spatial-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+  gap: 2.25rem; /* Spacious distance between each grid card */
+  margin-top: 1rem;
+}
+
+.agenda-spatial-card {
+  background: #0A0E18;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 18px;
+  padding: 1.8rem 2rem; /* Generous internal padding */
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  min-width: 65px;
-  padding: 0.6rem 0.8rem;
-  background: rgba(15, 20, 32, 0.7);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 12px;
+  justify-content: space-between;
+  gap: 1.4rem;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.5);
+  cursor: pointer;
+  position: relative;
 }
 
-.agenda-date-badge .day-val {
-  font-size: 1.5rem;
-  font-weight: 800;
-  color: #F8FAFC;
-  line-height: 1;
+.agenda-spatial-card:hover {
+  transform: translateY(-4px);
+  border-color: rgba(59, 130, 246, 0.45);
+  box-shadow: 0 20px 45px rgba(0, 0, 0, 0.7);
+  background: #0E1422;
 }
 
-.agenda-date-badge .month-val {
-  font-size: 0.74rem;
-  font-weight: 700;
-  color: #94A3B8;
-  text-transform: uppercase;
-  margin-top: 0.2rem;
-}
-
-.agenda-details {
-  flex: 1;
-}
-
-.agenda-details-top {
-  display: flex;
-  align-items: center;
-  gap: 0.8rem;
-  margin-bottom: 0.35rem;
-}
-
-.agenda-cat-badge {
-  font-size: 0.74rem;
-  font-weight: 700;
-  padding: 0.18rem 0.6rem;
-  border-radius: 12px;
-  border: 1px solid;
-}
-
-.agenda-time-text {
-  font-size: 0.82rem;
-  color: #94A3B8;
-}
-
-.agenda-title {
-  font-size: 1.15rem;
-  font-weight: 700;
-  margin: 0.15rem 0 0.35rem 0;
-  color: #FFFFFF;
-}
-
-.agenda-desc {
-  font-size: 0.86rem;
-  color: #94A3B8;
-  margin: 0;
-  line-height: 1.4;
-}
-
-.agenda-meta-row {
-  display: flex;
-  gap: 1.2rem;
-  margin-top: 0.6rem;
-  font-size: 0.8rem;
-  color: #CBD5E1;
-}
-
-/* Modals */
-.calendar-modal-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(5, 8, 15, 0.8);
-  backdrop-filter: blur(10px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1200;
-  padding: 1.5rem;
-}
-
-.event-detail-modal-window,
-.create-event-modal-window {
-  background: #111827;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 20px;
-  width: 100%;
-  max-width: 600px;
-  max-height: 90vh;
-  overflow-y: auto;
-  padding: 1.8rem;
-  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.65);
-}
-
-.modal-header-row {
+.spatial-card-top {
   display: flex;
   justify-content: space-between;
-  align-items: center;
-  margin-bottom: 1.4rem;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  padding-bottom: 1rem;
-}
-
-.modal-header-row h3 {
-  margin: 0;
-  font-size: 1.25rem;
-  color: #FFFFFF;
-}
-
-.close-modal-btn {
-  background: transparent;
-  border: none;
-  color: #94A3B8;
-  font-size: 1.2rem;
-  cursor: pointer;
-  padding: 0.2rem 0.5rem;
-}
-
-.detail-banner-card {
-  padding: 1.2rem;
-  border-radius: 12px;
-  margin-bottom: 1.2rem;
-  border: 1px solid;
-}
-
-.detail-type-tag {
-  font-size: 0.74rem;
-  font-weight: 800;
-  text-transform: uppercase;
-  margin-bottom: 0.4rem;
-  display: block;
-}
-
-.detail-heading {
-  margin: 0;
-  font-size: 1.3rem;
-  font-weight: 800;
-  color: #FFFFFF;
-}
-
-.detail-row-item {
-  margin-bottom: 0.9rem;
-}
-
-.detail-row-item .label {
-  font-size: 0.74rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  color: #64748B;
-  display: block;
-  margin-bottom: 0.2rem;
-}
-
-.detail-row-item .val {
-  font-size: 0.92rem;
-  color: #E2E8F0;
-}
-
-.form-grid-2 {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
+  align-items: flex-start;
   gap: 1rem;
 }
 
-.form-group-item {
+.spatial-date-capsule {
+  width: 66px;
+  height: 66px;
+  border-radius: 14px;
+  border: 1px solid;
   display: flex;
   flex-direction: column;
-  gap: 0.35rem;
-  margin-bottom: 1rem;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 
-.form-group-item label {
-  font-size: 0.8rem;
-  font-weight: 600;
+.spatial-month {
+  font-size: 0.7rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
   color: #CBD5E1;
 }
 
-.form-group-item input,
-.form-group-item select,
-.form-group-item textarea {
-  background: rgba(18, 24, 38, 0.8);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  color: #FFFFFF;
-  padding: 0.6rem 0.8rem;
-  border-radius: 8px;
-  font-size: 0.86rem;
-  font-family: inherit;
+.spatial-day {
+  font-size: 1.6rem;
+  font-weight: 900;
+  line-height: 1;
+  margin: 1px 0;
 }
 
-.form-group-item input:focus,
-.form-group-item select:focus,
-.form-group-item textarea:focus {
-  outline: none;
-  border-color: #6366F1;
+.spatial-year {
+  font-size: 0.65rem;
+  opacity: 0.7;
+}
+
+.spatial-badge-container {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.4rem;
+}
+
+.spatial-type-chip {
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 0.3rem 0.65rem;
+  border-radius: 20px;
+  border: 1px solid;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.spatial-timing-pill {
+  font-size: 0.76rem;
+  color: #94A3B8;
+  font-weight: 600;
+}
+
+.spatial-card-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.spatial-event-title {
+  margin: 0;
+  font-size: 1.18rem;
+  font-weight: 700;
+  color: #FFFFFF;
+  line-height: 1.35;
+}
+
+.spatial-host-line {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.85rem;
+  color: #60A5FA;
+  font-weight: 600;
+}
+
+.spatial-desc-text {
+  margin: 0.25rem 0 0 0;
+  font-size: 0.85rem;
+  color: #94A3B8;
+  line-height: 1.5;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.spatial-meta-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.spatial-venue-line {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.82rem;
+  color: #CBD5E1;
+}
+
+.spatial-audience-tags {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.audience-pill {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: #94A3B8;
+  padding: 0.15rem 0.55rem;
+  border-radius: 12px;
+  font-size: 0.72rem;
+  text-transform: capitalize;
+}
+
+.spatial-card-footer {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 0.25rem;
+}
+
+.spatial-action-btn {
+  flex: 1;
+  padding: 0.6rem 1rem;
+  border-radius: 10px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.spatial-action-btn.primary {
+  background: rgba(59, 130, 246, 0.15);
+  border: 1px solid rgba(59, 130, 246, 0.35);
+  color: #93C5FD;
+}
+
+.spatial-action-btn.primary:hover {
+  background: #3B82F6;
+  color: #FFFFFF;
+}
+
+.spatial-action-btn.secondary {
+  flex: 0 0 auto;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #CBD5E1;
+}
+
+.spatial-action-btn.secondary:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #FFFFFF;
+}
+
+/* ==========================================================================
+   AGENDA TIMELINE LIST (Generous 2.25rem Space Between Each Item)
+   ========================================================================== */
+.agenda-timeline-spacious-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2.25rem; /* Generous gap between timeline items */
+  margin-top: 1rem;
+}
+
+.agenda-timeline-card {
+  background: #0A0E18;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 18px;
+  padding: 1.8rem 2.2rem;
+  display: flex;
+  align-items: center;
+  gap: 2rem;
+  transition: all 0.25s ease;
+  cursor: pointer;
+}
+
+.agenda-timeline-card:hover {
+  transform: translateY(-3px);
+  background: #0E1422;
+  border-color: rgba(59, 130, 246, 0.4);
+}
+
+.timeline-date-box {
+  width: 78px;
+  height: 78px;
+  border-radius: 16px;
+  border: 1px solid;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.timeline-month {
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.timeline-day {
+  font-size: 1.8rem;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.timeline-weekday {
+  font-size: 0.65rem;
+  font-weight: 700;
+  opacity: 0.8;
+}
+
+.timeline-details {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.timeline-badges-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.timeline-type-badge {
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 0.25rem 0.65rem;
+  border-radius: 14px;
+  border: 1px solid;
+}
+
+.timeline-clock,
+.timeline-host {
+  font-size: 0.78rem;
+  color: #94A3B8;
+  font-weight: 600;
+}
+
+.timeline-title {
+  margin: 0;
+  font-size: 1.22rem;
+  font-weight: 700;
+  color: #FFFFFF;
+}
+
+.timeline-desc {
+  margin: 0;
+  font-size: 0.86rem;
+  color: #94A3B8;
+  line-height: 1.45;
+}
+
+.timeline-venue {
+  font-size: 0.82rem;
+  color: #CBD5E1;
+}
+
+.timeline-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.agenda-empty-state {
+  text-align: center;
+  padding: 4rem 2rem;
+  color: #94A3B8;
+}
+
+.empty-icon {
+  font-size: 3rem;
+  display: block;
+  margin-bottom: 1rem;
+}
+
+/* ==========================================================================
+   5. WEEK VIEW & DAY VIEW
+   ========================================================================== */
+.calendar-week-container,
+.calendar-day-container,
+.calendar-year-container {
+  background: #000000;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 20px;
+  padding: 2rem;
+}
+
+.week-header-bar h3,
+.day-hero-title,
+.year-header h2 {
+  margin: 0 0 0.35rem 0;
+  color: #FFFFFF;
+  font-weight: 800;
+}
+
+.week-columns-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 12px;
+  margin-top: 1.5rem;
+}
+
+.week-day-column {
+  background: #0A0E18;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
+  padding: 0.85rem 0.65rem;
+  display: flex;
+  flex-direction: column;
+  min-height: 280px;
+}
+
+.week-day-col-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  margin-bottom: 0.75rem;
+}
+
+.week-day-name {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #94A3B8;
+}
+
+.week-day-num {
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: #FFFFFF;
+}
+
+.blue-weekend {
+  color: #3B82F6 !important;
+}
+
+.week-col-events-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.week-event-card {
+  padding: 6px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.week-event-card:hover {
+  background: rgba(255, 255, 255, 0.08) !important;
+}
+
+.week-ev-title {
+  display: block;
+  font-size: 0.75rem;
+  color: #FFFFFF;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.week-ev-time {
+  font-size: 0.68rem;
+  color: #94A3B8;
+}
+
+.week-no-events {
+  font-size: 0.75rem;
+  color: #475569;
+  text-align: center;
+  margin-top: 1rem;
+}
+
+/* Day View Styles */
+.day-view-hero {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 1.5rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  margin-bottom: 1.5rem;
+}
+
+.day-hero-date-badge {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+}
+
+.hero-day-num {
+  background: #3B82F6;
+  color: #FFFFFF;
+  width: 58px;
+  height: 54px;
+  border-radius: 14px;
+  font-size: 1.8rem;
+  font-weight: 900;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 15px rgba(59, 130, 246, 0.5);
+}
+
+.hero-day-sub {
+  font-size: 0.85rem;
+  color: #94A3B8;
+}
+
+.day-timetable-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.day-timeline-entry {
+  background: #0A0E18;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 14px;
+  padding: 1.25rem 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+.entry-time-pill {
+  padding: 0.4rem 0.8rem;
+  border-radius: 10px;
+  font-weight: 700;
+  font-size: 0.82rem;
+  white-space: nowrap;
+}
+
+.entry-content {
+  flex: 1;
+}
+
+.entry-content h4 {
+  margin: 0.25rem 0;
+  color: #FFFFFF;
+}
+
+.entry-content p {
+  margin: 0 0 0.35rem 0;
+  color: #94A3B8;
+  font-size: 0.85rem;
+}
+
+.entry-badge-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.78rem;
+  color: #CBD5E1;
+}
+
+.entry-venue {
+  font-size: 0.8rem;
+  color: #64748B;
+}
+
+/* Year View */
+.year-months-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 1.25rem;
+  margin-top: 1.5rem;
+}
+
+.year-month-card {
+  background: #0A0E18;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  padding: 1.25rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.year-month-card:hover {
+  background: #0E1524;
+  border-color: #3B82F6;
+  transform: translateY(-2px);
+}
+
+.year-month-card.current-active-month {
+  border-color: #3B82F6;
+  background: rgba(59, 130, 246, 0.12);
+}
+
+.year-m-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.active-tag {
+  background: #3B82F6;
+  color: #FFFFFF;
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 0.15rem 0.5rem;
+  border-radius: 8px;
+}
+
+.year-m-events-count {
+  font-size: 0.8rem;
+  color: #94A3B8;
+}
+
+/* ==========================================================================
+   6. BOTTOM NAVIGATION DOCK (Exact Match to Mobile App Screenshot Dock)
+   Fixed / Docked at bottom: [ Year ] [ Month ] [ Week ] [ Day ] [ Agenda ]
+   ========================================================================= */
+.mobile-bottom-dock-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 64px;
+  background: #000000;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  z-index: 1000;
+  backdrop-filter: blur(16px);
+  padding: 0 1rem;
+}
+
+.dock-tab-btn {
+  background: transparent;
+  border: none;
+  color: #94A3B8;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  padding: 0.35rem 1.25rem;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.dock-icon {
+  font-size: 1.35rem;
+  line-height: 1;
+}
+
+.dock-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+}
+
+/* Active Dock Item Highlighted in Clean White with Soft Glow */
+.dock-tab-btn.active {
+  color: #FFFFFF;
+}
+
+.dock-tab-btn.active .dock-label {
+  color: #FFFFFF;
+  font-weight: 800;
+}
+
+.dock-tab-btn.active .dock-icon {
+  transform: scale(1.1);
+  filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.4));
+}
+
+.dock-tab-btn:hover {
+  color: #E2E8F0;
+}
+
+/* ==========================================================================
+   7. RESPONSIVE OPTIMIZATIONS
+   ========================================================================== */
+@media (max-width: 900px) {
+  .placement-calendar-page {
+    padding: 1rem 1rem 5.5rem 1rem;
+  }
+
+  .screenshot-big-month-title {
+    font-size: 2rem;
+  }
+
+  .agenda-cards-spatial-grid {
+    grid-template-columns: 1fr;
+    gap: 1.75rem;
+  }
+
+  .month-cells-grid {
+    gap: 4px;
+    row-gap: 16px;
+  }
+
+  .day-cell-slot {
+    min-height: 80px;
+  }
+
+  .date-number-label {
+    font-size: 1.05rem;
+  }
+
+  .today-capsule-badge {
+    width: 38px;
+    height: 34px;
+    font-size: 1.05rem;
+  }
 }
