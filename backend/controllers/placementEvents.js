@@ -20,7 +20,28 @@ const seedInitialEventsIfEmpty = async (userId) => {
       endDateTime: new Date(year, month, 5, 17, 30),
       venueOrLink: 'GRIET Auditorium / Online Portal',
       instructorOrCompany: 'Tata Consultancy Services',
+      creatorRole: 'admin',
+      creatorName: 'Main Admin (TPO Cell)',
+      visibility: 'public',
+      isVisibleToStudents: true,
+      priority: 'high',
       targetAudience: { roles: ['student', 'faculty', 'admin'], branches: ['All'] }
+    },
+    {
+      title: 'Main Admin Task: Final Resume & ATS Clearance',
+      description: 'Mandatory verification of student resumes and CGPA verification for Tier-1 companies.',
+      eventType: 'admin_task',
+      colorTag: 'gold',
+      startDateTime: new Date(year, month, 7, 10, 0),
+      endDateTime: new Date(year, month, 7, 18, 0),
+      venueOrLink: 'Placement Management Portal',
+      instructorOrCompany: 'GRIET Head of Placements',
+      creatorRole: 'admin',
+      creatorName: 'Main Admin (TPO Cell)',
+      visibility: 'students',
+      isVisibleToStudents: true,
+      priority: 'urgent',
+      targetAudience: { roles: ['student'], branches: ['All'] }
     },
     {
       title: 'DSA & Dynamic Programming Workshop',
@@ -31,6 +52,11 @@ const seedInitialEventsIfEmpty = async (userId) => {
       endDateTime: new Date(year, month, 8, 16, 30),
       venueOrLink: 'Seminar Hall 3 & Zoom',
       instructorOrCompany: 'Prof. Ramesh (Lead Algorithms Coach)',
+      creatorRole: 'faculty',
+      creatorName: 'Prof. Ramesh (Faculty Coordinator)',
+      visibility: 'students',
+      isVisibleToStudents: true,
+      priority: 'medium',
       targetAudience: { roles: ['student', 'faculty'], branches: ['CSE', 'IT', 'CSIT', 'AIML'] }
     },
     {
@@ -42,6 +68,11 @@ const seedInitialEventsIfEmpty = async (userId) => {
       endDateTime: new Date(year, month, 12, 11, 30),
       venueOrLink: 'Online Assessment Engine',
       instructorOrCompany: 'TPO Assessment Cell',
+      creatorRole: 'admin',
+      creatorName: 'Main Admin',
+      visibility: 'students',
+      isVisibleToStudents: true,
+      priority: 'high',
       targetAudience: { roles: ['student'], branches: ['All'] }
     },
     {
@@ -53,6 +84,11 @@ const seedInitialEventsIfEmpty = async (userId) => {
       endDateTime: new Date(year, month, 15, 16, 0),
       venueOrLink: 'Interview Rooms 1-4 & Google Meet',
       instructorOrCompany: 'Alumni Mentors & TPO Cell',
+      creatorRole: 'faculty',
+      creatorName: 'Dr. Madhuri (Faculty Coordinator)',
+      visibility: 'students',
+      isVisibleToStudents: true,
+      priority: 'high',
       targetAudience: { roles: ['student', 'faculty'], branches: ['All'] }
     },
     {
@@ -65,6 +101,11 @@ const seedInitialEventsIfEmpty = async (userId) => {
       allDay: true,
       venueOrLink: 'Portal Profile Portal',
       instructorOrCompany: 'Placement Cell',
+      creatorRole: 'admin',
+      creatorName: 'Main Admin',
+      visibility: 'public',
+      isVisibleToStudents: true,
+      priority: 'urgent',
       targetAudience: { roles: ['student', 'admin'], branches: ['All'] }
     },
     {
@@ -76,6 +117,11 @@ const seedInitialEventsIfEmpty = async (userId) => {
       endDateTime: new Date(year, month, 22, 17, 0),
       venueOrLink: 'Lab 502 & Live Stream',
       instructorOrCompany: 'Cloud Solutions Architect Guest Speaker',
+      creatorRole: 'faculty',
+      creatorName: 'Prof. K. Reddy (Faculty)',
+      visibility: 'students',
+      isVisibleToStudents: true,
+      priority: 'medium',
       targetAudience: { roles: ['student', 'faculty'], branches: ['CSE', 'IT', 'CSIT'] }
     },
     {
@@ -87,6 +133,11 @@ const seedInitialEventsIfEmpty = async (userId) => {
       endDateTime: new Date(year, month, 26, 13, 0),
       venueOrLink: 'Central Computing Lab',
       instructorOrCompany: 'Deloitte India',
+      creatorRole: 'admin',
+      creatorName: 'Main Admin',
+      visibility: 'public',
+      isVisibleToStudents: true,
+      priority: 'high',
       targetAudience: { roles: ['student', 'faculty', 'admin'], branches: ['All'] }
     }
   ];
@@ -118,9 +169,36 @@ exports.getEvents = async (req, res, next) => {
       }
     }
 
-    // Role-based target audience filtering
     const userRole = req.user?.role || 'student';
-    query['targetAudience.roles'] = { $in: [userRole] };
+    const userId = req.user?.id;
+
+    // Multi-tenant role-based visibility filter:
+    if (userRole === 'admin') {
+      // Main Admin sees everything
+    } else if (userRole === 'faculty') {
+      // Faculty sees:
+      // 1. All events created by themselves
+      // 2. All admin tasks / events
+      // 3. Any event with visibility: public, students, or faculty_only
+      query.$or = [
+        { createdBy: userId },
+        { creatorRole: 'admin' },
+        { visibility: { $in: ['public', 'students', 'faculty_only'] } },
+        { 'targetAudience.roles': { $in: ['faculty'] } }
+      ];
+    } else {
+      // Student sees:
+      // 1. Events created by this student (personal tasks)
+      // 2. Official Admin tasks and events where isVisibleToStudents is true
+      // 3. Faculty events where isVisibleToStudents is true and visibility != 'faculty_only' / 'private'
+      query.$or = [
+        { createdBy: userId },
+        {
+          isVisibleToStudents: { $ne: false },
+          visibility: { $nin: ['faculty_only', 'private'] }
+        }
+      ];
+    }
 
     const events = await PlacementEvent.find(query).sort({ startDateTime: 1 });
 
@@ -134,9 +212,9 @@ exports.getEvents = async (req, res, next) => {
   }
 };
 
-// @desc    Create new calendar event
+// @desc    Create new calendar event (Admin, Faculty, and Students)
 // @route   POST /api/placement-events
-// @access  Private (Admin, Faculty)
+// @access  Private (All authenticated users)
 exports.createEvent = async (req, res, next) => {
   try {
     const {
@@ -149,24 +227,64 @@ exports.createEvent = async (req, res, next) => {
       instructorOrCompany,
       targetRoles,
       targetBranches,
-      allDay
+      allDay,
+      isVisibleToStudents,
+      priority,
+      colorTag
     } = req.body;
 
-    if (!title || !eventType || !startDateTime || !endDateTime) {
-      return res.status(400).json({ success: false, error: 'Please provide all required event fields' });
+    if (!title || !startDateTime || !endDateTime) {
+      return res.status(400).json({ success: false, error: 'Please provide event title, start time, and end time' });
+    }
+
+    const userRole = req.user.role || 'student';
+    const userName = req.user.name || 'User';
+
+    // Normalize event type based on user role if not provided
+    let finalEventType = eventType;
+    if (!finalEventType) {
+      if (userRole === 'admin') finalEventType = 'admin_task';
+      else if (userRole === 'faculty') finalEventType = 'faculty_task';
+      else finalEventType = 'personal_task';
+    }
+
+    // Determine visibility & isVisibleToStudents flag
+    let finalIsVisibleToStudents = true;
+    let finalVisibility = 'public';
+
+    if (userRole === 'student') {
+      // Students default to private personal tasks unless explicitly shared
+      finalIsVisibleToStudents = isVisibleToStudents === true;
+      finalVisibility = finalIsVisibleToStudents ? 'students' : 'private';
+    } else if (userRole === 'faculty') {
+      // Faculty can toggle whether students see this event in their calendar
+      finalIsVisibleToStudents = isVisibleToStudents !== false;
+      finalVisibility = finalIsVisibleToStudents ? 'students' : 'faculty_only';
+    } else if (userRole === 'admin') {
+      // Admin defaults to visible for all students
+      finalIsVisibleToStudents = isVisibleToStudents !== false;
+      finalVisibility = finalIsVisibleToStudents ? 'public' : 'faculty_only';
     }
 
     const event = await PlacementEvent.create({
-      title,
-      description,
-      eventType,
+      title: title.trim(),
+      description: (description || '').trim(),
+      eventType: finalEventType,
+      colorTag: colorTag || undefined,
       startDateTime: new Date(startDateTime),
       endDateTime: new Date(endDateTime),
-      venueOrLink: venueOrLink || 'Campus Placement Cell',
-      instructorOrCompany: instructorOrCompany || '',
+      venueOrLink: (venueOrLink || 'Campus Placement Cell / Online').trim(),
+      instructorOrCompany: (instructorOrCompany || '').trim(),
       allDay: !!allDay,
+      creatorRole: userRole,
+      creatorName: userName,
+      visibility: finalVisibility,
+      isVisibleToStudents: finalIsVisibleToStudents,
+      priority: priority || 'medium',
       targetAudience: {
-        roles: targetRoles && targetRoles.length > 0 ? targetRoles : ['student', 'faculty', 'admin'],
+        roles: targetRoles && targetRoles.length > 0
+          ? targetRoles
+          : (userRole === 'student' ? ['student'] : ['student', 'faculty', 'admin']),
         branches: targetBranches && targetBranches.length > 0 ? targetBranches : ['All']
       },
       createdBy: req.user.id
@@ -176,8 +294,8 @@ exports.createEvent = async (req, res, next) => {
       user: req.user,
       action: 'CALENDAR_EVENT_CREATED',
       category: 'Placement Calendar',
-      description: `Created placement event: ${event.title} (${event.eventType})`,
-      details: { eventId: event._id, eventType: event.eventType },
+      description: `Created placement event: ${event.title} (${event.eventType}) [VisibleToStudents: ${finalIsVisibleToStudents}]`,
+      details: { eventId: event._id, eventType: event.eventType, creatorRole: userRole },
       req
     });
 
@@ -192,17 +310,30 @@ exports.createEvent = async (req, res, next) => {
 
 // @desc    Delete calendar event
 // @route   DELETE /api/placement-events/:id
-// @access  Private (Admin, Faculty)
+// @access  Private (Admin, or Faculty/Student creator)
 exports.deleteEvent = async (req, res, next) => {
   try {
-    const event = await PlacementEvent.findByIdAndDelete(req.params.id);
+    const event = await PlacementEvent.findById(req.params.id);
     if (!event) {
       return res.status(404).json({ success: false, error: 'Event not found' });
     }
 
+    const userRole = req.user.role;
+    const isCreator = event.createdBy && event.createdBy.toString() === req.user.id.toString();
+
+    // Permissions: Admin can delete anything; Faculty can delete their own or faculty events; Students can delete only their own
+    if (userRole !== 'admin' && !isCreator) {
+      return res.status(403).json({
+        success: false,
+        error: 'You do not have permission to delete this event'
+      });
+    }
+
+    await PlacementEvent.findByIdAndDelete(req.params.id);
+
     res.status(200).json({
       success: true,
-      message: 'Placement event deleted'
+      message: 'Placement event deleted successfully'
     });
   } catch (err) {
     next(err);

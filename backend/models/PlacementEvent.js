@@ -12,12 +12,23 @@ const PlacementEventSchema = new mongoose.Schema({
   },
   eventType: {
     type: String,
-    enum: ['training', 'mock_interview', 'company_drive', 'aptitude_test', 'deadline', 'workshop'],
+    enum: [
+      'training',
+      'mock_interview',
+      'company_drive',
+      'aptitude_test',
+      'deadline',
+      'workshop',
+      'admin_task',
+      'faculty_task',
+      'personal_task',
+      'general'
+    ],
     required: [true, 'Please select event type']
   },
   colorTag: {
     type: String,
-    enum: ['green', 'blue', 'purple', 'orange', 'red', 'yellow'],
+    enum: ['green', 'blue', 'purple', 'orange', 'red', 'yellow', 'gold', 'emerald'],
     default: function() {
       const mapping = {
         training: 'green',
@@ -25,10 +36,37 @@ const PlacementEventSchema = new mongoose.Schema({
         company_drive: 'purple',
         aptitude_test: 'orange',
         deadline: 'red',
-        workshop: 'yellow'
+        workshop: 'yellow',
+        admin_task: 'gold',
+        faculty_task: 'blue',
+        personal_task: 'emerald',
+        general: 'blue'
       };
       return mapping[this.eventType] || 'blue';
     }
+  },
+  visibility: {
+    type: String,
+    enum: ['public', 'students', 'faculty_only', 'private'],
+    default: 'public'
+  },
+  isVisibleToStudents: {
+    type: Boolean,
+    default: true
+  },
+  creatorRole: {
+    type: String,
+    enum: ['admin', 'faculty', 'student'],
+    default: 'admin'
+  },
+  creatorName: {
+    type: String,
+    default: ''
+  },
+  priority: {
+    type: String,
+    enum: ['low', 'medium', 'high', 'urgent'],
+    default: 'medium'
   },
   startDateTime: {
     type: Date,

@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { protect } = require('../middleware/auth');
 const {
+  getScopeStudents,
   getKnowledgeHeatmap,
   getSmartRevisionSet,
   getResourceRecommendations,
@@ -13,6 +14,7 @@ const {
 
 router.use(protect);
 
+router.get('/students', getScopeStudents);
 router.get('/heatmap', getKnowledgeHeatmap);
 router.get('/revision-set', getSmartRevisionSet);
 router.get('/recommendations', getResourceRecommendations);

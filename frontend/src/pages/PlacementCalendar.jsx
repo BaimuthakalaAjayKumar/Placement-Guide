@@ -5,13 +5,18 @@ import Header from '../components/Header';
 import { API_URL } from '../config/api';
 import './PlacementCalendar.css';
 
+import { sfx } from '../utils/audioVfx';
+
 const EVENT_TYPE_CONFIG = {
+  admin_task: { label: 'Admin Task', icon: '🏛️', color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.15)', border: 'rgba(245, 158, 11, 0.4)' },
+  company_drive: { label: 'Company Drive', icon: '🟣', color: '#a855f7', bg: 'rgba(168, 85, 247, 0.15)', border: 'rgba(168, 85, 247, 0.4)' },
   training: { label: 'Training Session', icon: '🟢', color: '#10b981', bg: 'rgba(16, 185, 129, 0.15)', border: 'rgba(16, 185, 129, 0.4)' },
   mock_interview: { label: 'Mock Interview', icon: '🔵', color: '#38bdf8', bg: 'rgba(56, 189, 248, 0.15)', border: 'rgba(56, 189, 248, 0.4)' },
-  company_drive: { label: 'Company Drive', icon: '🟣', color: '#a855f7', bg: 'rgba(168, 85, 247, 0.15)', border: 'rgba(168, 85, 247, 0.4)' },
   aptitude_test: { label: 'Aptitude Test', icon: '🟠', color: '#f97316', bg: 'rgba(249, 115, 22, 0.15)', border: 'rgba(249, 115, 22, 0.4)' },
+  workshop: { label: 'Workshop', icon: '🟡', color: '#eab308', bg: 'rgba(234, 179, 8, 0.15)', border: 'rgba(234, 179, 8, 0.4)' },
   deadline: { label: 'Important Deadline', icon: '🔴', color: '#ef4444', bg: 'rgba(239, 68, 68, 0.15)', border: 'rgba(239, 68, 68, 0.4)' },
-  workshop: { label: 'Workshop', icon: '🟡', color: '#eab308', bg: 'rgba(234, 179, 8, 0.15)', border: 'rgba(234, 179, 8, 0.4)' }
+  faculty_task: { label: 'Faculty Session', icon: '👨‍🏫', color: '#38bdf8', bg: 'rgba(56, 189, 248, 0.15)', border: 'rgba(56, 189, 248, 0.4)' },
+  personal_task: { label: 'Personal Study Task', icon: '👤', color: '#10b981', bg: 'rgba(16, 185, 129, 0.15)', border: 'rgba(16, 185, 129, 0.4)' }
 };
 
 const MONTH_NAMES = [
@@ -19,689 +24,144 @@ const MONTH_NAMES = [
   'July', 'August', 'September', 'October', 'November', 'December'
 ];
 
-// Contextual placement events matching institutional preparation milestones
-const SAMPLE_PLACEMENT_EVENTS = [
+// Clean, realistic fallback placement events matching Screenshot 1
+const REALISTIC_FALLBACK_EVENTS = [
   {
-    _id: 'seed-1',
-    title: 'Learning: DSA Mastery',
-    description: 'Foundational algorithmic concepts: Arrays, Two Pointers, and Binary Search optimizations.',
-    eventType: 'training',
-    startDateTime: '2026-09-01T09:00:00.000Z',
-    endDateTime: '2026-09-01T11:00:00.000Z',
-    venueOrLink: 'Lab 4 / Campus Coding Portal',
-    instructorOrCompany: 'Prof. Ramesh (Algorithms Coach)',
-    targetAudience: { roles: ['student'], branches: ['All'] }
-  },
-  {
-    _id: 'seed-1b',
-    title: 'Learn: Aptitude Prep',
-    description: 'Quantitative problem solving & fast calculation techniques.',
-    eventType: 'aptitude_test',
-    startDateTime: '2026-09-01T14:00:00.000Z',
-    endDateTime: '2026-09-01T15:30:00.000Z',
-    venueOrLink: 'Online Assessment Portal',
-    instructorOrCompany: 'TPO Aptitude Cell',
-    targetAudience: { roles: ['student'], branches: ['All'] }
-  },
-  {
-    _id: 'seed-2',
-    title: 'Learning: System Design',
-    description: 'Microservices architecture, caching patterns with Redis, and load balancer design.',
-    eventType: 'training',
-    startDateTime: '2026-09-02T10:00:00.000Z',
-    endDateTime: '2026-09-02T12:00:00.000Z',
-    venueOrLink: 'Seminar Hall 2 & Teams',
-    instructorOrCompany: 'Alumni Tech Lead (AWS)',
-    targetAudience: { roles: ['student'], branches: ['CSE', 'IT'] }
-  },
-  {
-    _id: 'seed-2b',
-    title: 'Learn: Web Architecture',
-    description: 'REST API lifecycle, database indexing, and query optimization.',
-    eventType: 'workshop',
-    startDateTime: '2026-09-02T15:00:00.000Z',
-    endDateTime: '2026-09-02T17:00:00.000Z',
-    venueOrLink: 'CSE Seminar Hall',
-    instructorOrCompany: 'TPO Cell',
-    targetAudience: { roles: ['student'], branches: ['All'] }
-  },
-  {
-    _id: 'seed-3',
-    title: 'Learning: DBMS & SQL',
-    description: 'Transactions, ACID compliance, Normalization (1NF to BCNF) and indexing practice.',
-    eventType: 'training',
-    startDateTime: '2026-09-03T10:30:00.000Z',
-    endDateTime: '2026-09-03T12:30:00.000Z',
-    venueOrLink: 'Lab 2 & Zoom',
-    instructorOrCompany: 'Prof. Rao',
-    targetAudience: { roles: ['student'], branches: ['All'] }
-  },
-  {
-    _id: 'seed-3b',
-    title: 'Learn: Interview Quiz',
-    description: 'Speed test on Core CS subjects: OS, DBMS, Computer Networks.',
-    eventType: 'aptitude_test',
-    startDateTime: '2026-09-03T16:00:00.000Z',
-    endDateTime: '2026-09-03T17:00:00.000Z',
-    venueOrLink: 'Assessment Portal',
-    instructorOrCompany: 'TPO Assessment Cell',
-    targetAudience: { roles: ['student'], branches: ['All'] }
-  },
-  {
-    _id: 'seed-4',
-    title: 'GRIET Placement Orientation',
-    description: 'Annual placement guidelines, recruiter eligibility thresholds, and campus drive code of conduct.',
+    _id: 'seed-drive-1',
+    title: 'TCS National Qualifier Drive',
+    description: 'Campus placement drive for 2026 graduating batch across all engineering disciplines.',
     eventType: 'company_drive',
-    startDateTime: '2026-09-04T09:30:00.000Z',
-    endDateTime: '2026-09-04T12:30:00.000Z',
-    venueOrLink: 'Main Auditorium',
-    instructorOrCompany: 'Director of Placements',
-    targetAudience: { roles: ['student', 'faculty'], branches: ['All'] }
-  },
-  {
-    _id: 'seed-4b',
-    title: 'Resume Screening Round 1',
-    description: 'Faculty review of ATS scores and project summaries.',
-    eventType: 'workshop',
-    startDateTime: '2026-09-04T14:00:00.000Z',
-    endDateTime: '2026-09-04T16:00:00.000Z',
-    venueOrLink: 'Placement Cell Boardroom',
-    instructorOrCompany: 'Placement Coordinators',
-    targetAudience: { roles: ['student'], branches: ['All'] }
-  },
-  {
-    _id: 'seed-4c',
-    title: 'Assessment Mock Session',
-    description: 'Practice assessment with automated proctoring.',
-    eventType: 'aptitude_test',
-    startDateTime: '2026-09-04T17:00:00.000Z',
-    endDateTime: '2026-09-04T18:00:00.000Z',
-    venueOrLink: 'Online Lab',
-    instructorOrCompany: 'TPO Cell',
-    targetAudience: { roles: ['student'], branches: ['All'] }
-  },
-  {
-    _id: 'seed-5',
-    title: 'Learning: Java Concurrency',
-    description: 'Thread pools, ExecutorService, synchronization, and race condition prevention.',
-    eventType: 'training',
-    startDateTime: '2026-09-05T10:00:00.000Z',
-    endDateTime: '2026-09-05T12:00:00.000Z',
-    venueOrLink: 'Seminar Hall 1',
-    instructorOrCompany: 'Industry Expert',
-    targetAudience: { roles: ['student'], branches: ['All'] }
-  },
-  {
-    _id: 'seed-5b',
-    title: 'Learn: Spring Boot Basics',
-    description: 'Dependency injection, REST controller scaffolding, and JPA entities.',
-    eventType: 'workshop',
-    startDateTime: '2026-09-05T14:00:00.000Z',
-    endDateTime: '2026-09-05T16:30:00.000Z',
-    venueOrLink: 'Lab 5',
-    instructorOrCompany: 'Prof. Ramesh',
-    targetAudience: { roles: ['student'], branches: ['All'] }
-  },
-  {
-    _id: 'seed-6',
-    title: 'Learning: Dynamic Programming',
-    description: 'Classic DP patterns: 0/1 Knapsack, LCS, LIS, and Matrix Chain Multiplication.',
-    eventType: 'training',
-    startDateTime: '2026-09-06T10:00:00.000Z',
-    endDateTime: '2026-09-06T12:00:00.000Z',
-    venueOrLink: 'Seminar Hall 3',
-    instructorOrCompany: 'Algorithms Coach',
-    targetAudience: { roles: ['student'], branches: ['All'] }
-  },
-  {
-    _id: 'seed-6b',
-    title: 'Learn: Memoization Drills',
-    description: 'Live interactive coding drills with automated test case evaluation.',
-    eventType: 'training',
-    startDateTime: '2026-09-06T14:00:00.000Z',
-    endDateTime: '2026-09-06T16:00:00.000Z',
-    venueOrLink: 'Campus Portal',
-    instructorOrCompany: 'Coding Club Leads',
-    targetAudience: { roles: ['student'], branches: ['All'] }
-  },
-  {
-    _id: 'seed-7',
-    title: 'Learning: Graph Algorithms',
-    description: 'Breadth First Search, Depth First Search, Dijkstra Shortest Path, and Topo Sort.',
-    eventType: 'training',
-    startDateTime: '2026-09-07T10:00:00.000Z',
-    endDateTime: '2026-09-07T12:00:00.000Z',
-    venueOrLink: 'Lab 3',
-    instructorOrCompany: 'Prof. K. Reddy',
-    targetAudience: { roles: ['student'], branches: ['All'] }
-  },
-  {
-    _id: 'seed-7b',
-    title: 'Learn: Topological Sort',
-    description: 'Directed Acyclic Graphs and prerequisite dependency resolution.',
-    eventType: 'workshop',
-    startDateTime: '2026-09-07T15:00:00.000Z',
-    endDateTime: '2026-09-07T17:00:00.000Z',
-    venueOrLink: 'Lab 3 & Online',
-    instructorOrCompany: 'Prof. K. Reddy',
-    targetAudience: { roles: ['student'], branches: ['All'] }
-  },
-  {
-    _id: 'seed-8',
-    title: 'Learning: Trees & Binary Search',
-    description: 'Tree traversals, lowest common ancestor, and balanced binary search trees.',
-    eventType: 'training',
-    startDateTime: '2026-09-08T10:00:00.000Z',
-    endDateTime: '2026-09-08T12:00:00.000Z',
-    venueOrLink: 'Seminar Hall 2',
-    instructorOrCompany: 'Algorithms Coach',
-    targetAudience: { roles: ['student'], branches: ['All'] }
-  },
-  {
-    _id: 'seed-8b',
-    title: 'Learn: Segment Trees',
-    description: 'Range query optimization and lazy propagation.',
-    eventType: 'training',
-    startDateTime: '2026-09-08T14:30:00.000Z',
-    endDateTime: '2026-09-08T16:30:00.000Z',
-    venueOrLink: 'Online Portal',
-    instructorOrCompany: 'Algorithms Coach',
-    targetAudience: { roles: ['student'], branches: ['All'] }
-  },
-  {
-    _id: 'seed-9',
-    title: 'Learning: Greedy Strategies',
-    description: 'Interval scheduling, Huffman coding, and fractional knapsack problem.',
-    eventType: 'training',
-    startDateTime: '2026-09-09T10:00:00.000Z',
-    endDateTime: '2026-09-09T12:00:00.000Z',
-    venueOrLink: 'Lab 1',
-    instructorOrCompany: 'Prof. Rao',
-    targetAudience: { roles: ['student'], branches: ['All'] }
-  },
-  {
-    _id: 'seed-9b',
-    title: 'Learn: Activity Selection',
-    description: 'Optimizing resource allocation and competitive programming problems.',
-    eventType: 'workshop',
-    startDateTime: '2026-09-09T15:00:00.000Z',
-    endDateTime: '2026-09-09T17:00:00.000Z',
-    venueOrLink: 'Lab 1',
-    instructorOrCompany: 'Prof. Rao',
-    targetAudience: { roles: ['student'], branches: ['All'] }
-  },
-  {
-    _id: 'seed-10',
-    title: 'Learning: OS Core Concepts',
-    description: 'Process scheduling, deadlocks, paging, and virtual memory page fault handling.',
-    eventType: 'training',
-    startDateTime: '2026-09-10T10:00:00.000Z',
-    endDateTime: '2026-09-10T12:00:00.000Z',
-    venueOrLink: 'Seminar Hall 1',
-    instructorOrCompany: 'Prof. Swathi',
-    targetAudience: { roles: ['student'], branches: ['All'] }
-  },
-  {
-    _id: 'seed-10b',
-    title: 'Learn: Memory Management',
-    description: 'Virtual address translation, segmentation, and cache replacement algorithms.',
-    eventType: 'workshop',
-    startDateTime: '2026-09-10T14:30:00.000Z',
-    endDateTime: '2026-09-10T16:30:00.000Z',
-    venueOrLink: 'Seminar Hall 1',
-    instructorOrCompany: 'Prof. Swathi',
-    targetAudience: { roles: ['student'], branches: ['All'] }
-  },
-  {
-    _id: 'seed-11',
-    title: 'Learning: Computer Networks',
-    description: 'TCP 3-way handshake, OSI model layers, DNS lookup flow, and HTTP/HTTPS security.',
-    eventType: 'training',
-    startDateTime: '2026-09-11T10:00:00.000Z',
-    endDateTime: '2026-09-11T12:00:00.000Z',
-    venueOrLink: 'Lab 4',
-    instructorOrCompany: 'Prof. V. Sharma',
-    targetAudience: { roles: ['student'], branches: ['All'] }
-  },
-  {
-    _id: 'seed-11b',
-    title: 'Learn: Socket Programming',
-    description: 'Client-server TCP/UDP communication and network troubleshooting.',
-    eventType: 'training',
-    startDateTime: '2026-09-11T14:30:00.000Z',
-    endDateTime: '2026-09-11T16:30:00.000Z',
-    venueOrLink: 'Lab 4',
-    instructorOrCompany: 'Prof. V. Sharma',
-    targetAudience: { roles: ['student'], branches: ['All'] }
-  },
-  {
-    _id: 'seed-12',
-    title: 'Learning: Aptitude Reasoning',
-    description: 'Blood relations, seating arrangement puzzles, and logical deduction practice.',
-    eventType: 'training',
-    startDateTime: '2026-09-12T10:00:00.000Z',
-    endDateTime: '2026-09-12T12:00:00.000Z',
-    venueOrLink: 'Seminar Hall 3',
-    instructorOrCompany: 'TPO Lead',
-    targetAudience: { roles: ['student'], branches: ['All'] }
-  },
-  {
-    _id: 'seed-12b',
-    title: 'Learn: Data Interpretation',
-    description: 'Bar charts, pie graphs, and radar analysis calculations under time constraints.',
-    eventType: 'aptitude_test',
-    startDateTime: '2026-09-12T14:30:00.000Z',
-    endDateTime: '2026-09-12T16:30:00.000Z',
-    venueOrLink: 'Campus Portal',
-    instructorOrCompany: 'TPO Lead',
-    targetAudience: { roles: ['student'], branches: ['All'] }
-  },
-  {
-    _id: 'seed-13',
-    title: 'Learning: Behavioral Prep',
-    description: 'STAR framework for behavioral questions, leadership stories, and situational judgment.',
-    eventType: 'training',
-    startDateTime: '2026-09-13T10:00:00.000Z',
-    endDateTime: '2026-09-13T12:00:00.000Z',
-    venueOrLink: 'Auditorium',
-    instructorOrCompany: 'HR Specialist',
-    targetAudience: { roles: ['student'], branches: ['All'] }
-  },
-  {
-    _id: 'seed-13b',
-    title: 'Learn: Group Discussion',
-    description: 'Current tech topics, non-verbal cues, and constructive articulation.',
-    eventType: 'workshop',
-    startDateTime: '2026-09-13T14:00:00.000Z',
-    endDateTime: '2026-09-13T16:30:00.000Z',
-    venueOrLink: 'Auditorium',
-    instructorOrCompany: 'HR Specialist',
-    targetAudience: { roles: ['student'], branches: ['All'] }
-  },
-  {
-    _id: 'seed-14',
-    title: 'Ganesh Utsav Drive Orientation',
-    description: 'Special weekend placement sprint and company drive announcements.',
-    eventType: 'company_drive',
-    startDateTime: '2026-09-14T09:30:00.000Z',
-    endDateTime: '2026-09-14T12:00:00.000Z',
-    venueOrLink: 'GRIET Auditorium',
-    instructorOrCompany: 'TPO Cell',
-    targetAudience: { roles: ['student', 'faculty'], branches: ['All'] }
-  },
-  {
-    _id: 'seed-14b',
-    title: 'Resume Clinic & Audit',
-    description: '1-on-1 resume proofreading and ATS keyword alignment.',
-    eventType: 'workshop',
-    startDateTime: '2026-09-14T13:00:00.000Z',
-    endDateTime: '2026-09-14T15:00:00.000Z',
-    venueOrLink: 'Placement Cell',
-    instructorOrCompany: 'Senior Faculty',
-    targetAudience: { roles: ['student'], branches: ['All'] }
-  },
-  {
-    _id: 'seed-14c',
-    title: 'Speed Interview Drills',
-    description: 'Rapid 10-minute technical screening rounds.',
-    eventType: 'mock_interview',
-    startDateTime: '2026-09-14T15:30:00.000Z',
-    endDateTime: '2026-09-14T17:30:00.000Z',
-    venueOrLink: 'Conference Room B',
-    instructorOrCompany: 'Industry Mentors',
-    targetAudience: { roles: ['student'], branches: ['All'] }
-  },
-  {
-    _id: 'seed-15',
-    title: 'Learning: Advanced C++ & OOP',
-    description: 'Smart pointers, move semantics, vtables, and multi-threading.',
-    eventType: 'training',
-    startDateTime: '2026-09-15T10:00:00.000Z',
-    endDateTime: '2026-09-15T12:00:00.000Z',
-    venueOrLink: 'Lab 2',
-    instructorOrCompany: 'Prof. Anand',
-    targetAudience: { roles: ['student'], branches: ['All'] }
-  },
-  {
-    _id: 'seed-15b',
-    title: 'Learn: Polymorphism in Depth',
-    description: 'Compile-time vs runtime polymorphism and interface segregation.',
-    eventType: 'training',
-    startDateTime: '2026-09-15T14:00:00.000Z',
-    endDateTime: '2026-09-15T16:00:00.000Z',
-    venueOrLink: 'Lab 2',
-    instructorOrCompany: 'Prof. Anand',
-    targetAudience: { roles: ['student'], branches: ['All'] }
-  },
-  {
-    _id: 'seed-16',
-    title: 'Learning: Python Scripting',
-    description: 'List comprehensions, generators, decorators, and multithreading.',
-    eventType: 'training',
-    startDateTime: '2026-09-16T10:00:00.000Z',
-    endDateTime: '2026-09-16T12:00:00.000Z',
-    venueOrLink: 'Lab 5',
-    instructorOrCompany: 'Prof. M. Reddy',
-    targetAudience: { roles: ['student'], branches: ['All'] }
-  },
-  {
-    _id: 'seed-16b',
-    title: 'Learn: Pandas & Data Prep',
-    description: 'DataFrames, group-by operations, and exploratory data analysis.',
-    eventType: 'workshop',
-    startDateTime: '2026-09-16T14:30:00.000Z',
-    endDateTime: '2026-09-16T16:30:00.000Z',
-    venueOrLink: 'Lab 5',
-    instructorOrCompany: 'Prof. M. Reddy',
-    targetAudience: { roles: ['student'], branches: ['All'] }
-  },
-  {
-    _id: 'seed-17',
-    title: 'Learning: Cloud Fundamentals',
-    description: 'AWS EC2, S3, IAM roles, VPC configurations, and serverless Lambda functions.',
-    eventType: 'training',
-    startDateTime: '2026-09-17T10:00:00.000Z',
-    endDateTime: '2026-09-17T12:00:00.000Z',
-    venueOrLink: 'Seminar Hall 2 & AWS Console',
-    instructorOrCompany: 'AWS Certified Trainer',
-    targetAudience: { roles: ['student'], branches: ['All'] }
-  },
-  {
-    _id: 'seed-17b',
-    title: 'AWS Certified Solutions Architect Q&A',
-    description: 'Exam patterns and cloud architecture sample projects.',
-    eventType: 'workshop',
-    startDateTime: '2026-09-17T14:00:00.000Z',
-    endDateTime: '2026-09-17T16:00:00.000Z',
-    venueOrLink: 'Seminar Hall 2',
-    instructorOrCompany: 'AWS Certified Trainer',
-    targetAudience: { roles: ['student'], branches: ['All'] }
-  },
-  {
-    _id: 'seed-18',
-    title: 'Train to Placement: HR Round',
-    description: 'Salary negotiation ethics, notice period handling, and culture fit interview simulation.',
-    eventType: 'mock_interview',
-    startDateTime: '2026-09-18T10:00:00.000Z',
-    endDateTime: '2026-09-18T12:30:00.000Z',
-    venueOrLink: 'Placement Training Center',
-    instructorOrCompany: 'Lead HR Consultant',
-    targetAudience: { roles: ['student'], branches: ['All'] }
-  },
-  {
-    _id: 'seed-18b',
-    title: 'Train: Behavioral Scenarios',
-    description: 'Handling conflict resolution and cross-functional team questions.',
-    eventType: 'training',
-    startDateTime: '2026-09-18T14:00:00.000Z',
-    endDateTime: '2026-09-18T16:00:00.000Z',
-    venueOrLink: 'Placement Training Center',
-    instructorOrCompany: 'Lead HR Consultant',
-    targetAudience: { roles: ['student'], branches: ['All'] }
-  },
-  {
-    _id: 'seed-19',
-    title: 'Learning: Docker & Containers',
-    description: 'Dockerfiles, multi-stage builds, port forwarding, and docker-compose deployment.',
-    eventType: 'training',
-    startDateTime: '2026-09-19T10:00:00.000Z',
-    endDateTime: '2026-09-19T12:00:00.000Z',
-    venueOrLink: 'Lab 3',
-    instructorOrCompany: 'DevOps Coach',
-    targetAudience: { roles: ['student'], branches: ['All'] }
-  },
-  {
-    _id: 'seed-19b',
-    title: 'Learn: CI/CD Pipelines',
-    description: 'GitHub Actions workflow file creation and automated testing pipelines.',
-    eventType: 'workshop',
-    startDateTime: '2026-09-19T14:00:00.000Z',
-    endDateTime: '2026-09-19T16:30:00.000Z',
-    venueOrLink: 'Lab 3 & GitHub',
-    instructorOrCompany: 'DevOps Coach',
-    targetAudience: { roles: ['student'], branches: ['All'] }
-  },
-  {
-    _id: 'seed-20',
-    title: 'Learning: Git & GitHub Workflows',
-    description: 'Rebase vs merge, resolving merge conflicts, and open source pull requests.',
-    eventType: 'training',
-    startDateTime: '2026-09-20T10:00:00.000Z',
-    endDateTime: '2026-09-20T12:00:00.000Z',
-    venueOrLink: 'Seminar Hall 3',
-    instructorOrCompany: 'Senior Developer',
-    targetAudience: { roles: ['student'], branches: ['All'] }
-  },
-  {
-    _id: 'seed-20b',
-    title: 'Learn: Open Source Contributions',
-    description: 'Finding good first issues and contributing to community repositories.',
-    eventType: 'workshop',
-    startDateTime: '2026-09-20T14:00:00.000Z',
-    endDateTime: '2026-09-20T16:00:00.000Z',
-    venueOrLink: 'Seminar Hall 3',
-    instructorOrCompany: 'Senior Developer',
-    targetAudience: { roles: ['student'], branches: ['All'] }
-  },
-  {
-    _id: 'seed-21',
-    title: 'Learning: REST & GraphQL',
-    description: 'Schema definition, queries, mutations, and comparing REST with GraphQL.',
-    eventType: 'training',
-    startDateTime: '2026-09-21T10:00:00.000Z',
-    endDateTime: '2026-09-21T12:00:00.000Z',
-    venueOrLink: 'Lab 1',
-    instructorOrCompany: 'Prof. Rao',
-    targetAudience: { roles: ['student'], branches: ['All'] }
-  },
-  {
-    _id: 'seed-21b',
-    title: 'Learn: API Rate Limiting',
-    description: 'Token bucket and leaky bucket algorithm implementations.',
-    eventType: 'training',
-    startDateTime: '2026-09-21T14:30:00.000Z',
-    endDateTime: '2026-09-21T16:30:00.000Z',
-    venueOrLink: 'Lab 1',
-    instructorOrCompany: 'Prof. Rao',
-    targetAudience: { roles: ['student'], branches: ['All'] }
-  },
-  {
-    _id: 'seed-22',
-    title: 'Learning: Web Security & OWASP',
-    description: 'XSS, CSRF, SQL Injection prevention, and JWT token authentication.',
-    eventType: 'training',
-    startDateTime: '2026-09-22T10:00:00.000Z',
-    endDateTime: '2026-09-22T12:00:00.000Z',
-    venueOrLink: 'Lab 4',
-    instructorOrCompany: 'Cybersecurity Mentor',
-    targetAudience: { roles: ['student'], branches: ['All'] }
-  },
-  {
-    _id: 'seed-22b',
-    title: 'Learn: Cryptography Basics',
-    description: 'Symmetric vs asymmetric encryption, RSA, and hashing algorithms.',
-    eventType: 'workshop',
-    startDateTime: '2026-09-22T14:30:00.000Z',
-    endDateTime: '2026-09-22T16:30:00.000Z',
-    venueOrLink: 'Lab 4',
-    instructorOrCompany: 'Cybersecurity Mentor',
-    targetAudience: { roles: ['student'], branches: ['All'] }
-  },
-  {
-    _id: 'seed-23',
-    title: 'Learning: Microservices & Kafka',
-    description: 'Event-driven architecture, Kafka producers/consumers, topics, and fault tolerance.',
-    eventType: 'training',
-    startDateTime: '2026-09-23T10:00:00.000Z',
-    endDateTime: '2026-09-23T12:00:00.000Z',
-    venueOrLink: 'Seminar Hall 1',
-    instructorOrCompany: 'System Architect',
-    targetAudience: { roles: ['student'], branches: ['All'] }
-  },
-  {
-    _id: 'seed-23b',
-    title: 'Learn: Kafka Pub/Sub',
-    description: 'Hands-on consumer group scaling and message persistence demonstration.',
-    eventType: 'workshop',
-    startDateTime: '2026-09-23T14:00:00.000Z',
-    endDateTime: '2026-09-23T16:00:00.000Z',
-    venueOrLink: 'Seminar Hall 1',
-    instructorOrCompany: 'System Architect',
-    targetAudience: { roles: ['student'], branches: ['All'] }
-  },
-  {
-    _id: 'seed-24',
-    title: 'Learning: Full-Stack React & Node',
-    description: 'Custom React hooks, state management with Zustand, and Express middleware.',
-    eventType: 'training',
-    startDateTime: '2026-09-24T10:00:00.000Z',
-    endDateTime: '2026-09-24T12:00:00.000Z',
-    venueOrLink: 'Lab 2',
-    instructorOrCompany: 'Lead Web Engineer',
-    targetAudience: { roles: ['student'], branches: ['All'] }
-  },
-  {
-    _id: 'seed-24b',
-    title: 'Learn: React Performance',
-    description: 'useMemo, useCallback, React Profiler, and code splitting techniques.',
-    eventType: 'training',
-    startDateTime: '2026-09-24T14:30:00.000Z',
-    endDateTime: '2026-09-24T16:30:00.000Z',
-    venueOrLink: 'Lab 2',
-    instructorOrCompany: 'Lead Web Engineer',
-    targetAudience: { roles: ['student'], branches: ['All'] }
-  },
-  {
-    _id: 'seed-25',
-    title: 'Learning: Machine Learning Prep',
-    description: 'Linear Regression, Decision Trees, Random Forests, and cross-validation metrics.',
-    eventType: 'training',
-    startDateTime: '2026-09-25T10:00:00.000Z',
-    endDateTime: '2026-09-25T12:00:00.000Z',
-    venueOrLink: 'Seminar Hall 2',
-    instructorOrCompany: 'AI Lead',
-    targetAudience: { roles: ['student'], branches: ['All'] }
-  },
-  {
-    _id: 'seed-25b',
-    title: 'Learn: Model Evaluation',
-    description: 'Precision, recall, ROC-AUC curves, and confusion matrix interpretation.',
-    eventType: 'workshop',
-    startDateTime: '2026-09-25T14:30:00.000Z',
-    endDateTime: '2026-09-25T16:30:00.000Z',
-    venueOrLink: 'Seminar Hall 2',
-    instructorOrCompany: 'AI Lead',
-    targetAudience: { roles: ['student'], branches: ['All'] }
-  },
-  {
-    _id: 'seed-26',
-    title: 'Learning: Resume ATS Deep-Dive',
-    description: 'Keyword parsing optimization, action verb quantification, and formatting rules.',
-    eventType: 'training',
-    startDateTime: '2026-09-26T10:00:00.000Z',
-    endDateTime: '2026-09-26T12:00:00.000Z',
-    venueOrLink: 'Placement Auditorium',
-    instructorOrCompany: 'Career Coach',
-    targetAudience: { roles: ['student'], branches: ['All'] }
-  },
-  {
-    _id: 'seed-26b',
-    title: 'Learn: Portfolio Showcase',
-    description: 'Live GitHub project walkthroughs and recruiter outreach on LinkedIn.',
-    eventType: 'workshop',
-    startDateTime: '2026-09-26T14:00:00.000Z',
-    endDateTime: '2026-09-26T16:00:00.000Z',
-    venueOrLink: 'Placement Auditorium',
-    instructorOrCompany: 'Career Coach',
-    targetAudience: { roles: ['student'], branches: ['All'] }
-  },
-  {
-    _id: 'seed-27',
-    title: 'Learning: Mock Coding Marathon',
-    description: '4-hour continuous coding contest simulating LeetCode weekly format.',
-    eventType: 'training',
-    startDateTime: '2026-09-27T09:00:00.000Z',
-    endDateTime: '2026-09-27T13:00:00.000Z',
-    venueOrLink: 'Coding Simulator Engine',
-    instructorOrCompany: 'GRIET TPO Cell',
-    targetAudience: { roles: ['student'], branches: ['All'] }
-  },
-  {
-    _id: 'seed-27b',
-    title: 'Learn: Editorial Discussion',
-    description: 'Live breakdown of contest solutions and optimal complexity trade-offs.',
-    eventType: 'workshop',
-    startDateTime: '2026-09-27T14:30:00.000Z',
-    endDateTime: '2026-09-27T16:30:00.000Z',
-    venueOrLink: 'Coding Simulator Engine',
-    instructorOrCompany: 'GRIET TPO Cell',
-    targetAudience: { roles: ['student'], branches: ['All'] }
-  },
-  {
-    _id: 'seed-28',
-    title: 'Learning: AI & Prompt Engineering',
-    description: 'LLM APIs, embedding vector databases, and modern developer tooling.',
-    eventType: 'training',
-    startDateTime: '2026-09-28T10:00:00.000Z',
-    endDateTime: '2026-09-28T12:00:00.000Z',
-    venueOrLink: 'Lab 5',
-    instructorOrCompany: 'AI Research Scholar',
-    targetAudience: { roles: ['student'], branches: ['All'] }
-  },
-  {
-    _id: 'seed-28b',
-    title: 'Train: Agentic Coding Workflows',
-    description: 'Hands-on practice using AI pair programmers and testing tools.',
-    eventType: 'workshop',
-    startDateTime: '2026-09-28T14:00:00.000Z',
-    endDateTime: '2026-09-28T16:00:00.000Z',
-    venueOrLink: 'Lab 5',
-    instructorOrCompany: 'AI Research Scholar',
-    targetAudience: { roles: ['student'], branches: ['All'] }
-  },
-  {
-    _id: 'seed-29',
-    title: 'Train to Placement: Speed Math',
-    description: 'Vedic math shortcuts, percentage tricks, and ratio calculation drills.',
-    eventType: 'training',
-    startDateTime: '2026-09-29T10:00:00.000Z',
-    endDateTime: '2026-09-29T12:00:00.000Z',
-    venueOrLink: 'Seminar Hall 3',
-    instructorOrCompany: 'Aptitude Coach',
-    targetAudience: { roles: ['student'], branches: ['All'] }
-  },
-  {
-    _id: 'seed-29b',
-    title: 'Train: Permutations & Probability',
-    description: 'Combinatorics, dice problems, and card probability problem solving.',
-    eventType: 'aptitude_test',
-    startDateTime: '2026-09-29T14:00:00.000Z',
-    endDateTime: '2026-09-29T16:00:00.000Z',
-    venueOrLink: 'Seminar Hall 3',
-    instructorOrCompany: 'Aptitude Coach',
-    targetAudience: { roles: ['student'], branches: ['All'] }
-  },
-  {
-    _id: 'seed-30',
-    title: 'Learning: Final Placement Sprint',
-    description: 'Comprehensive readiness checkpoint, documentation verification, and mock interviews.',
-    eventType: 'training',
-    startDateTime: '2026-09-30T09:30:00.000Z',
-    endDateTime: '2026-09-30T12:30:00.000Z',
-    venueOrLink: 'Central Auditorium',
-    instructorOrCompany: 'Dean of Placements',
+    colorTag: 'purple',
+    startDateTime: '2026-09-05T09:30:00.000Z',
+    endDateTime: '2026-09-05T17:30:00.000Z',
+    venueOrLink: 'GRIET Auditorium / Online Portal',
+    instructorOrCompany: 'Tata Consultancy Services',
+    creatorRole: 'admin',
+    creatorName: 'Main Admin',
+    visibility: 'public',
+    isVisibleToStudents: true,
+    priority: 'high',
     targetAudience: { roles: ['student', 'faculty', 'admin'], branches: ['All'] }
   },
   {
-    _id: 'seed-30b',
-    title: 'Learn: Mock Interview Feedback',
-    description: 'One-on-one personalized assessment review and improvement plan.',
-    eventType: 'mock_interview',
-    startDateTime: '2026-09-30T14:00:00.000Z',
-    endDateTime: '2026-09-30T17:00:00.000Z',
-    venueOrLink: 'Interview Rooms',
-    instructorOrCompany: 'Senior Faculty Panel',
+    _id: 'seed-task-1',
+    title: 'Admin Task: Mandatory ATS Resume Clearance',
+    description: 'Mandatory profile verification and ATS resume submission for Tier-1 recruitment.',
+    eventType: 'admin_task',
+    colorTag: 'gold',
+    startDateTime: '2026-09-07T10:00:00.000Z',
+    endDateTime: '2026-09-07T18:00:00.000Z',
+    venueOrLink: 'Placement Portal Dashboard',
+    instructorOrCompany: 'TPO Verification Cell',
+    creatorRole: 'admin',
+    creatorName: 'Main Admin (TPO)',
+    visibility: 'students',
+    isVisibleToStudents: true,
+    priority: 'urgent',
     targetAudience: { roles: ['student'], branches: ['All'] }
+  },
+  {
+    _id: 'seed-train-1',
+    title: 'DSA & Dynamic Programming Workshop',
+    description: 'Hands-on intensive masterclass on advanced DP and Graph interview patterns.',
+    eventType: 'training',
+    colorTag: 'green',
+    startDateTime: '2026-09-08T14:00:00.000Z',
+    endDateTime: '2026-09-08T16:30:00.000Z',
+    venueOrLink: 'Seminar Hall 3 & Zoom',
+    instructorOrCompany: 'Prof. Ramesh (Algorithms Coach)',
+    creatorRole: 'faculty',
+    creatorName: 'Prof. Ramesh',
+    visibility: 'students',
+    isVisibleToStudents: true,
+    priority: 'medium',
+    targetAudience: { roles: ['student', 'faculty'], branches: ['CSE', 'IT', 'CSIT', 'AIML'] }
+  },
+  {
+    _id: 'seed-test-1',
+    title: 'Institutional Aptitude & Reasoning Mock Test',
+    description: 'Timed assessment covering quantitative aptitude, logical reasoning, and verbal ability.',
+    eventType: 'aptitude_test',
+    colorTag: 'orange',
+    startDateTime: '2026-09-12T10:00:00.000Z',
+    endDateTime: '2026-09-12T11:30:00.000Z',
+    venueOrLink: 'Online Assessment Engine',
+    instructorOrCompany: 'TPO Assessment Cell',
+    creatorRole: 'admin',
+    creatorName: 'Main Admin',
+    visibility: 'students',
+    isVisibleToStudents: true,
+    priority: 'high',
+    targetAudience: { roles: ['student'], branches: ['All'] }
+  },
+  {
+    _id: 'seed-mock-1',
+    title: 'Google & Microsoft Mock Interview Rounds',
+    description: 'Simulated 1-on-1 technical and behavioral rounds with industry mentors and senior faculty.',
+    eventType: 'mock_interview',
+    colorTag: 'blue',
+    startDateTime: '2026-09-15T11:00:00.000Z',
+    endDateTime: '2026-09-15T16:00:00.000Z',
+    venueOrLink: 'Interview Rooms 1-4 & Google Meet',
+    instructorOrCompany: 'Dr. Madhuri & Alumni Mentors',
+    creatorRole: 'faculty',
+    creatorName: 'Dr. Madhuri (Faculty Coordinator)',
+    visibility: 'students',
+    isVisibleToStudents: true,
+    priority: 'high',
+    targetAudience: { roles: ['student', 'faculty'], branches: ['All'] }
+  },
+  {
+    _id: 'seed-dead-1',
+    title: 'Infosys & Accenture Registration Cutoff',
+    description: 'Strict cutoff for profile verification, resume upload, and consent submission on portal.',
+    eventType: 'deadline',
+    colorTag: 'red',
+    startDateTime: '2026-09-18T23:59:00.000Z',
+    endDateTime: '2026-09-18T23:59:00.000Z',
+    allDay: true,
+    venueOrLink: 'Placement Portal',
+    instructorOrCompany: 'Placement Cell',
+    creatorRole: 'admin',
+    creatorName: 'Main Admin',
+    visibility: 'public',
+    isVisibleToStudents: true,
+    priority: 'urgent',
+    targetAudience: { roles: ['student', 'admin'], branches: ['All'] }
+  },
+  {
+    _id: 'seed-work-1',
+    title: 'Full-Stack System Design & Cloud Workshop',
+    description: 'Architecting scalable microservices with Docker, Node.js, and AWS architecture basics.',
+    eventType: 'workshop',
+    colorTag: 'yellow',
+    startDateTime: '2026-09-22T13:00:00.000Z',
+    endDateTime: '2026-09-22T17:00:00.000Z',
+    venueOrLink: 'Lab 502 & Live Stream',
+    instructorOrCompany: 'Cloud Solutions Architect Guest Speaker',
+    creatorRole: 'faculty',
+    creatorName: 'Prof. K. Reddy',
+    visibility: 'students',
+    isVisibleToStudents: true,
+    priority: 'medium',
+    targetAudience: { roles: ['student', 'faculty'], branches: ['CSE', 'IT', 'CSIT'] }
+  },
+  {
+    _id: 'seed-drive-2',
+    title: 'Deloitte Tech Assessment Drive',
+    description: 'Online test for Associate Software Engineer and Risk Advisory campus roles.',
+    eventType: 'company_drive',
+    colorTag: 'purple',
+    startDateTime: '2026-09-26T10:00:00.000Z',
+    endDateTime: '2026-09-26T13:00:00.000Z',
+    venueOrLink: 'Central Computing Lab',
+    instructorOrCompany: 'Deloitte India',
+    creatorRole: 'admin',
+    creatorName: 'Main Admin',
+    visibility: 'public',
+    isVisibleToStudents: true,
+    priority: 'high',
+    targetAudience: { roles: ['student', 'faculty', 'admin'], branches: ['All'] }
   }
 ];
 
@@ -717,21 +177,26 @@ const PlacementCalendar = () => {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showQuickMenu, setShowQuickMenu] = useState(false);
   const [viewMode, setViewMode] = useState('month'); // 'month' | 'agenda' | 'week' | 'day' | 'year'
-  const [agendaLayout, setAgendaLayout] = useState('grid'); // 'grid' | 'timeline'
+  const userRole = user?.role || 'student';
+  const isStudent = userRole === 'student';
+  const isFaculty = userRole === 'faculty';
+  const isAdmin = userRole === 'admin';
 
   // New Event Form State
   const [newEvent, setNewEvent] = useState({
     title: '',
     description: '',
-    eventType: 'company_drive',
+    eventType: isStudent ? 'personal_task' : isFaculty ? 'faculty_task' : 'admin_task',
     startDate: new Date().toISOString().slice(0, 10),
     startTime: '10:00',
     endDate: new Date().toISOString().slice(0, 10),
     endTime: '12:00',
-    venueOrLink: 'GRIET Placement Cell',
-    instructorOrCompany: '',
-    targetRoles: ['student', 'faculty', 'admin'],
-    allDay: false
+    venueOrLink: 'GRIET Placement Cell / Online',
+    instructorOrCompany: isFaculty ? (user?.name || 'Faculty Coordinator') : isAdmin ? 'Main Admin (TPO)' : '',
+    targetRoles: isStudent ? ['student'] : ['student', 'faculty', 'admin'],
+    allDay: false,
+    isVisibleToStudents: isStudent ? false : true,
+    priority: 'medium'
   });
   const [creating, setCreating] = useState(false);
 
@@ -746,17 +211,10 @@ const PlacementCalendar = () => {
       if (selectedFilter !== 'all') url += `?eventType=${selectedFilter}`;
       const res = await axios.get(url, getAuthHeaders());
       const fetched = res.data?.data || [];
-      if (fetched.length === 0) {
-        setEvents(SAMPLE_PLACEMENT_EVENTS);
-      } else {
-        // Merge fetched with sample events ensuring unique IDs
-        const existingIds = new Set(fetched.map(e => e._id));
-        const merged = [...fetched, ...SAMPLE_PLACEMENT_EVENTS.filter(s => !existingIds.has(s._id))];
-        setEvents(merged);
-      }
+      setEvents(fetched.length > 0 ? fetched : REALISTIC_FALLBACK_EVENTS);
     } catch (err) {
       console.warn('Using seeded events as fallback', err);
-      setEvents(SAMPLE_PLACEMENT_EVENTS);
+      setEvents(REALISTIC_FALLBACK_EVENTS);
     } finally {
       setLoading(false);
     }
@@ -863,24 +321,29 @@ const PlacementCalendar = () => {
         venueOrLink: newEvent.venueOrLink.trim(),
         instructorOrCompany: newEvent.instructorOrCompany.trim(),
         allDay: newEvent.allDay,
-        targetRoles: newEvent.targetRoles
+        targetRoles: newEvent.targetRoles,
+        isVisibleToStudents: newEvent.isVisibleToStudents,
+        priority: newEvent.priority
       };
 
       const res = await axios.post(`${API_URL}/placement-events`, payload, getAuthHeaders());
+      sfx.playSuccess();
       setEvents(prev => [res.data.data, ...prev]);
       setShowCreateModal(false);
       setNewEvent({
         title: '',
         description: '',
-        eventType: 'company_drive',
+        eventType: isStudent ? 'personal_task' : isFaculty ? 'faculty_task' : 'admin_task',
         startDate: new Date().toISOString().slice(0, 10),
         startTime: '10:00',
         endDate: new Date().toISOString().slice(0, 10),
         endTime: '12:00',
-        venueOrLink: 'GRIET Placement Cell',
-        instructorOrCompany: '',
-        targetRoles: ['student', 'faculty', 'admin'],
-        allDay: false
+        venueOrLink: 'GRIET Placement Cell / Online',
+        instructorOrCompany: isFaculty ? (user?.name || 'Faculty Coordinator') : isAdmin ? 'Main Admin (TPO)' : '',
+        targetRoles: isStudent ? ['student'] : ['student', 'faculty', 'admin'],
+        allDay: false,
+        isVisibleToStudents: isStudent ? false : true,
+        priority: 'medium'
       });
     } catch (err) {
       alert(err.response?.data?.error || 'Failed to create placement event');
@@ -893,10 +356,10 @@ const PlacementCalendar = () => {
     if (!window.confirm('Delete this event from the Placement Calendar?')) return;
     try {
       await axios.delete(`${API_URL}/placement-events/${eventId}`, getAuthHeaders());
+      sfx.playClick();
       setEvents(prev => prev.filter(e => e._id !== eventId));
       if (selectedEventModal?._id === eventId) setSelectedEventModal(null);
     } catch (err) {
-      // If mock event
       setEvents(prev => prev.filter(e => e._id !== eventId));
       if (selectedEventModal?._id === eventId) setSelectedEventModal(null);
     }
@@ -1062,8 +525,17 @@ const PlacementCalendar = () => {
                     key={cell.key}
                     className={`day-cell-slot active-day-slot ${isTodayOrActive ? 'has-active-capsule' : ''}`}
                     onClick={() => {
+                      sfx.playClick();
                       if (dayEvents.length > 0) {
                         setSelectedDayEvents({ date: cell.date, events: dayEvents });
+                      } else {
+                        // Open event creation modal preset for this date
+                        const yr = cell.date.getFullYear();
+                        const mo = String(cell.date.getMonth() + 1).padStart(2, '0');
+                        const da = String(cell.date.getDate()).padStart(2, '0');
+                        const formatted = `${yr}-${mo}-${da}`;
+                        setNewEvent(prev => ({ ...prev, startDate: formatted, endDate: formatted }));
+                        setShowCreateModal(true);
                       }
                     }}
                   >
@@ -1082,42 +554,49 @@ const PlacementCalendar = () => {
 
                     {/* Compact Stacked Event Pills matching user screenshot */}
                     <div className="stacked-event-pills-container">
-                      {/* If more than 2 events: show 1 pill + '+N' badge */}
                       {dayEvents.length > 2 ? (
                         <>
                           <div
-                            className="screenshot-pill"
+                            className={`screenshot-pill ${dayEvents[0].eventType === 'admin_task' ? 'admin-pill' : dayEvents[0].eventType === 'faculty_task' ? 'faculty-pill' : dayEvents[0].eventType === 'personal_task' ? 'student-pill' : ''}`}
                             onClick={(e) => {
                               e.stopPropagation();
+                              sfx.playClick();
                               setSelectedEventModal(dayEvents[0]);
                             }}
-                            title={dayEvents[0].title}
+                            title={`${dayEvents[0].title} (${dayEvents[0].creatorRole === 'admin' ? 'Official Admin Task' : dayEvents[0].creatorRole === 'faculty' ? 'Faculty Event' : 'Personal Task'})`}
                           >
-                            <span className="pill-text-truncate">{dayEvents[0].title.split(':')[0]}</span>
+                            <span className="pill-text-truncate">
+                              {dayEvents[0].eventType === 'admin_task' ? '🏛️ ' : !dayEvents[0].isVisibleToStudents ? '🔒 ' : ''}
+                              {dayEvents[0].title}
+                            </span>
                           </div>
                           <div
                             className="more-count-pill"
                             onClick={(e) => {
                               e.stopPropagation();
+                              sfx.playClick();
                               setSelectedDayEvents({ date: cell.date, events: dayEvents });
                             }}
                           >
-                            +{dayEvents.length - 1}
+                            +{dayEvents.length - 1} more
                           </div>
                         </>
                       ) : (
-                        /* If 1 or 2 events: show compact pills */
-                        dayEvents.slice(0, 2).map((ev) => (
+                        dayEvents.map((ev) => (
                           <div
                             key={ev._id}
-                            className="screenshot-pill"
+                            className={`screenshot-pill ${ev.eventType === 'admin_task' ? 'admin-pill' : ev.eventType === 'faculty_task' ? 'faculty-pill' : ev.eventType === 'personal_task' ? 'student-pill' : ''}`}
                             onClick={(e) => {
                               e.stopPropagation();
+                              sfx.playClick();
                               setSelectedEventModal(ev);
                             }}
-                            title={ev.title}
+                            title={`${ev.title} (${ev.creatorRole === 'admin' ? 'Official Admin Task' : ev.creatorRole === 'faculty' ? 'Faculty Event' : 'Personal Task'})`}
                           >
-                            <span className="pill-text-truncate">{ev.title.split(':')[0]}</span>
+                            <span className="pill-text-truncate">
+                              {ev.eventType === 'admin_task' ? '🏛️ ' : !ev.isVisibleToStudents ? '🔒 ' : ''}
+                              {ev.title}
+                            </span>
                           </div>
                         ))
                       )}
@@ -1721,26 +1200,135 @@ const PlacementCalendar = () => {
                       value={newEvent.eventType}
                       onChange={e => setNewEvent({ ...newEvent, eventType: e.target.value })}
                     >
-                      <option value="company_drive">🟣 Company Drive</option>
-                      <option value="training">🟢 Training Session</option>
-                      <option value="mock_interview">🔵 Mock Interview</option>
-                      <option value="aptitude_test">🟠 Aptitude Test</option>
-                      <option value="deadline">🔴 Strict Deadline</option>
-                      <option value="workshop">🟡 Workshop</option>
+                      {isAdmin && (
+                        <>
+                          <option value="admin_task">🏛️ Official Main Admin Task</option>
+                          <option value="company_drive">🟣 Company Recruitment Drive</option>
+                          <option value="aptitude_test">🟠 Institutional Aptitude Assessment</option>
+                          <option value="training">🟢 Training & Masterclass</option>
+                          <option value="mock_interview">🔵 Mock Interview Drive</option>
+                          <option value="workshop">🟡 Technical Workshop</option>
+                          <option value="deadline">🔴 Cutoff Deadline</option>
+                        </>
+                      )}
+                      {isFaculty && (
+                        <>
+                          <option value="faculty_task">👨‍🏫 Faculty Session / Mentor Task</option>
+                          <option value="training">🟢 Placement Training Session</option>
+                          <option value="workshop">🟡 Hands-on Workshop</option>
+                          <option value="mock_interview">🔵 Faculty Mock Interview</option>
+                          <option value="aptitude_test">🟠 Department Diagnostic Quiz</option>
+                        </>
+                      )}
+                      {isStudent && (
+                        <>
+                          <option value="personal_task">👤 My Personal Placement Task</option>
+                          <option value="training">🟢 Peer Study Session</option>
+                          <option value="mock_interview">🔵 Peer Mock Interview Practice</option>
+                          <option value="aptitude_test">🟠 Aptitude Practice Goal</option>
+                        </>
+                      )}
                     </select>
                   </div>
 
                   <div className="form-group">
-                    <label className="form-label" style={{ fontWeight: 600 }}>Host / Company / Instructor</label>
-                    <input
-                      type="text"
+                    <label className="form-label" style={{ fontWeight: 600 }}>Priority Level</label>
+                    <select
                       className="form-control"
-                      placeholder="e.g. Amazon India / Prof. Rao"
-                      value={newEvent.instructorOrCompany}
-                      onChange={e => setNewEvent({ ...newEvent, instructorOrCompany: e.target.value })}
-                    />
+                      value={newEvent.priority}
+                      onChange={e => setNewEvent({ ...newEvent, priority: e.target.value })}
+                    >
+                      <option value="low">🟢 Low (Optional Reference)</option>
+                      <option value="medium">🔵 Medium (Recommended)</option>
+                      <option value="high">🟠 High (Important Placement Milestone)</option>
+                      <option value="urgent">🚨 Urgent (Mandatory Cutoff)</option>
+                    </select>
                   </div>
                 </div>
+
+                <div className="form-group">
+                  <label className="form-label" style={{ fontWeight: 600 }}>Organizer / Host / Faculty Name</label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    placeholder="e.g. Dr. Madhuri / Prof. Ramesh / Amazon India"
+                    value={newEvent.instructorOrCompany}
+                    onChange={e => setNewEvent({ ...newEvent, instructorOrCompany: e.target.value })}
+                  />
+                </div>
+
+                {/* Visibility & Student Calendar Access Setting */}
+                {isFaculty && (
+                  <div className="visibility-control-box" style={{ background: 'rgba(56, 189, 248, 0.08)', border: '1px solid rgba(56, 189, 248, 0.3)', borderRadius: '12px', padding: '12px 16px' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', margin: 0 }}>
+                      <div>
+                        <strong style={{ color: '#38bdf8', fontSize: '13.5px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <span>👥</span>
+                          <span>Visible to Students' Calendar</span>
+                        </strong>
+                        <span style={{ fontSize: '12px', color: '#94a3b8', display: 'block', marginTop: '2px' }}>
+                          {newEvent.isVisibleToStudents
+                            ? '✅ Students in targeted branches can view this event in their dashboard calendar'
+                            : '🔒 Faculty & Admin only (hidden from students calendar)'}
+                        </span>
+                      </div>
+                      <input
+                        type="checkbox"
+                        checked={newEvent.isVisibleToStudents}
+                        onChange={e => setNewEvent({ ...newEvent, isVisibleToStudents: e.target.checked })}
+                        style={{ width: '22px', height: '22px', accentColor: '#38bdf8', cursor: 'pointer' }}
+                      />
+                    </label>
+                  </div>
+                )}
+
+                {isStudent && (
+                  <div className="visibility-control-box" style={{ background: 'rgba(16, 185, 129, 0.08)', border: '1px solid rgba(16, 185, 129, 0.3)', borderRadius: '12px', padding: '12px 16px' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', margin: 0 }}>
+                      <div>
+                        <strong style={{ color: '#10b981', fontSize: '13.5px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <span>{newEvent.isVisibleToStudents ? '👥' : '🔒'}</span>
+                          <span>{newEvent.isVisibleToStudents ? 'Visible to Classmates & Peers' : 'Personal Task (Only Visible to Me)'}</span>
+                        </strong>
+                        <span style={{ fontSize: '12px', color: '#94a3b8', display: 'block', marginTop: '2px' }}>
+                          {newEvent.isVisibleToStudents
+                            ? 'Public study session visible to classmates in calendar'
+                            : 'Private personal task — visible only to you on this account'}
+                        </span>
+                      </div>
+                      <input
+                        type="checkbox"
+                        checked={newEvent.isVisibleToStudents}
+                        onChange={e => setNewEvent({ ...newEvent, isVisibleToStudents: e.target.checked })}
+                        style={{ width: '22px', height: '22px', accentColor: '#10b981', cursor: 'pointer' }}
+                      />
+                    </label>
+                  </div>
+                )}
+
+                {isAdmin && (
+                  <div className="visibility-control-box" style={{ background: 'rgba(245, 158, 11, 0.08)', border: '1px solid rgba(245, 158, 11, 0.3)', borderRadius: '12px', padding: '12px 16px' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', margin: 0 }}>
+                      <div>
+                        <strong style={{ color: '#f59e0b', fontSize: '13.5px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <span>🏛️</span>
+                          <span>Official Admin Task for Students</span>
+                        </strong>
+                        <span style={{ fontSize: '12px', color: '#94a3b8', display: 'block', marginTop: '2px' }}>
+                          {newEvent.isVisibleToStudents
+                            ? 'Mandatory task/announcement published to all student placement calendars'
+                            : 'Internal administration task (hidden from student view)'}
+                        </span>
+                      </div>
+                      <input
+                        type="checkbox"
+                        checked={newEvent.isVisibleToStudents}
+                        onChange={e => setNewEvent({ ...newEvent, isVisibleToStudents: e.target.checked })}
+                        style={{ width: '22px', height: '22px', accentColor: '#f59e0b', cursor: 'pointer' }}
+                      />
+                    </label>
+                  </div>
+                )}
 
                 {/* Start & End Times */}
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
@@ -1811,7 +1399,7 @@ const PlacementCalendar = () => {
                     Cancel
                   </button>
                   <button type="submit" className="btn btn-primary" disabled={creating}>
-                    {creating ? 'Scheduling...' : '🚀 Schedule Placement Event'}
+                    {creating ? 'Scheduling...' : '🚀 Save Placement Event'}
                   </button>
                 </div>
               </form>

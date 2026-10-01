@@ -269,19 +269,22 @@
   display: grid;
   grid-template-columns: repeat(7, 1fr);
   gap: 8px;
-  row-gap: 22px; /* Generous vertical spacing between calendar week rows */
+  row-gap: 16px;
 }
 
 /* Day Cell Slot */
 .day-cell-slot {
-  min-height: 100px;
+  min-height: 92px;
+  max-height: 102px;
   display: flex;
   flex-direction: column;
   align-items: center;
   border-radius: 10px;
-  padding: 4px 3px;
+  padding: 4px 4px;
   transition: all 0.2s ease;
   position: relative;
+  overflow: hidden;
+  box-sizing: border-box;
 }
 
 .day-cell-slot.blank-slot {
@@ -290,10 +293,12 @@
 
 .day-cell-slot.active-day-slot {
   cursor: pointer;
+  border: 1px solid transparent;
 }
 
 .day-cell-slot.active-day-slot:hover {
-  background: rgba(255, 255, 255, 0.03);
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.08);
 }
 
 /* Top Date Number */
@@ -302,12 +307,12 @@
   align-items: center;
   justify-content: center;
   width: 100%;
-  height: 44px;
-  margin-bottom: 6px;
+  height: 38px;
+  margin-bottom: 4px;
 }
 
 .date-number-label {
-  font-size: 1.25rem;
+  font-size: 1.2rem;
   font-weight: 700;
   display: inline-flex;
   align-items: center;
@@ -330,14 +335,14 @@
 .today-capsule-badge {
   background: #3B82F6;
   color: #FFFFFF;
-  border-radius: 12px;
-  width: 44px;
-  height: 40px;
+  border-radius: 10px;
+  width: 40px;
+  height: 34px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   font-weight: 800;
-  font-size: 1.25rem;
+  font-size: 1.15rem;
   line-height: 1;
   box-shadow: 0 4px 18px rgba(59, 130, 246, 0.5);
 }
@@ -363,7 +368,7 @@
   border: 1px solid rgba(59, 130, 246, 0.25);
   color: #BFDBFE;
   border-radius: 5px;
-  padding: 3px 5px;
+  padding: 3px 6px;
   font-size: 0.72rem;
   font-weight: 600;
   text-align: center;
@@ -381,6 +386,40 @@
   transform: translateY(-1px);
 }
 
+/* Admin Task Pill: Gold / Amber */
+.screenshot-pill.admin-pill {
+  background: rgba(245, 158, 11, 0.22);
+  border-color: rgba(245, 158, 11, 0.6);
+  color: #fef3c7;
+  font-weight: 700;
+}
+.screenshot-pill.admin-pill:hover {
+  background: rgba(245, 158, 11, 0.38);
+  color: #ffffff;
+}
+
+/* Faculty Session Pill: Sky / Cyan */
+.screenshot-pill.faculty-pill {
+  background: rgba(56, 189, 248, 0.22);
+  border-color: rgba(56, 189, 248, 0.5);
+  color: #e0f2fe;
+}
+.screenshot-pill.faculty-pill:hover {
+  background: rgba(56, 189, 248, 0.38);
+  color: #ffffff;
+}
+
+/* Student Personal Task: Emerald */
+.screenshot-pill.student-pill {
+  background: rgba(16, 185, 129, 0.22);
+  border-color: rgba(16, 185, 129, 0.5);
+  color: #d1fae5;
+}
+.screenshot-pill.student-pill:hover {
+  background: rgba(16, 185, 129, 0.38);
+  color: #ffffff;
+}
+
 .pill-text-truncate {
   overflow: hidden;
   text-overflow: ellipsis;
@@ -394,7 +433,7 @@
   background: rgba(59, 130, 246, 0.12);
   border: 1px solid rgba(59, 130, 246, 0.2);
   border-radius: 4px;
-  font-size: 0.72rem;
+  font-size: 0.7rem;
   font-weight: 700;
   text-align: center;
   padding: 2px 4px;
