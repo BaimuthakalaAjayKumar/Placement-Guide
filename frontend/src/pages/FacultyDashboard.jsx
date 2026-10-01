@@ -278,7 +278,7 @@ const FacultyDashboard = () => {
     };
 
     useEffect(() => {
-        if (activeTab === 'students') {
+        if (activeTab === 'students' || activeTab === 'batch-comparison' || activeTab === 'placement-export') {
             fetchStudents();
         } else if (activeTab === 'subjects') {
             fetchSubjects();
@@ -2368,12 +2368,12 @@ const FacultyDashboard = () => {
 
                     {/* TAB: BATCH COMPARISON */}
                     {activeTab === 'batch-comparison' && (
-                        <BatchComparison />
+                        <BatchComparison students={students} />
                     )}
 
                     {/* TAB: PLACEMENT STATS EXPORT */}
                     {activeTab === 'placement-export' && (
-                        <PlacementStatsExport />
+                        <PlacementStatsExport students={students} />
                     )}
 
                     {/* TAB 1: STUDENT MONITORING */}

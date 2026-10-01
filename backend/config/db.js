@@ -57,10 +57,20 @@ const connectDB = async () => {
         role: 'faculty',
         mustChangePassword: false,
         managedScopes: [
-          { academicYear: '2024-2025', branch: 'CSE', section: 'A' },
-          { academicYear: '2024-2025', branch: 'CSE', section: 'B' }
+          { academicYear: '2026', branch: 'CSE', section: 'A' },
+          { academicYear: '2026', branch: 'CSE', section: 'B' },
+          { academicYear: '2026', branch: 'IT', section: 'A' },
+          { academicYear: '2026', branch: 'AIML', section: 'A' },
+          { academicYear: '2026', branch: 'ECE', section: 'A' },
+          { academicYear: '2027', branch: 'CSE', section: 'A' },
+          { academicYear: '2027', branch: 'CSE', section: 'C' },
+          { academicYear: '2027', branch: 'IT', section: 'A' },
+          { academicYear: '2028', branch: 'CSE', section: 'A' },
+          { academicYear: '2028', branch: 'IT', section: 'A' },
+          { academicYear: '2028', branch: 'ECE', section: 'A' },
+          { academicYear: '4th Year', branch: 'CSE', section: 'C' }
         ],
-        managedAcademicYears: ['2024-2025']
+        managedAcademicYears: ['2026', '2027', '2028', '4th Year']
       },
       {
         name: 'Super Administrator',
@@ -74,13 +84,13 @@ const connectDB = async () => {
     for (const acc of defaultAccounts) {
       let existingUser = await User.findOne({ email: acc.email });
       if (existingUser) {
-        // Preserve existing user's password and credentials without overwriting
+        // Update scopes and academic years if configured
         let modified = false;
-        if (acc.managedScopes && (!existingUser.managedScopes || existingUser.managedScopes.length === 0)) {
+        if (acc.managedScopes && acc.managedScopes.length > 0) {
           existingUser.managedScopes = acc.managedScopes;
           modified = true;
         }
-        if (acc.managedAcademicYears && (!existingUser.managedAcademicYears || existingUser.managedAcademicYears.length === 0)) {
+        if (acc.managedAcademicYears && acc.managedAcademicYears.length > 0) {
           existingUser.managedAcademicYears = acc.managedAcademicYears;
           modified = true;
         }

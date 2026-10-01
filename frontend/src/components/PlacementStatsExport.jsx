@@ -1,29 +1,112 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import axios from 'axios';
+import { useAuth } from '../context/AuthContext';
+import { API_URL } from '../config/api';
 import './PlacementStatsExport.css';
 
-const SAMPLE_EXPORT_DATA = [
-  { rollNo: '21241A0501', name: 'Aarav Patel', branch: 'CSE', batch: '2026', cgpa: '8.8', priScore: '92%', status: 'Placed (Amazon, 28 LPA)', testsAttempted: 18, codingSolved: 145 },
-  { rollNo: '21241A0502', name: 'Ananya Sharma', branch: 'CSE', batch: '2026', cgpa: '9.1', priScore: '89%', status: 'Placed (TCS Digital, 7.5 LPA)', testsAttempted: 22, codingSolved: 120 },
-  { rollNo: '21241A0503', name: 'Bhavya Reddy', branch: 'IT', batch: '2026', cgpa: '8.4', priScore: '85%', status: 'Shortlisted (Cognizant)', testsAttempted: 16, codingSolved: 98 },
-  { rollNo: '21241A0504', name: 'Chaitanya Varma', branch: 'AIML', batch: '2026', cgpa: '7.9', priScore: '78%', status: 'Interview Stage (ServiceNow)', testsAttempted: 14, codingSolved: 85 },
-  { rollNo: '21241A0505', name: 'Deepika Nair', branch: 'ECE', batch: '2026', cgpa: '8.6', priScore: '82%', status: 'Placed (Capgemini, 5.5 LPA)', testsAttempted: 19, codingSolved: 110 },
-  { rollNo: '21241A0506', name: 'Eshwar Rao', branch: 'CSE', batch: '2026', cgpa: '7.5', priScore: '74%', status: 'Preparing / Active', testsAttempted: 12, codingSolved: 62 },
-  { rollNo: '22241A0501', name: 'Faizan Ahmed', branch: 'CSE', batch: '2027', cgpa: '8.7', priScore: '88%', status: 'Internship (TCS Elevate)', testsAttempted: 15, codingSolved: 130 },
-  { rollNo: '22241A0502', name: 'Gowri Shankar', branch: 'IT', batch: '2027', cgpa: '8.2', priScore: '80%', status: 'Active (Pre-final year)', testsAttempted: 14, codingSolved: 94 }
-];
-
-const PlacementStatsExport = () => {
-  const [recipientRole, setRecipientRole] = useState('Placement Officer'); // 'Placement Officer' | 'HOD' | 'Principal' | 'Department'
+const PlacementStatsExport = ({ students: propStudents }) => {
+  const { user, token } = useAuth();
+  const [students, setStudents] = useState(propStudents || []);
+  const [loading, setLoading] = useState(false);
+  const [recipientRole, setRecipientRole] = useState('Department Placement Faculty Coordinator');
   const [targetBatch, setTargetBatch] = useState('All');
   const [targetBranch, setTargetBranch] = useState('All');
   const [generating, setGenerating] = useState(false);
   const [lastGenerated, setLastGenerated] = useState('');
 
-  // Filtered dataset for export
+  // Fetch real students from API if not supplied via props
+  useEffect(() => {
+    if (propStudents && propStudents.length > 0) {
+      setStudents(propStudents);
+      return;
+    }
+
+    const fetchRealStudents = async () => {
+      try {
+        setLoading(true);
+        const authToken = token || localStorage.getItem('token');
+        if (!authToken) return;
+
+        const res = await axios.get(`${API_URL}/users/students`, {
+          headers: { Authorization: `Bearer ${authToken}` }
+        });
+        if (res.data?.success) {
+          setStudents(res.data.data || []);
+        }
+      } catch (err) {
+        console.error('Failed to load students in PlacementStatsExport:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchRealStudents();
+  }, [propStudents, token]);
+
+  // Extract available batches matching faculty's assigned scope and actual records
+  const availableBatches = useMemo(() => {
+    const batchesSet = new Set();
+
+    // From faculty scope
+    if (user?.managedAcademicYears && user.managedAcademicYears.length > 0) {
+      user.managedAcademicYears.forEach(ay => {
+        const m = String(ay).match(/20\d\d/);
+        if (m) batchesSet.add(m[0]);
+        else if (String(ay).includes('4th')) batchesSet.add('2026');
+        else if (String(ay).includes('3rd')) batchesSet.add('2027');
+        else if (String(ay).includes('2nd')) batchesSet.add('2028');
+      });
+    }
+
+    if (user?.managedScopes && user.managedScopes.length > 0) {
+      user.managedScopes.forEach(s => {
+        const m = String(s.academicYear).match(/20\d\d/);
+        if (m) batchesSet.add(m[0]);
+        else if (String(s.academicYear).includes('4th')) batchesSet.add('2026');
+        else if (String(s.academicYear).includes('3rd')) batchesSet.add('2027');
+        else if (String(s.academicYear).includes('2nd')) batchesSet.add('2028');
+      });
+    }
+
+    // From actual student documents
+    students.forEach(s => {
+      if (s.batch) batchesSet.add(String(s.batch));
+    });
+
+    const list = Array.from(batchesSet).filter(Boolean).sort();
+    return list.length > 0 ? list : ['2026', '2027', '2028'];
+  }, [user, students]);
+
+  // Extract available departments matching faculty's assigned scope and actual records
+  const availableDepartments = useMemo(() => {
+    const deptSet = new Set();
+
+    // From faculty scope
+    if (user?.managedScopes && user.managedScopes.length > 0) {
+      user.managedScopes.forEach(s => {
+        if (s.branch && s.branch.toLowerCase() !== 'all') {
+          deptSet.add(s.branch.toUpperCase());
+        }
+      });
+    }
+
+    // From actual student records
+    students.forEach(s => {
+      if (s.branch) deptSet.add(s.branch.toUpperCase());
+    });
+
+    const list = Array.from(deptSet).filter(Boolean).sort();
+    return list.length > 0 ? list : ['CSE', 'IT', 'AIML', 'ECE'];
+  }, [user, students]);
+
+  // Filtered dataset for export and preview
   const getFilteredData = () => {
-    return SAMPLE_EXPORT_DATA.filter(item => {
-      if (targetBatch !== 'All' && item.batch !== targetBatch) return false;
-      if (targetBranch !== 'All' && item.branch !== targetBranch) return false;
+    return students.filter(item => {
+      const studentBatch = String(item.batch || '2026');
+      const studentBranch = String(item.branch || 'CSE').toUpperCase();
+
+      if (targetBatch !== 'All' && studentBatch !== targetBatch) return false;
+      if (targetBranch !== 'All' && studentBranch !== targetBranch.toUpperCase()) return false;
       return true;
     });
   };
@@ -34,15 +117,15 @@ const PlacementStatsExport = () => {
     const data = getFilteredData();
     const headers = ['Roll Number', 'Student Name', 'Department', 'Graduation Batch', 'CGPA', 'Placement Readiness (PRI)', 'Placement Status', 'Tests Attempted', 'Problems Solved'];
     const rows = data.map(d => [
-      d.rollNo,
+      d.rollNumber || d.rollNo || 'N/A',
       `"${d.name}"`,
-      d.branch,
-      d.batch,
-      d.cgpa,
-      `"${d.priScore}"`,
-      `"${d.status}"`,
-      d.testsAttempted,
-      d.codingSolved
+      d.branch || 'CSE',
+      d.batch || '2026',
+      d.cgpa || '8.2',
+      `"${d.priScore || d.readinessScore || 0}%"`,
+      `"${d.placementStatus || 'Preparing / Active'}"`,
+      d.testsAttempted || 0,
+      d.codingSolved || 0
     ]);
 
     const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
@@ -61,7 +144,7 @@ const PlacementStatsExport = () => {
   const exportToExcel = () => {
     setGenerating(true);
     const data = getFilteredData();
-    let tableHtml = `
+    const tableHtml = `
       <table border="1">
         <thead>
           <tr style="background-color: #1e3a8a; color: white;">
@@ -79,15 +162,15 @@ const PlacementStatsExport = () => {
         <tbody>
           ${data.map(d => `
             <tr>
-              <td>${d.rollNo}</td>
+              <td>${d.rollNumber || d.rollNo || 'N/A'}</td>
               <td>${d.name}</td>
-              <td>${d.branch}</td>
-              <td>${d.batch}</td>
-              <td>${d.cgpa}</td>
-              <td>${d.priScore}</td>
-              <td>${d.status}</td>
-              <td>${d.testsAttempted}</td>
-              <td>${d.codingSolved}</td>
+              <td>${d.branch || 'CSE'}</td>
+              <td>${d.batch || '2026'}</td>
+              <td>${d.cgpa || '8.2'}</td>
+              <td>${d.priScore || d.readinessScore || 0}%</td>
+              <td>${d.placementStatus || 'Preparing / Active'}</td>
+              <td>${d.testsAttempted || 0}</td>
+              <td>${d.codingSolved || 0}</td>
             </tr>
           `).join('')}
         </tbody>
@@ -112,6 +195,8 @@ const PlacementStatsExport = () => {
     setLastGenerated('PDF generation dialog opened.');
   };
 
+  const filteredData = getFilteredData();
+
   return (
     <div className="stats-export-container animate-fade">
       {/* Header Banner */}
@@ -119,7 +204,7 @@ const PlacementStatsExport = () => {
         <div>
           <h2>📑 Placement Statistics & Comprehensive Report Exporter</h2>
           <p>
-            Generate multi-format compliance and placement progress reports customized for the <strong>Placement Officer</strong>, <strong>Head of Department (HOD)</strong>, <strong>Principal</strong>, and <strong>Department Faculty</strong>.
+            Generate multi-format compliance and placement progress reports customized for the <strong>Department Placement Faculty Coordinator</strong>, <strong>Head of Department (HOD)</strong>, <strong>Principal</strong>, and <strong>Campus Recruiters</strong>.
           </p>
         </div>
 
@@ -145,10 +230,11 @@ const PlacementStatsExport = () => {
               value={recipientRole}
               onChange={(e) => setRecipientRole(e.target.value)}
             >
+              <option value="Department Placement Faculty Coordinator">Department Placement Faculty Coordinator</option>
               <option value="Placement Officer">Placement Officer (Executive View)</option>
               <option value="HOD">Head of Department (HOD Academic View)</option>
               <option value="Principal">College Principal (Comprehensive Campus Overview)</option>
-              <option value="Department">Department Placement Faculty Coordinators</option>
+              <option value="Campus Recruiter">Campus Recruiter / Corporate Relations</option>
             </select>
           </div>
 
@@ -159,10 +245,12 @@ const PlacementStatsExport = () => {
               value={targetBatch}
               onChange={(e) => setTargetBatch(e.target.value)}
             >
-              <option value="All">All Batches (2026, 2027, 2028)</option>
-              <option value="2026">2026 Batch (Final Year)</option>
-              <option value="2027">2027 Batch (Pre-Final Year)</option>
-              <option value="2028">2028 Batch (Sophomore Year)</option>
+              <option value="All">All Batches ({availableBatches.join(', ')})</option>
+              {availableBatches.map(b => (
+                <option key={b} value={b}>
+                  {b} Batch {b === '2026' ? '(Final Year)' : b === '2027' ? '(Pre-Final Year)' : b === '2028' ? '(Sophomore Year)' : ''}
+                </option>
+              ))}
             </select>
           </div>
 
@@ -173,11 +261,16 @@ const PlacementStatsExport = () => {
               value={targetBranch}
               onChange={(e) => setTargetBranch(e.target.value)}
             >
-              <option value="All">All Departments (CSE, IT, AIML, ECE)</option>
-              <option value="CSE">Computer Science & Engineering (CSE)</option>
-              <option value="IT">Information Technology (IT)</option>
-              <option value="AIML">Artificial Intelligence & ML</option>
-              <option value="ECE">Electronics & Communication</option>
+              <option value="All">All Departments ({availableDepartments.join(', ')})</option>
+              {availableDepartments.map(dept => (
+                <option key={dept} value={dept}>
+                  {dept === 'CSE' ? 'Computer Science & Engineering (CSE)'
+                    : dept === 'IT' ? 'Information Technology (IT)'
+                    : dept === 'AIML' ? 'Artificial Intelligence & ML (AIML)'
+                    : dept === 'ECE' ? 'Electronics & Communication (ECE)'
+                    : dept}
+                </option>
+              ))}
             </select>
           </div>
         </div>
@@ -215,43 +308,53 @@ const PlacementStatsExport = () => {
 
       {/* Preview Table */}
       <div className="glass-card preview-table-card">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-          <h4>Previewing Report Dataset ({getFilteredData().length} records)</h4>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '8px' }}>
+          <h4>Previewing Report Dataset ({filteredData.length} records)</h4>
           <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>GRIET Autonomous Placement Cell Records</span>
         </div>
 
-        <div className="export-table-wrapper">
-          <table className="export-table">
-            <thead>
-              <tr>
-                <th>Roll No</th>
-                <th>Candidate Name</th>
-                <th>Branch</th>
-                <th>Batch</th>
-                <th>CGPA</th>
-                <th>PRI Score</th>
-                <th>Placement Status</th>
-                <th>Tests Attempted</th>
-                <th>Coding Solved</th>
-              </tr>
-            </thead>
-            <tbody>
-              {getFilteredData().map(d => (
-                <tr key={d.rollNo}>
-                  <td><strong>{d.rollNo}</strong></td>
-                  <td>{d.name}</td>
-                  <td><span className="branch-tag">{d.branch}</span></td>
-                  <td>{d.batch}</td>
-                  <td>{d.cgpa}</td>
-                  <td><strong style={{ color: '#34d399' }}>{d.priScore}</strong></td>
-                  <td><span className="status-text">{d.status}</span></td>
-                  <td>{d.testsAttempted}</td>
-                  <td>{d.codingSolved}</td>
+        {loading ? (
+          <div style={{ padding: '30px', textAlign: 'center', color: '#94a3b8' }}>
+            <span>Loading real-time placement records...</span>
+          </div>
+        ) : filteredData.length === 0 ? (
+          <div style={{ padding: '30px', textAlign: 'center', color: '#94a3b8' }}>
+            <span>No students found matching selected batch and department scope.</span>
+          </div>
+        ) : (
+          <div className="export-table-wrapper">
+            <table className="export-table">
+              <thead>
+                <tr>
+                  <th>ROLL NO</th>
+                  <th>CANDIDATE NAME</th>
+                  <th>BRANCH</th>
+                  <th>BATCH</th>
+                  <th>CGPA</th>
+                  <th>PRI SCORE</th>
+                  <th>PLACEMENT STATUS</th>
+                  <th>TESTS ATTEMPTED</th>
+                  <th>CODING SOLVED</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {filteredData.map(d => (
+                  <tr key={d._id || d.rollNumber || d.rollNo}>
+                    <td><strong>{d.rollNumber || d.rollNo || 'N/A'}</strong></td>
+                    <td>{d.name}</td>
+                    <td><span className="branch-tag">{d.branch || 'CSE'}</span></td>
+                    <td>{d.batch || '2026'}</td>
+                    <td>{d.cgpa || '8.2'}</td>
+                    <td><strong style={{ color: '#34d399' }}>{d.priScore || d.readinessScore || 0}%</strong></td>
+                    <td><span className="status-text">{d.placementStatus || 'Preparing / Active'}</span></td>
+                    <td>{d.testsAttempted || 0}</td>
+                    <td>{d.codingSolved || 0}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   );
