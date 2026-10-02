@@ -189,6 +189,7 @@ const atRiskRoutes = require('./routes/atRisk');
 const placementSuiteRoutes = require('./routes/placementSuite');
 const peerMentorRoutes = require('./routes/peerMentors');
 const interviewExperienceRoutes = require('./routes/interviewExperiences');
+const recruiterRoutes = require('./routes/recruiter');
 
 // ============================================================
 // MOUNT API ROUTES
@@ -217,6 +218,7 @@ app.use('/api/at-risk', atRiskRoutes);
 app.use('/api/placement-suite', placementSuiteRoutes);
 app.use('/api/peer-mentors', peerMentorRoutes);
 app.use('/api/interview-experiences', interviewExperienceRoutes);
+app.use('/api/recruiter', recruiterRoutes);
 
 // ============================================================
 // HEALTH CHECK

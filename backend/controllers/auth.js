@@ -150,6 +150,14 @@ exports.login = async (req, res, next) => {
       });
     }
 
+    // Check if temporary recruiter account has expired
+    if (user.role === 'recruiter' && user.recruiterExpiresAt && new Date() > new Date(user.recruiterExpiresAt)) {
+      return res.status(403).json({
+        success: false,
+        error: 'Your temporary recruiter credentials have expired. Please contact the campus placement cell for access renewal.'
+      });
+    }
+
     // Extract client network IP and browser agent
     const clientIp = extractClientIp(req);
     const userAgent = extractUserAgent(req);

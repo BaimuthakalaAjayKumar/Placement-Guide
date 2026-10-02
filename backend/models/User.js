@@ -28,8 +28,36 @@ const UserSchema = new mongoose.Schema({
   },
   role: {
     type: String,
-    enum: ['student', 'faculty', 'admin'],
+    enum: ['student', 'faculty', 'admin', 'recruiter'],
     default: 'student'
+  },
+  companyName: {
+    type: String,
+    default: ''
+  },
+  companyWebsite: {
+    type: String,
+    default: ''
+  },
+  companyLogo: {
+    type: String,
+    default: ''
+  },
+  recruiterExpiresAt: {
+    type: Date,
+    default: null
+  },
+  isTemporaryAccount: {
+    type: Boolean,
+    default: false
+  },
+  tempPasswordPlain: {
+    type: String,
+    default: ''
+  },
+  recruiterNotes: {
+    type: String,
+    default: ''
   },
   bio: {
     type: String,

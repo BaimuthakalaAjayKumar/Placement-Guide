@@ -40,6 +40,15 @@ import ChangePassword from './pages/ChangePassword';
 import LabPractice from './pages/LabPractice';
 import PlacementCalendar from './pages/PlacementCalendar';
 import PlacementSuitePage from './pages/PlacementSuitePage';
+import RecruiterDashboard from './pages/RecruiterDashboard';
+
+// Helper for home route by role
+const getRoleHome = (role) => {
+  if (role === 'admin') return '/admin';
+  if (role === 'faculty') return '/faculty';
+  if (role === 'recruiter') return '/recruiter';
+  return '/dashboard';
+};
 
 // Private Route Wrapper
 const PrivateRoute = ({ children, allowedRoles }) => {
@@ -60,7 +69,7 @@ const PrivateRoute = ({ children, allowedRoles }) => {
   }
 
   if (allowedRoles && !allowedRoles.includes(user.role)) {
-    return <Navigate to={user.role === 'admin' ? '/admin' : user.role === 'faculty' ? '/faculty' : '/dashboard'} replace />;
+    return <Navigate to={getRoleHome(user.role)} replace />;
   }
 
   if (user.mustChangePassword && location.pathname !== '/change-password') {
@@ -88,24 +97,24 @@ const AppRoutes = () => {
       />
       <Route
         path="/login"
-        element={token && user ? <Navigate to={user.role === 'admin' ? '/admin' : user.role === 'faculty' ? '/faculty' : '/dashboard'} replace /> : <Login />}
+        element={token && user ? <Navigate to={getRoleHome(user.role)} replace /> : <Login />}
       />
       <Route
         path="/register"
-        element={token && user ? <Navigate to={user.role === 'admin' ? '/admin' : user.role === 'faculty' ? '/faculty' : '/dashboard'} replace /> : <Register />}
+        element={token && user ? <Navigate to={getRoleHome(user.role)} replace /> : <Register />}
       />
       <Route
         path="/forgot-password"
-        element={token && user ? <Navigate to={user.role === 'admin' ? '/admin' : user.role === 'faculty' ? '/faculty' : '/dashboard'} replace /> : <ForgotPassword />}
+        element={token && user ? <Navigate to={getRoleHome(user.role)} replace /> : <ForgotPassword />}
       />
       <Route
         path="/reset-password/:token"
-        element={token && user ? <Navigate to={user.role === 'admin' ? '/admin' : user.role === 'faculty' ? '/faculty' : '/dashboard'} replace /> : <ResetPassword />}
+        element={token && user ? <Navigate to={getRoleHome(user.role)} replace /> : <ResetPassword />}
       />
       <Route
         path="/change-password"
         element={
-          <PrivateRoute allowedRoles={['student', 'faculty', 'admin']}>
+          <PrivateRoute allowedRoles={['student', 'faculty', 'admin', 'recruiter']}>
             <ChangePassword />
           </PrivateRoute>
         }
@@ -347,10 +356,24 @@ const AppRoutes = () => {
       <Route
         path="/placement-calendar"
         element={
-          <PrivateRoute allowedRoles={['student', 'faculty', 'admin']}>
+          <PrivateRoute allowedRoles={['student', 'faculty', 'admin', 'recruiter']}>
             <PlacementCalendar />
           </PrivateRoute>
         }
+      />
+
+      {/* Recruiter Routes */}
+      <Route
+        path="/recruiter"
+        element={
+          <PrivateRoute allowedRoles={['recruiter', 'admin']}>
+            <RecruiterDashboard />
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/recruiter-dashboard"
+        element={<Navigate to="/recruiter" replace />}
       />
       <Route
         path="/placement-suite"
@@ -388,7 +411,7 @@ const AppRoutes = () => {
       {/* Fallback routing */}
       <Route
         path="*"
-        element={<Navigate to={token && user ? (user.role === 'admin' ? '/admin' : user.role === 'faculty' ? '/faculty' : '/dashboard') : "/"} replace />}
+        element={<Navigate to={token && user ? getRoleHome(user.role) : "/"} replace />}
       />
     </Routes>
   );

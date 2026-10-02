@@ -64,6 +64,8 @@ const Login = () => {
         navigate('/admin');
       } else if (result.user && result.user.role === 'faculty') {
         navigate('/faculty');
+      } else if (result.user && result.user.role === 'recruiter') {
+        navigate('/recruiter');
       } else {
         navigate('/dashboard');
       }
@@ -84,7 +86,7 @@ const Login = () => {
             <span>GRIET Placement</span>
           </div>
           <h2>Welcome Back</h2>
-          <p>Accelerate your placement preparation with AI tools</p>
+          <p>Portal for Students, Faculty, Admins & Campus Recruiters</p>
         </div>
 
         {error && (

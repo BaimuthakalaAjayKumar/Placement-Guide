@@ -293,6 +293,20 @@ const Sidebar = () => {
             </NavLink>
           </>
         )}
+
+        {user.role === 'recruiter' && (
+          <>
+            <NavLink to="/recruiter" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+              <svg viewBox="0 0 24 24" className="nav-icon"><rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" /><rect x="14" y="14" width="7" height="7" /><rect x="3" y="14" width="7" height="7" /></svg>
+              <span>Recruiter Dashboard</span>
+            </NavLink>
+
+            <NavLink to="/placement-calendar" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+              <svg viewBox="0 0 24 24" className="nav-icon" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg>
+              <span>Campus Placement Calendar</span>
+            </NavLink>
+          </>
+        )}
       </nav>
 
       <div className="sidebar-footer" style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
@@ -329,6 +343,26 @@ const Sidebar = () => {
                   </button>
                 </div>
               )}
+            </div>
+            <button onClick={handleLogout} className="logout-btn" style={{ width: '100%' }}>
+              <svg viewBox="0 0 24 24" className="logout-icon"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" /></svg>
+              <span>Sign Out</span>
+            </button>
+          </>
+        ) : user.role === 'recruiter' ? (
+          <>
+            <div className="user-badge-container">
+              <div className="user-profile-badge-btn" style={{ cursor: 'default' }}>
+                <div className="user-avatar" style={{ background: 'linear-gradient(135deg, #2563eb, #06b6d4)', color: '#fff', fontWeight: 'bold' }}>
+                  🏢
+                </div>
+                <div className="user-info">
+                  <span className="user-name">{user.name}</span>
+                  <span className="user-role" style={{ color: '#60a5fa', fontWeight: 600 }}>
+                    {user.companyName || 'Campus Recruiter'}
+                  </span>
+                </div>
+              </div>
             </div>
             <button onClick={handleLogout} className="logout-btn" style={{ width: '100%' }}>
               <svg viewBox="0 0 24 24" className="logout-icon"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" /></svg>

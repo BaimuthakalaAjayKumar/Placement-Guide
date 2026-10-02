@@ -34,6 +34,14 @@ exports.protect = async (req, res, next) => {
       });
     }
 
+    // Check if temporary recruiter account has expired
+    if (req.user.role === 'recruiter' && req.user.recruiterExpiresAt && new Date() > new Date(req.user.recruiterExpiresAt)) {
+      return res.status(403).json({
+        success: false,
+        error: 'Your temporary recruiter credentials have expired. Please contact the campus placement cell for access renewal.'
+      });
+    }
+
     next();
   } catch (err) {
     return res.status(401).json({

@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import Header from '../components/Header';
 import CompanyPlacementManager from '../components/CompanyPlacementManager';
+import RecruiterCredentialsManager from '../components/RecruiterCredentialsManager';
 import AtRiskDetectionModule from '../components/AtRiskDetectionModule';
 import BatchComparison from '../components/BatchComparison';
 import PlacementStatsExport from '../components/PlacementStatsExport';
@@ -3828,10 +3829,35 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
                     <span>💼</span>
                     <span>Job Postings &amp; Listings ({jobs.length})</span>
                   </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPlacementHubSubTab('recruiters');
+                      setActiveTab('job-opportunities');
+                    }}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      padding: '8px 18px',
+                      background: (placementHubSubTab === 'recruiters') ? 'linear-gradient(135deg, rgba(234, 179, 8, 0.3), rgba(245, 158, 11, 0.3))' : 'rgba(255, 255, 255, 0.04)',
+                      border: (placementHubSubTab === 'recruiters') ? '1px solid #fbbf24' : '1px solid rgba(255, 255, 255, 0.08)',
+                      borderRadius: '8px',
+                      color: (placementHubSubTab === 'recruiters') ? '#FFFFFF' : '#94A3B8',
+                      fontWeight: 700,
+                      fontSize: '13px',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <span>🔑</span>
+                    <span>Recruiter Accounts &amp; Temporary Logins</span>
+                  </button>
                 </div>
               </div>
 
-              {(placementHubSubTab === 'drives' || activeTab === 'company-drives') ? (
+              {placementHubSubTab === 'recruiters' ? (
+                <RecruiterCredentialsManager />
+              ) : (placementHubSubTab === 'drives' || activeTab === 'company-drives') ? (
                 <CompanyPlacementManager />
               ) : (
                 <div className="admin-split-layout">
