@@ -1257,7 +1257,7 @@ const Dashboard = () => {
                     className="btn btn-primary btn-sm"
                     onClick={() => navigate('/jobs')}
                   >
-                    Explore Job Board ↗
+                    Explore Drives &amp; Job Board ↗
                   </button>
                 </div>
               </div>

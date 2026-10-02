@@ -80,6 +80,7 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
   const [jobTargetBatches, setJobTargetBatches] = useState(['All']);
   const [jobTargetBranches, setJobTargetBranches] = useState(['All']);
   const [submittingJob, setSubmittingJob] = useState(false);
+  const [placementHubSubTab, setPlacementHubSubTab] = useState('drives');
 
   // Admin creation form states
   const [adminName, setAdminName] = useState('');
@@ -3494,13 +3495,13 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
             📊 Candidate Analytics
           </button>
           <button
-            className={`admin-tab-btn ${activeTab === 'job-opportunities' || activeTab === 'jobs' || activeTab === 'job-postings' ? 'active' : ''}`}
+            className={`admin-tab-btn ${activeTab === 'job-opportunities' || activeTab === 'jobs' || activeTab === 'job-postings' || activeTab === 'company-drives' ? 'active' : ''}`}
             onClick={() => {
               setActiveTab('job-opportunities');
               fetchJobs();
             }}
           >
-            💼 Job Opportunities
+            💼 Placement Drives &amp; Jobs
           </button>
           <button
             className={`admin-tab-btn ${activeTab === 'applied-jobs' || activeTab === 'job-applications' ? 'active' : ''}`}
@@ -3510,13 +3511,7 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
               fetchApplicationsReport();
             }}
           >
-            📋 Applied Jobs Report
-          </button>
-          <button
-            className={`admin-tab-btn ${activeTab === 'company-drives' ? 'active' : ''}`}
-            onClick={() => setActiveTab('company-drives')}
-          >
-            🏢 Company Drives &amp; PMS
+            📋 Candidate Applications Report
           </button>
           <button
             className={`admin-tab-btn ${activeTab === 'at-risk' ? 'active' : ''}`}
@@ -3750,23 +3745,25 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
         }
 
         {
-          (activeTab === 'job-opportunities' || activeTab === 'jobs' || activeTab === 'job-postings') && (
+          (activeTab === 'job-opportunities' || activeTab === 'jobs' || activeTab === 'job-postings' || activeTab === 'company-drives') && (
             <div className="job-opportunities-management-wrapper animate-fade">
               {/* Header / Intro Card */}
-              <div className="glass-card" style={{ marginBottom: '24px' }}>
+              <div className="glass-card" style={{ marginBottom: '20px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
                   <div>
-                    <h3 style={{ margin: '0 0 6px 0' }}>💼 Job Opportunities & Placement Drives</h3>
+                    <h3 style={{ margin: '0 0 6px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span>💼</span> Placement Drives &amp; Job Board Hub
+                    </h3>
                     <p className="card-desc" style={{ margin: 0 }}>
-                      Publish job opportunities that notify matching students, manage application deadlines, and monitor posted listings.
+                      Manage on-campus placement drives (PMS), student registrations, eligibility criteria, and off-campus job opportunities in one unified hub.
                     </p>
                   </div>
-                  <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
                     <span className="badge" style={{ backgroundColor: 'rgba(99, 102, 241, 0.15)', color: '#818cf8', border: '1px solid rgba(99, 102, 241, 0.3)', padding: '6px 14px', borderRadius: '6px', fontSize: '13px', fontWeight: 600 }}>
-                      {jobs.length} Active Job Listings
+                      {jobs.length} Off-Campus Listings
                     </span>
                     <button type="button" className="btn btn-secondary btn-sm" onClick={fetchJobs} title="Refresh Jobs">
-                      🔄 Refresh Listings
+                      🔄 Refresh
                     </button>
                     <button
                       type="button"
@@ -3781,9 +3778,63 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
                     </button>
                   </div>
                 </div>
+
+                {/* Sub-Tab Navigation Switcher */}
+                <div style={{ display: 'flex', gap: '10px', marginTop: '16px', borderTop: '1px solid rgba(255, 255, 255, 0.08)', paddingTop: '14px', flexWrap: 'wrap' }}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPlacementHubSubTab('drives');
+                      setActiveTab('job-opportunities');
+                    }}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      padding: '8px 18px',
+                      background: (placementHubSubTab === 'drives' || activeTab === 'company-drives') ? 'linear-gradient(135deg, rgba(168, 85, 247, 0.3), rgba(99, 102, 241, 0.3))' : 'rgba(255, 255, 255, 0.04)',
+                      border: (placementHubSubTab === 'drives' || activeTab === 'company-drives') ? '1px solid #c084fc' : '1px solid rgba(255, 255, 255, 0.08)',
+                      borderRadius: '8px',
+                      color: (placementHubSubTab === 'drives' || activeTab === 'company-drives') ? '#FFFFFF' : '#94A3B8',
+                      fontWeight: 700,
+                      fontSize: '13px',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <span>🏢</span>
+                    <span>Campus Placement Drives (PMS)</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPlacementHubSubTab('postings');
+                      setActiveTab('job-opportunities');
+                      fetchJobs();
+                    }}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      padding: '8px 18px',
+                      background: (placementHubSubTab === 'postings' && activeTab !== 'company-drives') ? 'linear-gradient(135deg, rgba(56, 189, 248, 0.3), rgba(99, 102, 241, 0.3))' : 'rgba(255, 255, 255, 0.04)',
+                      border: (placementHubSubTab === 'postings' && activeTab !== 'company-drives') ? '1px solid #38bdf8' : '1px solid rgba(255, 255, 255, 0.08)',
+                      borderRadius: '8px',
+                      color: (placementHubSubTab === 'postings' && activeTab !== 'company-drives') ? '#FFFFFF' : '#94A3B8',
+                      fontWeight: 700,
+                      fontSize: '13px',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <span>💼</span>
+                    <span>Job Postings &amp; Listings ({jobs.length})</span>
+                  </button>
+                </div>
               </div>
 
-              <div className="admin-split-layout">
+              {(placementHubSubTab === 'drives' || activeTab === 'company-drives') ? (
+                <CompanyPlacementManager />
+              ) : (
+                <div className="admin-split-layout">
                 {/* Admin Panels Left Column: Posted Job Listings (Image 2) */}
                 <div className="admin-left-column" style={{ display: 'flex', flexDirection: 'column', gap: '24px', minWidth: 0 }}>
                   <div className="glass-card posted-jobs-card">
@@ -4231,15 +4282,10 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
                   </div>
                 </div>
               </div>
-            </div>
-          )
-        }
-
-        {
-          activeTab === 'company-drives' && (
-            <CompanyPlacementManager />
-          )
-        }
+            )}
+          </div>
+        )
+      }
 
         {
           activeTab === 'at-risk' && (

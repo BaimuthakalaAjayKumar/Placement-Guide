@@ -155,7 +155,7 @@ const Sidebar = () => {
 
             <NavLink to="/jobs" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
               <svg viewBox="0 0 24 24" className="nav-icon"><rect x="2" y="7" width="20" height="14" rx="2" ry="2" /><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" /></svg>
-              <span>Job Board</span>
+              <span>Placement Drives &amp; Job Board</span>
             </NavLink>
           </>
         )}
@@ -216,7 +216,7 @@ const Sidebar = () => {
                 <rect x="2" y="7" width="20" height="14" rx="2" ry="2" />
                 <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" />
               </svg>
-              <span>Job Opportunities</span>
+              <span>Placement Drives &amp; Jobs</span>
             </NavLink>
 
             <NavLink to="/applied-jobs-report" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
