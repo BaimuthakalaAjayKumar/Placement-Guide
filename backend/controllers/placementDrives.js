@@ -115,12 +115,22 @@ exports.getDrives = async (req, res, next) => {
       });
     }
 
-    // For faculty and admin, return drives with aggregate candidate counts
+    // For faculty and admin, return drives with aggregate candidate counts & compatibility aliases
     const formatted = drives.map(d => {
       const dObj = d.toObject();
       const apps = dObj.applications || [];
+      const candidatesList = apps.map(a => ({
+        ...a,
+        stage: a.currentStage || 'applied'
+      }));
       return {
         ...dObj,
+        driveTitle: dObj.title,
+        packageLPA: dObj.packageDetails,
+        description: dObj.jobDescription,
+        deadline: dObj.dates?.registrationDeadline,
+        driveDate: dObj.dates?.driveDate,
+        candidates: candidatesList,
         totalApplicants: apps.length,
         shortlistedCount: apps.filter(a => ['shortlisted', 'online_test_cleared', 'interview_round_1', 'interview_round_2', 'hr_round', 'selected'].includes(a.currentStage)).length,
         selectedCount: apps.filter(a => a.currentStage === 'selected').length
@@ -153,9 +163,23 @@ exports.getDriveById = async (req, res, next) => {
       matchAnalysis = calculateDriveMatch(student, drive);
     }
 
+    const dObj = drive.toObject();
+    const formattedDrive = {
+      ...dObj,
+      driveTitle: dObj.title,
+      packageLPA: dObj.packageDetails,
+      description: dObj.jobDescription,
+      deadline: dObj.dates?.registrationDeadline,
+      driveDate: dObj.dates?.driveDate,
+      candidates: (dObj.applications || []).map(a => ({
+        ...a,
+        stage: a.currentStage || 'applied'
+      }))
+    };
+
     res.status(200).json({
       success: true,
-      data: drive,
+      data: formattedDrive,
       matchAnalysis
     });
   } catch (err) {
@@ -168,12 +192,102 @@ exports.getDriveById = async (req, res, next) => {
 // @access  Private (Admin only)
 exports.createDrive = async (req, res, next) => {
   try {
+    const b = req.body;
+    const title = (b.title || b.driveTitle || `${b.companyName || 'Campus'} Recruitment Drive`).trim();
+    const packageDetails = (
+      b.packageDetails ||
+      (b.packageLPA
+        ? (String(b.packageLPA).toUpperCase().includes('LPA') ? String(b.packageLPA) : `${b.packageLPA} LPA`)
+        : 'Competitive Package')
+    ).trim();
+    const jobDescription = (
+      b.jobDescription ||
+      b.description ||
+      `${b.companyName || 'Recruiter'} is hiring for ${b.role || 'Software Engineer'} with CTC package of ${packageDetails}. Eligible candidates should apply before the registration deadline.`
+    ).trim();
+
+    // Deadlines normalization
+    const regDeadline = b.dates?.registrationDeadline || b.deadline || b.registrationDeadline || new Date(Date.now() + 7 * 86400000);
+    const driveDt = b.dates?.driveDate || b.driveDate || new Date(Date.now() + 10 * 86400000);
+
+    // Skills normalization
+    let skillsArr = b.skillsRequired || b.requiredSkills || [];
+    if (typeof skillsArr === 'string') {
+      skillsArr = skillsArr.split(',').map(s => s.trim()).filter(Boolean);
+    }
+
+    // Eligibility normalization
+    const minCgpa = Number(b.eligibility?.minCgpa) || 6.5;
+    const maxActiveBacklogs = Number(b.eligibility?.maxActiveBacklogs ?? b.eligibility?.maxBacklogs ?? 0);
+    let allowedBranches = b.eligibility?.allowedBranches || ['CSE', 'IT', 'CSIT', 'AIML', 'AIDS', 'ECE', 'EEE'];
+    if (typeof allowedBranches === 'string') {
+      allowedBranches = allowedBranches.split(',').map(s => s.trim()).filter(Boolean);
+    }
+    let allowedBatches = b.eligibility?.allowedBatches || ['2026', '2025', '4th Year', '3rd Year'];
+    if (typeof allowedBatches === 'string') {
+      allowedBatches = allowedBatches.split(',').map(s => s.trim()).filter(Boolean);
+    }
+
     const driveData = {
-      ...req.body,
+      companyName: (b.companyName || 'Campus Recruiter').trim(),
+      companyLogo: b.companyLogo || '',
+      companyWebsite: b.companyWebsite || '',
+      tier: b.tier || 'Dream (6-10 LPA)',
+      title,
+      role: (b.role || 'Software Engineer').trim(),
+      packageDetails,
+      location: (b.location || 'Hyderabad / Pan India').trim(),
+      jobDescription,
+      skillsRequired: skillsArr,
+      eligibility: {
+        minCgpa,
+        maxActiveBacklogs,
+        allowedBranches: allowedBranches.length > 0 ? allowedBranches : ['CSE', 'IT', 'ECE'],
+        allowedBatches: allowedBatches.length > 0 ? allowedBatches : ['2025', '2026'],
+        min10thPercentage: Number(b.eligibility?.min10thPercentage) || 60,
+        min12thPercentage: Number(b.eligibility?.min12thPercentage) || 60
+      },
+      dates: {
+        registrationDeadline: new Date(regDeadline),
+        driveDate: new Date(driveDt),
+        onlineTestDate: b.dates?.onlineTestDate ? new Date(b.dates.onlineTestDate) : undefined,
+        interviewStartDate: b.dates?.interviewStartDate ? new Date(b.dates.interviewStartDate) : undefined
+      },
+      status: b.status || 'applications_open',
+      driveStages: b.driveStages || ['Online Application', 'Aptitude & Coding Test', 'Technical Interview', 'HR Interview', 'Final Selection'],
       createdBy: req.user.id
     };
 
     const drive = await PlacementDrive.create(driveData);
+
+    // Auto-sync into Placement Calendar as a company drive event!
+    try {
+      const PlacementEvent = require('../models/PlacementEvent');
+      await PlacementEvent.create({
+        title: `${drive.companyName}: ${drive.role} Campus Drive`,
+        description: `Package: ${drive.packageDetails} | Reg Deadline: ${new Date(drive.dates.registrationDeadline).toLocaleDateString()} | ${drive.jobDescription.slice(0, 140)}...`,
+        eventType: 'company_drive',
+        colorTag: 'purple',
+        startDateTime: new Date(drive.dates.driveDate || drive.dates.registrationDeadline),
+        endDateTime: new Date(new Date(drive.dates.driveDate || drive.dates.registrationDeadline).getTime() + 4 * 3600000),
+        venueOrLink: drive.location || 'Campus Placement Cell',
+        instructorOrCompany: drive.companyName,
+        creatorRole: 'admin',
+        creatorName: req.user.name || 'Main Admin (TPO Cell)',
+        visibility: 'public',
+        isVisibleToStudents: true,
+        priority: 'high',
+        targetAudience: {
+          roles: ['student', 'faculty', 'admin'],
+          branches: drive.eligibility?.allowedBranches || ['All'],
+          batches: drive.eligibility?.allowedBatches || ['All']
+        },
+        relatedDrive: drive._id,
+        createdBy: req.user.id
+      });
+    } catch (calSyncErr) {
+      console.warn('Could not auto-sync placement drive to calendar:', calSyncErr.message);
+    }
 
     // Broadcast notification to eligible students
     const targetBranches = drive.eligibility?.allowedBranches || [];
@@ -291,7 +405,10 @@ exports.updateCandidateStage = async (req, res, next) => {
       return res.status(404).json({ success: false, error: 'Placement drive not found' });
     }
 
-    const candidateApp = drive.applications.find(a => String(a.student) === String(req.params.studentId));
+    const targetId = req.params.studentId || req.body.candidateId || req.body.studentId;
+    const candidateApp = drive.applications.find(a => 
+      String(a.student) === String(targetId) || String(a._id) === String(targetId)
+    );
     if (!candidateApp) {
       return res.status(404).json({ success: false, error: 'Candidate application not found' });
     }

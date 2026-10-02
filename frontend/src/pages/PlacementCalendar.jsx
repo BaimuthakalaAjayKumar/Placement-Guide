@@ -24,176 +24,273 @@ const MONTH_NAMES = [
   'July', 'August', 'September', 'October', 'November', 'December'
 ];
 
-// Clean, realistic fallback placement events matching Screenshot 1
-const REALISTIC_FALLBACK_EVENTS = [
-  {
-    _id: 'seed-drive-1',
-    title: 'TCS National Qualifier Drive',
-    description: 'Campus placement drive for 2026 graduating batch across all engineering disciplines.',
-    eventType: 'company_drive',
-    colorTag: 'purple',
-    startDateTime: '2026-09-05T09:30:00.000Z',
-    endDateTime: '2026-09-05T17:30:00.000Z',
-    venueOrLink: 'GRIET Auditorium / Online Portal',
-    instructorOrCompany: 'Tata Consultancy Services',
-    creatorRole: 'admin',
-    creatorName: 'Main Admin',
-    visibility: 'public',
-    isVisibleToStudents: true,
-    priority: 'high',
-    targetAudience: { roles: ['student', 'faculty', 'admin'], branches: ['All'] }
-  },
-  {
-    _id: 'seed-task-1',
-    title: 'Admin Task: Mandatory ATS Resume Clearance',
-    description: 'Mandatory profile verification and ATS resume submission for Tier-1 recruitment.',
-    eventType: 'admin_task',
-    colorTag: 'gold',
-    startDateTime: '2026-09-07T10:00:00.000Z',
-    endDateTime: '2026-09-07T18:00:00.000Z',
-    venueOrLink: 'Placement Portal Dashboard',
-    instructorOrCompany: 'TPO Verification Cell',
-    creatorRole: 'admin',
-    creatorName: 'Main Admin (TPO)',
-    visibility: 'students',
-    isVisibleToStudents: true,
-    priority: 'urgent',
-    targetAudience: { roles: ['student'], branches: ['All'] }
-  },
-  {
-    _id: 'seed-train-1',
-    title: 'DSA & Dynamic Programming Workshop',
-    description: 'Hands-on intensive masterclass on advanced DP and Graph interview patterns.',
-    eventType: 'training',
-    colorTag: 'green',
-    startDateTime: '2026-09-08T14:00:00.000Z',
-    endDateTime: '2026-09-08T16:30:00.000Z',
-    venueOrLink: 'Seminar Hall 3 & Zoom',
-    instructorOrCompany: 'Prof. Ramesh (Algorithms Coach)',
-    creatorRole: 'faculty',
-    creatorName: 'Prof. Ramesh',
-    visibility: 'students',
-    isVisibleToStudents: true,
-    priority: 'medium',
-    targetAudience: { roles: ['student', 'faculty'], branches: ['CSE', 'IT', 'CSIT', 'AIML'] }
-  },
-  {
-    _id: 'seed-test-1',
-    title: 'Institutional Aptitude & Reasoning Mock Test',
-    description: 'Timed assessment covering quantitative aptitude, logical reasoning, and verbal ability.',
-    eventType: 'aptitude_test',
-    colorTag: 'orange',
-    startDateTime: '2026-09-12T10:00:00.000Z',
-    endDateTime: '2026-09-12T11:30:00.000Z',
-    venueOrLink: 'Online Assessment Engine',
-    instructorOrCompany: 'TPO Assessment Cell',
-    creatorRole: 'admin',
-    creatorName: 'Main Admin',
-    visibility: 'students',
-    isVisibleToStudents: true,
-    priority: 'high',
-    targetAudience: { roles: ['student'], branches: ['All'] }
-  },
-  {
-    _id: 'seed-mock-1',
-    title: 'Google & Microsoft Mock Interview Rounds',
-    description: 'Simulated 1-on-1 technical and behavioral rounds with industry mentors and senior faculty.',
-    eventType: 'mock_interview',
-    colorTag: 'blue',
-    startDateTime: '2026-09-15T11:00:00.000Z',
-    endDateTime: '2026-09-15T16:00:00.000Z',
-    venueOrLink: 'Interview Rooms 1-4 & Google Meet',
-    instructorOrCompany: 'Dr. Madhuri & Alumni Mentors',
-    creatorRole: 'faculty',
-    creatorName: 'Dr. Madhuri (Faculty Coordinator)',
-    visibility: 'students',
-    isVisibleToStudents: true,
-    priority: 'high',
-    targetAudience: { roles: ['student', 'faculty'], branches: ['All'] }
-  },
-  {
-    _id: 'seed-dead-1',
-    title: 'Infosys & Accenture Registration Cutoff',
-    description: 'Strict cutoff for profile verification, resume upload, and consent submission on portal.',
-    eventType: 'deadline',
-    colorTag: 'red',
-    startDateTime: '2026-09-18T23:59:00.000Z',
-    endDateTime: '2026-09-18T23:59:00.000Z',
-    allDay: true,
-    venueOrLink: 'Placement Portal',
-    instructorOrCompany: 'Placement Cell',
-    creatorRole: 'admin',
-    creatorName: 'Main Admin',
-    visibility: 'public',
-    isVisibleToStudents: true,
-    priority: 'urgent',
-    targetAudience: { roles: ['student', 'admin'], branches: ['All'] }
-  },
-  {
-    _id: 'seed-work-1',
-    title: 'Full-Stack System Design & Cloud Workshop',
-    description: 'Architecting scalable microservices with Docker, Node.js, and AWS architecture basics.',
-    eventType: 'workshop',
-    colorTag: 'yellow',
-    startDateTime: '2026-09-22T13:00:00.000Z',
-    endDateTime: '2026-09-22T17:00:00.000Z',
-    venueOrLink: 'Lab 502 & Live Stream',
-    instructorOrCompany: 'Cloud Solutions Architect Guest Speaker',
-    creatorRole: 'faculty',
-    creatorName: 'Prof. K. Reddy',
-    visibility: 'students',
-    isVisibleToStudents: true,
-    priority: 'medium',
-    targetAudience: { roles: ['student', 'faculty'], branches: ['CSE', 'IT', 'CSIT'] }
-  },
-  {
-    _id: 'seed-drive-2',
-    title: 'Deloitte Tech Assessment Drive',
-    description: 'Online test for Associate Software Engineer and Risk Advisory campus roles.',
-    eventType: 'company_drive',
-    colorTag: 'purple',
-    startDateTime: '2026-09-26T10:00:00.000Z',
-    endDateTime: '2026-09-26T13:00:00.000Z',
-    venueOrLink: 'Central Computing Lab',
-    instructorOrCompany: 'Deloitte India',
-    creatorRole: 'admin',
-    creatorName: 'Main Admin',
-    visibility: 'public',
-    isVisibleToStudents: true,
-    priority: 'high',
-    targetAudience: { roles: ['student', 'faculty', 'admin'], branches: ['All'] }
-  }
-];
+// Dynamic, realistic fallback placement events anchoring around today's live date
+const generateRealisticEvents = () => {
+  const now = new Date();
+  const yr = now.getFullYear();
+  const mo = now.getMonth();
+  const day = now.getDate();
+
+  return [
+    {
+      _id: 'seed-task-today',
+      title: 'TPO Placement Cell: ATS Profile & Resume Clearance',
+      description: 'Mandatory profile verification and ATS resume submission for upcoming tier-1 recruitment drives.',
+      eventType: 'admin_task',
+      colorTag: 'gold',
+      startDateTime: new Date(yr, mo, day, 10, 0).toISOString(),
+      endDateTime: new Date(yr, mo, day, 18, 0).toISOString(),
+      venueOrLink: 'Placement Portal Dashboard',
+      instructorOrCompany: 'Main Admin (TPO Cell)',
+      creatorRole: 'admin',
+      creatorName: 'Main Admin (TPO)',
+      visibility: 'public',
+      isVisibleToStudents: true,
+      priority: 'urgent',
+      targetAudience: { roles: ['student', 'faculty', 'admin'], branches: ['All'] }
+    },
+    {
+      _id: 'seed-drive-1',
+      title: 'TCS National Qualifier Campus Drive',
+      description: 'Campus placement drive for 2026 graduating batch across all engineering disciplines.',
+      eventType: 'company_drive',
+      colorTag: 'purple',
+      startDateTime: new Date(yr, mo, day + 2, 9, 30).toISOString(),
+      endDateTime: new Date(yr, mo, day + 2, 17, 30).toISOString(),
+      venueOrLink: 'GRIET Auditorium / Online Portal',
+      instructorOrCompany: 'Tata Consultancy Services',
+      creatorRole: 'admin',
+      creatorName: 'Main Admin',
+      visibility: 'public',
+      isVisibleToStudents: true,
+      priority: 'high',
+      targetAudience: { roles: ['student', 'faculty', 'admin'], branches: ['All'] }
+    },
+    {
+      _id: 'seed-train-1',
+      title: 'DSA & Dynamic Programming Masterclass',
+      description: 'Hands-on intensive masterclass on advanced DP and Graph interview patterns with senior algorithms coach.',
+      eventType: 'training',
+      colorTag: 'green',
+      startDateTime: new Date(yr, mo, day + 4, 14, 0).toISOString(),
+      endDateTime: new Date(yr, mo, day + 4, 16, 30).toISOString(),
+      venueOrLink: 'Seminar Hall 3 & Zoom',
+      instructorOrCompany: 'Prof. Ramesh (Algorithms Coach)',
+      creatorRole: 'faculty',
+      creatorName: 'Prof. Ramesh (Faculty Coordinator)',
+      visibility: 'students',
+      isVisibleToStudents: true,
+      priority: 'medium',
+      targetAudience: { roles: ['student', 'faculty'], branches: ['CSE', 'IT', 'CSIT', 'AIML'] }
+    },
+    {
+      _id: 'seed-test-1',
+      title: 'Institutional Aptitude & Reasoning Mock Test',
+      description: 'Timed assessment covering quantitative aptitude, logical reasoning, and verbal ability.',
+      eventType: 'aptitude_test',
+      colorTag: 'orange',
+      startDateTime: new Date(yr, mo, day + 6, 10, 0).toISOString(),
+      endDateTime: new Date(yr, mo, day + 6, 11, 30).toISOString(),
+      venueOrLink: 'Online Assessment Engine',
+      instructorOrCompany: 'TPO Assessment Cell',
+      creatorRole: 'admin',
+      creatorName: 'Main Admin',
+      visibility: 'students',
+      isVisibleToStudents: true,
+      priority: 'high',
+      targetAudience: { roles: ['student'], branches: ['All'] }
+    },
+    {
+      _id: 'seed-mock-1',
+      title: 'Google & Microsoft Mock Interview Rounds',
+      description: 'Simulated 1-on-1 technical and behavioral rounds with industry mentors and senior faculty.',
+      eventType: 'mock_interview',
+      colorTag: 'blue',
+      startDateTime: new Date(yr, mo, day + 8, 11, 0).toISOString(),
+      endDateTime: new Date(yr, mo, day + 8, 16, 0).toISOString(),
+      venueOrLink: 'Interview Rooms 1-4 & Google Meet',
+      instructorOrCompany: 'Dr. Madhuri & Alumni Mentors',
+      creatorRole: 'faculty',
+      creatorName: 'Dr. Madhuri (Faculty Coordinator)',
+      visibility: 'students',
+      isVisibleToStudents: true,
+      priority: 'high',
+      targetAudience: { roles: ['student', 'faculty'], branches: ['All'] }
+    },
+    {
+      _id: 'seed-dead-1',
+      title: 'Infosys & Accenture Registration Cutoff',
+      description: 'Strict cutoff for profile verification, resume upload, and consent submission on portal.',
+      eventType: 'deadline',
+      colorTag: 'red',
+      startDateTime: new Date(yr, mo, day + 11, 23, 59).toISOString(),
+      endDateTime: new Date(yr, mo, day + 11, 23, 59).toISOString(),
+      allDay: true,
+      venueOrLink: 'Placement Portal',
+      instructorOrCompany: 'Placement Cell',
+      creatorRole: 'admin',
+      creatorName: 'Main Admin',
+      visibility: 'public',
+      isVisibleToStudents: true,
+      priority: 'urgent',
+      targetAudience: { roles: ['student', 'admin'], branches: ['All'] }
+    },
+    {
+      _id: 'seed-work-1',
+      title: 'Full-Stack System Design & Cloud Workshop',
+      description: 'Architecting scalable microservices with Docker, Node.js, and AWS architecture basics.',
+      eventType: 'workshop',
+      colorTag: 'yellow',
+      startDateTime: new Date(yr, mo, day + 14, 13, 0).toISOString(),
+      endDateTime: new Date(yr, mo, day + 14, 17, 0).toISOString(),
+      venueOrLink: 'Lab 502 & Live Stream',
+      instructorOrCompany: 'Cloud Solutions Architect Guest Speaker',
+      creatorRole: 'faculty',
+      creatorName: 'Prof. K. Reddy (Faculty)',
+      visibility: 'students',
+      isVisibleToStudents: true,
+      priority: 'medium',
+      targetAudience: { roles: ['student', 'faculty'], branches: ['CSE', 'IT', 'CSIT'] }
+    },
+    {
+      _id: 'seed-drive-2',
+      title: 'Deloitte Tech Assessment Drive',
+      description: 'Online test for Associate Software Engineer and Risk Advisory campus roles.',
+      eventType: 'company_drive',
+      colorTag: 'purple',
+      startDateTime: new Date(yr, mo, day + 18, 10, 0).toISOString(),
+      endDateTime: new Date(yr, mo, day + 18, 13, 0).toISOString(),
+      venueOrLink: 'Central Computing Lab',
+      instructorOrCompany: 'Deloitte India',
+      creatorRole: 'admin',
+      creatorName: 'Main Admin',
+      visibility: 'public',
+      isVisibleToStudents: true,
+      priority: 'high',
+      targetAudience: { roles: ['student', 'faculty', 'admin'], branches: ['All'] }
+    }
+  ];
+};
 
 const PlacementCalendar = () => {
   const { user, token } = useAuth();
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [currentDate, setCurrentDate] = useState(new Date(2026, 8, 30)); // 2026 / 9 (Sept 30, 2026)
+  const [currentDate, setCurrentDate] = useState(new Date()); // Live real-time current date
   const [selectedFilter, setSelectedFilter] = useState('all');
+  const [creatorScopeFilter, setCreatorScopeFilter] = useState('all'); // 'all' | 'admin' | 'faculty' | 'personal' | 'pinned'
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedDayEvents, setSelectedDayEvents] = useState(null);
   const [selectedEventModal, setSelectedEventModal] = useState(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showQuickMenu, setShowQuickMenu] = useState(false);
   const [viewMode, setViewMode] = useState('month'); // 'month' | 'agenda' | 'week' | 'day' | 'year'
+  const [agendaLayout, setAgendaLayout] = useState('grid'); // 'grid' | 'timeline'
+  const [notificationToast, setNotificationToast] = useState('');
+
   const userRole = user?.role || 'student';
   const isStudent = userRole === 'student';
   const isFaculty = userRole === 'faculty';
   const isAdmin = userRole === 'admin';
+  const userId = user?._id || user?.id || 'guest';
 
-  // New Event Form State
+  // Pinned Everyday Schedule State (persisted per user)
+  const storageKeyPinned = `pinned_calendar_events_${userId}`;
+  const [pinnedIds, setPinnedIds] = useState(() => {
+    try {
+      const saved = localStorage.getItem(storageKeyPinned);
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  // Daily Tasks Completion State (persisted per user for today)
+  const todayDateStr = new Date().toISOString().slice(0, 10);
+  const storageKeyCompleted = `daily_completed_tasks_${userId}_${todayDateStr}`;
+  const [completedTaskIds, setCompletedTaskIds] = useState(() => {
+    try {
+      const saved = localStorage.getItem(storageKeyCompleted);
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  // Toggle Pin on an event
+  const togglePinEvent = (eventId, e) => {
+    if (e) e.stopPropagation();
+    sfx.playClick();
+    setPinnedIds(prev => {
+      const isPinned = prev.includes(eventId);
+      const next = isPinned ? prev.filter(id => id !== eventId) : [...prev, eventId];
+      try {
+        localStorage.setItem(storageKeyPinned, JSON.stringify(next));
+      } catch {}
+      setNotificationToast(isPinned ? '📍 Unpinned from Everyday Schedule' : '📌 Pinned to Everyday Schedule!');
+      setTimeout(() => setNotificationToast(''), 3000);
+      return next;
+    });
+  };
+
+  // Toggle task complete for today
+  const toggleTaskCompleted = (taskId, e) => {
+    if (e) e.stopPropagation();
+    setCompletedTaskIds(prev => {
+      const isDone = prev.includes(taskId);
+      const next = isDone ? prev.filter(id => id !== taskId) : [...prev, taskId];
+      if (!isDone) {
+        sfx.playSuccess();
+      } else {
+        sfx.playClick();
+      }
+      try {
+        localStorage.setItem(storageKeyCompleted, JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+  };
+
+  // Trigger browser & in-app notification reminder for everyday tasks
+  const triggerEverydayTasksNotification = () => {
+    sfx.playSuccess();
+    const count = todayPinnedOrScheduled.length;
+    const title = 'Placement Calendar — Everyday Tasks Reminder';
+    const body = count > 0
+      ? `You have ${count} placement task(s) and milestone(s) on your daily schedule today!`
+      : 'Your daily placement schedule is clean! Check out upcoming drives and training workshops.';
+
+    if ('Notification' in window) {
+      if (Notification.permission === 'granted') {
+        new Notification(title, { body, icon: '/favicon.ico' });
+      } else if (Notification.permission !== 'denied') {
+        Notification.requestPermission().then(permission => {
+          if (permission === 'granted') {
+            new Notification(title, { body, icon: '/favicon.ico' });
+          }
+        });
+      }
+    }
+
+    setNotificationToast(`🔔 Everyday Tasks Alert: You have ${count} task(s) on your schedule today!`);
+    setTimeout(() => setNotificationToast(''), 4500);
+  };
+
+  // New Event Form State with Audience Scope
   const [newEvent, setNewEvent] = useState({
     title: '',
     description: '',
-    eventType: isStudent ? 'personal_task' : isFaculty ? 'faculty_task' : 'admin_task',
+    audienceScope: isStudent ? 'personal' : 'students', // 'personal' | 'students'
+    isForPersonal: isStudent ? true : false,
+    eventType: isStudent ? 'personal_task' : isFaculty ? 'faculty_task' : 'company_drive',
     startDate: new Date().toISOString().slice(0, 10),
     startTime: '10:00',
     endDate: new Date().toISOString().slice(0, 10),
     endTime: '12:00',
-    venueOrLink: 'GRIET Placement Cell / Online',
-    instructorOrCompany: isFaculty ? (user?.name || 'Faculty Coordinator') : isAdmin ? 'Main Admin (TPO)' : '',
+    venueOrLink: isStudent ? 'Personal Desk / Online' : 'GRIET Placement Cell / Online',
+    instructorOrCompany: isFaculty ? (user?.name || 'Faculty Coordinator') : isAdmin ? 'Main Admin (TPO)' : (user?.name || 'Self'),
     targetRoles: isStudent ? ['student'] : ['student', 'faculty', 'admin'],
+    targetBranches: ['All'],
     allDay: false,
     isVisibleToStudents: isStudent ? false : true,
     priority: 'medium'
@@ -211,10 +308,10 @@ const PlacementCalendar = () => {
       if (selectedFilter !== 'all') url += `?eventType=${selectedFilter}`;
       const res = await axios.get(url, getAuthHeaders());
       const fetched = res.data?.data || [];
-      setEvents(fetched.length > 0 ? fetched : REALISTIC_FALLBACK_EVENTS);
+      setEvents(fetched.length > 0 ? fetched : generateRealisticEvents());
     } catch (err) {
       console.warn('Using seeded events as fallback', err);
-      setEvents(REALISTIC_FALLBACK_EVENTS);
+      setEvents(generateRealisticEvents());
     } finally {
       setLoading(false);
     }
@@ -238,7 +335,7 @@ const PlacementCalendar = () => {
   };
 
   const handleToday = () => {
-    setCurrentDate(new Date(2026, 8, 30));
+    setCurrentDate(new Date());
     setSelectedDayEvents(null);
   };
 
@@ -246,18 +343,16 @@ const PlacementCalendar = () => {
   const firstDayOfMonth = new Date(year, month, 1).getDay(); // 0 is Sun, 1 is Mon, 2 is Tue ...
   const daysInMonth = new Date(year, month + 1, 0).getDate();
 
-  // Exactly calculate rows needed (e.g. 5 rows for Sept 2026)
-  const leadingBlanks = firstDayOfMonth; // e.g., 2 blanks for Tuesday
+  // Exactly calculate rows needed
+  const leadingBlanks = firstDayOfMonth;
   const totalSlots = Math.ceil((leadingBlanks + daysInMonth) / 7) * 7;
   const trailingBlanks = totalSlots - (leadingBlanks + daysInMonth);
 
   const monthGridCells = useMemo(() => {
     const cells = [];
-    // Leading blank slots (SUN, MON empty when month starts on TUE)
     for (let i = 0; i < leadingBlanks; i++) {
       cells.push({ isBlank: true, key: `lead-${i}` });
     }
-    // Days of the month (1 .. daysInMonth)
     for (let d = 1; d <= daysInMonth; d++) {
       const dateObj = new Date(year, month, d);
       cells.push({
@@ -268,24 +363,75 @@ const PlacementCalendar = () => {
         key: `day-${d}`
       });
     }
-    // Trailing blank slots
     for (let i = 0; i < trailingBlanks; i++) {
       cells.push({ isBlank: true, key: `trail-${i}` });
     }
     return cells;
   }, [year, month, leadingBlanks, daysInMonth, trailingBlanks]);
 
-  // Filtered Events
+  // Dynamic 7-day Week Generation
+  const activeWeekDays = useMemo(() => {
+    const curr = new Date(currentDate);
+    const dayOfWeek = curr.getDay();
+    const sunday = new Date(curr);
+    sunday.setDate(curr.getDate() - dayOfWeek);
+    return Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(sunday);
+      d.setDate(sunday.getDate() + i);
+      return d;
+    });
+  }, [currentDate]);
+
+  // Filtered Events with Category, Scope (Admin, Faculty, Personal, Pinned), and Search
   const filteredEvents = useMemo(() => {
     return events.filter(ev => {
       const matchesCategory = selectedFilter === 'all' || ev.eventType === selectedFilter;
+
+      let matchesScope = true;
+      if (creatorScopeFilter === 'admin') {
+        matchesScope = ev.creatorRole === 'admin';
+      } else if (creatorScopeFilter === 'faculty') {
+        matchesScope = ev.creatorRole === 'faculty';
+      } else if (creatorScopeFilter === 'personal') {
+        matchesScope = String(ev.createdBy) === String(userId) || ev.creatorRole === 'student' || ev.eventType === 'personal_task';
+      } else if (creatorScopeFilter === 'pinned') {
+        matchesScope = pinnedIds.includes(ev._id);
+      }
+
       const matchesSearch = !searchQuery.trim() ||
         ev.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
         (ev.instructorOrCompany && ev.instructorOrCompany.toLowerCase().includes(searchQuery.toLowerCase())) ||
         (ev.venueOrLink && ev.venueOrLink.toLowerCase().includes(searchQuery.toLowerCase()));
-      return matchesCategory && matchesSearch;
+
+      return matchesCategory && matchesScope && matchesSearch;
     });
-  }, [events, selectedFilter, searchQuery]);
+  }, [events, selectedFilter, creatorScopeFilter, searchQuery, pinnedIds, userId]);
+
+  // Today's Scheduled or Pinned Tasks for the Everyday Schedule Panel
+  const todayPinnedOrScheduled = useMemo(() => {
+    const today = new Date();
+    const todayY = today.getFullYear();
+    const todayM = today.getMonth();
+    const todayD = today.getDate();
+
+    return events.filter(ev => {
+      const isPinned = pinnedIds.includes(ev._id);
+      const startDt = new Date(ev.startDateTime);
+      const isToday = startDt.getFullYear() === todayY &&
+                      startDt.getMonth() === todayM &&
+                      startDt.getDate() === todayD;
+      return isPinned || isToday;
+    });
+  }, [events, pinnedIds]);
+
+  const completedTodayCount = useMemo(() => {
+    return todayPinnedOrScheduled.filter(e => completedTaskIds.includes(e._id)).length;
+  }, [todayPinnedOrScheduled, completedTaskIds]);
+
+  const dailyProgressPercent = useMemo(() => {
+    if (todayPinnedOrScheduled.length === 0) return 0;
+    return Math.round((completedTodayCount / todayPinnedOrScheduled.length) * 100);
+  }, [completedTodayCount, todayPinnedOrScheduled]);
 
   // Get events on a specific date
   const getEventsForDate = (date) => {
@@ -311,36 +457,53 @@ const PlacementCalendar = () => {
       setCreating(true);
       const startDateTime = new Date(`${newEvent.startDate}T${newEvent.startTime || '00:00'}:00`);
       const endDateTime = new Date(`${newEvent.endDate}T${newEvent.endTime || '23:59'}:00`);
+      const isPersonal = newEvent.audienceScope === 'personal';
 
       const payload = {
         title: newEvent.title.trim(),
         description: newEvent.description.trim(),
         eventType: newEvent.eventType,
+        audienceScope: newEvent.audienceScope,
+        isForPersonal: isPersonal,
         startDateTime,
         endDateTime,
         venueOrLink: newEvent.venueOrLink.trim(),
         instructorOrCompany: newEvent.instructorOrCompany.trim(),
         allDay: newEvent.allDay,
-        targetRoles: newEvent.targetRoles,
-        isVisibleToStudents: newEvent.isVisibleToStudents,
+        targetRoles: isPersonal ? [userRole] : newEvent.targetRoles,
+        targetBranches: newEvent.targetBranches || ['All'],
+        isVisibleToStudents: isPersonal ? false : newEvent.isVisibleToStudents,
         priority: newEvent.priority
       };
 
       const res = await axios.post(`${API_URL}/placement-events`, payload, getAuthHeaders());
       sfx.playSuccess();
-      setEvents(prev => [res.data.data, ...prev]);
+      const created = res.data.data;
+      setEvents(prev => [created, ...prev]);
       setShowCreateModal(false);
+
+      // Auto pin personal tasks to everyday schedule
+      if (isPersonal && created?._id) {
+        togglePinEvent(created._id);
+      }
+
+      setNotificationToast(`✅ Event "${created.title}" successfully scheduled!`);
+      setTimeout(() => setNotificationToast(''), 3500);
+
       setNewEvent({
         title: '',
         description: '',
-        eventType: isStudent ? 'personal_task' : isFaculty ? 'faculty_task' : 'admin_task',
+        audienceScope: isStudent ? 'personal' : 'students',
+        isForPersonal: isStudent ? true : false,
+        eventType: isStudent ? 'personal_task' : isFaculty ? 'faculty_task' : 'company_drive',
         startDate: new Date().toISOString().slice(0, 10),
         startTime: '10:00',
         endDate: new Date().toISOString().slice(0, 10),
         endTime: '12:00',
-        venueOrLink: 'GRIET Placement Cell / Online',
-        instructorOrCompany: isFaculty ? (user?.name || 'Faculty Coordinator') : isAdmin ? 'Main Admin (TPO)' : '',
+        venueOrLink: isStudent ? 'Personal Desk / Online' : 'GRIET Placement Cell / Online',
+        instructorOrCompany: isFaculty ? (user?.name || 'Faculty Coordinator') : isAdmin ? 'Main Admin (TPO)' : (user?.name || 'Self'),
         targetRoles: isStudent ? ['student'] : ['student', 'faculty', 'admin'],
+        targetBranches: ['All'],
         allDay: false,
         isVisibleToStudents: isStudent ? false : true,
         priority: 'medium'
@@ -399,19 +562,38 @@ const PlacementCalendar = () => {
   };
 
   // Today reference string
-  const todayDate = new Date(2026, 8, 30);
+  const todayDate = useMemo(() => new Date(), []);
   const isSelectedDate = (dateObj) => {
     return dateObj.getFullYear() === todayDate.getFullYear() &&
            dateObj.getMonth() === todayDate.getMonth() &&
            dateObj.getDate() === todayDate.getDate();
   };
 
+  const todayFormattedDate = useMemo(() => {
+    return todayDate.toLocaleDateString(undefined, {
+      weekday: 'long',
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric'
+    });
+  }, [todayDate]);
+
   return (
     <>
       <Header title="Placement & Training Calendar" />
       <div className="content-wrapper placement-calendar-page animate-fade">
 
-        {/* Top Minimalist Header Matching Screenshot (e.g. 2026 / 9 on left, + and ⋮ on right) */}
+        {/* Notification Toast Alert Banner */}
+        {notificationToast && (
+          <div className="notification-alert-banner">
+            <div className="notification-alert-left">
+              <span>{notificationToast}</span>
+            </div>
+            <button className="btn-close-toast" onClick={() => setNotificationToast('')}>✕</button>
+          </div>
+        )}
+
+        {/* Top Minimalist Header (e.g. 2026 / 10 on left, stepper buttons, + and ⋮ on right) */}
         <div className="mobile-calendar-header-bar">
           <div className="header-left-cluster">
             <h1 className="screenshot-big-month-title">
@@ -430,7 +612,14 @@ const PlacementCalendar = () => {
           <div className="header-right-cluster">
             <button
               className="icon-action-button"
-              onClick={() => setShowCreateModal(true)}
+              onClick={() => {
+                setNewEvent(prev => ({
+                  ...prev,
+                  startDate: new Date().toISOString().slice(0, 10),
+                  endDate: new Date().toISOString().slice(0, 10)
+                }));
+                setShowCreateModal(true);
+              }}
               title="Add Placement Event"
             >
               <span className="icon-plus-symbol">+</span>
@@ -448,7 +637,7 @@ const PlacementCalendar = () => {
               {showQuickMenu && (
                 <div className="quick-action-menu glass-card">
                   <button className="menu-option-item" onClick={() => { handleToday(); setShowQuickMenu(false); }}>
-                    🎯 Go to Today (Sept 30)
+                    🎯 Go to Today ({todayDate.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })})
                   </button>
                   <button className="menu-option-item" onClick={() => { setViewMode('agenda'); setShowQuickMenu(false); }}>
                     📋 Switch to Agenda Grid
@@ -456,8 +645,11 @@ const PlacementCalendar = () => {
                   <button className="menu-option-item" onClick={() => { setViewMode('month'); setShowQuickMenu(false); }}>
                     🗓️ Switch to Month Grid
                   </button>
+                  <button className="menu-option-item" onClick={() => { triggerEverydayTasksNotification(); setShowQuickMenu(false); }}>
+                    🔔 Send Today's Schedule Alert
+                  </button>
                   <button className="menu-option-item" onClick={() => { fetchEvents(); setShowQuickMenu(false); }}>
-                    🔄 Refresh Events
+                    🔄 Refresh Live Events
                   </button>
                 </div>
               )}
@@ -465,14 +657,199 @@ const PlacementCalendar = () => {
           </div>
         </div>
 
+        {/* ====================================================================
+            EVERYDAY SCHEDULE & DAILY TASK PLANNER (PINNED SCHEDULE)
+            Allows pinning any event/task to everyday schedule, tracking daily completion,
+            and receiving daily notifications.
+           ==================================================================== */}
+        <div className="everyday-schedule-card glass-card">
+          <div className="everyday-schedule-header">
+            <div className="schedule-header-left">
+              <div className="schedule-badge-pulse">
+                <span className="pulse-dot"></span>
+                <span className="pulse-text">TODAY'S DAILY SCHEDULE</span>
+              </div>
+              <h3 className="everyday-schedule-title">
+                📌 Everyday Schedule &amp; Daily Tasks ({todayPinnedOrScheduled.length})
+              </h3>
+              <p className="everyday-schedule-desc">
+                Personal preparation routine, pinned milestones, and campus tasks for {todayFormattedDate}.
+              </p>
+            </div>
+
+            <div className="schedule-header-right">
+              <button
+                className="btn-daily-notify"
+                onClick={triggerEverydayTasksNotification}
+                title="Trigger Notification Reminder for Everyday Tasks"
+              >
+                <span>🔔</span>
+                <span>Notify Everyday Tasks</span>
+              </button>
+
+              <button
+                className="btn-add-daily-task"
+                onClick={() => {
+                  setNewEvent({
+                    title: '',
+                    description: '',
+                    audienceScope: isStudent ? 'personal' : 'students',
+                    isForPersonal: isStudent ? true : false,
+                    eventType: isStudent ? 'personal_task' : isFaculty ? 'faculty_task' : 'company_drive',
+                    startDate: new Date().toISOString().slice(0, 10),
+                    startTime: '10:00',
+                    endDate: new Date().toISOString().slice(0, 10),
+                    endTime: '12:00',
+                    venueOrLink: isStudent ? 'Personal Desk / Online' : 'GRIET Placement Cell / Online',
+                    instructorOrCompany: isFaculty ? (user?.name || 'Faculty Coordinator') : isAdmin ? 'Main Admin (TPO)' : (user?.name || 'Self'),
+                    targetRoles: isStudent ? ['student'] : ['student', 'faculty', 'admin'],
+                    targetBranches: ['All'],
+                    allDay: false,
+                    isVisibleToStudents: isStudent ? false : true,
+                    priority: 'medium'
+                  });
+                  setShowCreateModal(true);
+                }}
+              >
+                <span>➕</span>
+                <span>Add Daily Task</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Daily Progress Tracker Bar */}
+          {todayPinnedOrScheduled.length > 0 && (
+            <div className="daily-progress-container">
+              <div className="progress-info-row">
+                <span>Daily Task Progress</span>
+                <strong>{completedTodayCount} of {todayPinnedOrScheduled.length} Completed ({dailyProgressPercent}%)</strong>
+              </div>
+              <div className="progress-track-bar">
+                <div className="progress-fill-bar" style={{ width: `${dailyProgressPercent}%` }}></div>
+              </div>
+            </div>
+          )}
+
+          {/* Daily Tasks List */}
+          <div className="everyday-tasks-grid">
+            {todayPinnedOrScheduled.length === 0 ? (
+              <div className="empty-daily-tasks">
+                <span className="empty-icon">📌</span>
+                <p>No tasks currently pinned to your everyday schedule for today.</p>
+                <span className="empty-sub">
+                  Click the "📌 Pin" button on any company drive, faculty workshop, or admin task below to pin it to your daily routine, or click "+ Add Daily Task" to log your personal goals.
+                </span>
+              </div>
+            ) : (
+              todayPinnedOrScheduled.map(item => {
+                const isDone = completedTaskIds.includes(item._id);
+                const isPinned = pinnedIds.includes(item._id);
+                const cfg = EVENT_TYPE_CONFIG[item.eventType] || EVENT_TYPE_CONFIG.training;
+
+                return (
+                  <div
+                    key={item._id}
+                    className={`daily-task-item ${isDone ? 'is-completed' : ''}`}
+                    style={{ borderLeftColor: cfg.color }}
+                  >
+                    <div className="task-check-column">
+                      <input
+                        type="checkbox"
+                        checked={isDone}
+                        onChange={(e) => toggleTaskCompleted(item._id, e)}
+                        title="Mark task completed for today"
+                        className="task-checkbox"
+                      />
+                    </div>
+
+                    <div className="task-details-column" onClick={() => setSelectedEventModal(item)}>
+                      <div className="task-meta-line">
+                        <span className="task-type-badge" style={{ background: cfg.bg, color: cfg.color, borderColor: cfg.border }}>
+                          {cfg.icon} {cfg.label}
+                        </span>
+
+                        {item.creatorRole === 'admin' ? (
+                          <span className="creator-badge admin-badge">🏛️ TPO Admin</span>
+                        ) : item.creatorRole === 'faculty' ? (
+                          <span className="creator-badge faculty-badge">👨‍🏫 Faculty: {item.creatorName || item.instructorOrCompany || 'Coordinator'}</span>
+                        ) : (
+                          <span className="creator-badge personal-badge">👤 My Personal Task</span>
+                        )}
+
+                        <span className="task-time-pill">
+                          🕒 {new Date(item.startDateTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                      </div>
+
+                      <h4 className={`task-item-title ${isDone ? 'done-strike' : ''}`}>{item.title}</h4>
+                      {item.description && (
+                        <p className="task-item-desc">{item.description}</p>
+                      )}
+                    </div>
+
+                    <div className="task-actions-column">
+                      <button
+                        className={`btn-pin-toggle ${isPinned ? 'pinned-active' : ''}`}
+                        onClick={(e) => togglePinEvent(item._id, e)}
+                        title={isPinned ? 'Unpin from Everyday Schedule' : 'Pin to Everyday Schedule'}
+                      >
+                        {isPinned ? '📌 Pinned' : '📍 Pin'}
+                      </button>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </div>
+
+        {/* Audience Scope & Creator Filter Bar */}
+        <div className="calendar-legend-bar glass-card" style={{ gap: '8px', flexWrap: 'wrap' }}>
+          <span className="legend-label">Scope:</span>
+          <button
+            className={`legend-pill ${creatorScopeFilter === 'all' ? 'active' : ''}`}
+            onClick={() => setCreatorScopeFilter('all')}
+          >
+            All Activities ({events.length})
+          </button>
+          <button
+            className={`legend-pill ${creatorScopeFilter === 'pinned' ? 'active' : ''}`}
+            style={{ color: '#facc15', borderColor: creatorScopeFilter === 'pinned' ? '#facc15' : 'rgba(234, 179, 8, 0.4)' }}
+            onClick={() => setCreatorScopeFilter('pinned')}
+          >
+            <span>📌 Pinned to Everyday ({pinnedIds.length})</span>
+          </button>
+          <button
+            className={`legend-pill ${creatorScopeFilter === 'admin' ? 'active' : ''}`}
+            style={{ color: '#f59e0b', borderColor: creatorScopeFilter === 'admin' ? '#f59e0b' : 'rgba(245, 158, 11, 0.4)' }}
+            onClick={() => setCreatorScopeFilter('admin')}
+          >
+            <span>🏛️ Official Admin &amp; Drives ({events.filter(e => e.creatorRole === 'admin').length})</span>
+          </button>
+          <button
+            className={`legend-pill ${creatorScopeFilter === 'faculty' ? 'active' : ''}`}
+            style={{ color: '#38bdf8', borderColor: creatorScopeFilter === 'faculty' ? '#38bdf8' : 'rgba(56, 189, 248, 0.4)' }}
+            onClick={() => setCreatorScopeFilter('faculty')}
+          >
+            <span>👨‍🏫 Faculty Sessions ({events.filter(e => e.creatorRole === 'faculty').length})</span>
+          </button>
+          <button
+            className={`legend-pill ${creatorScopeFilter === 'personal' ? 'active' : ''}`}
+            style={{ color: '#10b981', borderColor: creatorScopeFilter === 'personal' ? '#10b981' : 'rgba(16, 185, 129, 0.4)' }}
+            onClick={() => setCreatorScopeFilter('personal')}
+          >
+            <span>👤 My Personal Tasks ({events.filter(e => String(e.createdBy) === String(userId) || e.creatorRole === 'student' || e.eventType === 'personal_task').length})</span>
+          </button>
+        </div>
+
         {/* Category Filter Legend Bar */}
         <div className="calendar-legend-bar glass-card">
-          <span className="legend-label">Filter:</span>
+          <span className="legend-label">Type:</span>
           <button
             className={`legend-pill ${selectedFilter === 'all' ? 'active' : ''}`}
             onClick={() => setSelectedFilter('all')}
           >
-            All Categories ({events.length})
+            All Types ({events.length})
           </button>
           {Object.entries(EVENT_TYPE_CONFIG).map(([typeKey, cfg]) => {
             const count = events.filter(e => e.eventType === typeKey).length;
@@ -698,6 +1075,13 @@ const PlacementCalendar = () => {
                           <span className="spatial-timing-pill">
                             🕒 {startDt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                           </span>
+                          {ev.creatorRole === 'admin' ? (
+                            <span className="creator-badge admin-badge">🏛️ TPO Admin</span>
+                          ) : ev.creatorRole === 'faculty' ? (
+                            <span className="creator-badge faculty-badge">👨‍🏫 Faculty</span>
+                          ) : (
+                            <span className="creator-badge personal-badge">👤 Personal</span>
+                          )}
                         </div>
                       </div>
 
@@ -740,6 +1124,14 @@ const PlacementCalendar = () => {
                           }}
                         >
                           View Dossier →
+                        </button>
+                        <button
+                          type="button"
+                          className={`btn-pin-toggle ${pinnedIds.includes(ev._id) ? 'pinned-active' : ''}`}
+                          onClick={(e) => togglePinEvent(ev._id, e)}
+                          title={pinnedIds.includes(ev._id) ? 'Pinned to Everyday Schedule' : 'Pin to Everyday Schedule'}
+                        >
+                          📌 {pinnedIds.includes(ev._id) ? 'Pinned' : 'Pin'}
                         </button>
                         <button
                           type="button"
@@ -786,6 +1178,13 @@ const PlacementCalendar = () => {
                           <span className="timeline-clock">
                             🕒 {startDt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - {endDt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                           </span>
+                          {ev.creatorRole === 'admin' ? (
+                            <span className="creator-badge admin-badge">🏛️ TPO Admin</span>
+                          ) : ev.creatorRole === 'faculty' ? (
+                            <span className="creator-badge faculty-badge">👨‍🏫 Faculty</span>
+                          ) : (
+                            <span className="creator-badge personal-badge">👤 Personal</span>
+                          )}
                           {ev.instructorOrCompany && (
                             <span className="timeline-host">🏢 {ev.instructorOrCompany}</span>
                           )}
@@ -797,6 +1196,14 @@ const PlacementCalendar = () => {
                       </div>
 
                       <div className="timeline-buttons">
+                        <button
+                          type="button"
+                          className={`btn-pin-toggle ${pinnedIds.includes(ev._id) ? 'pinned-active' : ''}`}
+                          onClick={(e) => togglePinEvent(ev._id, e)}
+                          title={pinnedIds.includes(ev._id) ? 'Pinned to Everyday Schedule' : 'Pin to Everyday Schedule'}
+                        >
+                          📌 {pinnedIds.includes(ev._id) ? 'Pinned' : 'Pin'}
+                        </button>
                         <button
                           type="button"
                           className="btn btn-secondary btn-sm"
@@ -828,21 +1235,22 @@ const PlacementCalendar = () => {
         )}
 
         {/* ====================================================================
-            VIEW 3: WEEK VIEW (7-Day Overview)
+            VIEW 3: WEEK VIEW (Dynamic 7-Day Live Overview)
            ==================================================================== */}
         {viewMode === 'week' && (
           <div className="calendar-week-container glass-card">
             <div className="week-header-bar">
-              <h3>7-Day Schedule Overview (Week of Sept 27 - Oct 3, 2026)</h3>
+              <h3>
+                7-Day Schedule Overview ({activeWeekDays[0].toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} – {activeWeekDays[6].toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })})
+              </h3>
               <p className="agenda-subtitle">Daily breakdown of active campus training cohorts and recruiter timelines</p>
             </div>
             <div className="week-columns-grid">
-              {[27, 28, 29, 30, 1, 2, 3].map((dNum, idx) => {
-                const dayMonth = idx < 4 ? 8 : 9;
-                const dDate = new Date(2026, dayMonth, dNum);
+              {activeWeekDays.map((dDate, idx) => {
+                const dNum = dDate.getDate();
                 const dayEvs = getEventsForDate(dDate);
                 const isSunOrSat = idx === 0 || idx === 6;
-                const isTodayPill = dNum === 30 && dayMonth === 8;
+                const isTodayPill = isSelectedDate(dDate);
 
                 return (
                   <div key={idx} className="week-day-column">
@@ -870,10 +1278,22 @@ const PlacementCalendar = () => {
                               style={{ borderLeft: `3px solid ${cfg.color}`, background: 'rgba(255,255,255,0.03)' }}
                               onClick={() => setSelectedEventModal(ev)}
                             >
-                              <strong className="week-ev-title">{ev.title}</strong>
-                              <span className="week-ev-time">
-                                {new Date(ev.startDateTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                              </span>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <strong className="week-ev-title">{ev.title}</strong>
+                                {pinnedIds.includes(ev._id) && <span title="Pinned to Everyday Schedule">📌</span>}
+                              </div>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px' }}>
+                                <span className="week-ev-time">
+                                  {new Date(ev.startDateTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                </span>
+                                {ev.creatorRole === 'admin' ? (
+                                  <span className="creator-badge admin-badge" style={{ fontSize: '10px', padding: '1px 4px' }}>🏛️ Admin</span>
+                                ) : ev.creatorRole === 'faculty' ? (
+                                  <span className="creator-badge faculty-badge" style={{ fontSize: '10px', padding: '1px 4px' }}>👨‍🏫 Faculty</span>
+                                ) : (
+                                  <span className="creator-badge personal-badge" style={{ fontSize: '10px', padding: '1px 4px' }}>👤 Personal</span>
+                                )}
+                              </div>
                             </div>
                           );
                         })
@@ -887,51 +1307,83 @@ const PlacementCalendar = () => {
         )}
 
         {/* ====================================================================
-            VIEW 4: DAY VIEW (Detailed Timetable for Selected Date)
+            VIEW 4: DAY VIEW (Detailed Timetable for Live Date)
            ==================================================================== */}
         {viewMode === 'day' && (
           <div className="calendar-day-container glass-card">
             <div className="day-view-hero">
               <div className="day-hero-date-badge">
-                <span className="hero-day-num">30</span>
+                <span className="hero-day-num">{currentDate.getDate()}</span>
                 <div>
-                  <h3 className="hero-day-title">Wednesday, September 30, 2026</h3>
-                  <span className="hero-day-sub">Today's Placement Readiness Operations</span>
+                  <h3 className="hero-day-title">
+                    {currentDate.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
+                  </h3>
+                  <span className="hero-day-sub">Daily Placement & Academic Routine</span>
                 </div>
               </div>
-              <button className="btn btn-primary btn-sm" onClick={() => setShowCreateModal(true)}>
-                ➕ Add Event
-              </button>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button className="btn btn-secondary btn-sm" onClick={handleToday}>📅 Today</button>
+                <button className="btn btn-primary btn-sm" onClick={() => setShowCreateModal(true)}>
+                  ➕ Add Event
+                </button>
+              </div>
             </div>
 
             <div className="day-timetable-list">
-              {getEventsForDate(new Date(2026, 8, 30)).map((ev) => {
-                const cfg = EVENT_TYPE_CONFIG[ev.eventType] || EVENT_TYPE_CONFIG.training;
-                const sTime = new Date(ev.startDateTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                const eTime = new Date(ev.endDateTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+              {getEventsForDate(currentDate).length === 0 ? (
+                <div className="agenda-empty-state" style={{ padding: '2.5rem 1rem' }}>
+                  <span className="empty-icon">📅</span>
+                  <h3>No Events Scheduled for This Day</h3>
+                  <p>Click "Add Event" to schedule an activity, task, or recruitment milestone.</p>
+                  <button className="btn btn-primary btn-sm" onClick={() => setShowCreateModal(true)}>
+                    ➕ Add Task or Event
+                  </button>
+                </div>
+              ) : (
+                getEventsForDate(currentDate).map((ev) => {
+                  const cfg = EVENT_TYPE_CONFIG[ev.eventType] || EVENT_TYPE_CONFIG.training;
+                  const sTime = new Date(ev.startDateTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                  const eTime = new Date(ev.endDateTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-                return (
-                  <div key={ev._id} className="day-timeline-entry glass-card" style={{ borderLeft: `5px solid ${cfg.color}` }}>
-                    <div className="entry-time-pill" style={{ background: cfg.bg, color: cfg.color }}>
-                      {sTime} - {eTime}
-                    </div>
-                    <div className="entry-content">
-                      <div className="entry-badge-row">
-                        <span className="spatial-type-chip" style={{ background: cfg.bg, color: cfg.color }}>
-                          {cfg.icon} {cfg.label}
-                        </span>
-                        {ev.instructorOrCompany && <span>🏢 {ev.instructorOrCompany}</span>}
+                  return (
+                    <div key={ev._id} className="day-timeline-entry glass-card" style={{ borderLeft: `5px solid ${cfg.color}` }}>
+                      <div className="entry-time-pill" style={{ background: cfg.bg, color: cfg.color }}>
+                        {sTime} - {eTime}
                       </div>
-                      <h4>{ev.title}</h4>
-                      <p>{ev.description}</p>
-                      <div className="entry-venue">📍 {ev.venueOrLink}</div>
+                      <div className="entry-content">
+                        <div className="entry-badge-row">
+                          <span className="spatial-type-chip" style={{ background: cfg.bg, color: cfg.color }}>
+                            {cfg.icon} {cfg.label}
+                          </span>
+                          {ev.creatorRole === 'admin' ? (
+                            <span className="creator-badge admin-badge">🏛️ TPO Admin</span>
+                          ) : ev.creatorRole === 'faculty' ? (
+                            <span className="creator-badge faculty-badge">👨‍🏫 Faculty</span>
+                          ) : (
+                            <span className="creator-badge personal-badge">👤 Personal</span>
+                          )}
+                          {ev.instructorOrCompany && <span>🏢 {ev.instructorOrCompany}</span>}
+                        </div>
+                        <h4>{ev.title}</h4>
+                        <p>{ev.description}</p>
+                        <div className="entry-venue">📍 {ev.venueOrLink}</div>
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                        <button
+                          type="button"
+                          className={`btn-pin-toggle ${pinnedIds.includes(ev._id) ? 'pinned-active' : ''}`}
+                          onClick={(e) => togglePinEvent(ev._id, e)}
+                        >
+                          📌 {pinnedIds.includes(ev._id) ? 'Pinned' : 'Pin'}
+                        </button>
+                        <button className="btn btn-secondary btn-sm" onClick={() => setSelectedEventModal(ev)}>
+                          Dossier
+                        </button>
+                      </div>
                     </div>
-                    <button className="btn btn-secondary btn-sm" onClick={() => setSelectedEventModal(ev)}>
-                      Dossier
-                    </button>
-                  </div>
-                );
-              })}
+                  );
+                })
+              )}
             </div>
           </div>
         )}
@@ -942,7 +1394,7 @@ const PlacementCalendar = () => {
         {viewMode === 'year' && (
           <div className="calendar-year-container glass-card">
             <div className="year-header">
-              <h2>Academic & Placement Year 2026</h2>
+              <h2>Academic & Placement Year {year}</h2>
               <p>Click any month to navigate directly into its full-month view</p>
             </div>
             <div className="year-months-grid">
@@ -951,7 +1403,7 @@ const PlacementCalendar = () => {
                   key={mName}
                   className={`year-month-card ${mIdx === month ? 'current-active-month' : ''}`}
                   onClick={() => {
-                    setCurrentDate(new Date(2026, mIdx, 1));
+                    setCurrentDate(new Date(year, mIdx, 1));
                     setViewMode('month');
                   }}
                 >
@@ -1001,7 +1453,7 @@ const PlacementCalendar = () => {
             className={`dock-tab-btn ${viewMode === 'day' ? 'active' : ''}`}
             onClick={() => setViewMode('day')}
           >
-            <div className="dock-icon">3️⃣0️⃣</div>
+            <div className="dock-icon">📅</div>
             <span className="dock-label">Day</span>
           </button>
 
@@ -1083,9 +1535,18 @@ const PlacementCalendar = () => {
                       <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                         <span style={{ fontSize: '26px' }}>{cfg.icon}</span>
                         <div>
-                          <span style={{ fontSize: '11px', fontWeight: 700, color: cfg.color, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                            {cfg.label}
-                          </span>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span style={{ fontSize: '11px', fontWeight: 700, color: cfg.color, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                              {cfg.label}
+                            </span>
+                            {selectedEventModal.creatorRole === 'admin' ? (
+                              <span className="creator-badge admin-badge">🏛️ TPO Admin</span>
+                            ) : selectedEventModal.creatorRole === 'faculty' ? (
+                              <span className="creator-badge faculty-badge">👨‍🏫 Faculty Session</span>
+                            ) : (
+                              <span className="creator-badge personal-badge">👤 Personal Task</span>
+                            )}
+                          </div>
                           <h3 style={{ margin: 0, color: '#fff', fontSize: '1.25rem' }}>{selectedEventModal.title}</h3>
                         </div>
                       </div>
@@ -1107,9 +1568,9 @@ const PlacementCalendar = () => {
                           </strong>
                         </div>
                         <div>
-                          <span style={{ fontSize: '11px', color: '#94a3b8', display: 'block' }}>Host / Instructor</span>
+                          <span style={{ fontSize: '11px', color: '#94a3b8', display: 'block' }}>Organizer / Company</span>
                           <strong style={{ color: '#38bdf8', fontSize: '13px' }}>
-                            {selectedEventModal.instructorOrCompany || 'GRIET Placement Cell'}
+                            {selectedEventModal.instructorOrCompany || selectedEventModal.creatorName || 'Placement Cell'}
                           </strong>
                         </div>
                         <div>
@@ -1127,8 +1588,17 @@ const PlacementCalendar = () => {
                         </p>
                       </div>
 
-                      <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-                        <span style={{ fontSize: '12px', color: '#94a3b8' }}>Target Audience:</span>
+                      <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+                        <span style={{ fontSize: '12px', color: '#94a3b8' }}>Target Audience & Scope:</span>
+                        {selectedEventModal.isVisibleToStudents ? (
+                          <span style={{ background: 'rgba(16, 185, 129, 0.15)', color: '#34d399', padding: '2px 8px', borderRadius: '12px', fontSize: '11px', fontWeight: 600 }}>
+                            🎓 Published to Students' Calendar
+                          </span>
+                        ) : (
+                          <span style={{ background: 'rgba(239, 68, 68, 0.15)', color: '#f87171', padding: '2px 8px', borderRadius: '12px', fontSize: '11px', fontWeight: 600 }}>
+                            🔒 Private Personal Schedule (Hidden from Students)
+                          </span>
+                        )}
                         {(selectedEventModal.targetAudience?.roles || ['student', 'faculty', 'admin']).map(r => (
                           <span key={r} style={{ background: 'rgba(99, 102, 241, 0.15)', color: '#818cf8', padding: '2px 8px', borderRadius: '12px', fontSize: '11px', textTransform: 'capitalize' }}>
                             {r}
@@ -1137,17 +1607,26 @@ const PlacementCalendar = () => {
                       </div>
                     </div>
 
-                    <div className="modal-footer" style={{ display: 'flex', justifyContent: 'space-between', padding: '14px 24px', alignItems: 'center' }}>
-                      <button
-                        type="button"
-                        className="btn btn-secondary btn-sm"
-                        onClick={() => handleDownloadICS(selectedEventModal)}
-                      >
-                        📥 Add to Calendar (.ics)
-                      </button>
+                    <div className="modal-footer" style={{ display: 'flex', justifyContent: 'space-between', padding: '14px 24px', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        <button
+                          type="button"
+                          className="btn btn-secondary btn-sm"
+                          onClick={() => handleDownloadICS(selectedEventModal)}
+                        >
+                          📥 Add to Calendar (.ics)
+                        </button>
+                        <button
+                          type="button"
+                          className={`btn-pin-toggle ${pinnedIds.includes(selectedEventModal._id) ? 'pinned-active' : ''}`}
+                          onClick={(e) => togglePinEvent(selectedEventModal._id, e)}
+                        >
+                          📌 {pinnedIds.includes(selectedEventModal._id) ? 'Pinned to Everyday Schedule' : 'Pin to Everyday Schedule'}
+                        </button>
+                      </div>
 
                       <div style={{ display: 'flex', gap: '10px' }}>
-                        {(user?.role === 'admin' || user?.role === 'faculty') && (
+                        {(isAdmin || isFaculty || String(selectedEventModal.createdBy) === String(userId)) && (
                           <button
                             className="btn btn-secondary btn-sm"
                             style={{ color: '#f87171', borderColor: 'rgba(239, 68, 68, 0.4)' }}
@@ -1180,18 +1659,88 @@ const PlacementCalendar = () => {
               </div>
 
               <form onSubmit={handleCreateEvent} className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '14px', padding: '20px 24px' }}>
+                {/* 1. AUDIENCE SCOPE SELECTOR: Clear 2-option interactive cards */}
+                <div className="form-group">
+                  <label className="form-label" style={{ fontWeight: 600 }}>Event Purpose & Target Audience *</label>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))', gap: '10px' }}>
+                    {/* Option 1: Personal Schedule */}
+                    <div
+                      className={`scope-select-card ${newEvent.audienceScope === 'personal' ? 'selected' : ''}`}
+                      onClick={() => setNewEvent(prev => ({
+                        ...prev,
+                        audienceScope: 'personal',
+                        isForPersonal: true,
+                        isVisibleToStudents: false,
+                        eventType: isStudent ? 'personal_task' : isFaculty ? 'faculty_task' : 'admin_task'
+                      }))}
+                    >
+                      <div className="scope-radio-row">
+                        <input
+                          type="radio"
+                          name="audienceScope"
+                          checked={newEvent.audienceScope === 'personal'}
+                          onChange={() => {}}
+                        />
+                        <strong>👤 For My Personal Schedule</strong>
+                      </div>
+                      <p>
+                        {isAdmin
+                          ? 'Private administrative task. Kept strictly private and hidden from students.'
+                          : isFaculty
+                          ? 'Personal schedule or reminder. Kept strictly private and hidden from students.'
+                          : 'Personal study task or goal. Visible only to you.'}
+                      </p>
+                    </div>
+
+                    {/* Option 2: Broadcast to Students */}
+                    <div
+                      className={`scope-select-card ${newEvent.audienceScope === 'students' ? 'selected' : ''}`}
+                      onClick={() => setNewEvent(prev => ({
+                        ...prev,
+                        audienceScope: 'students',
+                        isForPersonal: false,
+                        isVisibleToStudents: true,
+                        eventType: isStudent ? 'training' : isFaculty ? 'training' : 'company_drive'
+                      }))}
+                    >
+                      <div className="scope-radio-row">
+                        <input
+                          type="radio"
+                          name="audienceScope"
+                          checked={newEvent.audienceScope === 'students'}
+                          onChange={() => {}}
+                        />
+                        <strong>{isStudent ? '👥 Peer Study Group' : '🎓 For Students (Campus Calendar)'}</strong>
+                      </div>
+                      <p>
+                        {isAdmin
+                          ? 'Official drive, assessment, or cutoff published to all students’ Placement Calendars.'
+                          : isFaculty
+                          ? 'Official training, workshop, or mock interview for students.'
+                          : 'Collaborative study session visible to classmates in calendar.'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 2. Event Title */}
                 <div className="form-group">
                   <label className="form-label" style={{ fontWeight: 600 }}>Event Title *</label>
                   <input
                     type="text"
                     className="form-control"
-                    placeholder="e.g. Amazon Campus Recruitment Drive"
+                    placeholder={
+                      newEvent.audienceScope === 'personal'
+                        ? 'e.g. Complete 5 LeetCode DP Problems / Review System Design'
+                        : 'e.g. Google Campus Recruitment Drive / Placement Masterclass'
+                    }
                     value={newEvent.title}
                     onChange={e => setNewEvent({ ...newEvent, title: e.target.value })}
                     required
                   />
                 </div>
 
+                {/* 3. Event Type & Priority */}
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px' }}>
                   <div className="form-group">
                     <label className="form-label" style={{ fontWeight: 600 }}>Event Type *</label>
@@ -1200,32 +1749,45 @@ const PlacementCalendar = () => {
                       value={newEvent.eventType}
                       onChange={e => setNewEvent({ ...newEvent, eventType: e.target.value })}
                     >
-                      {isAdmin && (
+                      {newEvent.audienceScope === 'personal' ? (
                         <>
-                          <option value="admin_task">🏛️ Official Main Admin Task</option>
-                          <option value="company_drive">🟣 Company Recruitment Drive</option>
-                          <option value="aptitude_test">🟠 Institutional Aptitude Assessment</option>
-                          <option value="training">🟢 Training & Masterclass</option>
-                          <option value="mock_interview">🔵 Mock Interview Drive</option>
-                          <option value="workshop">🟡 Technical Workshop</option>
-                          <option value="deadline">🔴 Cutoff Deadline</option>
-                        </>
-                      )}
-                      {isFaculty && (
-                        <>
-                          <option value="faculty_task">👨‍🏫 Faculty Session / Mentor Task</option>
-                          <option value="training">🟢 Placement Training Session</option>
-                          <option value="workshop">🟡 Hands-on Workshop</option>
-                          <option value="mock_interview">🔵 Faculty Mock Interview</option>
-                          <option value="aptitude_test">🟠 Department Diagnostic Quiz</option>
-                        </>
-                      )}
-                      {isStudent && (
-                        <>
-                          <option value="personal_task">👤 My Personal Placement Task</option>
-                          <option value="training">🟢 Peer Study Session</option>
-                          <option value="mock_interview">🔵 Peer Mock Interview Practice</option>
+                          <option value={isStudent ? 'personal_task' : isFaculty ? 'faculty_task' : 'admin_task'}>
+                            {isStudent ? '👤 Personal Study Task' : isFaculty ? '👨‍🏫 Faculty Personal Prep' : '🏛️ Admin Internal Task'}
+                          </option>
+                          <option value="training">🟢 Personal Learning / Study Session</option>
                           <option value="aptitude_test">🟠 Aptitude Practice Goal</option>
+                          <option value="mock_interview">🔵 Mock Interview Preparation</option>
+                          <option value="deadline">🔴 Self Target Deadline</option>
+                        </>
+                      ) : (
+                        <>
+                          {isAdmin && (
+                            <>
+                              <option value="company_drive">🟣 Company Recruitment Drive</option>
+                              <option value="admin_task">🏛️ Official Placement Cell Task / Clearance</option>
+                              <option value="aptitude_test">🟠 Institutional Aptitude Assessment</option>
+                              <option value="training">🟢 Placement Training Masterclass</option>
+                              <option value="mock_interview">🔵 Mock Interview Drive</option>
+                              <option value="workshop">🟡 Technical Workshop</option>
+                              <option value="deadline">🔴 Registration / Consent Cutoff</option>
+                            </>
+                          )}
+                          {isFaculty && (
+                            <>
+                              <option value="training">🟢 Department Training Session</option>
+                              <option value="workshop">🟡 Hands-on Workshop</option>
+                              <option value="mock_interview">🔵 Faculty Mock Interview</option>
+                              <option value="faculty_task">👨‍🏫 Faculty Mentoring Session</option>
+                              <option value="aptitude_test">🟠 Department Diagnostic Quiz</option>
+                            </>
+                          )}
+                          {isStudent && (
+                            <>
+                              <option value="training">🟢 Peer Study Session</option>
+                              <option value="mock_interview">🔵 Peer Mock Interview Practice</option>
+                              <option value="aptitude_test">🟠 Group Aptitude Challenge</option>
+                            </>
+                          )}
                         </>
                       )}
                     </select>
@@ -1246,6 +1808,7 @@ const PlacementCalendar = () => {
                   </div>
                 </div>
 
+                {/* 4. Host / Instructor */}
                 <div className="form-group">
                   <label className="form-label" style={{ fontWeight: 600 }}>Organizer / Host / Faculty Name</label>
                   <input
@@ -1256,79 +1819,6 @@ const PlacementCalendar = () => {
                     onChange={e => setNewEvent({ ...newEvent, instructorOrCompany: e.target.value })}
                   />
                 </div>
-
-                {/* Visibility & Student Calendar Access Setting */}
-                {isFaculty && (
-                  <div className="visibility-control-box" style={{ background: 'rgba(56, 189, 248, 0.08)', border: '1px solid rgba(56, 189, 248, 0.3)', borderRadius: '12px', padding: '12px 16px' }}>
-                    <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', margin: 0 }}>
-                      <div>
-                        <strong style={{ color: '#38bdf8', fontSize: '13.5px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <span>👥</span>
-                          <span>Visible to Students' Calendar</span>
-                        </strong>
-                        <span style={{ fontSize: '12px', color: '#94a3b8', display: 'block', marginTop: '2px' }}>
-                          {newEvent.isVisibleToStudents
-                            ? '✅ Students in targeted branches can view this event in their dashboard calendar'
-                            : '🔒 Faculty & Admin only (hidden from students calendar)'}
-                        </span>
-                      </div>
-                      <input
-                        type="checkbox"
-                        checked={newEvent.isVisibleToStudents}
-                        onChange={e => setNewEvent({ ...newEvent, isVisibleToStudents: e.target.checked })}
-                        style={{ width: '22px', height: '22px', accentColor: '#38bdf8', cursor: 'pointer' }}
-                      />
-                    </label>
-                  </div>
-                )}
-
-                {isStudent && (
-                  <div className="visibility-control-box" style={{ background: 'rgba(16, 185, 129, 0.08)', border: '1px solid rgba(16, 185, 129, 0.3)', borderRadius: '12px', padding: '12px 16px' }}>
-                    <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', margin: 0 }}>
-                      <div>
-                        <strong style={{ color: '#10b981', fontSize: '13.5px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <span>{newEvent.isVisibleToStudents ? '👥' : '🔒'}</span>
-                          <span>{newEvent.isVisibleToStudents ? 'Visible to Classmates & Peers' : 'Personal Task (Only Visible to Me)'}</span>
-                        </strong>
-                        <span style={{ fontSize: '12px', color: '#94a3b8', display: 'block', marginTop: '2px' }}>
-                          {newEvent.isVisibleToStudents
-                            ? 'Public study session visible to classmates in calendar'
-                            : 'Private personal task — visible only to you on this account'}
-                        </span>
-                      </div>
-                      <input
-                        type="checkbox"
-                        checked={newEvent.isVisibleToStudents}
-                        onChange={e => setNewEvent({ ...newEvent, isVisibleToStudents: e.target.checked })}
-                        style={{ width: '22px', height: '22px', accentColor: '#10b981', cursor: 'pointer' }}
-                      />
-                    </label>
-                  </div>
-                )}
-
-                {isAdmin && (
-                  <div className="visibility-control-box" style={{ background: 'rgba(245, 158, 11, 0.08)', border: '1px solid rgba(245, 158, 11, 0.3)', borderRadius: '12px', padding: '12px 16px' }}>
-                    <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', margin: 0 }}>
-                      <div>
-                        <strong style={{ color: '#f59e0b', fontSize: '13.5px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <span>🏛️</span>
-                          <span>Official Admin Task for Students</span>
-                        </strong>
-                        <span style={{ fontSize: '12px', color: '#94a3b8', display: 'block', marginTop: '2px' }}>
-                          {newEvent.isVisibleToStudents
-                            ? 'Mandatory task/announcement published to all student placement calendars'
-                            : 'Internal administration task (hidden from student view)'}
-                        </span>
-                      </div>
-                      <input
-                        type="checkbox"
-                        checked={newEvent.isVisibleToStudents}
-                        onChange={e => setNewEvent({ ...newEvent, isVisibleToStudents: e.target.checked })}
-                        style={{ width: '22px', height: '22px', accentColor: '#f59e0b', cursor: 'pointer' }}
-                      />
-                    </label>
-                  </div>
-                )}
 
                 {/* Start & End Times */}
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>

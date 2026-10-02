@@ -9,15 +9,32 @@ const seedInitialEventsIfEmpty = async (userId) => {
   const now = new Date();
   const year = now.getFullYear();
   const month = now.getMonth();
+  const day = now.getDate();
 
   const seedEvents = [
+    {
+      title: 'TPO Admin Task: Final Resume & ATS Clearance',
+      description: 'Mandatory verification of student resumes and CGPA verification for Tier-1 companies.',
+      eventType: 'admin_task',
+      colorTag: 'gold',
+      startDateTime: new Date(year, month, day, 10, 0),
+      endDateTime: new Date(year, month, day, 18, 0),
+      venueOrLink: 'Placement Management Portal',
+      instructorOrCompany: 'GRIET Head of Placements',
+      creatorRole: 'admin',
+      creatorName: 'Main Admin (TPO Cell)',
+      visibility: 'public',
+      isVisibleToStudents: true,
+      priority: 'urgent',
+      targetAudience: { roles: ['student', 'faculty', 'admin'], branches: ['All'] }
+    },
     {
       title: 'TCS National Qualifier Drive',
       description: 'Campus placement drive for 2026 graduating batch across all engineering disciplines.',
       eventType: 'company_drive',
       colorTag: 'purple',
-      startDateTime: new Date(year, month, 5, 9, 30),
-      endDateTime: new Date(year, month, 5, 17, 30),
+      startDateTime: new Date(year, month, day + 2, 9, 30),
+      endDateTime: new Date(year, month, day + 2, 17, 30),
       venueOrLink: 'GRIET Auditorium / Online Portal',
       instructorOrCompany: 'Tata Consultancy Services',
       creatorRole: 'admin',
@@ -28,28 +45,12 @@ const seedInitialEventsIfEmpty = async (userId) => {
       targetAudience: { roles: ['student', 'faculty', 'admin'], branches: ['All'] }
     },
     {
-      title: 'Main Admin Task: Final Resume & ATS Clearance',
-      description: 'Mandatory verification of student resumes and CGPA verification for Tier-1 companies.',
-      eventType: 'admin_task',
-      colorTag: 'gold',
-      startDateTime: new Date(year, month, 7, 10, 0),
-      endDateTime: new Date(year, month, 7, 18, 0),
-      venueOrLink: 'Placement Management Portal',
-      instructorOrCompany: 'GRIET Head of Placements',
-      creatorRole: 'admin',
-      creatorName: 'Main Admin (TPO Cell)',
-      visibility: 'students',
-      isVisibleToStudents: true,
-      priority: 'urgent',
-      targetAudience: { roles: ['student'], branches: ['All'] }
-    },
-    {
       title: 'DSA & Dynamic Programming Workshop',
       description: 'Hands-on intensive masterclass on advanced DP and Graph interview patterns.',
       eventType: 'training',
       colorTag: 'green',
-      startDateTime: new Date(year, month, 8, 14, 0),
-      endDateTime: new Date(year, month, 8, 16, 30),
+      startDateTime: new Date(year, month, day + 4, 14, 0),
+      endDateTime: new Date(year, month, day + 4, 16, 30),
       venueOrLink: 'Seminar Hall 3 & Zoom',
       instructorOrCompany: 'Prof. Ramesh (Lead Algorithms Coach)',
       creatorRole: 'faculty',
@@ -64,8 +65,8 @@ const seedInitialEventsIfEmpty = async (userId) => {
       description: 'Timed assessment covering quantitative aptitude, logical reasoning, and verbal ability.',
       eventType: 'aptitude_test',
       colorTag: 'orange',
-      startDateTime: new Date(year, month, 12, 10, 0),
-      endDateTime: new Date(year, month, 12, 11, 30),
+      startDateTime: new Date(year, month, day + 6, 10, 0),
+      endDateTime: new Date(year, month, day + 6, 11, 30),
       venueOrLink: 'Online Assessment Engine',
       instructorOrCompany: 'TPO Assessment Cell',
       creatorRole: 'admin',
@@ -80,10 +81,10 @@ const seedInitialEventsIfEmpty = async (userId) => {
       description: 'Simulated 1-on-1 technical and behavioral rounds with industry mentors and senior faculty.',
       eventType: 'mock_interview',
       colorTag: 'blue',
-      startDateTime: new Date(year, month, 15, 11, 0),
-      endDateTime: new Date(year, month, 15, 16, 0),
+      startDateTime: new Date(year, month, day + 8, 11, 0),
+      endDateTime: new Date(year, month, day + 8, 16, 0),
       venueOrLink: 'Interview Rooms 1-4 & Google Meet',
-      instructorOrCompany: 'Alumni Mentors & TPO Cell',
+      instructorOrCompany: 'Dr. Madhuri & Alumni Mentors',
       creatorRole: 'faculty',
       creatorName: 'Dr. Madhuri (Faculty Coordinator)',
       visibility: 'students',
@@ -96,8 +97,8 @@ const seedInitialEventsIfEmpty = async (userId) => {
       description: 'Strict cutoff for profile verification, resume upload, and consent submission on portal.',
       eventType: 'deadline',
       colorTag: 'red',
-      startDateTime: new Date(year, month, 18, 23, 59),
-      endDateTime: new Date(year, month, 18, 23, 59),
+      startDateTime: new Date(year, month, day + 11, 23, 59),
+      endDateTime: new Date(year, month, day + 11, 23, 59),
       allDay: true,
       venueOrLink: 'Portal Profile Portal',
       instructorOrCompany: 'Placement Cell',
@@ -113,8 +114,8 @@ const seedInitialEventsIfEmpty = async (userId) => {
       description: 'Architecting scalable microservices with Docker, Node.js, and AWS architecture basics.',
       eventType: 'workshop',
       colorTag: 'yellow',
-      startDateTime: new Date(year, month, 22, 13, 0),
-      endDateTime: new Date(year, month, 22, 17, 0),
+      startDateTime: new Date(year, month, day + 14, 13, 0),
+      endDateTime: new Date(year, month, day + 14, 17, 0),
       venueOrLink: 'Lab 502 & Live Stream',
       instructorOrCompany: 'Cloud Solutions Architect Guest Speaker',
       creatorRole: 'faculty',
@@ -129,8 +130,8 @@ const seedInitialEventsIfEmpty = async (userId) => {
       description: 'Online test for Associate Software Engineer and Risk Advisory campus roles.',
       eventType: 'company_drive',
       colorTag: 'purple',
-      startDateTime: new Date(year, month, 26, 10, 0),
-      endDateTime: new Date(year, month, 26, 13, 0),
+      startDateTime: new Date(year, month, day + 18, 10, 0),
+      endDateTime: new Date(year, month, day + 18, 13, 0),
       venueOrLink: 'Central Computing Lab',
       instructorOrCompany: 'Deloitte India',
       creatorRole: 'admin',
@@ -171,30 +172,44 @@ exports.getEvents = async (req, res, next) => {
 
     const userRole = req.user?.role || 'student';
     const userId = req.user?.id;
+    const { scope } = req.query; // 'all' | 'personal' | 'admin' | 'faculty' | 'students'
 
-    // Multi-tenant role-based visibility filter:
-    if (userRole === 'admin') {
-      // Main Admin sees everything
+    if (scope === 'personal') {
+      // User only wants to see their personal tasks & schedule
+      query.createdBy = userId;
+    } else if (scope === 'admin') {
+      query.creatorRole = 'admin';
+      if (userRole === 'student') {
+        query.isVisibleToStudents = true;
+        query.visibility = { $nin: ['faculty_only', 'private'] };
+      }
+    } else if (scope === 'faculty') {
+      query.creatorRole = 'faculty';
+      if (userRole === 'student') {
+        query.isVisibleToStudents = true;
+        query.visibility = { $nin: ['faculty_only', 'private'] };
+      }
+    } else if (userRole === 'admin') {
+      // Main Admin sees all events, or respects filters
     } else if (userRole === 'faculty') {
       // Faculty sees:
-      // 1. All events created by themselves
-      // 2. All admin tasks / events
+      // 1. All events created by themselves (personal + departmental)
+      // 2. Official admin tasks & company drives
       // 3. Any event with visibility: public, students, or faculty_only
       query.$or = [
         { createdBy: userId },
-        { creatorRole: 'admin' },
-        { visibility: { $in: ['public', 'students', 'faculty_only'] } },
-        { 'targetAudience.roles': { $in: ['faculty'] } }
+        { creatorRole: 'admin', visibility: { $in: ['public', 'students', 'faculty_only'] } },
+        { isVisibleToStudents: true, visibility: { $in: ['public', 'students', 'faculty_only'] } }
       ];
     } else {
       // Student sees:
       // 1. Events created by this student (personal tasks)
-      // 2. Official Admin tasks and events where isVisibleToStudents is true
-      // 3. Faculty events where isVisibleToStudents is true and visibility != 'faculty_only' / 'private'
+      // 2. Official Admin & Faculty events intended for students
       query.$or = [
         { createdBy: userId },
         {
-          isVisibleToStudents: { $ne: false },
+          creatorRole: { $in: ['admin', 'faculty'] },
+          isVisibleToStudents: true,
           visibility: { $nin: ['faculty_only', 'private'] }
         }
       ];
@@ -229,6 +244,8 @@ exports.createEvent = async (req, res, next) => {
       targetBranches,
       allDay,
       isVisibleToStudents,
+      audienceScope, // 'personal' | 'students'
+      isForPersonal,
       priority,
       colorTag
     } = req.body;
@@ -240,28 +257,36 @@ exports.createEvent = async (req, res, next) => {
     const userRole = req.user.role || 'student';
     const userName = req.user.name || 'User';
 
-    // Normalize event type based on user role if not provided
+    // Normalize audience purpose
+    const isPersonalScope = audienceScope === 'personal' || isForPersonal === true;
+
+    // Normalize event type based on user role and scope
     let finalEventType = eventType;
     if (!finalEventType) {
-      if (userRole === 'admin') finalEventType = 'admin_task';
+      if (isPersonalScope) finalEventType = 'personal_task';
+      else if (userRole === 'admin') finalEventType = 'admin_task';
       else if (userRole === 'faculty') finalEventType = 'faculty_task';
       else finalEventType = 'personal_task';
     }
 
     // Determine visibility & isVisibleToStudents flag
-    let finalIsVisibleToStudents = true;
-    let finalVisibility = 'public';
+    let finalIsVisibleToStudents = false;
+    let finalVisibility = 'private';
 
-    if (userRole === 'student') {
-      // Students default to private personal tasks unless explicitly shared
+    if (isPersonalScope) {
+      // Strictly personal to this user (Admin, Faculty, or Student)
+      finalIsVisibleToStudents = false;
+      finalVisibility = 'private';
+    } else if (userRole === 'student') {
+      // Students can share with classmates if explicitly selected
       finalIsVisibleToStudents = isVisibleToStudents === true;
       finalVisibility = finalIsVisibleToStudents ? 'students' : 'private';
     } else if (userRole === 'faculty') {
-      // Faculty can toggle whether students see this event in their calendar
+      // Faculty publishing for students
       finalIsVisibleToStudents = isVisibleToStudents !== false;
       finalVisibility = finalIsVisibleToStudents ? 'students' : 'faculty_only';
     } else if (userRole === 'admin') {
-      // Admin defaults to visible for all students
+      // Admin publishing for students / institution
       finalIsVisibleToStudents = isVisibleToStudents !== false;
       finalVisibility = finalIsVisibleToStudents ? 'public' : 'faculty_only';
     }
@@ -273,8 +298,8 @@ exports.createEvent = async (req, res, next) => {
       colorTag: colorTag || undefined,
       startDateTime: new Date(startDateTime),
       endDateTime: new Date(endDateTime),
-      venueOrLink: (venueOrLink || 'Campus Placement Cell / Online').trim(),
-      instructorOrCompany: (instructorOrCompany || '').trim(),
+      venueOrLink: (venueOrLink || (isPersonalScope ? 'Personal Schedule / Desk' : 'Campus Placement Cell / Online')).trim(),
+      instructorOrCompany: (instructorOrCompany || (isPersonalScope ? userName : userRole === 'admin' ? 'TPO Admin' : userName)).trim(),
       allDay: !!allDay,
       creatorRole: userRole,
       creatorName: userName,
@@ -282,7 +307,9 @@ exports.createEvent = async (req, res, next) => {
       isVisibleToStudents: finalIsVisibleToStudents,
       priority: priority || 'medium',
       targetAudience: {
-        roles: targetRoles && targetRoles.length > 0
+        roles: isPersonalScope
+          ? [userRole]
+          : targetRoles && targetRoles.length > 0
           ? targetRoles
           : (userRole === 'student' ? ['student'] : ['student', 'faculty', 'admin']),
         branches: targetBranches && targetBranches.length > 0 ? targetBranches : ['All']
@@ -294,8 +321,8 @@ exports.createEvent = async (req, res, next) => {
       user: req.user,
       action: 'CALENDAR_EVENT_CREATED',
       category: 'Placement Calendar',
-      description: `Created placement event: ${event.title} (${event.eventType}) [VisibleToStudents: ${finalIsVisibleToStudents}]`,
-      details: { eventId: event._id, eventType: event.eventType, creatorRole: userRole },
+      description: `Created placement event: ${event.title} (${event.eventType}) [Scope: ${isPersonalScope ? 'Personal' : 'Students'}]`,
+      details: { eventId: event._id, eventType: event.eventType, creatorRole: userRole, isPersonalScope },
       req
     });
 

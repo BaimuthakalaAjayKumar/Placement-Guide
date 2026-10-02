@@ -185,21 +185,48 @@ exports.getSmartAlerts = async (req, res, next) => {
         }
       });
 
-      // 4. Calendar Events Today / Tomorrow
-      const upcomingEvents = await PlacementEvent.find({
-        startDateTime: { $gte: now, $lte: twoDaysLater }
-      }).limit(3);
+      // 4. Everyday Tasks & Calendar Events Today / Tomorrow
+      const startOfToday = new Date();
+      startOfToday.setHours(0, 0, 0, 0);
 
-      upcomingEvents.forEach(e => {
+      const studentCalendarEvents = await PlacementEvent.find({
+        $or: [
+          { createdBy: req.user.id },
+          { creatorRole: { $in: ['admin', 'faculty'] }, isVisibleToStudents: true, visibility: { $nin: ['faculty_only', 'private'] } }
+        ],
+        startDateTime: { $gte: startOfToday, $lte: twoDaysLater }
+      }).sort({ startDateTime: 1 }).limit(5);
+
+      const todayTasks = studentCalendarEvents.filter(e => {
+        const d = new Date(e.startDateTime);
+        return d.getDate() === now.getDate() && d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+      });
+
+      if (todayTasks.length > 0) {
+        smartAlerts.unshift({
+          id: `everyday_tasks_today_${now.toISOString().slice(0, 10)}`,
+          role: 'student',
+          type: 'calendar',
+          icon: '📌',
+          title: `Everyday Tasks Today (${todayTasks.length})`,
+          message: `You have ${todayTasks.length} placement task(s) and milestone(s) on your daily schedule today!`,
+          targetUrl: '/placement-calendar',
+          priority: 'high',
+          createdAt: now
+        });
+      }
+
+      studentCalendarEvents.slice(0, 3).forEach(e => {
+        const isSelf = String(e.createdBy) === String(req.user.id);
         smartAlerts.push({
           id: `event_${e._id}`,
           role: 'student',
           type: 'calendar',
-          icon: '📅',
-          title: `Upcoming: ${e.title}`,
+          icon: isSelf ? '👤' : '📅',
+          title: isSelf ? `Personal Task: ${e.title}` : `Upcoming: ${e.title}`,
           message: `${e.eventType.toUpperCase().replace('_', ' ')} scheduled at ${new Date(e.startDateTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} (${e.venueOrLink}).`,
           targetUrl: '/placement-calendar',
-          priority: 'medium',
+          priority: isSelf ? 'high' : 'medium',
           createdAt: e.startDateTime
         });
       });

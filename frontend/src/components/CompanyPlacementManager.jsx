@@ -24,12 +24,12 @@ const CompanyPlacementManager = () => {
   const [formData, setFormData] = useState({
     companyName: '',
     driveTitle: '',
-    role: '',
+    role: 'Software Development Engineer',
     jobType: 'Full-Time',
     packageLPA: '12.0 LPA',
     location: 'Hyderabad / Bangalore',
-    driveDate: '',
-    deadline: '',
+    driveDate: new Date(Date.now() + 10 * 86400000).toISOString().slice(0, 10),
+    deadline: new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10),
     eligibility: {
       minCgpa: 7.0,
       allowedBranches: 'CSE, IT, ECE',
@@ -37,7 +37,7 @@ const CompanyPlacementManager = () => {
       maxBacklogs: 0
     },
     requiredSkills: 'Python, SQL, DSA, Web Development',
-    description: ''
+    description: 'Full-time campus recruitment drive covering online aptitude test, coding assessment, and technical interview rounds.'
   });
   const [submitting, setSubmitting] = useState(false);
 
@@ -88,43 +88,58 @@ const CompanyPlacementManager = () => {
     try {
       setSubmitting(true);
       const branchesArr = formData.eligibility.allowedBranches
-        ? formData.eligibility.allowedBranches.split(',').map(s => s.trim()).filter(Boolean)
-        : [];
+        ? (Array.isArray(formData.eligibility.allowedBranches) ? formData.eligibility.allowedBranches : formData.eligibility.allowedBranches.split(',').map(s => s.trim()).filter(Boolean))
+        : ['CSE', 'IT', 'ECE'];
       const batchesArr = formData.eligibility.allowedBatches
-        ? formData.eligibility.allowedBatches.split(',').map(s => s.trim()).filter(Boolean)
-        : [];
+        ? (Array.isArray(formData.eligibility.allowedBatches) ? formData.eligibility.allowedBatches : formData.eligibility.allowedBatches.split(',').map(s => s.trim()).filter(Boolean))
+        : ['2025', '2026'];
       const skillsArr = formData.requiredSkills
-        ? formData.requiredSkills.split(',').map(s => s.trim()).filter(Boolean)
-        : [];
+        ? (Array.isArray(formData.requiredSkills) ? formData.requiredSkills : formData.requiredSkills.split(',').map(s => s.trim()).filter(Boolean))
+        : ['DSA', 'Problem Solving'];
+
+      const resolvedTitle = (formData.driveTitle || `${formData.companyName} Campus Recruitment Drive`).trim();
+      const resolvedPackage = (formData.packageLPA || '12.0 LPA').trim();
+      const resolvedDescription = (formData.description || `${formData.companyName} is hiring ${formData.role || 'Engineers'} with CTC package of ${resolvedPackage}. Eligible candidates must register before the cutoff date.`).trim();
+      const deadlineDate = formData.deadline ? new Date(formData.deadline) : new Date(Date.now() + 7 * 86400000);
+      const driveDateObj = formData.driveDate ? new Date(formData.driveDate) : new Date(Date.now() + 10 * 86400000);
 
       const payload = {
-        companyName: formData.companyName,
-        driveTitle: formData.driveTitle,
-        role: formData.role,
-        jobType: formData.jobType,
-        packageLPA: formData.packageLPA,
-        location: formData.location,
-        driveDate: formData.driveDate || new Date(Date.now() + 7 * 86400000),
-        deadline: formData.deadline || new Date(Date.now() + 5 * 86400000),
+        companyName: formData.companyName.trim(),
+        title: resolvedTitle,
+        driveTitle: resolvedTitle,
+        role: (formData.role || 'Software Development Engineer').trim(),
+        jobType: formData.jobType || 'Full-Time',
+        packageDetails: resolvedPackage,
+        packageLPA: resolvedPackage,
+        location: (formData.location || 'Hyderabad / Bangalore').trim(),
+        jobDescription: resolvedDescription,
+        description: resolvedDescription,
+        skillsRequired: skillsArr,
+        requiredSkills: skillsArr,
+        dates: {
+          registrationDeadline: deadlineDate,
+          driveDate: driveDateObj
+        },
+        deadline: deadlineDate,
+        driveDate: driveDateObj,
         eligibility: {
           minCgpa: Number(formData.eligibility.minCgpa) || 6.5,
-          allowedBranches: branchesArr,
-          allowedBatches: batchesArr,
+          allowedBranches: branchesArr.length > 0 ? branchesArr : ['CSE', 'IT', 'ECE'],
+          allowedBatches: batchesArr.length > 0 ? batchesArr : ['2025', '2026'],
+          maxActiveBacklogs: Number(formData.eligibility.maxBacklogs) || 0,
           maxBacklogs: Number(formData.eligibility.maxBacklogs) || 0
-        },
-        requiredSkills: skillsArr,
-        description: formData.description
+        }
       };
 
       const res = await axios.post(`${API_URL}/placement-drives`, payload, getAuthHeaders());
       if (res.data?.success) {
-        setFeedback({ type: 'success', message: `✅ Campus Drive for "${formData.companyName}" successfully launched!` });
+        setFeedback({ type: 'success', message: `✅ Campus Drive for "${formData.companyName}" successfully launched and synced to calendar!` });
         setShowCreateModal(false);
         fetchDrives();
         setTimeout(() => setFeedback({ type: '', message: '' }), 3000);
       }
     } catch (err) {
-      alert(err.response?.data?.error || 'Failed to create placement drive.');
+      alert(err.response?.data?.error || err.message || 'Failed to create placement drive.');
     } finally {
       setSubmitting(false);
     }
@@ -204,8 +219,8 @@ const CompanyPlacementManager = () => {
               onClick={() => setSelectedDrive(d)}
             >
               <span className="drive-co">{d.companyName}</span>
-              <span className="drive-pkg">{d.packageLPA}</span>
-              <span className="drive-count">({d.candidates?.length || 0})</span>
+              <span className="drive-pkg">{d.packageDetails || d.packageLPA}</span>
+              <span className="drive-count">({(d.candidates || d.applications || []).length})</span>
             </button>
           ))}
           {drives.length === 0 && !loading && (
@@ -221,20 +236,20 @@ const CompanyPlacementManager = () => {
             <div className="drive-card-header">
               <div>
                 <span className="co-tag">{selectedDrive.companyName}</span>
-                <h3 className="drive-name">{selectedDrive.driveTitle}</h3>
-                <span className="role-tag">Role: {selectedDrive.role} ({selectedDrive.jobType})</span>
+                <h3 className="drive-name">{selectedDrive.title || selectedDrive.driveTitle}</h3>
+                <span className="role-tag">Role: {selectedDrive.role} ({selectedDrive.jobType || 'Full-Time'})</span>
               </div>
               <div className="drive-kpis">
                 <div className="kpi-mini">
-                  <span className="val">{selectedDrive.packageLPA}</span>
+                  <span className="val">{selectedDrive.packageDetails || selectedDrive.packageLPA}</span>
                   <span className="lbl">CTC Package</span>
                 </div>
                 <div className="kpi-mini">
-                  <span className="val">{selectedDrive.candidates?.length || 0}</span>
+                  <span className="val">{(selectedDrive.candidates || selectedDrive.applications || []).length}</span>
                   <span className="lbl">Applicants</span>
                 </div>
                 <div className="kpi-mini">
-                  <span className="val">{candidatesByStage['selected']?.length + candidatesByStage['offered']?.length || 0}</span>
+                  <span className="val">{(candidatesByStage['selected']?.length || 0) + (candidatesByStage['offered']?.length || 0)}</span>
                   <span className="lbl">Selected / Offers</span>
                 </div>
               </div>
@@ -357,9 +372,10 @@ const CompanyPlacementManager = () => {
                 </div>
 
                 <div className="form-item">
-                  <label>Job Role</label>
+                  <label>Job Role *</label>
                   <input
                     type="text"
+                    required
                     placeholder="e.g. Software Development Engineer (SDE-1)"
                     value={formData.role}
                     onChange={e => setFormData({ ...formData, role: e.target.value })}
@@ -374,6 +390,50 @@ const CompanyPlacementManager = () => {
                     placeholder="e.g. 14.5 LPA or ₹45,000/month"
                     value={formData.packageLPA}
                     onChange={e => setFormData({ ...formData, packageLPA: e.target.value })}
+                  />
+                </div>
+
+                <div className="form-item">
+                  <label>Employment / Job Type</label>
+                  <select
+                    value={formData.jobType}
+                    onChange={e => setFormData({ ...formData, jobType: e.target.value })}
+                    style={{ background: '#111827', color: '#fff', border: '1px solid #374151', borderRadius: '8px', padding: '10px' }}
+                  >
+                    <option value="Full-Time">Full-Time (Direct Placement)</option>
+                    <option value="Internship + FTE">Internship + FTE Conversion</option>
+                    <option value="Internship">Summer / 6-Month Internship</option>
+                    <option value="Contract">Specialized Contract Role</option>
+                  </select>
+                </div>
+
+                <div className="form-item">
+                  <label>Drive Location / Mode</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Hyderabad / Virtual Online"
+                    value={formData.location}
+                    onChange={e => setFormData({ ...formData, location: e.target.value })}
+                  />
+                </div>
+
+                <div className="form-item">
+                  <label>Registration Cutoff Deadline *</label>
+                  <input
+                    type="date"
+                    required
+                    value={formData.deadline}
+                    onChange={e => setFormData({ ...formData, deadline: e.target.value })}
+                  />
+                </div>
+
+                <div className="form-item">
+                  <label>Drive Date / Assessment Day *</label>
+                  <input
+                    type="date"
+                    required
+                    value={formData.driveDate}
+                    onChange={e => setFormData({ ...formData, driveDate: e.target.value })}
                   />
                 </div>
 
