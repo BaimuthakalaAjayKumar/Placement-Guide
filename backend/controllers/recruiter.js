@@ -656,7 +656,9 @@ exports.getMyDrives = async (req, res, next) => {
       };
     }
 
-    const drives = await PlacementDrive.find(query).sort({ createdAt: -1 });
+    const drives = await PlacementDrive.find(query)
+      .populate('createdBy', 'name email companyName role')
+      .sort({ createdAt: -1 });
 
     const formatted = drives.map(d => {
       const dObj = d.toObject();

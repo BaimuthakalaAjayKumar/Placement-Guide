@@ -3855,80 +3855,9 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
               ) : (placementHubSubTab === 'drives' || activeTab === 'company-drives') ? (
                 <CompanyPlacementManager />
               ) : (
-                <div className="admin-split-layout">
-                {/* Admin Panels Left Column: Posted Job Listings (Image 2) */}
-                <div className="admin-left-column" style={{ display: 'flex', flexDirection: 'column', gap: '24px', minWidth: 0 }}>
-                  <div className="glass-card posted-jobs-card">
-                    <h3>Posted Job Listings</h3>
-                    <p className="card-desc">Review and manage job postings currently visible to students.</p>
-
-                    <div className="table-responsive-wrapper">
-                      <table className="student-roster-table">
-                        <thead>
-                          <tr>
-                            <th>Job Title</th>
-                            <th>Company</th>
-                            <th>Location</th>
-                            <th>Salary</th>
-                            <th>Target Batch</th>
-                            <th style={{ textAlign: 'center' }}>Action</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {fetchJobsLoading ? (
-                            <tr>
-                              <td colSpan="6" className="table-empty-msg">
-                                <span className="spinner-loader" style={{ margin: '10px auto' }}></span>
-                              </td>
-                            </tr>
-                          ) : jobs.length > 0 ? (
-                            jobs.map((job) => (
-                              <tr key={job._id}>
-                                <td>
-                                  <strong>{job.title}</strong>
-                                </td>
-                                <td>{job.company}</td>
-                                <td>{job.location}</td>
-                                <td>{job.salary}</td>
-                                <td>
-                                  <span className="badge" style={{ backgroundColor: 'rgba(99, 102, 241, 0.1)', color: '#818cf8', border: '1px solid rgba(99, 102, 241, 0.2)', padding: '4px 8px', borderRadius: '4px', fontSize: '12px' }}>
-                                    {job.targetBatch || 'All'}
-                                  </span>
-                                </td>
-                                <td>
-                                  <div style={{ display: 'flex', justifyContent: 'center' }}>
-                                    <button
-                                      className="btn btn-secondary btn-sm"
-                                      onClick={() => openJobExpiryEditor(job)}
-                                      title="Extend application deadline"
-                                    >
-                                      Extend Deadline
-                                    </button>
-                                    <button
-                                      className="btn btn-danger btn-sm"
-                                      onClick={() => handleDeleteJob(job._id, job.title)}
-                                      title="Delete Job"
-                                    >
-                                      🗑 Delete
-                                    </button>
-                                  </div>
-                                </td>
-                              </tr>
-                            ))
-                          ) : (
-                            <tr>
-                              <td colSpan="6" className="table-empty-msg">No job postings found.</td>
-                            </tr>
-                          )}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Admin Panels Right Column: Post Job Opportunities (Image 1) */}
-                <div className="admin-right-column" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-                  <div className="glass-card create-job-form-card">
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '32px', width: '100%' }} className="animate-fade">
+                  {/* 1. First: Post Job Opportunities */}
+                  <div className="glass-card create-job-form-card" style={{ width: '100%' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap', gap: '8px' }}>
                       <h3 style={{ margin: 0 }}>Post Job Opportunities</h3>
                       <div className="job-mode-toggle" style={{ display: 'flex', gap: '4px', background: 'rgba(255,255,255,0.05)', padding: '3px', borderRadius: '6px' }}>
@@ -4301,8 +4230,75 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
                       </>
                     )}
                   </div>
+
+                  {/* 2. Then: Posted Job Listings */}
+                  <div className="glass-card posted-jobs-card" style={{ width: '100%' }}>
+                    <h3>Posted Job Listings</h3>
+                    <p className="card-desc">Review and manage job postings currently visible to students.</p>
+
+                    <div className="table-responsive-wrapper">
+                      <table className="student-roster-table">
+                        <thead>
+                          <tr>
+                            <th>Job Title</th>
+                            <th>Company</th>
+                            <th>Location</th>
+                            <th>Salary</th>
+                            <th>Target Batch</th>
+                            <th style={{ textAlign: 'center' }}>Action</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {fetchJobsLoading ? (
+                            <tr>
+                              <td colSpan="6" className="table-empty-msg">
+                                <span className="spinner-loader" style={{ margin: '10px auto' }}></span>
+                              </td>
+                            </tr>
+                          ) : jobs.length > 0 ? (
+                            jobs.map((job) => (
+                              <tr key={job._id}>
+                                <td>
+                                  <strong>{job.title}</strong>
+                                </td>
+                                <td>{job.company}</td>
+                                <td>{job.location}</td>
+                                <td>{job.salary}</td>
+                                <td>
+                                  <span className="badge" style={{ backgroundColor: 'rgba(99, 102, 241, 0.1)', color: '#818cf8', border: '1px solid rgba(99, 102, 241, 0.2)', padding: '4px 8px', borderRadius: '4px', fontSize: '12px' }}>
+                                    {job.targetBatch || 'All'}
+                                  </span>
+                                </td>
+                                <td>
+                                  <div style={{ display: 'flex', justifyContent: 'center' }}>
+                                    <button
+                                      className="btn btn-secondary btn-sm"
+                                      onClick={() => openJobExpiryEditor(job)}
+                                      title="Extend application deadline"
+                                    >
+                                      Extend Deadline
+                                    </button>
+                                    <button
+                                      className="btn btn-danger btn-sm"
+                                      onClick={() => handleDeleteJob(job._id, job.title)}
+                                      title="Delete Job"
+                                    >
+                                      🗑 Delete
+                                    </button>
+                                  </div>
+                                </td>
+                              </tr>
+                            ))
+                          ) : (
+                            <tr>
+                              <td colSpan="6" className="table-empty-msg">No job postings found.</td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
                 </div>
-              </div>
             )}
           </div>
         )
@@ -5707,174 +5703,172 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
 
         {
           activeTab === 'academic-content' && (
-            <div className="admin-split-layout animate-fade">
-              <div className="admin-left-column" style={{ display: 'flex', flexDirection: 'column', gap: '24px', minWidth: 0 }}>
-                <div className="glass-card">
-                  <div className="manager-header">
-                    <div>
-                      <h3>Academic Subjects</h3>
-                      <p className="card-desc">Create subject preparation areas for a specific academic year.</p>
-                    </div>
-                    <button className="btn btn-secondary btn-sm" type="button" onClick={downloadAcademicSubjects} disabled={!academicSubjects.length}>Download CSV</button>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '32px', width: '100%' }} className="animate-fade">
+              {/* Whole Academic Subjects Section */}
+              <div className="glass-card" style={{ width: '100%' }}>
+                <div className="manager-header">
+                  <div>
+                    <h3>Academic Subjects</h3>
+                    <p className="card-desc">Create subject preparation areas for a specific academic year.</p>
                   </div>
-                  <form className="admin-job-form mt-20" onSubmit={createAcademicSubject}>
-                    <div className="form-group">
-                      <label className="form-label" htmlFor="academicSubjectName">Subject Name</label>
-                      <input id="academicSubjectName" className="form-control" value={subjectForm.name} onChange={event => setSubjectForm({ ...subjectForm, name: event.target.value })} required />
-                    </div>
-                    <div className="form-group">
-                      <label className="form-label" htmlFor="academicSubjectCode">Subject Code</label>
-                      <input id="academicSubjectCode" className="form-control" value={subjectForm.code} onChange={event => setSubjectForm({ ...subjectForm, code: event.target.value })} required />
-                    </div>
-                    <div className="form-group">
-                      <label className="form-label" htmlFor="academicSubjectYear">Academic Year</label>
-                      <input id="academicSubjectYear" className="form-control" placeholder="e.g. 2026 or 3rd Year" value={subjectForm.academicYear} onChange={event => setSubjectForm({ ...subjectForm, academicYear: event.target.value })} required />
-                    </div>
-                    <div className="form-group">
-                      <label className="form-label" htmlFor="academicSubjectBranch">Branch</label>
-                      <input id="academicSubjectBranch" className="form-control" placeholder="Branch, e.g. CSE (or leave blank for all branches)" value={subjectForm.branch} onChange={event => setSubjectForm({ ...subjectForm, branch: event.target.value })} />
-                    </div>
-                    <div className="form-group">
-                      <label className="form-label" htmlFor="academicSubjectDescription">Description</label>
-                      <textarea id="academicSubjectDescription" className="form-control" value={subjectForm.description} onChange={event => setSubjectForm({ ...subjectForm, description: event.target.value })} />
-                    </div>
-                    <button className="btn btn-primary" type="submit">Add Subject</button>
-                  </form>
+                  <button className="btn btn-secondary btn-sm" type="button" onClick={downloadAcademicSubjects} disabled={!academicSubjects.length}>Download CSV</button>
+                </div>
+                <form className="admin-job-form mt-20" onSubmit={createAcademicSubject}>
+                  <div className="form-group">
+                    <label className="form-label" htmlFor="academicSubjectName">Subject Name</label>
+                    <input id="academicSubjectName" className="form-control" value={subjectForm.name} onChange={event => setSubjectForm({ ...subjectForm, name: event.target.value })} required />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label" htmlFor="academicSubjectCode">Subject Code</label>
+                    <input id="academicSubjectCode" className="form-control" value={subjectForm.code} onChange={event => setSubjectForm({ ...subjectForm, code: event.target.value })} required />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label" htmlFor="academicSubjectYear">Academic Year</label>
+                    <input id="academicSubjectYear" className="form-control" placeholder="e.g. 2026 or 3rd Year" value={subjectForm.academicYear} onChange={event => setSubjectForm({ ...subjectForm, academicYear: event.target.value })} required />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label" htmlFor="academicSubjectBranch">Branch</label>
+                    <input id="academicSubjectBranch" className="form-control" placeholder="Branch, e.g. CSE (or leave blank for all branches)" value={subjectForm.branch} onChange={event => setSubjectForm({ ...subjectForm, branch: event.target.value })} />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label" htmlFor="academicSubjectDescription">Description</label>
+                    <textarea id="academicSubjectDescription" className="form-control" value={subjectForm.description} onChange={event => setSubjectForm({ ...subjectForm, description: event.target.value })} />
+                  </div>
+                  <button className="btn btn-primary" type="submit">Add Subject</button>
+                </form>
+                <div className="table-responsive-wrapper mt-20">
+                  <table className="student-roster-table">
+                    <thead>
+                      <tr>
+                        <th>Subject</th>
+                        <th>Code</th>
+                        <th>Academic Year</th>
+                        <th>Status</th>
+                        <th>Action</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {academicSubjects.map(subject => (
+                        <tr key={subject._id}>
+                          <td><strong>{subject.name}</strong></td>
+                          <td><span className="code-pill">{subject.code}</span></td>
+                          <td>{subject.academicYear}{subject.branch ? ` (${subject.branch})` : ''}</td>
+                          <td><span className="status-badge-active">{subject.isActive ? 'Active' : 'Inactive'}</span></td>
+                          <td>
+                            <button
+                              className="btn btn-danger btn-sm"
+                              type="button"
+                              onClick={() => handleDeleteSubject(subject._id, subject.name)}
+                              title="Delete Subject"
+                            >
+                              🗑 Remove
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                      {!academicSubjects.length && <tr><td colSpan="5">No subjects found.</td></tr>}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Whole Student Projects Section */}
+              <div className="glass-card" style={{ width: '100%' }}>
+                <div className="manager-header">
+                  <div>
+                    <h3>Student Projects</h3>
+                    <p className="card-desc">Review complete project files, status, feedback, and grades across all academic years.</p>
+                  </div>
+                  <button className="btn btn-secondary btn-sm" type="button" onClick={downloadAcademicProjects} disabled={!academicProjects.length}>Download CSV</button>
+                </div>
+                {loadingAcademicContent ? (
+                  <div className="dashboard-loading-container"><div className="spinner-loader"></div><p>Loading academic content...</p></div>
+                ) : (
                   <div className="table-responsive-wrapper mt-20">
                     <table className="student-roster-table">
                       <thead>
                         <tr>
-                          <th>Subject</th>
-                          <th>Code</th>
-                          <th>Academic Year</th>
+                          <th>Student &amp; Teammates</th>
+                          <th>Project Title &amp; Links</th>
+                          <th>Technologies</th>
+                          <th>Goals</th>
                           <th>Status</th>
+                          <th>Grade</th>
                           <th>Action</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {academicSubjects.map(subject => (
-                          <tr key={subject._id}>
-                            <td><strong>{subject.name}</strong></td>
-                            <td><span className="code-pill">{subject.code}</span></td>
-                            <td>{subject.academicYear}{subject.branch ? ` (${subject.branch})` : ''}</td>
-                            <td><span className="status-badge-active">{subject.isActive ? 'Active' : 'Inactive'}</span></td>
-                            <td>
-                              <button
-                                className="btn btn-danger btn-sm"
-                                type="button"
-                                onClick={() => handleDeleteSubject(subject._id, subject.name)}
-                                title="Delete Subject"
-                              >
-                                🗑 Remove
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
-                        {!academicSubjects.length && <tr><td colSpan="5">No subjects found.</td></tr>}
+                        {academicProjects.map(project => {
+                          const liveUrl = project.deploymentUrl || project.previewUrl;
+                          const hasTeam = project.teamMembers && project.teamMembers.length > 0;
+                          return (
+                            <tr key={project._id}>
+                              <td>
+                                <strong>{project.student?.name || 'Student'}</strong>
+                                <div className="text-secondary" style={{ fontSize: '11px' }}>
+                                  {project.student?.email || ''}
+                                  {project.student?.rollNumber ? ` · ${project.student.rollNumber}` : ''}
+                                </div>
+                                {hasTeam && (
+                                  <div style={{ fontSize: '11px', color: '#a5b4fc', marginTop: '2px' }}>
+                                    👥 +{project.teamMembers.length} Teammates: {project.teamMembers.map(m => m.name).join(', ')}
+                                  </div>
+                                )}
+                              </td>
+                              <td>
+                                <strong>{project.title}</strong>
+                                <div style={{ display: 'flex', gap: '6px', marginTop: '4px', flexWrap: 'wrap' }}>
+                                  {liveUrl && (
+                                    <a
+                                      href={liveUrl.startsWith('http') ? liveUrl : `https://${liveUrl}`}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      style={{ color: '#34d399', fontSize: '11px', fontWeight: 600 }}
+                                    >
+                                      🚀 Live Demo ↗
+                                    </a>
+                                  )}
+                                  {project.repositoryUrl && (
+                                    <a
+                                      href={project.repositoryUrl}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      style={{ color: '#38bdf8', fontSize: '11px', fontWeight: 600 }}
+                                    >
+                                      💻 GitHub ↗
+                                    </a>
+                                  )}
+                                </div>
+                              </td>
+                              <td>
+                                <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', maxWidth: '180px' }}>
+                                  {project.technologies && project.technologies.length > 0 ? (
+                                    project.technologies.map(t => (
+                                      <span key={t} style={{ background: 'rgba(99, 102, 241, 0.15)', border: '1px solid rgba(99, 102, 241, 0.3)', color: '#a5b4fc', fontSize: '10px', padding: '1px 5px', borderRadius: '4px' }}>
+                                        {t}
+                                      </span>
+                                    ))
+                                  ) : (
+                                    <span className="text-secondary" style={{ fontSize: '11px' }}>General</span>
+                                  )}
+                                </div>
+                              </td>
+                              <td>
+                                <div style={{ maxWidth: '160px', fontSize: '12px', color: '#cbd5e1', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={project.goals || 'No goals specified'}>
+                                  {project.goals || '-'}
+                                </div>
+                              </td>
+                              <td><span className={`status-pill ${project.status}`}>{project.status.replace('_', ' ')}</span></td>
+                              <td>{project.grade !== null && project.grade !== undefined ? <strong>{project.grade}/100</strong> : <span style={{ color: '#94a3b8' }}>Not graded</span>}</td>
+                              <td><button className="btn btn-primary btn-sm" type="button" onClick={() => openProjectReview(project)}>Inspect &amp; Review</button></td>
+                            </tr>
+                          );
+                        })}
+                        {!academicProjects.length && <tr><td colSpan="7" style={{ textAlign: 'center', padding: '24px' }}>No student projects found.</td></tr>}
                       </tbody>
                     </table>
                   </div>
-                </div>
-              </div>
-
-              <div className="admin-right-column" style={{ minWidth: 0 }}>
-                <div className="glass-card">
-                  <div className="manager-header">
-                    <div>
-                      <h3>Student Projects</h3>
-                      <p className="card-desc">Review complete project files, status, feedback, and grades across all academic years.</p>
-                    </div>
-                    <button className="btn btn-secondary btn-sm" type="button" onClick={downloadAcademicProjects} disabled={!academicProjects.length}>Download CSV</button>
-                  </div>
-                  {loadingAcademicContent ? (
-                    <div className="dashboard-loading-container"><div className="spinner-loader"></div><p>Loading academic content...</p></div>
-                  ) : (
-                    <div className="table-responsive-wrapper mt-20">
-                      <table className="student-roster-table">
-                        <thead>
-                          <tr>
-                            <th>Student & Teammates</th>
-                            <th>Project Title & Links</th>
-                            <th>Technologies</th>
-                            <th>Goals</th>
-                            <th>Status</th>
-                            <th>Grade</th>
-                            <th>Action</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {academicProjects.map(project => {
-                            const liveUrl = project.deploymentUrl || project.previewUrl;
-                            const hasTeam = project.teamMembers && project.teamMembers.length > 0;
-                            return (
-                              <tr key={project._id}>
-                                <td>
-                                  <strong>{project.student?.name || 'Student'}</strong>
-                                  <div className="text-secondary" style={{ fontSize: '11px' }}>
-                                    {project.student?.email || ''}
-                                    {project.student?.rollNumber ? ` · ${project.student.rollNumber}` : ''}
-                                  </div>
-                                  {hasTeam && (
-                                    <div style={{ fontSize: '11px', color: '#a5b4fc', marginTop: '2px' }}>
-                                      👥 +{project.teamMembers.length} Teammates: {project.teamMembers.map(m => m.name).join(', ')}
-                                    </div>
-                                  )}
-                                </td>
-                                <td>
-                                  <strong>{project.title}</strong>
-                                  <div style={{ display: 'flex', gap: '6px', marginTop: '4px', flexWrap: 'wrap' }}>
-                                    {liveUrl && (
-                                      <a
-                                        href={liveUrl.startsWith('http') ? liveUrl : `https://${liveUrl}`}
-                                        target="_blank"
-                                        rel="noreferrer"
-                                        style={{ color: '#34d399', fontSize: '11px', fontWeight: 600 }}
-                                      >
-                                        🚀 Live Demo ↗
-                                      </a>
-                                    )}
-                                    {project.repositoryUrl && (
-                                      <a
-                                        href={project.repositoryUrl}
-                                        target="_blank"
-                                        rel="noreferrer"
-                                        style={{ color: '#38bdf8', fontSize: '11px', fontWeight: 600 }}
-                                      >
-                                        💻 GitHub ↗
-                                      </a>
-                                    )}
-                                  </div>
-                                </td>
-                                <td>
-                                  <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', maxWidth: '180px' }}>
-                                    {project.technologies && project.technologies.length > 0 ? (
-                                      project.technologies.map(t => (
-                                        <span key={t} style={{ background: 'rgba(99, 102, 241, 0.15)', border: '1px solid rgba(99, 102, 241, 0.3)', color: '#a5b4fc', fontSize: '10px', padding: '1px 5px', borderRadius: '4px' }}>
-                                          {t}
-                                        </span>
-                                      ))
-                                    ) : (
-                                      <span className="text-secondary" style={{ fontSize: '11px' }}>General</span>
-                                    )}
-                                  </div>
-                                </td>
-                                <td>
-                                  <div style={{ maxWidth: '160px', fontSize: '12px', color: '#cbd5e1', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={project.goals || 'No goals specified'}>
-                                    {project.goals || '-'}
-                                  </div>
-                                </td>
-                                <td><span className={`status-pill ${project.status}`}>{project.status.replace('_', ' ')}</span></td>
-                                <td>{project.grade !== null && project.grade !== undefined ? <strong>{project.grade}/100</strong> : <span style={{ color: '#94a3b8' }}>Not graded</span>}</td>
-                                <td><button className="btn btn-primary btn-sm" type="button" onClick={() => openProjectReview(project)}>Inspect & Review</button></td>
-                              </tr>
-                            );
-                          })}
-                          {!academicProjects.length && <tr><td colSpan="7" style={{ textAlign: 'center', padding: '24px' }}>No student projects found.</td></tr>}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-                </div>
+                )}
               </div>
             </div>
           )

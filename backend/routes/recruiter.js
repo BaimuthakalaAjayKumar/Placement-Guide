@@ -27,10 +27,14 @@ router.delete('/accounts/:id', authorize('admin'), revokeRecruiterAccount);
 router.put('/accounts/:id/extend', authorize('admin'), extendRecruiterAccount);
 
 // Recruiter & Admin shared operations
+const { cancelDrive, deleteDrive } = require('../controllers/placementDrives');
+
 router.get('/suitable-students', authorize('recruiter', 'admin'), getSuitableStudents);
 router.post('/invite-student', authorize('recruiter', 'admin'), inviteStudentToDrive);
 router.get('/my-drives', authorize('recruiter', 'admin'), getMyDrives);
 router.post('/drives', authorize('recruiter', 'admin'), createDriveByRecruiter);
+router.put('/drives/:id/cancel', authorize('recruiter', 'admin'), cancelDrive);
+router.delete('/drives/:id', authorize('recruiter', 'admin'), deleteDrive);
 router.put('/candidates/:driveId/:studentId/stage', authorize('recruiter', 'admin'), updateCandidateRecruiterStage);
 router.get('/export-csv', authorize('recruiter', 'admin'), exportRecruiterCSV);
 

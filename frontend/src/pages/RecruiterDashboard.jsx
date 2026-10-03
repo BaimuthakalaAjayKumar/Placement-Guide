@@ -262,6 +262,73 @@ const RecruiterDashboard = () => {
     }
   };
 
+  // Handle Recruiter Cancel Drive
+  const handleCancelDrive = async (driveId, companyName) => {
+    if (!window.confirm(`Are you sure you want to cancel the on-campus placement drive for "${companyName}"? All registered students will be notified of the cancellation.`)) {
+      return;
+    }
+    try {
+      setActionLoading(true);
+      setError('');
+      setSuccessMsg('');
+
+      const res = await fetch(`${API_URL}/placement-drives/${driveId}/cancel`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ reason: 'Cancelled by recruiter' })
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        sfx.playSuccess();
+        setSuccessMsg(`🚫 Placement drive for "${companyName}" has been successfully cancelled.`);
+        fetchMyDrives();
+      } else {
+        setError(data.error || 'Failed to cancel placement drive.');
+      }
+    } catch (err) {
+      setError('An error occurred while cancelling the placement drive.');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // Handle Recruiter Delete Drive
+  const handleDeleteDrive = async (driveId, companyName) => {
+    if (!window.confirm(`Are you sure you want to permanently delete the on-campus placement drive for "${companyName}"? This action cannot be undone.`)) {
+      return;
+    }
+    try {
+      setActionLoading(true);
+      setError('');
+      setSuccessMsg('');
+
+      const res = await fetch(`${API_URL}/placement-drives/${driveId}`, {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        sfx.playSuccess();
+        setSuccessMsg(`🗑️ Placement drive for "${companyName}" has been deleted.`);
+        fetchMyDrives();
+        fetchSuitableStudents();
+      } else {
+        setError(data.error || 'Failed to delete placement drive.');
+      }
+    } catch (err) {
+      setError('An error occurred while deleting the placement drive.');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   // Handle Stage Update Submission
   const handleStageUpdate = async (e) => {
     e.preventDefault();
@@ -1262,9 +1329,24 @@ const RecruiterDashboard = () => {
                     >
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                         <div>
-                          <span style={{ fontSize: '11px', color: '#c084fc', fontWeight: 800, textTransform: 'uppercase' }}>
-                            {drive.companyName}
-                          </span>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                            <span style={{ fontSize: '11px', color: '#c084fc', fontWeight: 800, textTransform: 'uppercase' }}>
+                              {drive.companyName}
+                            </span>
+                            {drive.status === 'cancelled' && (
+                              <span style={{
+                                background: '#ef4444',
+                                color: '#ffffff',
+                                padding: '2px 7px',
+                                borderRadius: '5px',
+                                fontSize: '10px',
+                                fontWeight: 800,
+                                letterSpacing: '0.5px'
+                              }}>
+                                🚫 CANCELLED
+                              </span>
+                            )}
+                          </div>
                           <h3 style={{ margin: '2px 0 0 0', fontSize: '1.2rem', color: '#FFFFFF' }}>
                             {drive.role || drive.title}
                           </h3>
@@ -1325,28 +1407,70 @@ const RecruiterDashboard = () => {
                       </div>
 
                       {/* Actions */}
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 'auto', paddingTop: '8px', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
-                        <button
-                          type="button"
-                          className="btn btn-secondary btn-sm"
-                          onClick={() => {
-                            setSelectedDriveId(drive._id);
-                            setActiveTab('students');
-                          }}
-                        >
-                          🎯 View Suitable Pool
-                        </button>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 'auto', paddingTop: '10px', borderTop: '1px solid rgba(255,255,255,0.08)', flexWrap: 'wrap', gap: '8px' }}>
+                        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                          <button
+                            type="button"
+                            className="btn btn-secondary btn-sm"
+                            onClick={() => {
+                              setSelectedDriveId(drive._id);
+                              setActiveTab('students');
+                            }}
+                          >
+                            🎯 View Suitable Pool
+                          </button>
 
-                        <button
-                          type="button"
-                          className="btn btn-primary btn-sm"
-                          onClick={() => {
-                            setSelectedDriveId(drive._id);
-                            setActiveTab('pipeline');
-                          }}
-                        >
-                          📋 Candidate Pipeline ({apps.length}) →
-                        </button>
+                          <button
+                            type="button"
+                            className="btn btn-primary btn-sm"
+                            onClick={() => {
+                              setSelectedDriveId(drive._id);
+                              setActiveTab('pipeline');
+                            }}
+                          >
+                            📋 Candidate Pipeline ({apps.length}) →
+                          </button>
+                        </div>
+
+                        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                          {drive.status !== 'cancelled' && (
+                            <button
+                              type="button"
+                              className="btn btn-secondary btn-sm"
+                              style={{
+                                background: 'rgba(239, 68, 68, 0.15)',
+                                color: '#f87171',
+                                border: '1px solid rgba(239, 68, 68, 0.4)',
+                                fontSize: '11px',
+                                padding: '4px 10px',
+                                fontWeight: 700
+                              }}
+                              disabled={actionLoading}
+                              onClick={() => handleCancelDrive(drive._id, drive.companyName || drive.role)}
+                              title="Cancel this drive (notifies registered students)"
+                            >
+                              🚫 Cancel
+                            </button>
+                          )}
+
+                          <button
+                            type="button"
+                            className="btn btn-secondary btn-sm"
+                            style={{
+                              background: 'rgba(220, 38, 38, 0.25)',
+                              color: '#fca5a5',
+                              border: '1px solid rgba(220, 38, 38, 0.5)',
+                              fontSize: '11px',
+                              padding: '4px 10px',
+                              fontWeight: 700
+                            }}
+                            disabled={actionLoading}
+                            onClick={() => handleDeleteDrive(drive._id, drive.companyName || drive.role)}
+                            title="Delete this placement drive"
+                          >
+                            🗑️ Delete
+                          </button>
+                        </div>
                       </div>
                     </div>
                   );
@@ -1378,9 +1502,23 @@ const RecruiterDashboard = () => {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
               <div>
-                <h3 style={{ margin: 0, color: '#FFFFFF', fontSize: '1.25rem' }}>
-                  📋 Candidate Pipeline — {currentDrive ? `${currentDrive.companyName} (${currentDrive.role || currentDrive.title})` : 'Select a Drive'}
-                </h3>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                  <h3 style={{ margin: 0, color: '#FFFFFF', fontSize: '1.25rem' }}>
+                    📋 Candidate Pipeline — {currentDrive ? `${currentDrive.companyName} (${currentDrive.role || currentDrive.title})` : 'Select a Drive'}
+                  </h3>
+                  {currentDrive?.status === 'cancelled' && (
+                    <span style={{
+                      background: '#ef4444',
+                      color: '#ffffff',
+                      padding: '2px 8px',
+                      borderRadius: '5px',
+                      fontSize: '11px',
+                      fontWeight: 800
+                    }}>
+                      🚫 CANCELLED
+                    </span>
+                  )}
+                </div>
                 <p style={{ margin: '4px 0 0 0', color: '#94a3b8', fontSize: '13px' }}>
                   Manage candidate progression across recruitment rounds, schedule interview slots, and release offer letters.
                 </p>
@@ -1395,7 +1533,7 @@ const RecruiterDashboard = () => {
                 >
                   {drives.map((d) => (
                     <option key={d._id} value={d._id}>
-                      {d.role || d.title} ({d.applications?.length || 0} applicants)
+                      {d.role || d.title} ({d.applications?.length || 0} applicants) {d.status === 'cancelled' ? '[CANCELLED]' : ''}
                     </option>
                   ))}
                 </select>
@@ -1468,6 +1606,47 @@ const RecruiterDashboard = () => {
               >
                 🏆 Final Select &amp; Offers
               </button>
+
+              {currentDrive && (
+                <div style={{ marginLeft: 'auto', display: 'flex', gap: '8px' }}>
+                  {currentDrive.status !== 'cancelled' && (
+                    <button
+                      type="button"
+                      className="btn btn-sm"
+                      style={{
+                        background: 'rgba(239, 68, 68, 0.15)',
+                        color: '#f87171',
+                        border: '1px solid rgba(239, 68, 68, 0.4)',
+                        fontSize: '11px',
+                        padding: '5px 10px',
+                        fontWeight: 700
+                      }}
+                      disabled={actionLoading}
+                      onClick={() => handleCancelDrive(currentDrive._id, currentDrive.companyName || currentDrive.role)}
+                      title="Cancel this drive (notifies registered students)"
+                    >
+                      🚫 Cancel Drive
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    className="btn btn-sm"
+                    style={{
+                      background: 'rgba(220, 38, 38, 0.25)',
+                      color: '#fca5a5',
+                      border: '1px solid rgba(220, 38, 38, 0.5)',
+                      fontSize: '11px',
+                      padding: '5px 10px',
+                      fontWeight: 700
+                    }}
+                    disabled={actionLoading}
+                    onClick={() => handleDeleteDrive(currentDrive._id, currentDrive.companyName || currentDrive.role)}
+                    title="Delete this drive"
+                  >
+                    🗑️ Delete Drive
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* Stages Columns (Kanban) */}

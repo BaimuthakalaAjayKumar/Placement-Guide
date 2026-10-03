@@ -145,6 +145,45 @@ const CompanyPlacementManager = () => {
     }
   };
 
+  const handleCancelDrive = async (driveId, companyName) => {
+    if (!window.confirm(`Are you sure you want to cancel the on-campus placement drive for "${companyName}"? All registered students will be notified of the cancellation.`)) {
+      return;
+    }
+    try {
+      setLoading(true);
+      const res = await axios.put(`${API_URL}/placement-drives/${driveId}/cancel`, {}, getAuthHeaders());
+      if (res.data?.success) {
+        setFeedback({ type: 'success', message: `🚫 Placement drive for "${companyName}" has been cancelled.` });
+        fetchDrives();
+        setTimeout(() => setFeedback({ type: '', message: '' }), 3500);
+      }
+    } catch (err) {
+      alert(err.response?.data?.error || 'Failed to cancel placement drive.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteDrive = async (driveId, companyName) => {
+    if (!window.confirm(`Are you sure you want to permanently delete the on-campus placement drive for "${companyName}"? This will delete the drive and any linked calendar events across the portal. Admin has full authority to delete any drive posted by Recruiters or Admins.`)) {
+      return;
+    }
+    try {
+      setLoading(true);
+      const res = await axios.delete(`${API_URL}/placement-drives/${driveId}`, getAuthHeaders());
+      if (res.data?.success) {
+        setFeedback({ type: 'success', message: `🗑️ Placement drive for "${companyName}" has been permanently deleted.` });
+        setSelectedDrive(null);
+        fetchDrives();
+        setTimeout(() => setFeedback({ type: '', message: '' }), 3500);
+      }
+    } catch (err) {
+      alert(err.response?.data?.error || 'Failed to delete placement drive.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleUpdateCandidateStage = async (driveId, candidateId, newStage, extraData = {}) => {
     try {
       const payload = {
@@ -216,9 +255,15 @@ const CompanyPlacementManager = () => {
               key={d._id}
               type="button"
               className={`drive-chip ${selectedDrive?._id === d._id ? 'active' : ''}`}
+              style={d.status === 'cancelled' ? { opacity: 0.75, border: '1px dashed #ef4444' } : {}}
               onClick={() => setSelectedDrive(d)}
             >
               <span className="drive-co">{d.companyName}</span>
+              {d.status === 'cancelled' && (
+                <span style={{ background: '#ef4444', color: '#fff', fontSize: '9px', padding: '1px 5px', borderRadius: '4px', fontWeight: 800, marginLeft: '4px' }}>
+                  CANCELLED
+                </span>
+              )}
               <span className="drive-pkg">{d.packageDetails || d.packageLPA}</span>
               <span className="drive-count">({(d.candidates || d.applications || []).length})</span>
             </button>
@@ -235,7 +280,35 @@ const CompanyPlacementManager = () => {
           <div className="drive-overview-card">
             <div className="drive-card-header">
               <div>
-                <span className="co-tag">{selectedDrive.companyName}</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '4px' }}>
+                  <span className="co-tag">{selectedDrive.companyName}</span>
+                  {selectedDrive.status === 'cancelled' && (
+                    <span style={{
+                      background: '#ef4444',
+                      color: '#ffffff',
+                      padding: '2px 8px',
+                      borderRadius: '6px',
+                      fontSize: '11px',
+                      fontWeight: 800,
+                      letterSpacing: '0.5px'
+                    }}>
+                      🚫 CANCELLED
+                    </span>
+                  )}
+                  <span style={{
+                    background: selectedDrive.createdBy?.role === 'recruiter' ? 'rgba(168, 85, 247, 0.2)' : 'rgba(59, 130, 246, 0.2)',
+                    color: selectedDrive.createdBy?.role === 'recruiter' ? '#c084fc' : '#60a5fa',
+                    border: `1px solid ${selectedDrive.createdBy?.role === 'recruiter' ? 'rgba(168, 85, 247, 0.4)' : 'rgba(59, 130, 246, 0.4)'}`,
+                    padding: '2px 8px',
+                    borderRadius: '6px',
+                    fontSize: '11px',
+                    fontWeight: 600
+                  }}>
+                    {selectedDrive.createdBy?.role === 'recruiter'
+                      ? `🏢 Posted by Recruiter: ${selectedDrive.createdBy?.companyName || selectedDrive.createdBy?.name || selectedDrive.companyName || 'Corporate Recruiter'}`
+                      : '🛡️ Posted by Placement Admin'}
+                  </span>
+                </div>
                 <h3 className="drive-name">{selectedDrive.title || selectedDrive.driveTitle}</h3>
                 <span className="role-tag">Role: {selectedDrive.role} ({selectedDrive.jobType || 'Full-Time'})</span>
               </div>
@@ -252,6 +325,71 @@ const CompanyPlacementManager = () => {
                   <span className="val">{(candidatesByStage['selected']?.length || 0) + (candidatesByStage['offered']?.length || 0)}</span>
                   <span className="lbl">Selected / Offers</span>
                 </div>
+              </div>
+            </div>
+
+            {/* Admin Management Action Row (Cancel & Delete Drive) */}
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              flexWrap: 'wrap',
+              gap: '12px',
+              padding: '10px 14px',
+              margin: '12px 0',
+              background: 'rgba(15, 23, 42, 0.65)',
+              borderRadius: '8px',
+              border: '1px solid rgba(255, 255, 255, 0.08)'
+            }}>
+              <div style={{ fontSize: '13px', color: '#cbd5e1' }}>
+                ⚙️ <strong>Drive Management Actions:</strong>
+                {selectedDrive.status === 'cancelled' ? (
+                  <span style={{ marginLeft: '8px', color: '#f87171', fontWeight: 600 }}>
+                    Drive is currently CANCELLED. Students and recruiters are notified.
+                  </span>
+                ) : (
+                  <span style={{ marginLeft: '8px', color: '#94a3b8' }}>
+                    Admin can cancel or delete any drive, including recruiter-posted drives.
+                  </span>
+                )}
+              </div>
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                {selectedDrive.status !== 'cancelled' && (
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-sm"
+                    style={{
+                      background: 'rgba(239, 68, 68, 0.15)',
+                      color: '#f87171',
+                      border: '1px solid rgba(239, 68, 68, 0.4)',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      padding: '6px 14px',
+                      borderRadius: '6px'
+                    }}
+                    onClick={() => handleCancelDrive(selectedDrive._id, selectedDrive.companyName)}
+                    title="Cancel this drive (notifies all registered candidates)"
+                  >
+                    🚫 Cancel Drive
+                  </button>
+                )}
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm"
+                  style={{
+                    background: 'rgba(220, 38, 38, 0.25)',
+                    color: '#fca5a5',
+                    border: '1px solid rgba(220, 38, 38, 0.5)',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    padding: '6px 14px',
+                    borderRadius: '6px'
+                  }}
+                  onClick={() => handleDeleteDrive(selectedDrive._id, selectedDrive.companyName)}
+                  title="Permanently delete this drive (Admin can delete any recruiter or admin drive)"
+                >
+                  🗑️ Delete Drive
+                </button>
               </div>
             </div>
 

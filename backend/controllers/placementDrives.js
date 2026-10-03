@@ -87,7 +87,9 @@ exports.getDrives = async (req, res, next) => {
       ];
     }
 
-    const drives = await PlacementDrive.find(query).sort({ 'dates.registrationDeadline': 1, createdAt: -1 });
+    const drives = await PlacementDrive.find(query)
+      .populate('createdBy', 'name email companyName role')
+      .sort({ 'dates.registrationDeadline': 1, createdAt: -1 });
 
     // If user is a student, attach their specific match percentage & application status
     if (req.user.role === 'student') {
@@ -464,15 +466,103 @@ exports.updateCandidateStage = async (req, res, next) => {
   }
 };
 
+// @desc    Cancel placement drive
+// @route   PUT /api/placement-drives/:id/cancel
+// @access  Private (Admin, or Recruiter who created it)
+exports.cancelDrive = async (req, res, next) => {
+  try {
+    const drive = await PlacementDrive.findById(req.params.id);
+    if (!drive) {
+      return res.status(404).json({ success: false, error: 'Placement drive not found' });
+    }
+
+    // Permission check: Admin can cancel any drive; Recruiter can cancel drives they created
+    const creatorId = drive.createdBy?._id ? String(drive.createdBy._id) : String(drive.createdBy || '');
+    const isOwner = creatorId === String(req.user.id) ||
+      (req.user.role === 'recruiter' && req.user.companyName && drive.companyName && req.user.companyName.trim().toLowerCase() === drive.companyName.trim().toLowerCase());
+    if (req.user.role !== 'admin' && !isOwner) {
+      return res.status(403).json({ success: false, error: 'Not authorized to cancel this placement drive' });
+    }
+
+    drive.status = 'cancelled';
+    await drive.save();
+
+    // Notify registered candidates
+    if (drive.applications && drive.applications.length > 0) {
+      for (const app of drive.applications) {
+        if (app.student) {
+          Notification.create({
+            user: app.student,
+            type: 'job_update',
+            message: `⚠️ Placement Drive Cancelled: The on-campus recruitment drive for ${drive.companyName} (${drive.role}) has been cancelled.`,
+            metadata: { jobId: drive._id }
+          }).catch(() => {});
+        }
+      }
+    }
+
+    // Update calendar event if present
+    try {
+      const PlacementEvent = require('../models/PlacementEvent');
+      await PlacementEvent.updateMany(
+        { relatedDrive: drive._id },
+        { title: `[CANCELLED] ${drive.companyName}: ${drive.role} Campus Drive`, colorTag: 'red' }
+      );
+    } catch (e) {}
+
+    await logActivity({
+      user: req.user,
+      action: 'DRIVE_CANCELLED',
+      category: 'Placement Operations',
+      description: `${req.user.role === 'admin' ? 'Admin' : 'Recruiter'} cancelled placement drive: ${drive.companyName} (${drive.role})`,
+      details: { driveId: drive._id, companyName: drive.companyName },
+      req
+    });
+
+    res.status(200).json({
+      success: true,
+      message: `Placement drive for ${drive.companyName} cancelled successfully`,
+      data: drive
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
 // @desc    Delete placement drive
 // @route   DELETE /api/placement-drives/:id
-// @access  Private (Admin only)
+// @access  Private (Admin, or Recruiter who created it)
 exports.deleteDrive = async (req, res, next) => {
   try {
-    const drive = await PlacementDrive.findByIdAndDelete(req.params.id);
+    const drive = await PlacementDrive.findById(req.params.id);
     if (!drive) {
       return res.status(404).json({ success: false, error: 'Drive not found' });
     }
+
+    // Permission check: Admin can delete any drive (including recruiter-posted); Recruiter can delete only drives they created
+    const creatorId = drive.createdBy?._id ? String(drive.createdBy._id) : String(drive.createdBy || '');
+    const isOwner = creatorId === String(req.user.id) ||
+      (req.user.role === 'recruiter' && req.user.companyName && drive.companyName && req.user.companyName.trim().toLowerCase() === drive.companyName.trim().toLowerCase());
+    if (req.user.role !== 'admin' && !isOwner) {
+      return res.status(403).json({ success: false, error: 'Not authorized to delete this placement drive' });
+    }
+
+    await PlacementDrive.findByIdAndDelete(req.params.id);
+
+    // Also delete any calendar sync events for this drive
+    try {
+      const PlacementEvent = require('../models/PlacementEvent');
+      await PlacementEvent.deleteMany({ relatedDrive: drive._id });
+    } catch (e) {}
+
+    await logActivity({
+      user: req.user,
+      action: 'DRIVE_DELETED',
+      category: 'Placement Operations',
+      description: `${req.user.role === 'admin' ? 'Admin' : 'Recruiter'} deleted placement drive: ${drive.companyName} (${drive.role})`,
+      details: { driveId: drive._id, companyName: drive.companyName },
+      req
+    });
 
     res.status(200).json({
       success: true,
