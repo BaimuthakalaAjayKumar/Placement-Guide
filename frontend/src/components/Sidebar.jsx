@@ -63,14 +63,14 @@ const Sidebar = () => {
         <span>GRIET Placement</span>
       </div>
 
-      {user.role !== 'student' && (
+      {(user.role === 'admin' || user.role === 'faculty') && (
         <div className="user-badge">
           <div className="user-avatar">
             {user.name.charAt(0).toUpperCase()}
           </div>
           <div className="user-info">
             <span className="user-name">{user.name}</span>
-            <span className="user-role">{user.role === 'admin' ? 'Administrator' : user.role === 'faculty' ? 'Faculty' : user.targetRole || 'Student'}</span>
+            <span className="user-role">{user.role === 'admin' ? 'Administrator' : 'Faculty'}</span>
           </div>
         </div>
       )}

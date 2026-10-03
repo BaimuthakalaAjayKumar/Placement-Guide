@@ -11,7 +11,11 @@ const {
   getMyDrives,
   createDriveByRecruiter,
   updateCandidateRecruiterStage,
-  exportRecruiterCSV
+  exportRecruiterCSV,
+  bulkAddCandidates,
+  conductDriveExam,
+  bulkImportTestCleared,
+  bulkAdvanceCandidatesStage
 } = require('../controllers/recruiter');
 
 router.use(protect);
@@ -29,5 +33,11 @@ router.get('/my-drives', authorize('recruiter', 'admin'), getMyDrives);
 router.post('/drives', authorize('recruiter', 'admin'), createDriveByRecruiter);
 router.put('/candidates/:driveId/:studentId/stage', authorize('recruiter', 'admin'), updateCandidateRecruiterStage);
 router.get('/export-csv', authorize('recruiter', 'admin'), exportRecruiterCSV);
+
+// Candidate selection, conducting exam, and bulk stage advancement
+router.post('/drives/:driveId/bulk-add-candidates', authorize('recruiter', 'admin'), bulkAddCandidates);
+router.post('/drives/:driveId/conduct-exam', authorize('recruiter', 'admin'), conductDriveExam);
+router.post('/drives/:driveId/bulk-import-test-cleared', authorize('recruiter', 'admin'), bulkImportTestCleared);
+router.post('/drives/:driveId/bulk-advance-stage', authorize('recruiter', 'admin'), bulkAdvanceCandidatesStage);
 
 module.exports = router;

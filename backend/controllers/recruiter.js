@@ -4,7 +4,11 @@ const PlacementDrive = require('../models/PlacementDrive');
 const PlacementEvent = require('../models/PlacementEvent');
 const Notification = require('../models/Notification');
 const Resume = require('../models/Resume');
+const Project = require('../models/Project');
 const { logActivity } = require('../utils/auditLogger');
+const sendEmail = require('../utils/sendEmail');
+const { sendWhatsAppMessage } = require('../utils/sendWhatsApp');
+const { notifyStudentsOnDrivePost } = require('../utils/placementNotifier');
 
 // Helper to generate secure random temporary password
 const generateTempPassword = (length = 10) => {
@@ -74,6 +78,7 @@ exports.createTemporaryCredentials = async (req, res, next) => {
       email: cleanEmail,
       password: tempPassword,
       role: 'recruiter',
+      targetRole: 'Recruiter',
       companyName: companyName.trim(),
       companyWebsite: (companyWebsite || '').trim(),
       companyLogo: (companyLogo || '').trim(),
@@ -343,8 +348,63 @@ exports.getSuitableStudents = async (req, res, next) => {
         resumeMap[String(r.user)] = {
           resumeUrl: r.filePath,
           fileName: r.fileName,
-          resumeScore: r.score || 0
+          resumeScore: r.score || 0,
+          skills: r.skills || [],
+          uploadedAt: r.createdAt
         };
+      }
+    });
+
+    // Fetch deployed projects mapped by student ID
+    const studentEmails = students.map(s => s.email).filter(Boolean);
+    const studentRolls = students.map(s => s.rollNumber).filter(Boolean);
+
+    const allProjects = await Project.find({
+      $or: [
+        { student: { $in: studentIds } },
+        { 'teamMembers.email': { $in: studentEmails } },
+        { 'teamMembers.rollNumber': { $in: studentRolls } }
+      ]
+    }).sort({ updatedAt: -1 }).lean();
+
+    const projectMap = {};
+    allProjects.forEach(p => {
+      const ownerId = String(p.student);
+      if (!projectMap[ownerId]) projectMap[ownerId] = [];
+      projectMap[ownerId].push({
+        _id: p._id,
+        title: p.title,
+        description: p.description || '',
+        deploymentUrl: p.deploymentUrl || p.previewUrl || '',
+        repositoryUrl: p.repositoryUrl || '',
+        technologies: p.technologies || [],
+        status: p.status,
+        isDeployed: !!(p.deploymentUrl || p.previewUrl)
+      });
+
+      if (p.teamMembers && p.teamMembers.length > 0) {
+        p.teamMembers.forEach(tm => {
+          const matchStudent = students.find(s =>
+            (tm.email && s.email && s.email.toLowerCase() === tm.email.toLowerCase()) ||
+            (tm.rollNumber && s.rollNumber && s.rollNumber.toLowerCase() === tm.rollNumber.toLowerCase())
+          );
+          if (matchStudent) {
+            const mId = String(matchStudent._id);
+            if (!projectMap[mId]) projectMap[mId] = [];
+            if (!projectMap[mId].some(proj => String(proj._id) === String(p._id))) {
+              projectMap[mId].push({
+                _id: p._id,
+                title: p.title,
+                description: p.description || '',
+                deploymentUrl: p.deploymentUrl || p.previewUrl || '',
+                repositoryUrl: p.repositoryUrl || '',
+                technologies: p.technologies || [],
+                status: p.status,
+                isDeployed: !!(p.deploymentUrl || p.previewUrl)
+              });
+            }
+          }
+        });
       }
     });
 
@@ -418,6 +478,8 @@ exports.getSuitableStudents = async (req, res, next) => {
       }
 
       const resMeta = resumeMap[String(student._id)] || {};
+      const studentProjects = projectMap[String(student._id)] || [];
+      const deployedProjects = studentProjects.filter(p => p.deploymentUrl);
 
       return {
         _id: student._id,
@@ -437,6 +499,17 @@ exports.getSuitableStudents = async (req, res, next) => {
         githubProfileUrl: student.githubProfileUrl || '',
         resumeUrl: resMeta.resumeUrl || '',
         resumeFileName: resMeta.fileName || '',
+        resumeScore: resMeta.resumeScore || 0,
+        resumeSkills: resMeta.skills || [],
+        latestResume: resMeta.resumeUrl ? {
+          filePath: resMeta.resumeUrl,
+          fileName: resMeta.fileName,
+          score: resMeta.resumeScore,
+          skills: resMeta.skills,
+          uploadedAt: resMeta.uploadedAt
+        } : null,
+        projects: studentProjects,
+        deployedProjects: deployedProjects.length > 0 ? deployedProjects : studentProjects,
         isCgpaEligible,
         isBranchEligible,
         isBatchEligible,
@@ -474,8 +547,10 @@ exports.getSuitableStudents = async (req, res, next) => {
       filtered = filtered.filter(s => s.isEligible);
     }
 
-    // Sort: applied/shortlisted first, then highest match score, then highest CGPA
+    // Sort: Eligible students first, then applied/in pipeline, then highest match score, then highest CGPA
     filtered.sort((a, b) => {
+      if (a.isEligible && !b.isEligible) return -1;
+      if (!a.isEligible && b.isEligible) return 1;
       if (a.hasApplied && !b.hasApplied) return -1;
       if (!a.hasApplied && b.hasApplied) return 1;
       if (b.matchScore !== a.matchScore) return b.matchScore - a.matchScore;
@@ -704,23 +779,10 @@ exports.createDriveByRecruiter = async (req, res, next) => {
       console.warn('Calendar sync error on recruiter drive create:', e.message);
     }
 
-    // Broadcast notifications to eligible students
-    const targetQuery = { role: 'student' };
-    if (allowedBranches.length > 0 && !allowedBranches.includes('All')) {
-      targetQuery.branch = { $in: allowedBranches.map(br => new RegExp(`^${br}$`, 'i')) };
-    }
-
-    const eligibleStudents = await User.find(targetQuery).select('_id');
-    const notifs = eligibleStudents.map(st => ({
-      user: st._id,
-      type: 'job_update',
-      message: `🟣 New Campus Recruitment Drive: ${drive.companyName} is hiring for ${drive.role} (${drive.packageDetails})! Register before deadline.`,
-      metadata: { jobId: drive._id }
-    }));
-
-    if (notifs.length > 0) {
-      Notification.insertMany(notifs).catch(() => {});
-    }
+    // Broadcast email & WhatsApp notifications (including phone 8074701052)
+    notifyStudentsOnDrivePost(drive, '8074701052').catch(err => {
+      console.warn('Placement notification dispatch error:', err.message);
+    });
 
     await logActivity({
       user: req.user,
@@ -893,6 +955,505 @@ exports.exportRecruiterCSV = async (req, res, next) => {
     res.setHeader('Content-Type', 'text/csv');
     res.setHeader('Content-Disposition', `attachment; filename="recruiter_students_export_${Date.now()}.csv"`);
     res.status(200).send(csvContent);
+  } catch (err) {
+    next(err);
+  }
+};
+
+// =========================================================================
+// CANDIDATE ASSESSMENT & PIPELINE STAGE CONTROLS
+// =========================================================================
+
+// @desc    Bulk add selected students into drive pipeline
+// @route   POST /api/recruiter/drives/:driveId/bulk-add-candidates
+// @access  Private (Recruiter, Admin)
+exports.bulkAddCandidates = async (req, res, next) => {
+  try {
+    const { driveId } = req.params;
+    const { studentIds = [] } = req.body;
+
+    const drive = await PlacementDrive.findById(driveId);
+    if (!drive) {
+      return res.status(404).json({ success: false, error: 'Placement drive not found' });
+    }
+
+    const students = await User.find({ _id: { $in: studentIds } });
+    let addedCount = 0;
+
+    for (const student of students) {
+      const exists = (drive.applications || []).some(a => String(a.student) === String(student._id));
+      if (!exists) {
+        drive.applications.push({
+          student: student._id,
+          studentName: student.name,
+          studentEmail: student.email,
+          studentRollNumber: student.rollNumber || '',
+          studentBranch: student.branch || '',
+          studentCgpa: student.cgpa || 7.5,
+          studentPhone: student.phone || '',
+          currentStage: 'applied',
+          appliedAt: new Date()
+        });
+        addedCount++;
+      }
+    }
+
+    await drive.save();
+
+    res.status(200).json({
+      success: true,
+      message: `Enrolled ${addedCount} student(s) into candidate pipeline!`,
+      addedCount,
+      applications: drive.applications
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// @desc    Recruiter conducts/schedules exam for candidate pool
+// @route   POST /api/recruiter/drives/:driveId/conduct-exam
+// @access  Private (Recruiter, Admin)
+exports.conductDriveExam = async (req, res, next) => {
+  try {
+    const { driveId } = req.params;
+    const {
+      examTitle = 'Campus Online Assessment',
+      examLink = '',
+      examDate,
+      examTime = '10:00 AM',
+      instructions = 'Please ensure a stable internet connection and quiet environment for the proctored test.',
+      studentIds = [],
+      specificPhone = '8074701052'
+    } = req.body;
+
+    const drive = await PlacementDrive.findById(driveId);
+    if (!drive) {
+      return res.status(404).json({ success: false, error: 'Placement drive not found' });
+    }
+
+    if (examDate) {
+      drive.dates.onlineTestDate = new Date(examDate);
+    }
+
+    // Determine target candidates: either specified studentIds, or all candidate applications in drive
+    let targetApplications = [];
+    if (studentIds.length > 0) {
+      const missingIds = studentIds.filter(id => !drive.applications.some(a => String(a.student) === String(id)));
+      if (missingIds.length > 0) {
+        const missingStudents = await User.find({ _id: { $in: missingIds } });
+        missingStudents.forEach(st => {
+          drive.applications.push({
+            student: st._id,
+            studentName: st.name,
+            studentEmail: st.email,
+            studentRollNumber: st.rollNumber || '',
+            studentBranch: st.branch || '',
+            studentCgpa: st.cgpa || 7.5,
+            studentPhone: st.phone || '',
+            currentStage: 'shortlisted',
+            appliedAt: new Date()
+          });
+        });
+      }
+
+      targetApplications = drive.applications.filter(a => studentIds.includes(String(a.student)));
+    } else {
+      targetApplications = drive.applications;
+    }
+
+    if (targetApplications.length === 0) {
+      return res.status(400).json({ success: false, error: 'No candidates selected or present in drive pipeline to conduct exam.' });
+    }
+
+    // Update their stage & schedule notes
+    targetApplications.forEach(app => {
+      app.currentStage = 'shortlisted';
+      app.interviewSchedule = {
+        roundName: examTitle,
+        scheduledAt: examDate ? (examTime ? new Date(`${examDate}T${examTime}`) : new Date(examDate)) : new Date(),
+        venue: 'Online Proctored Platform',
+        meetingLink: examLink,
+        interviewerNotes: `Exam instructions: ${instructions}`
+      };
+    });
+
+    await drive.save();
+
+    const formattedDate = examDate ? new Date(examDate).toLocaleDateString() : 'Scheduled Date';
+    const waExamMsg =
+`📝 *GRIET CAMPUS PLACEMENT - ONLINE EXAM SCHEDULED*
+------------------------------------------------
+Dear Candidate,
+The recruitment team from *${drive.companyName}* has scheduled your Online Exam:
+
+📋 *Assessment Round:* ${examTitle}
+📅 *Exam Date:* ${formattedDate}
+⏰ *Time:* ${examTime}
+🔗 *Exam Platform Link:* ${examLink || 'Accessible on student placement dashboard'}
+ℹ️ *Instructions:* ${instructions}
+
+Please login to your portal 15 minutes before the exam window:
+👉 https://placement-guide-nu.vercel.app/login
+
+- Placement Cell & ${drive.companyName}`;
+
+    // Send WhatsApp notification to phone 8074701052
+    await sendWhatsAppMessage({
+      to: specificPhone,
+      message: waExamMsg,
+      studentName: 'Candidate / Coordinator',
+      driveTitle: `${drive.companyName} - Online Exam (${targetApplications.length} Candidates)`
+    });
+
+    // Notify candidates via email & WhatsApp
+    for (const app of targetApplications) {
+      if (app.studentEmail) {
+        sendEmail({
+          to: app.studentEmail,
+          subject: `📝 Online Exam Scheduled: ${drive.companyName} - ${examTitle}`,
+          text: `Dear ${app.studentName},\n\nYour online test for ${drive.companyName} (${drive.role}) has been scheduled on ${formattedDate} at ${examTime}.\nExam Link: ${examLink}\nInstructions: ${instructions}\n\nLogin at https://placement-guide-nu.vercel.app/login`,
+          html: `<div style="font-family: Arial, sans-serif; background: #0f172a; color: #f8fafc; padding: 24px; border-radius: 10px;">
+            <h2 style="color: #fbbf24;">📝 Online Assessment Round Scheduled</h2>
+            <p>Dear <strong>${app.studentName}</strong>,</p>
+            <p>You have been shortlisted to take the online assessment for <strong>${drive.companyName}</strong> (${drive.role}).</p>
+            <div style="background: #1e293b; padding: 16px; border-radius: 8px; margin: 16px 0;">
+              <p><strong>Round Name:</strong> ${examTitle}</p>
+              <p><strong>Scheduled Date &amp; Time:</strong> ${formattedDate} at ${examTime}</p>
+              <p><strong>Exam Link:</strong> <a href="${examLink}" style="color: #38bdf8;">${examLink || 'Check placement portal'}</a></p>
+              <p><strong>Instructions:</strong> ${instructions}</p>
+            </div>
+            <a href="https://placement-guide-nu.vercel.app/login" style="background: #a855f7; color: white; padding: 10px 20px; border-radius: 6px; text-decoration: none; font-weight: bold; display: inline-block;">Open Placement Portal</a>
+          </div>`
+        }).catch(() => {});
+      }
+
+      if (app.studentPhone && app.studentPhone !== specificPhone) {
+        sendWhatsAppMessage({
+          to: app.studentPhone,
+          message: waExamMsg,
+          studentName: app.studentName,
+          driveTitle: `${drive.companyName} - Online Exam`
+        }).catch(() => {});
+      }
+
+      Notification.create({
+        user: app.student,
+        type: 'job_update',
+        message: `📝 Online Exam Scheduled: ${drive.companyName} test on ${formattedDate} at ${examTime}. Check details!`,
+        metadata: { driveId: drive._id, examLink, examTitle }
+      }).catch(() => {});
+    }
+
+    res.status(200).json({
+      success: true,
+      message: `Online exam successfully scheduled for ${targetApplications.length} candidate(s)! Notifications dispatched.`,
+      candidatesCount: targetApplications.length
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// @desc    Recruiter imports bulk list of students who cleared the online test
+// @route   POST /api/recruiter/drives/:driveId/bulk-import-test-cleared
+// @access  Private (Recruiter, Admin)
+exports.bulkImportTestCleared = async (req, res, next) => {
+  try {
+    const { driveId } = req.params;
+    const {
+      rollNumbers = [],
+      rawText = '',
+      testMarks = {},
+      specificPhone = '8074701052'
+    } = req.body;
+
+    const drive = await PlacementDrive.findById(driveId);
+    if (!drive) {
+      return res.status(404).json({ success: false, error: 'Placement drive not found' });
+    }
+
+    // Extract identifiers (roll numbers, emails, student IDs)
+    let identifiers = [...rollNumbers];
+    if (rawText && rawText.trim()) {
+      const extracted = rawText
+        .split(/[\r\n,;]+/)
+        .map(t => t.trim())
+        .filter(Boolean);
+      identifiers = [...identifiers, ...extracted];
+    }
+
+    identifiers = Array.from(new Set(identifiers.map(i => i.trim())));
+    if (identifiers.length === 0) {
+      return res.status(400).json({ success: false, error: 'Please provide at least one student roll number or email.' });
+    }
+
+    const mongoose = require('mongoose');
+    const queryConditions = [
+      { rollNumber: { $in: identifiers.map(i => new RegExp(`^${i}$`, 'i')) } },
+      { email: { $in: identifiers.map(i => new RegExp(`^${i}$`, 'i')) } }
+    ];
+
+    const validIds = identifiers.filter(i => mongoose.Types.ObjectId.isValid(i));
+    if (validIds.length > 0) {
+      queryConditions.push({ _id: { $in: validIds } });
+    }
+
+    const matchedStudents = await User.find({
+      role: 'student',
+      $or: queryConditions
+    });
+
+    if (matchedStudents.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: 'None of the provided roll numbers or emails matched registered student accounts in the portal.'
+      });
+    }
+
+    let updatedCount = 0;
+    const clearedList = [];
+
+    matchedStudents.forEach(student => {
+      let app = drive.applications.find(a => String(a.student) === String(student._id));
+      const score = testMarks[student.rollNumber] || testMarks[student.email] || testMarks[String(student._id)] || 'Cleared';
+
+      if (app) {
+        app.currentStage = 'online_test_cleared';
+        app.interviewerNotes = `Online Test Result: Cleared (Score: ${score}). Ready for Interview Round 1.`;
+      } else {
+        drive.applications.push({
+          student: student._id,
+          studentName: student.name,
+          studentEmail: student.email,
+          studentRollNumber: student.rollNumber || '',
+          studentBranch: student.branch || '',
+          studentCgpa: student.cgpa || 7.5,
+          studentPhone: student.phone || '',
+          currentStage: 'online_test_cleared',
+          appliedAt: new Date(),
+          interviewerNotes: `Online Test Result: Cleared (Score: ${score}). Bulk imported by recruiter.`
+        });
+      }
+
+      clearedList.push({
+        _id: student._id,
+        name: student.name,
+        rollNumber: student.rollNumber,
+        email: student.email,
+        phone: student.phone
+      });
+      updatedCount++;
+    });
+
+    await drive.save();
+
+    const waClearedMsg =
+`🎉 *CONGRATULATIONS! ONLINE TEST CLEARED*
+----------------------------------------
+Dear Candidate,
+You have successfully *CLEARED THE ONLINE ASSESSMENT* for *${drive.companyName}* (${drive.role})!
+
+Next Steps:
+🎙️ You are now officially advanced to *Interview Round 1 (Technical)*.
+📅 The interview slot, venue, and video call link will be published on your placement dashboard shortly.
+
+Check your Candidate Status:
+👉 https://placement-guide-nu.vercel.app/login
+
+- Placement Cell & ${drive.companyName} Recruitment Team`;
+
+    // Send WhatsApp notification to phone 8074701052
+    await sendWhatsAppMessage({
+      to: specificPhone,
+      message: waClearedMsg,
+      studentName: 'Cleared Candidate / Coordinator',
+      driveTitle: `${drive.companyName} - Online Test Cleared (${updatedCount} Candidates)`
+    });
+
+    // Notify individual students
+    matchedStudents.forEach(st => {
+      if (st.email) {
+        sendEmail({
+          to: st.email,
+          subject: `🎉 Online Test Cleared: ${drive.companyName} Recruitment Drive`,
+          text: `Congratulations ${st.name}!\n\nYou have successfully CLEARED the Online Assessment for ${drive.companyName} (${drive.role}).\nYou are now advanced to Interview Round 1 (Technical).\n\nCheck portal: https://placement-guide-nu.vercel.app/login`,
+          html: `<div style="font-family: Arial, sans-serif; background: #0f172a; color: #f8fafc; padding: 24px; border-radius: 10px;">
+            <h2 style="color: #34d399;">🎉 Online Test Cleared!</h2>
+            <p>Dear <strong>${st.name}</strong> (${st.rollNumber}),</p>
+            <p>Congratulations! You have passed the Online Assessment round for <strong>${drive.companyName}</strong> (${drive.role}).</p>
+            <div style="background: #1e293b; padding: 16px; border-radius: 8px; margin: 16px 0;">
+              <p><strong>Current Stage:</strong> 3. Online Test Cleared</p>
+              <p><strong>Next Step:</strong> 4. Interview Round 1 (Technical)</p>
+              <p>Your interview time slot, venue, and meeting links will appear on your dashboard shortly.</p>
+            </div>
+            <a href="https://placement-guide-nu.vercel.app/login" style="background: #10b981; color: white; padding: 10px 20px; border-radius: 6px; text-decoration: none; font-weight: bold; display: inline-block;">View Recruitment Status</a>
+          </div>`
+        }).catch(() => {});
+      }
+
+      if (st.phone && st.phone !== specificPhone) {
+        sendWhatsAppMessage({
+          to: st.phone,
+          message: waClearedMsg,
+          studentName: st.name,
+          driveTitle: `${drive.companyName} - Test Cleared`
+        }).catch(() => {});
+      }
+
+      Notification.create({
+        user: st._id,
+        type: 'job_update',
+        message: `🎉 Congratulations! You cleared the ${drive.companyName} online test and advanced to Interview Round 1.`,
+        metadata: { driveId: drive._id, stage: 'online_test_cleared' }
+      }).catch(() => {});
+    });
+
+    res.status(200).json({
+      success: true,
+      message: `Successfully imported & marked ${updatedCount} student(s) as 'Test Cleared'!`,
+      clearedCount: updatedCount,
+      clearedStudents: clearedList
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// @desc    Bulk advance candidates to Interview 1, Interview 2, Selected, or Offered
+// @route   POST /api/recruiter/drives/:driveId/bulk-advance-stage
+// @access  Private (Recruiter, Admin)
+exports.bulkAdvanceCandidatesStage = async (req, res, next) => {
+  try {
+    const { driveId } = req.params;
+    const {
+      studentIds = [],
+      targetStage = 'interview_round_1',
+      interviewDate,
+      interviewTime = '11:00 AM',
+      venue = 'Campus Placement Cell',
+      meetingLink = '',
+      interviewerNotes = '',
+      offeredPackage = '',
+      specificPhone = '8074701052'
+    } = req.body;
+
+    const drive = await PlacementDrive.findById(driveId);
+    if (!drive) {
+      return res.status(404).json({ success: false, error: 'Placement drive not found' });
+    }
+
+    const stageNames = {
+      interview_round_1: 'Interview Round 1 (Technical)',
+      interview_round_2: 'Interview Round 2 (Managerial / Final)',
+      hr_round: 'HR & Cultural Round',
+      selected: 'Final Selection',
+      offered: 'Offer Released'
+    };
+    const stageDisplay = stageNames[targetStage] || targetStage.replace(/_/g, ' ').toUpperCase();
+
+    let scheduledAt = interviewDate
+      ? (interviewTime ? new Date(`${interviewDate}T${interviewTime}`) : new Date(interviewDate))
+      : undefined;
+
+    let updatedCount = 0;
+    const advancedList = [];
+
+    drive.applications.forEach(app => {
+      if (studentIds.includes(String(app.student))) {
+        app.currentStage = targetStage;
+        if (scheduledAt || venue || meetingLink || interviewerNotes) {
+          app.interviewSchedule = {
+            roundName: stageDisplay,
+            scheduledAt: scheduledAt || app.interviewSchedule?.scheduledAt,
+            venue: venue || app.interviewSchedule?.venue || 'Campus Placement Hall',
+            meetingLink: meetingLink || app.interviewSchedule?.meetingLink || '',
+            interviewerNotes: interviewerNotes || app.interviewSchedule?.interviewerNotes || ''
+          };
+        }
+
+        if (targetStage === 'selected' || targetStage === 'offered') {
+          app.offerDetails = {
+            offeredPackage: offeredPackage || drive.packageDetails,
+            offeredRole: drive.role,
+            offerDate: new Date(),
+            accepted: app.offerDetails?.accepted || false
+          };
+        }
+
+        advancedList.push(app);
+        updatedCount++;
+      }
+    });
+
+    await drive.save();
+
+    const formattedDate = interviewDate ? new Date(interviewDate).toLocaleDateString() : 'Scheduled Date';
+    const waAdvanceMsg =
+`📢 *GRIET PLACEMENT UPDATE: ${stageDisplay.toUpperCase()}*
+-------------------------------------------------
+Dear Candidate,
+Your application for *${drive.companyName}* (${drive.role}) has advanced to:
+🎯 *Stage:* ${stageDisplay}
+
+${targetStage.includes('interview') ? `📅 *Interview Date:* ${formattedDate}\n⏰ *Time Slot:* ${interviewTime}\n📍 *Venue / Mode:* ${venue}\n🔗 *Meeting Link:* ${meetingLink || 'In-Person on Campus'}\n` : ''}${targetStage === 'selected' || targetStage === 'offered' ? `🏆 *Congratulations on your selection!*\n💰 *Compensation (CTC):* ${offeredPackage || drive.packageDetails}\n` : ''}
+Please log in to your student portal for instructions:
+👉 https://placement-guide-nu.vercel.app/login
+
+- Placement Cell & ${drive.companyName}`;
+
+    // Notify WhatsApp to 8074701052
+    await sendWhatsAppMessage({
+      to: specificPhone,
+      message: waAdvanceMsg,
+      studentName: 'Candidate / Coordinator',
+      driveTitle: `${drive.companyName} - Advanced to ${stageDisplay}`
+    });
+
+    // Notify individual candidates
+    for (const app of advancedList) {
+      if (app.studentEmail) {
+        sendEmail({
+          to: app.studentEmail,
+          subject: `📢 ${drive.companyName} Placement Update: ${stageDisplay}`,
+          text: `Dear ${app.studentName},\n\nYou have advanced to ${stageDisplay} for ${drive.companyName} (${drive.role}).\nLogin to https://placement-guide-nu.vercel.app/login`,
+          html: `<div style="font-family: Arial, sans-serif; background: #0f172a; color: #f8fafc; padding: 24px; border-radius: 10px;">
+            <h2 style="color: #c084fc;">📢 Candidate Advancement: ${stageDisplay}</h2>
+            <p>Dear <strong>${app.studentName}</strong>,</p>
+            <p>Your candidacy for <strong>${drive.companyName}</strong> (${drive.role}) has been moved to <strong>${stageDisplay}</strong>.</p>
+            ${scheduledAt ? `<div style="background: #1e293b; padding: 14px; border-radius: 8px; margin: 16px 0;">
+              <p><strong>Scheduled Date:</strong> ${formattedDate} at ${interviewTime}</p>
+              <p><strong>Venue / Mode:</strong> ${venue}</p>
+              ${meetingLink ? `<p><strong>Link:</strong> <a href="${meetingLink}" style="color: #38bdf8;">${meetingLink}</a></p>` : ''}
+            </div>` : ''}
+            <a href="https://placement-guide-nu.vercel.app/login" style="background: #a855f7; color: white; padding: 10px 20px; border-radius: 6px; text-decoration: none; font-weight: bold; display: inline-block;">View Placement Dashboard</a>
+          </div>`
+        }).catch(() => {});
+      }
+
+      if (app.studentPhone && app.studentPhone !== specificPhone) {
+        sendWhatsAppMessage({
+          to: app.studentPhone,
+          message: waAdvanceMsg,
+          studentName: app.studentName,
+          driveTitle: `${drive.companyName} - ${stageDisplay}`
+        }).catch(() => {});
+      }
+
+      Notification.create({
+        user: app.student,
+        type: 'job_update',
+        message: `📢 Status Update: You advanced to ${stageDisplay} for ${drive.companyName}. Check your interview schedule!`,
+        metadata: { driveId: drive._id, stage: targetStage }
+      }).catch(() => {});
+    }
+
+    res.status(200).json({
+      success: true,
+      message: `Successfully advanced ${updatedCount} candidate(s) to '${stageDisplay}'!`,
+      updatedCount,
+      stage: targetStage
+    });
   } catch (err) {
     next(err);
   }

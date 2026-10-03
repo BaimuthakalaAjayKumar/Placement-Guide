@@ -6,7 +6,7 @@ import { API_URL } from '../config/api';
 import Header from '../components/Header';
 import AtRiskDetectionModule from '../components/AtRiskDetectionModule';
 import FacultyTestBuilder from '../components/FacultyTestBuilder';
-import BatchComparison from '../components/BatchComparison';
+
 import PlacementStatsExport from '../components/PlacementStatsExport';
 import './FacultyDashboard.css';
 
@@ -2275,12 +2275,7 @@ const FacultyDashboard = () => {
                         >
                             🛠️ Faculty Test Builder
                         </button>
-                        <button
-                            className={`faculty-tab-btn ${activeTab === 'batch-comparison' ? 'active' : ''}`}
-                            onClick={() => { setActiveTab('batch-comparison'); setError(null); setSuccessMsg(''); }}
-                        >
-                            📊 Batch Comparison
-                        </button>
+
                         <button
                             className={`faculty-tab-btn ${activeTab === 'placement-export' ? 'active' : ''}`}
                             onClick={() => { setActiveTab('placement-export'); setError(null); setSuccessMsg(''); }}
@@ -2366,10 +2361,7 @@ const FacultyDashboard = () => {
                         <FacultyTestBuilder />
                     )}
 
-                    {/* TAB: BATCH COMPARISON */}
-                    {activeTab === 'batch-comparison' && (
-                        <BatchComparison students={students} />
-                    )}
+
 
                     {/* TAB: PLACEMENT STATS EXPORT */}
                     {activeTab === 'placement-export' && (

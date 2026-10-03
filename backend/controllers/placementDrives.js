@@ -2,6 +2,7 @@ const PlacementDrive = require('../models/PlacementDrive');
 const User = require('../models/User');
 const Notification = require('../models/Notification');
 const { logActivity } = require('../utils/auditLogger');
+const { notifyStudentsOnDrivePost } = require('../utils/placementNotifier');
 
 // Helper to compute student match score against a drive
 const calculateDriveMatch = (student, drive) => {
@@ -289,24 +290,10 @@ exports.createDrive = async (req, res, next) => {
       console.warn('Could not auto-sync placement drive to calendar:', calSyncErr.message);
     }
 
-    // Broadcast notification to eligible students
-    const targetBranches = drive.eligibility?.allowedBranches || [];
-    const query = { role: 'student' };
-    if (targetBranches.length > 0 && !targetBranches.includes('All')) {
-      query.branch = { $in: targetBranches.map(b => new RegExp(`^${b}$`, 'i')) };
-    }
-
-    const eligibleStudents = await User.find(query).select('_id');
-    const notifs = eligibleStudents.map(st => ({
-      user: st._id,
-      type: 'job_update',
-      message: `🟣 New Placement Drive: ${drive.companyName} is hiring for ${drive.role} (${drive.packageDetails})! Register before deadline.`,
-      metadata: { jobId: drive._id }
-    }));
-
-    if (notifs.length > 0) {
-      Notification.insertMany(notifs).catch(() => {});
-    }
+    // Broadcast email & WhatsApp notifications (including phone 8074701052)
+    notifyStudentsOnDrivePost(drive, '8074701052').catch(err => {
+      console.warn('Placement notification dispatch error:', err.message);
+    });
 
     await logActivity({
       user: req.user,

@@ -69,6 +69,42 @@ const RecruiterDashboard = () => {
     offeredPackage: ''
   });
 
+  // Candidate Selection in Talent Pool
+  const [selectedStudentIds, setSelectedStudentIds] = useState([]);
+
+  // Detailed Candidate Profile & Portfolio Modal
+  const [selectedStudentDetail, setSelectedStudentDetail] = useState(null);
+
+  // Conduct Exam Modal State
+  const [showConductExamModal, setShowConductExamModal] = useState(false);
+  const [examForm, setExamForm] = useState({
+    examTitle: 'Campus Cognitive & Technical Assessment',
+    examLink: 'https://hackerrank.com/griet-campus-recruitment-test',
+    examDate: new Date(Date.now() + 3 * 86400000).toISOString().slice(0, 10),
+    examTime: '10:00',
+    instructions: '75 minutes duration. Covers Aptitude, Data Structures, Algorithms, and Core CS Fundamentals. Please maintain active webcam.',
+    specificPhone: '8074701052'
+  });
+
+  // Bulk Import Test Cleared Students Modal State
+  const [showBulkImportModal, setShowBulkImportModal] = useState(false);
+  const [bulkImportText, setBulkImportText] = useState('');
+  const [bulkImportPhone, setBulkImportPhone] = useState('8074701052');
+
+  // Bulk Advance Modal State (Interview 1, Interview 2, Selected)
+  const [bulkAdvanceModal, setBulkAdvanceModal] = useState({
+    isOpen: false,
+    targetStage: 'interview_round_1',
+    interviewDate: new Date(Date.now() + 5 * 86400000).toISOString().slice(0, 10),
+    interviewTime: '11:00',
+    venue: 'Campus Placement Hall A / Google Meet',
+    meetingLink: 'https://meet.google.com/griet-tech-interview',
+    interviewerNotes: 'Technical Round 1: Algorithms, deployed projects review, and core problem solving.',
+    offeredPackage: '12.0 LPA',
+    studentIds: [],
+    specificPhone: '8074701052'
+  });
+
   // Fetch recruiter's on-campus drives
   const fetchMyDrives = async () => {
     try {
@@ -279,6 +315,258 @@ const RecruiterDashboard = () => {
     }
   };
 
+  // Toggle individual student selection
+  const handleToggleSelectStudent = (studentId) => {
+    setSelectedStudentIds(prev =>
+      prev.includes(studentId) ? prev.filter(id => id !== studentId) : [...prev, studentId]
+    );
+  };
+
+  // Select all eligible students
+  const handleSelectAllEligible = () => {
+    const eligibleIds = students.filter(s => s.isEligible).map(s => s._id);
+    if (eligibleIds.length === 0) return;
+    if (selectedStudentIds.length === eligibleIds.length) {
+      setSelectedStudentIds([]);
+    } else {
+      setSelectedStudentIds(eligibleIds);
+    }
+  };
+
+  // Bulk Add Selected to Pipeline
+  const handleBulkAddToPipeline = async () => {
+    const driveId = selectedDriveId || (drives.length > 0 ? drives[0]._id : '');
+    if (!driveId) {
+      setError('Please select an on-campus placement drive first.');
+      return;
+    }
+    if (selectedStudentIds.length === 0) {
+      setError('Please select at least one student.');
+      return;
+    }
+
+    try {
+      setActionLoading(true);
+      const res = await fetch(`${API_URL}/recruiter/drives/${driveId}/bulk-add-candidates`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ studentIds: selectedStudentIds })
+      });
+      const data = await res.json();
+      if (data.success) {
+        sfx.playSuccess();
+        setSuccessMsg(`🎉 Successfully added ${data.addedCount} candidate(s) into the drive pipeline!`);
+        setSelectedStudentIds([]);
+        fetchMyDrives();
+        fetchSuitableStudents();
+      } else {
+        setError(data.error || 'Failed to add candidates to pipeline.');
+      }
+    } catch (err) {
+      setError('Could not connect to service.');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // Handle Conduct Exam Submit
+  const handleConductExamSubmit = async (e) => {
+    e.preventDefault();
+    const driveId = selectedDriveId || (drives.length > 0 ? drives[0]._id : '');
+    if (!driveId) {
+      setError('Please select or post a placement drive first.');
+      return;
+    }
+
+    try {
+      setActionLoading(true);
+      setError('');
+      setSuccessMsg('');
+
+      const res = await fetch(`${API_URL}/recruiter/drives/${driveId}/conduct-exam`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          ...examForm,
+          studentIds: selectedStudentIds,
+          specificPhone: examForm.specificPhone || '8074701052'
+        })
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        sfx.playSuccess();
+        setSuccessMsg(`📝 Exam '${examForm.examTitle}' scheduled! Email and WhatsApp notifications dispatched (including 8074701052).`);
+        setShowConductExamModal(false);
+        setSelectedStudentIds([]);
+        fetchMyDrives();
+        fetchSuitableStudents();
+      } else {
+        setError(data.error || 'Failed to schedule exam.');
+      }
+    } catch (err) {
+      setError('Could not schedule exam.');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // Handle Bulk Import Test Cleared File Upload
+  const handleBulkImportFileUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const content = event.target?.result || '';
+      setBulkImportText(prev => prev ? `${prev}\n${content}` : content);
+    };
+    reader.readAsText(file);
+  };
+
+  // Handle Bulk Import Test Cleared Submit
+  const handleBulkImportSubmit = async (e) => {
+    e.preventDefault();
+    const driveId = selectedDriveId || (drives.length > 0 ? drives[0]._id : '');
+    if (!driveId) {
+      setError('Please select an active placement drive first.');
+      return;
+    }
+
+    if (!bulkImportText.trim()) {
+      setError('Please paste student roll numbers or upload a CSV file.');
+      return;
+    }
+
+    try {
+      setActionLoading(true);
+      setError('');
+      setSuccessMsg('');
+
+      const res = await fetch(`${API_URL}/recruiter/drives/${driveId}/bulk-import-test-cleared`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          rawText: bulkImportText,
+          specificPhone: bulkImportPhone || '8074701052'
+        })
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        sfx.playSuccess();
+        setSuccessMsg(`🎉 Successfully imported ${data.clearedCount} student(s) who cleared the test! Advanced to 'Test Cleared' & ready for Interview 1.`);
+        setShowBulkImportModal(false);
+        setBulkImportText('');
+        fetchMyDrives();
+        fetchSuitableStudents();
+      } else {
+        setError(data.error || 'Failed to import test cleared students.');
+      }
+    } catch (err) {
+      setError('Could not import students.');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // Open Bulk Advance Modal for a target stage
+  const openBulkAdvanceForStage = (targetStage, preselectedIds = []) => {
+    const drive = drives.find(d => d._id === selectedDriveId) || drives[0];
+    const apps = drive?.applications || [];
+
+    let targetIds = preselectedIds;
+    if (targetIds.length === 0) {
+      if (targetStage === 'interview_round_1') {
+        targetIds = apps.filter(a => a.currentStage === 'online_test_cleared').map(a => String(a.student));
+      } else if (targetStage === 'interview_round_2') {
+        targetIds = apps.filter(a => a.currentStage === 'interview_round_1').map(a => String(a.student));
+      } else if (targetStage === 'selected' || targetStage === 'offered') {
+        targetIds = apps.filter(a => a.currentStage === 'interview_round_2').map(a => String(a.student));
+      }
+    }
+
+    const defaultNotes = {
+      interview_round_1: 'Technical Interview 1: Data Structures, Algorithms, System Concepts, and Deployed Projects.',
+      interview_round_2: 'Interview 2 (Managerial & Cultural Fit): Architecture design, team problem solving, and behavioral.',
+      selected: 'Final Selection: Candidate has successfully cleared all technical and managerial rounds.',
+      offered: 'Offer Letter: Congratulate candidate and issue official campus placement package.'
+    };
+
+    setBulkAdvanceModal({
+      isOpen: true,
+      targetStage,
+      interviewDate: new Date(Date.now() + 3 * 86400000).toISOString().slice(0, 10),
+      interviewTime: '11:00',
+      venue: 'Campus Placement Cell Hall A / Google Meet',
+      meetingLink: 'https://meet.google.com/griet-campus-interview',
+      interviewerNotes: defaultNotes[targetStage] || '',
+      offeredPackage: drive?.packageDetails || '12.0 LPA',
+      studentIds: targetIds,
+      specificPhone: '8074701052'
+    });
+  };
+
+  // Handle Bulk Advance Stage Submit
+  const handleBulkAdvanceSubmit = async (e) => {
+    e.preventDefault();
+    const driveId = selectedDriveId || (drives.length > 0 ? drives[0]._id : '');
+    if (!driveId) return;
+
+    if (!bulkAdvanceModal.studentIds || bulkAdvanceModal.studentIds.length === 0) {
+      setError('No candidates found or selected for this stage advancement.');
+      return;
+    }
+
+    try {
+      setActionLoading(true);
+      setError('');
+      setSuccessMsg('');
+
+      const res = await fetch(`${API_URL}/recruiter/drives/${driveId}/bulk-advance-stage`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          studentIds: bulkAdvanceModal.studentIds,
+          targetStage: bulkAdvanceModal.targetStage,
+          interviewDate: bulkAdvanceModal.interviewDate,
+          interviewTime: bulkAdvanceModal.interviewTime,
+          venue: bulkAdvanceModal.venue,
+          meetingLink: bulkAdvanceModal.meetingLink,
+          interviewerNotes: bulkAdvanceModal.interviewerNotes,
+          offeredPackage: bulkAdvanceModal.offeredPackage,
+          specificPhone: bulkAdvanceModal.specificPhone || '8074701052'
+        })
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        sfx.playSuccess();
+        setSuccessMsg(`📢 Successfully advanced ${data.updatedCount} candidate(s) to ${bulkAdvanceModal.targetStage.replace(/_/g, ' ').toUpperCase()}! Email and WhatsApp notifications dispatched.`);
+        setBulkAdvanceModal(prev => ({ ...prev, isOpen: false }));
+        fetchMyDrives();
+      } else {
+        setError(data.error || 'Failed to advance candidates.');
+      }
+    } catch (err) {
+      setError('Could not advance candidates.');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   // Export Suitable Students to CSV
   const handleExportCSV = () => {
     const params = new URLSearchParams({
@@ -313,7 +601,7 @@ const RecruiterDashboard = () => {
     <>
       <Header title="Campus Recruiter Portal" />
 
-      <div className="recruiter-dashboard-container animate-fade">
+      <div className="content-wrapper recruiter-dashboard-container animate-fade">
         {/* Error Notification Banner */}
         {error && (
           <div className="error-banner" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -510,6 +798,24 @@ const RecruiterDashboard = () => {
                 >
                   📥 Export Talent Pool (CSV)
                 </button>
+
+                <button
+                  type="button"
+                  className="btn btn-sm btn-exam"
+                  onClick={() => setShowConductExamModal(true)}
+                  title="Schedule or conduct an online assessment for candidates"
+                >
+                  📝 Conduct Exam
+                </button>
+
+                <button
+                  type="button"
+                  className="btn btn-sm btn-import-test"
+                  onClick={() => setShowBulkImportModal(true)}
+                  title="Bulk import students who cleared the online test"
+                >
+                  📥 Bulk Import Test Cleared
+                </button>
               </div>
 
               <div className="filter-row-controls">
@@ -581,6 +887,50 @@ const RecruiterDashboard = () => {
               </div>
             </div>
 
+            {/* Multi-Selection Action Toolbar */}
+            {selectedStudentIds.length > 0 && (
+              <div className="selection-action-bar">
+                <div className="selection-count-badge">
+                  <span style={{ fontSize: '1.25rem' }}>🎯</span>
+                  <span><strong>{selectedStudentIds.length}</strong> Student(s) Selected</span>
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-sm"
+                    style={{ fontSize: '11px', padding: '3px 8px' }}
+                    onClick={() => setSelectedStudentIds([])}
+                  >
+                    ✕ Clear
+                  </button>
+                </div>
+
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-sm"
+                    onClick={handleSelectAllEligible}
+                  >
+                    {selectedStudentIds.length === eligibleCount ? 'Deselect All' : 'Select All Eligible'}
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-primary btn-sm"
+                    onClick={handleBulkAddToPipeline}
+                    disabled={actionLoading}
+                    style={{ background: 'linear-gradient(135deg, #0284c7, #2563eb)' }}
+                  >
+                    ➕ Add Selected to Pipeline
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-exam"
+                    onClick={() => setShowConductExamModal(true)}
+                  >
+                    📝 Conduct Exam for Selected ({selectedStudentIds.length})
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* Students Grid */}
             {studentsLoading ? (
               <div className="dashboard-loading-container" style={{ padding: '3rem' }}>
@@ -593,21 +943,33 @@ const RecruiterDashboard = () => {
                   const matchVal = student.matchScore || 75;
                   const isHighMatch = matchVal >= 75;
 
+                  const isSelected = selectedStudentIds.includes(student._id);
+                  const deployedList = student.deployedProjects || [];
+
                   return (
                     <div
                       key={student._id}
-                      className={`student-talent-card glass-card ${student.isEligible ? 'eligible' : 'not-eligible'}`}
+                      className={`student-talent-card glass-card ${student.isEligible ? 'eligible' : 'not-eligible'} ${isSelected ? 'is-selected' : ''}`}
                     >
                       <div className="student-header-row">
-                        <div className="student-avatar-info">
-                          <div className="student-avatar">
-                            {student.name.charAt(0).toUpperCase()}
-                          </div>
-                          <div className="student-name-group">
-                            <h4>{student.name}</h4>
-                            <span>
-                              {student.rollNumber} • {student.branch} ({student.batch})
-                            </span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <input
+                            type="checkbox"
+                            className="student-select-checkbox"
+                            checked={isSelected}
+                            onChange={() => handleToggleSelectStudent(student._id)}
+                            title="Select candidate for Exam / Pipeline"
+                          />
+                          <div className="student-avatar-info">
+                            <div className="student-avatar">
+                              {student.name.charAt(0).toUpperCase()}
+                            </div>
+                            <div className="student-name-group">
+                              <h4>{student.name}</h4>
+                              <span>
+                                {student.rollNumber} • {student.branch} ({student.batch})
+                              </span>
+                            </div>
                           </div>
                         </div>
 
@@ -659,10 +1021,88 @@ const RecruiterDashboard = () => {
                         )}
                       </div>
 
+                      {/* Resume Analyzer Highlight */}
+                      {student.resumeUrl ? (
+                        <div className="student-resume-preview-pill">
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <span style={{ fontSize: '13px' }}>📄</span>
+                            <span className="resume-name" title={student.resumeFileName || 'Resume'}>
+                              {student.resumeFileName ? (student.resumeFileName.length > 20 ? `${student.resumeFileName.slice(0, 18)}...` : student.resumeFileName) : 'Uploaded Resume'}
+                            </span>
+                            {student.resumeScore > 0 && (
+                              <span className="resume-score-tag">
+                                🎯 {student.resumeScore}% ATS
+                              </span>
+                            )}
+                          </div>
+                          <a
+                            href={student.resumeUrl.startsWith('http') ? student.resumeUrl : `${API_URL.replace('/api', '')}/${student.resumeUrl.replace(/^\/+/, '')}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="resume-view-link"
+                          >
+                            View Resume ↗
+                          </a>
+                        </div>
+                      ) : (
+                        <div style={{ fontSize: '11px', color: '#64748b', fontStyle: 'italic', padding: '2px 0' }}>
+                          📄 No resume uploaded in Resume Analyzer
+                        </div>
+                      )}
+
+                      {/* Deployed Projects Section */}
+                      {deployedList.length > 0 && (
+                        <div className="student-deployed-projects-preview">
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span className="proj-title-label">
+                              🚀 Deployed Projects ({deployedList.filter(p => p.deploymentUrl).length || deployedList.length}):
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => setSelectedStudentDetail(student)}
+                              style={{ background: 'none', border: 'none', color: '#38bdf8', fontSize: '10.5px', cursor: 'pointer', textDecoration: 'underline' }}
+                            >
+                              View All ({student.projects?.length || deployedList.length})
+                            </button>
+                          </div>
+                          {deployedList.slice(0, 2).map((proj, pIdx) => (
+                            <div key={proj._id || pIdx} className="deployed-proj-badge">
+                              <span className="proj-name" title={proj.title}>
+                                {proj.title?.length > 22 ? `${proj.title.slice(0, 20)}...` : proj.title}
+                              </span>
+                              <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                                {proj.deploymentUrl && (
+                                  <a
+                                    href={proj.deploymentUrl.startsWith('http') ? proj.deploymentUrl : `https://${proj.deploymentUrl}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="proj-live-link"
+                                    title="View Live Deployed App"
+                                  >
+                                    🌐 Live Demo
+                                  </a>
+                                )}
+                                {proj.repositoryUrl && (
+                                  <a
+                                    href={proj.repositoryUrl.startsWith('http') ? proj.repositoryUrl : `https://${proj.repositoryUrl}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="proj-repo-link"
+                                    title="View Source Code"
+                                  >
+                                    💻 Code
+                                  </a>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
                       {/* Skills Chips */}
                       {student.skills && student.skills.length > 0 && (
                         <div className="student-skills-chips">
-                          {student.skills.slice(0, 6).map((skill, sIdx) => {
+                          {student.skills.slice(0, 5).map((skill, sIdx) => {
                             const isMatched = student.matchedSkills?.some(
                               (m) => m.toLowerCase() === skill.toLowerCase()
                             );
@@ -675,9 +1115,9 @@ const RecruiterDashboard = () => {
                               </span>
                             );
                           })}
-                          {student.skills.length > 6 && (
+                          {student.skills.length > 5 && (
                             <span style={{ fontSize: '11px', color: '#64748b' }}>
-                              +{student.skills.length - 6} more
+                              +{student.skills.length - 5} more
                             </span>
                           )}
                         </div>
@@ -686,19 +1126,15 @@ const RecruiterDashboard = () => {
                       {/* Card Footer Actions */}
                       <div className="student-card-footer">
                         <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-                          {student.resumeUrl ? (
-                            <a
-                              href={student.resumeUrl.startsWith('http') ? student.resumeUrl : `${API_URL.replace('/api', '')}/${student.resumeUrl.replace(/^\/+/, '')}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="btn btn-secondary btn-sm"
-                              style={{ fontSize: '11px', padding: '4px 8px' }}
-                            >
-                              📄 Resume ↗
-                            </a>
-                          ) : (
-                            <span style={{ fontSize: '11px', color: '#64748b' }}>No resume file</span>
-                          )}
+                          <button
+                            type="button"
+                            className="btn btn-secondary btn-sm"
+                            style={{ fontSize: '11px', padding: '4px 8px' }}
+                            onClick={() => setSelectedStudentDetail(student)}
+                            title="Inspect full profile, projects and resume analyzer analysis"
+                          >
+                            🔍 Full Profile
+                          </button>
                           {student.phone && (
                             <a
                               href={`tel:${student.phone}`}
@@ -731,7 +1167,7 @@ const RecruiterDashboard = () => {
                                 borderRadius: '6px'
                               }}
                             >
-                              ✓ Registered ({student.applicationStatus || 'Applied'})
+                              ✓ In Pipeline ({student.applicationStatus || 'Applied'})
                             </span>
                           ) : student.invited ? (
                             <span className="btn-invite-student invited" style={{ fontSize: '11px', padding: '4px 10px' }}>
@@ -966,6 +1402,74 @@ const RecruiterDashboard = () => {
               )}
             </div>
 
+            {/* Recruitment Pipeline Workflow Action Bar */}
+            <div
+              className="pipeline-action-bar glass-card"
+              style={{
+                padding: '0.9rem 1.25rem',
+                display: 'flex',
+                gap: '10px',
+                flexWrap: 'wrap',
+                alignItems: 'center',
+                background: 'rgba(30, 41, 59, 0.75)',
+                border: '1px solid rgba(168, 85, 247, 0.25)',
+                borderRadius: '10px'
+              }}
+            >
+              <span style={{ fontSize: '11px', fontWeight: 800, color: '#c084fc', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                Pipeline Actions:
+              </span>
+              <button
+                type="button"
+                className="btn btn-sm btn-exam"
+                onClick={() => setShowConductExamModal(true)}
+                title="Conduct Online Assessment for Candidates"
+              >
+                📝 Conduct Exam
+              </button>
+              <button
+                type="button"
+                className="btn btn-sm btn-import-test"
+                onClick={() => setShowBulkImportModal(true)}
+                title="Bulk import students who passed the online test"
+              >
+                📥 Bulk Import Test Cleared
+              </button>
+              <button
+                type="button"
+                className="btn btn-sm btn-interview-1"
+                onClick={() => openBulkAdvanceForStage('interview_round_1')}
+                title="Schedule Technical Interview 1 for test-cleared students"
+              >
+                🎙️ Schedule Interview 1
+              </button>
+              <button
+                type="button"
+                className="btn btn-sm btn-interview-2"
+                onClick={() => openBulkAdvanceForStage('interview_round_2')}
+                title="Schedule Interview Round 2 (Managerial) for round 1 cleared students"
+              >
+                🗣️ Schedule Interview 2
+              </button>
+              <button
+                type="button"
+                className="btn btn-sm"
+                style={{
+                  background: 'linear-gradient(135deg, #10b981, #059669)',
+                  color: '#FFFFFF',
+                  border: 'none',
+                  fontWeight: 700,
+                  fontSize: '11.5px',
+                  padding: '6px 12px',
+                  borderRadius: '6px'
+                }}
+                onClick={() => openBulkAdvanceForStage('selected')}
+                title="Roll out final placement offers"
+              >
+                🏆 Final Select &amp; Offers
+              </button>
+            </div>
+
             {/* Stages Columns (Kanban) */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '14px', alignItems: 'flex-start' }}>
               {LIFECYCLE_STAGES.filter((s) => s.key !== 'rejected').map((stage) => {
@@ -1039,42 +1543,106 @@ const RecruiterDashboard = () => {
                               </div>
                             )}
 
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '6px', paddingTop: '6px', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+                            {cand.offeredPackage && (
+                              <div style={{ fontSize: '10.5px', background: 'rgba(16, 185, 129, 0.1)', color: '#34d399', padding: '3px 6px', borderRadius: '4px', fontWeight: 700 }}>
+                                💰 Offer: {cand.offeredPackage}
+                              </div>
+                            )}
+
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '6px', paddingTop: '6px', borderTop: '1px solid rgba(255,255,255,0.06)', gap: '6px' }}>
                               {cand.resumeUrl ? (
                                 <a
                                   href={cand.resumeUrl.startsWith('http') ? cand.resumeUrl : `${API_URL.replace('/api', '')}/${cand.resumeUrl.replace(/^\/+/, '')}`}
                                   target="_blank"
                                   rel="noopener noreferrer"
-                                  style={{ fontSize: '11px', color: '#38bdf8', textDecoration: 'none' }}
+                                  style={{ fontSize: '11px', color: '#38bdf8', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '3px' }}
                                 >
-                                  Resume ↗
+                                  📄 Resume ↗
                                 </a>
                               ) : (
                                 <span style={{ fontSize: '10px', color: '#64748b' }}>No resume</span>
                               )}
 
-                              <button
-                                type="button"
-                                className="btn btn-secondary btn-sm"
-                                style={{ fontSize: '10.5px', padding: '3px 8px' }}
-                                onClick={() => {
-                                  setStageModal({
-                                    isOpen: true,
-                                    candidate: cand,
-                                    driveId: currentDrive._id,
-                                    targetStage: stage.key === 'applied' ? 'shortlisted' : 'interview_round_1',
-                                    roundName: '',
-                                    interviewDate: '',
-                                    interviewTime: '',
-                                    venue: 'Campus Placement Hall',
-                                    meetingLink: '',
-                                    interviewerNotes: '',
-                                    offeredPackage: ''
-                                  });
-                                }}
-                              >
-                                Advance Round ➔
-                              </button>
+                              <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                                {stage.key === 'applied' && (
+                                  <button
+                                    type="button"
+                                    className="btn btn-secondary btn-sm"
+                                    style={{ fontSize: '10px', padding: '3px 6px', color: '#38bdf8' }}
+                                    onClick={() => openBulkAdvanceForStage('shortlisted', [cand.student || cand._id])}
+                                    title="Shortlist for Test"
+                                  >
+                                    📋 Shortlist
+                                  </button>
+                                )}
+                                {stage.key === 'shortlisted' && (
+                                  <button
+                                    type="button"
+                                    className="btn btn-secondary btn-sm"
+                                    style={{ fontSize: '10px', padding: '3px 6px', color: '#fbbf24' }}
+                                    onClick={() => openBulkAdvanceForStage('online_test_cleared', [cand.student || cand._id])}
+                                    title="Mark Test Cleared"
+                                  >
+                                    🧪 Clear Test
+                                  </button>
+                                )}
+                                {stage.key === 'online_test_cleared' && (
+                                  <button
+                                    type="button"
+                                    className="btn btn-secondary btn-sm"
+                                    style={{ fontSize: '10px', padding: '3px 6px', color: '#fb923c' }}
+                                    onClick={() => openBulkAdvanceForStage('interview_round_1', [cand.student || cand._id])}
+                                    title="Advance to Interview 1"
+                                  >
+                                    🎙️ Interview 1
+                                  </button>
+                                )}
+                                {stage.key === 'interview_round_1' && (
+                                  <button
+                                    type="button"
+                                    className="btn btn-secondary btn-sm"
+                                    style={{ fontSize: '10px', padding: '3px 6px', color: '#c084fc' }}
+                                    onClick={() => openBulkAdvanceForStage('interview_round_2', [cand.student || cand._id])}
+                                    title="Advance to Interview 2"
+                                  >
+                                    🗣️ Interview 2
+                                  </button>
+                                )}
+                                {stage.key === 'interview_round_2' && (
+                                  <button
+                                    type="button"
+                                    className="btn btn-secondary btn-sm"
+                                    style={{ fontSize: '10px', padding: '3px 6px', color: '#34d399' }}
+                                    onClick={() => openBulkAdvanceForStage('selected', [cand.student || cand._id])}
+                                    title="Final Select candidate"
+                                  >
+                                    🏆 Select
+                                  </button>
+                                )}
+                                <button
+                                  type="button"
+                                  className="btn btn-secondary btn-sm"
+                                  style={{ fontSize: '10px', padding: '3px 6px' }}
+                                  onClick={() => {
+                                    setStageModal({
+                                      isOpen: true,
+                                      candidate: cand,
+                                      driveId: currentDrive._id,
+                                      targetStage: stage.key === 'applied' ? 'shortlisted' : 'interview_round_1',
+                                      roundName: '',
+                                      interviewDate: '',
+                                      interviewTime: '',
+                                      venue: 'Campus Placement Hall',
+                                      meetingLink: '',
+                                      interviewerNotes: '',
+                                      offeredPackage: ''
+                                    });
+                                  }}
+                                  title="Custom stage update & notes"
+                                >
+                                  ⚙️
+                                </button>
+                              </div>
                             </div>
                           </div>
                         ))
@@ -1363,6 +1931,563 @@ const RecruiterDashboard = () => {
                   </button>
                 </div>
               </form>
+            </div>
+          </div>
+        )}
+
+        {/* ========================================================================= */}
+        {/* CONDUCT ASSESSMENT EXAM MODAL */}
+        {/* ========================================================================= */}
+        {showConductExamModal && (
+          <div className="recruiter-modal-backdrop" onClick={() => setShowConductExamModal(false)}>
+            <div className="recruiter-modal-window" onClick={(e) => e.stopPropagation()}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '0.8rem' }}>
+                <div>
+                  <h3 style={{ margin: 0, color: '#FFFFFF', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span>📝</span> Conduct Online Assessment Exam
+                  </h3>
+                  <span style={{ fontSize: '12px', color: '#94a3b8' }}>
+                    {selectedStudentIds.length > 0
+                      ? `Targeting ${selectedStudentIds.length} candidate(s) selected from Talent Pool`
+                      : `Targeting registered candidates for: ${currentDrive?.role || currentDrive?.title || 'Placement Drive'}`}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  style={{ background: 'transparent', border: 'none', color: '#94a3b8', fontSize: '1.3rem', cursor: 'pointer' }}
+                  onClick={() => setShowConductExamModal(false)}
+                >
+                  ✕
+                </button>
+              </div>
+
+              <form onSubmit={handleConductExamSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                <div className="recruiter-form-grid">
+                  <div className="recruiter-form-group full-width">
+                    <label>Assessment Title *</label>
+                    <input
+                      type="text"
+                      required
+                      value={examForm.examTitle}
+                      onChange={(e) => setExamForm({ ...examForm, examTitle: e.target.value })}
+                      placeholder="e.g. Cognitive & Coding Assessment Round"
+                    />
+                  </div>
+
+                  <div className="recruiter-form-group full-width">
+                    <label>Exam Platform URL / Test Link *</label>
+                    <input
+                      type="url"
+                      required
+                      value={examForm.examLink}
+                      onChange={(e) => setExamForm({ ...examForm, examLink: e.target.value })}
+                      placeholder="https://hackerrank.com/... or https://exam.griet.ac.in"
+                    />
+                  </div>
+
+                  <div className="recruiter-form-group">
+                    <label>Exam Date *</label>
+                    <input
+                      type="date"
+                      required
+                      value={examForm.examDate}
+                      onChange={(e) => setExamForm({ ...examForm, examDate: e.target.value })}
+                    />
+                  </div>
+
+                  <div className="recruiter-form-group">
+                    <label>Exam Start Time *</label>
+                    <input
+                      type="time"
+                      required
+                      value={examForm.examTime}
+                      onChange={(e) => setExamForm({ ...examForm, examTime: e.target.value })}
+                    />
+                  </div>
+
+                  <div className="recruiter-form-group full-width">
+                    <label>WhatsApp Alert Target Mobile Number</label>
+                    <input
+                      type="tel"
+                      value={examForm.specificPhone}
+                      onChange={(e) => setExamForm({ ...examForm, specificPhone: e.target.value })}
+                      placeholder="8074701052"
+                    />
+                    <small style={{ color: '#94a3b8', fontSize: '11px', marginTop: '2px' }}>
+                      ⚡ Instant WhatsApp notification with assessment link will be sent to <strong>8074701052</strong> and all selected students.
+                    </small>
+                  </div>
+
+                  <div className="recruiter-form-group full-width">
+                    <label>Instructions &amp; Test Syllabus</label>
+                    <textarea
+                      rows="3"
+                      value={examForm.instructions}
+                      onChange={(e) => setExamForm({ ...examForm, instructions: e.target.value })}
+                      placeholder="Specify duration, proctoring guidelines, topic weightages..."
+                    />
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '10px' }}>
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    onClick={() => setShowConductExamModal(false)}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="btn btn-primary"
+                    disabled={actionLoading}
+                    style={{ background: 'linear-gradient(135deg, #0284c7, #2563eb)', border: 'none' }}
+                  >
+                    {actionLoading ? 'Scheduling...' : '🚀 Schedule Exam & Send Alerts'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* ========================================================================= */}
+        {/* BULK IMPORT TEST CLEARED STUDENTS MODAL */}
+        {/* ========================================================================= */}
+        {showBulkImportModal && (
+          <div className="recruiter-modal-backdrop" onClick={() => setShowBulkImportModal(false)}>
+            <div className="recruiter-modal-window" onClick={(e) => e.stopPropagation()}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '0.8rem' }}>
+                <div>
+                  <h3 style={{ margin: 0, color: '#FFFFFF', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span>📥</span> Bulk Import Test-Cleared Students
+                  </h3>
+                  <span style={{ fontSize: '12px', color: '#94a3b8' }}>
+                    Import students who passed the assessment. They will advance to 'Test Cleared' stage &amp; queue for Interview 1.
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  style={{ background: 'transparent', border: 'none', color: '#94a3b8', fontSize: '1.3rem', cursor: 'pointer' }}
+                  onClick={() => setShowBulkImportModal(false)}
+                >
+                  ✕
+                </button>
+              </div>
+
+              <form onSubmit={handleBulkImportSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                <div className="recruiter-form-group full-width">
+                  <label>Paste Roll Numbers or Emails (One per line, comma or space separated) *</label>
+                  <textarea
+                    rows="6"
+                    required
+                    value={bulkImportText}
+                    onChange={(e) => setBulkImportText(e.target.value)}
+                    placeholder="21241A0501&#10;21241A0502&#10;student@griet.ac.in&#10;21241A0505"
+                    style={{ fontFamily: 'monospace', fontSize: '12px' }}
+                  />
+                </div>
+
+                <div className="recruiter-form-group full-width">
+                  <label>Or Upload CSV File with Roll Numbers / Emails</label>
+                  <input
+                    type="file"
+                    accept=".csv, .txt"
+                    onChange={handleBulkImportFileUpload}
+                    style={{ background: '#0f172a', border: '1px solid #334155', padding: '6px', borderRadius: '6px', color: '#94a3b8' }}
+                  />
+                </div>
+
+                <div className="recruiter-form-group full-width">
+                  <label>WhatsApp Notification Phone Number</label>
+                  <input
+                    type="tel"
+                    value={bulkImportPhone}
+                    onChange={(e) => setBulkImportPhone(e.target.value)}
+                    placeholder="8074701052"
+                  />
+                  <small style={{ color: '#94a3b8', fontSize: '11px', marginTop: '2px' }}>
+                    Dispatches congratulations &amp; Interview 1 round briefing to <strong>8074701052</strong> and each cleared student.
+                  </small>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '10px' }}>
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    onClick={() => setShowBulkImportModal(false)}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="btn btn-primary"
+                    disabled={actionLoading || !bulkImportText.trim()}
+                    style={{ background: 'linear-gradient(135deg, #10b981, #059669)', border: 'none' }}
+                  >
+                    {actionLoading ? 'Importing & Advancing...' : '📥 Import & Move to Test Cleared'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* ========================================================================= */}
+        {/* BULK STAGE ADVANCEMENT MODAL (INTERVIEW 1, INTERVIEW 2, SELECTION) */}
+        {/* ========================================================================= */}
+        {bulkAdvanceModal.isOpen && (
+          <div className="recruiter-modal-backdrop" onClick={() => setBulkAdvanceModal(prev => ({ ...prev, isOpen: false }))}>
+            <div className="recruiter-modal-window" onClick={(e) => e.stopPropagation()}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '0.8rem' }}>
+                <div>
+                  <h3 style={{ margin: 0, color: '#FFFFFF', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span>🚀</span> Advance Candidates to {bulkAdvanceModal.targetStage.replace(/_/g, ' ').toUpperCase()}
+                  </h3>
+                  <span style={{ fontSize: '12px', color: '#38bdf8' }}>
+                    Advancing {bulkAdvanceModal.studentIds?.length || 0} candidate(s) to this round
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  style={{ background: 'transparent', border: 'none', color: '#94a3b8', fontSize: '1.3rem', cursor: 'pointer' }}
+                  onClick={() => setBulkAdvanceModal(prev => ({ ...prev, isOpen: false }))}
+                >
+                  ✕
+                </button>
+              </div>
+
+              <form onSubmit={handleBulkAdvanceSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                <div className="recruiter-form-grid">
+                  <div className="recruiter-form-group">
+                    <label>Interview / Schedule Date</label>
+                    <input
+                      type="date"
+                      value={bulkAdvanceModal.interviewDate}
+                      onChange={(e) => setBulkAdvanceModal({ ...bulkAdvanceModal, interviewDate: e.target.value })}
+                    />
+                  </div>
+
+                  <div className="recruiter-form-group">
+                    <label>Time Slot</label>
+                    <input
+                      type="time"
+                      value={bulkAdvanceModal.interviewTime}
+                      onChange={(e) => setBulkAdvanceModal({ ...bulkAdvanceModal, interviewTime: e.target.value })}
+                    />
+                  </div>
+
+                  <div className="recruiter-form-group full-width">
+                    <label>Venue or Online Meeting URL</label>
+                    <input
+                      type="text"
+                      value={bulkAdvanceModal.venue}
+                      onChange={(e) => setBulkAdvanceModal({ ...bulkAdvanceModal, venue: e.target.value })}
+                      placeholder="Placement Cell Hall A or Google Meet link"
+                    />
+                  </div>
+
+                  <div className="recruiter-form-group full-width">
+                    <label>Meeting / Video Call Link (Optional)</label>
+                    <input
+                      type="url"
+                      value={bulkAdvanceModal.meetingLink}
+                      onChange={(e) => setBulkAdvanceModal({ ...bulkAdvanceModal, meetingLink: e.target.value })}
+                      placeholder="https://meet.google.com/xyz"
+                    />
+                  </div>
+
+                  {(bulkAdvanceModal.targetStage === 'selected' || bulkAdvanceModal.targetStage === 'offered') && (
+                    <div className="recruiter-form-group full-width">
+                      <label>Offered CTC / Package</label>
+                      <input
+                        type="text"
+                        value={bulkAdvanceModal.offeredPackage}
+                        onChange={(e) => setBulkAdvanceModal({ ...bulkAdvanceModal, offeredPackage: e.target.value })}
+                        placeholder="e.g. 14.5 LPA + Performance Bonus"
+                      />
+                    </div>
+                  )}
+
+                  <div className="recruiter-form-group full-width">
+                    <label>WhatsApp Target Mobile Number</label>
+                    <input
+                      type="tel"
+                      value={bulkAdvanceModal.specificPhone}
+                      onChange={(e) => setBulkAdvanceModal({ ...bulkAdvanceModal, specificPhone: e.target.value })}
+                      placeholder="8074701052"
+                    />
+                    <small style={{ color: '#94a3b8', fontSize: '11px', marginTop: '2px' }}>
+                      Alerts sent to <strong>8074701052</strong> and each candidate's registered phone.
+                    </small>
+                  </div>
+
+                  <div className="recruiter-form-group full-width">
+                    <label>Interviewer Notes &amp; Round Syllabus</label>
+                    <textarea
+                      rows="3"
+                      value={bulkAdvanceModal.interviewerNotes}
+                      onChange={(e) => setBulkAdvanceModal({ ...bulkAdvanceModal, interviewerNotes: e.target.value })}
+                      placeholder="Round focus, interviewers, preparation requirements..."
+                    />
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '10px' }}>
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    onClick={() => setBulkAdvanceModal(prev => ({ ...prev, isOpen: false }))}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="btn btn-primary"
+                    disabled={actionLoading || !bulkAdvanceModal.studentIds || bulkAdvanceModal.studentIds.length === 0}
+                    style={{ background: 'linear-gradient(135deg, #10b981, #059669)', border: 'none' }}
+                  >
+                    {actionLoading ? 'Advancing Candidates...' : '✓ Confirm Round Advancement'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* ========================================================================= */}
+        {/* DETAILED CANDIDATE PROFILE & PORTFOLIO MODAL */}
+        {/* ========================================================================= */}
+        {selectedStudentDetail && (
+          <div className="recruiter-modal-backdrop" onClick={() => setSelectedStudentDetail(null)}>
+            <div className="recruiter-modal-window" style={{ maxWidth: '780px' }} onClick={(e) => e.stopPropagation()}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '0.8rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <div className="student-avatar" style={{ width: '48px', height: '48px', fontSize: '1.3rem' }}>
+                    {selectedStudentDetail.name?.charAt(0).toUpperCase()}
+                  </div>
+                  <div>
+                    <h3 style={{ margin: 0, color: '#FFFFFF' }}>{selectedStudentDetail.name}</h3>
+                    <span style={{ fontSize: '12px', color: '#94a3b8' }}>
+                      {selectedStudentDetail.rollNumber} • {selectedStudentDetail.branch} • Batch {selectedStudentDetail.batch}
+                    </span>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  style={{ background: 'transparent', border: 'none', color: '#94a3b8', fontSize: '1.3rem', cursor: 'pointer' }}
+                  onClick={() => setSelectedStudentDetail(null)}
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', maxHeight: '72vh', overflowY: 'auto', paddingRight: '4px' }}>
+                {/* Academic & Readiness Stats */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px' }}>
+                  <div style={{ background: 'rgba(255,255,255,0.04)', padding: '10px', borderRadius: '8px', textAlign: 'center' }}>
+                    <span style={{ fontSize: '11px', color: '#94a3b8', display: 'block' }}>CGPA</span>
+                    <strong style={{ fontSize: '1.2rem', color: selectedStudentDetail.cgpa >= 8.0 ? '#34d399' : '#38bdf8' }}>
+                      {selectedStudentDetail.cgpa}
+                    </strong>
+                  </div>
+                  <div style={{ background: 'rgba(255,255,255,0.04)', padding: '10px', borderRadius: '8px', textAlign: 'center' }}>
+                    <span style={{ fontSize: '11px', color: '#94a3b8', display: 'block' }}>PRI Score</span>
+                    <strong style={{ fontSize: '1.2rem', color: '#c084fc' }}>
+                      {selectedStudentDetail.readinessScore}%
+                    </strong>
+                  </div>
+                  <div style={{ background: 'rgba(255,255,255,0.04)', padding: '10px', borderRadius: '8px', textAlign: 'center' }}>
+                    <span style={{ fontSize: '11px', color: '#94a3b8', display: 'block' }}>Match</span>
+                    <strong style={{ fontSize: '1.2rem', color: '#34d399' }}>
+                      {selectedStudentDetail.matchScore || 75}%
+                    </strong>
+                  </div>
+                  <div style={{ background: 'rgba(255,255,255,0.04)', padding: '10px', borderRadius: '8px', textAlign: 'center' }}>
+                    <span style={{ fontSize: '11px', color: '#94a3b8', display: 'block' }}>LeetCode</span>
+                    <strong style={{ fontSize: '1.2rem', color: '#fbbf24' }}>
+                      {selectedStudentDetail.leetcodeStats?.totalSolved || 0}
+                    </strong>
+                  </div>
+                </div>
+
+                {/* Contact & Links Strip */}
+                <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', background: 'rgba(0,0,0,0.25)', padding: '10px 14px', borderRadius: '8px', fontSize: '12.5px' }}>
+                  <span style={{ color: '#94a3b8' }}>✉️ {selectedStudentDetail.email}</span>
+                  {selectedStudentDetail.phone && <span style={{ color: '#94a3b8' }}>📞 {selectedStudentDetail.phone}</span>}
+                  {selectedStudentDetail.githubProfileUrl && (
+                    <a
+                      href={selectedStudentDetail.githubProfileUrl.startsWith('http') ? selectedStudentDetail.githubProfileUrl : `https://${selectedStudentDetail.githubProfileUrl}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{ color: '#38bdf8', textDecoration: 'none' }}
+                    >
+                      💻 GitHub Profile ↗
+                    </a>
+                  )}
+                </div>
+
+                {/* Resume Analyzer Section */}
+                <div style={{ background: 'rgba(168, 85, 247, 0.08)', border: '1px solid rgba(168, 85, 247, 0.25)', borderRadius: '10px', padding: '14px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                    <h4 style={{ margin: 0, color: '#FFFFFF', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.95rem' }}>
+                      <span>📄</span> Resume Analyzer Details
+                    </h4>
+                    {selectedStudentDetail.resumeScore > 0 && (
+                      <span style={{ background: 'rgba(16, 185, 129, 0.2)', color: '#34d399', padding: '3px 10px', borderRadius: '999px', fontSize: '12px', fontWeight: 800 }}>
+                        🎯 {selectedStudentDetail.resumeScore}% ATS Score
+                      </span>
+                    )}
+                  </div>
+
+                  {selectedStudentDetail.resumeUrl ? (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                      <div>
+                        <strong style={{ color: '#f1f5f9', fontSize: '13px', display: 'block' }}>
+                          {selectedStudentDetail.resumeFileName || 'Uploaded Resume File'}
+                        </strong>
+                        <span style={{ fontSize: '11px', color: '#94a3b8' }}>
+                          Verified in campus Resume Analyzer
+                        </span>
+                      </div>
+                      <a
+                        href={selectedStudentDetail.resumeUrl.startsWith('http') ? selectedStudentDetail.resumeUrl : `${API_URL.replace('/api', '')}/${selectedStudentDetail.resumeUrl.replace(/^\/+/, '')}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="btn btn-primary btn-sm"
+                        style={{ fontSize: '12px', padding: '6px 14px', background: 'linear-gradient(135deg, #a855f7, #6366f1)' }}
+                      >
+                        📄 Open Full Resume ↗
+                      </a>
+                    </div>
+                  ) : (
+                    <p style={{ color: '#94a3b8', fontSize: '12px', margin: 0, fontStyle: 'italic' }}>
+                      Candidate has not uploaded a resume to the Resume Analyzer yet.
+                    </p>
+                  )}
+                </div>
+
+                {/* Deployed Projects Section */}
+                <div>
+                  <h4 style={{ margin: '0 0 10px 0', color: '#FFFFFF', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.95rem' }}>
+                    <span>🚀</span> Deployed Projects &amp; Portfolio ({(selectedStudentDetail.deployedProjects || selectedStudentDetail.projects || []).length})
+                  </h4>
+
+                  {(selectedStudentDetail.deployedProjects || selectedStudentDetail.projects || []).length > 0 ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                      {(selectedStudentDetail.deployedProjects || selectedStudentDetail.projects || []).map((proj, pIdx) => (
+                        <div
+                          key={proj._id || pIdx}
+                          style={{
+                            background: '#1e293b',
+                            border: '1px solid rgba(255,255,255,0.08)',
+                            borderRadius: '8px',
+                            padding: '12px',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '8px'
+                          }}
+                        >
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '6px' }}>
+                            <div>
+                              <strong style={{ color: '#FFFFFF', fontSize: '0.95rem' }}>{proj.title}</strong>
+                              {proj.status && (
+                                <span style={{ marginLeft: '8px', fontSize: '10.5px', background: 'rgba(56, 189, 248, 0.15)', color: '#38bdf8', padding: '2px 6px', borderRadius: '4px' }}>
+                                  {proj.status}
+                                </span>
+                              )}
+                            </div>
+
+                            <div style={{ display: 'flex', gap: '6px' }}>
+                              {proj.deploymentUrl && (
+                                <a
+                                  href={proj.deploymentUrl.startsWith('http') ? proj.deploymentUrl : `https://${proj.deploymentUrl}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="btn btn-primary btn-sm"
+                                  style={{ fontSize: '11px', padding: '3px 8px', background: 'linear-gradient(135deg, #10b981, #059669)', border: 'none' }}
+                                >
+                                  🌐 Live App ↗
+                                </a>
+                              )}
+                              {proj.repositoryUrl && (
+                                <a
+                                  href={proj.repositoryUrl.startsWith('http') ? proj.repositoryUrl : `https://${proj.repositoryUrl}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="btn btn-secondary btn-sm"
+                                  style={{ fontSize: '11px', padding: '3px 8px' }}
+                                >
+                                  💻 Code ↗
+                                </a>
+                              )}
+                            </div>
+                          </div>
+
+                          {proj.description && (
+                            <p style={{ margin: 0, color: '#94a3b8', fontSize: '12px', lineHeight: 1.4 }}>
+                              {proj.description}
+                            </p>
+                          )}
+
+                          {proj.technologies && proj.technologies.length > 0 && (
+                            <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap' }}>
+                              {proj.technologies.map((t, tIdx) => (
+                                <span
+                                  key={tIdx}
+                                  style={{ background: 'rgba(255,255,255,0.06)', color: '#cbd5e1', padding: '2px 7px', borderRadius: '4px', fontSize: '10.5px' }}
+                                >
+                                  {t}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div style={{ color: '#94a3b8', fontSize: '12px', fontStyle: 'italic', padding: '8px 0' }}>
+                      No deployed projects found for this candidate.
+                    </div>
+                  )}
+                </div>
+
+                {/* Candidate Technical Skills */}
+                {selectedStudentDetail.skills && selectedStudentDetail.skills.length > 0 && (
+                  <div>
+                    <h4 style={{ margin: '0 0 8px 0', color: '#FFFFFF', fontSize: '0.95rem' }}>
+                      🛠️ Technical Skills
+                    </h4>
+                    <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                      {selectedStudentDetail.skills.map((s, idx) => (
+                        <span key={idx} className="skill-chip matched" style={{ fontSize: '11px' }}>
+                          {s}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '14px', paddingTop: '12px', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => setSelectedStudentDetail(null)}
+                >
+                  Close
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={() => {
+                    handleToggleSelectStudent(selectedStudentDetail._id);
+                    setSelectedStudentDetail(null);
+                  }}
+                >
+                  {selectedStudentIds.includes(selectedStudentDetail._id) ? 'Deselect Candidate' : '✓ Select for Exam / Pipeline'}
+                </button>
+              </div>
             </div>
           </div>
         )}

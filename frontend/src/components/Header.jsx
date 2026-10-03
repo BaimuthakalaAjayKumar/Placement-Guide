@@ -233,7 +233,9 @@ const Header = ({ title }) => {
         <div className="header-divider"></div>
 
         <div className="header-profile">
-          <span className="profile-role-badge">{user.role === 'admin' ? 'Admin' : user.role === 'faculty' ? 'Faculty' : 'Student'}</span>
+          <span className={`profile-role-badge ${user.role === 'recruiter' ? 'badge-recruiter' : user.role === 'admin' ? 'badge-admin' : user.role === 'faculty' ? 'badge-faculty' : 'badge-student'}`}>
+            {user.role === 'admin' ? 'Admin' : user.role === 'faculty' ? 'Faculty' : user.role === 'recruiter' ? 'Recruiter' : 'Student'}
+          </span>
         </div>
       </div>
     </header>

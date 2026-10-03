@@ -3,13 +3,27 @@
    ========================================================================== */
 
 .recruiter-dashboard-container {
-  padding: 2rem;
-  overflow-y: auto;
-  max-width: 1440px;
-  margin: 0 auto;
   display: flex;
   flex-direction: column;
   gap: 1.75rem;
+  box-sizing: border-box;
+  margin-left: var(--sidebar-width) !important;
+  margin-top: var(--header-height) !important;
+  width: calc(100% - var(--sidebar-width)) !important;
+  max-width: calc(100% - var(--sidebar-width)) !important;
+  padding: 2rem 2.5rem !important;
+  min-height: calc(100vh - var(--header-height)) !important;
+  position: relative !important;
+  z-index: 10;
+}
+
+@media (max-width: 992px) {
+  .recruiter-dashboard-container {
+    margin-left: var(--sidebar-width) !important;
+    width: calc(100% - var(--sidebar-width)) !important;
+    max-width: calc(100% - var(--sidebar-width)) !important;
+    padding: 1.5rem !important;
+  }
 }
 
 /* Recruiter Hero Banner */
@@ -500,3 +514,222 @@
   border-color: #a855f7;
   outline: none;
 }
+
+/* ==========================================================================
+   SELECTION ACTION BAR & DEPLOYED PROJECTS / RESUME BADGES
+   ========================================================================== */
+
+.selection-action-bar {
+  background: linear-gradient(135deg, rgba(30, 41, 59, 0.98), rgba(15, 23, 42, 0.99));
+  border: 1px solid rgba(168, 85, 247, 0.4);
+  border-radius: 12px;
+  padding: 12px 18px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.5);
+  animation: slideDown 0.25s ease-out;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.selection-count-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+  color: #f1f5f9;
+  font-size: 0.92rem;
+}
+
+.student-talent-card.is-selected {
+  border-color: #a855f7 !important;
+  box-shadow: 0 0 0 2px rgba(168, 85, 247, 0.35), 0 12px 28px rgba(0, 0, 0, 0.5);
+  background: linear-gradient(135deg, rgba(45, 30, 70, 0.8), rgba(15, 23, 42, 0.9));
+}
+
+.student-select-checkbox {
+  width: 18px;
+  height: 18px;
+  accent-color: #a855f7;
+  cursor: pointer;
+}
+
+/* Deployed Projects in Student Card */
+.student-deployed-projects-preview {
+  background: rgba(15, 23, 42, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 8px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.section-micro-lbl {
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: #38bdf8;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.deployed-project-items {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.deployed-proj-badge {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 6px;
+  padding: 5px 8px;
+  gap: 8px;
+}
+
+.deployed-proj-badge .proj-info {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.deployed-proj-badge .proj-title {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #f8fafc;
+}
+
+.deployed-proj-badge .proj-tech {
+  font-size: 0.72rem;
+  color: #94a3b8;
+}
+
+.deployed-proj-badge .proj-links {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.proj-live-link {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #34d399;
+  background: rgba(16, 185, 129, 0.15);
+  border: 1px solid rgba(16, 185, 129, 0.35);
+  padding: 2px 7px;
+  border-radius: 4px;
+  text-decoration: none;
+  transition: all 0.2s ease;
+}
+
+.proj-live-link:hover {
+  background: rgba(16, 185, 129, 0.3);
+  color: #ffffff;
+}
+
+.proj-repo-link {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #94a3b8;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 2px 7px;
+  border-radius: 4px;
+  text-decoration: none;
+  transition: all 0.2s ease;
+}
+
+.proj-repo-link:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #ffffff;
+}
+
+/* Resume Analyzer Pill */
+.student-resume-preview-pill {
+  width: 100%;
+}
+
+.resume-analyzer-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: rgba(56, 189, 248, 0.08);
+  border: 1px solid rgba(56, 189, 248, 0.25);
+  padding: 8px 12px;
+  border-radius: 8px;
+  gap: 10px;
+}
+
+.resume-analyzer-title {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #f1f5f9;
+  display: block;
+}
+
+.resume-analyzer-score {
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: #38bdf8;
+  display: inline-block;
+  margin-top: 2px;
+}
+
+/* Stage Action Buttons */
+.pipeline-top-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.btn-exam {
+  background: linear-gradient(135deg, #f59e0b, #d97706) !important;
+  color: #ffffff !important;
+  border: none !important;
+  font-weight: 700 !important;
+}
+
+.btn-import-test {
+  background: linear-gradient(135deg, #10b981, #059669) !important;
+  color: #ffffff !important;
+  border: none !important;
+  font-weight: 700 !important;
+}
+
+.btn-interview-1 {
+  background: linear-gradient(135deg, #f97316, #ea580c) !important;
+  color: #ffffff !important;
+  border: none !important;
+  font-weight: 700 !important;
+}
+
+.btn-interview-2 {
+  background: linear-gradient(135deg, #8b5cf6, #7c3aed) !important;
+  color: #ffffff !important;
+  border: none !important;
+  font-weight: 700 !important;
+}
+
