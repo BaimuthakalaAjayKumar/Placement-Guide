@@ -61,6 +61,13 @@ exports.getPosts = async (req, res, next) => {
 
           query.$or = orClauses;
         }
+      } else if (req.user.role === 'hod') {
+        const hodBranch = req.user.branch || 'IT';
+        query.$or = [
+          { user: req.user.id },
+          { branch: new RegExp(`^${escapeRegex(hodBranch.trim())}$`, 'i') },
+          { branch: { $in: ['', null, 'All', 'all'] } }
+        ];
       } else if (req.user.role === 'student') {
         // Students see discussions for their year/branch or enrolled subjects
         const studentYear = req.user.academicYear || req.user.year || '';
@@ -400,9 +407,10 @@ exports.deletePost = async (req, res, next) => {
       return res.status(404).json({ success: false, error: 'Post not found' });
     }
 
-    // Authorization: Author, Admin, or Faculty assigned to the subject can delete
+    // Authorization: Author, Admin, HOD, or Faculty assigned to the subject can delete
     const isAuthor = post.user.toString() === req.user.id;
     const isAdmin = req.user.role === 'admin';
+    const isHOD = req.user.role === 'hod';
     let isAssignedFaculty = false;
 
     if (req.user.role === 'faculty' && post.forumType === 'subject') {
@@ -418,7 +426,7 @@ exports.deletePost = async (req, res, next) => {
       }
     }
 
-    if (!isAuthor && !isAdmin && !isAssignedFaculty) {
+    if (!isAuthor && !isAdmin && !isHOD && !isAssignedFaculty) {
       return res.status(401).json({ success: false, error: 'Not authorized to delete this post' });
     }
 

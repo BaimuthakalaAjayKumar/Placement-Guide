@@ -39,27 +39,27 @@ router.post('/:id/submit', submitTestAttempt);
 router.get('/practice-stats/me', getStudentPracticeStats);
 router.get('/practice-questions/:platform', getPracticeQuestions);
 
-// Subject Test Reports (Admin & Faculty)
-router.get('/subject/:subjectId/reports', authorize('admin', 'faculty'), getSubjectTestReports);
+// Subject Test Reports (Admin & Faculty & HOD)
+router.get('/subject/:subjectId/reports', authorize('admin', 'faculty', 'hod'), getSubjectTestReports);
 
-// Admin and Faculty Test & Question Management
-router.get('/admin/attempts', authorize('admin'), getAdminAttempts);
-router.post('/', authorize('admin', 'faculty'), createTest);
-router.delete('/:id', authorize('admin', 'faculty'), deleteTest);
-router.get('/:id/questions', authorize('admin', 'faculty'), getTestQuestionsAdmin);
-router.post('/:id/questions', authorize('admin', 'faculty'), addQuestion);
-router.put('/:id/questions/:qId', authorize('admin', 'faculty'), editQuestion);
-router.delete('/:id/questions/:qId', authorize('admin', 'faculty'), deleteQuestion);
+// Admin, HOD and Faculty Test & Question Management
+router.get('/admin/attempts', authorize('admin', 'faculty', 'hod'), getAdminAttempts);
+router.post('/', authorize('admin', 'faculty', 'hod'), createTest);
+router.delete('/:id', authorize('admin', 'faculty', 'hod'), deleteTest);
+router.get('/:id/questions', authorize('admin', 'faculty', 'hod'), getTestQuestionsAdmin);
+router.post('/:id/questions', authorize('admin', 'faculty', 'hod'), addQuestion);
+router.put('/:id/questions/:qId', authorize('admin', 'faculty', 'hod'), editQuestion);
+router.delete('/:id/questions/:qId', authorize('admin', 'faculty', 'hod'), deleteQuestion);
 
 // Image Upload
-router.post('/upload-image', authorize('admin', 'faculty'), uploadQuestionImage, uploadImage);
+router.post('/upload-image', authorize('admin', 'faculty', 'hod'), uploadQuestionImage, uploadImage);
 
-// Practice Platform Coordinator & Reports (Admin & Faculty)
-router.post('/practice-questions/:platform', authorize('admin'), addPracticeQuestion);
-router.delete('/practice-questions/:platform/:id', authorize('admin'), deletePracticeQuestion);
-router.put('/practice-questions/:platform/:id', authorize('admin'), editPracticeQuestion);
-router.post('/practice-questions/:platform/bulk', authorize('admin'), bulkCreatePracticeQuestions);
-router.get('/practice-reports/student/:studentId', authorize('admin', 'faculty'), getIndividualPracticeReport);
-router.get('/practice-reports/:platform', authorize('admin', 'faculty'), getPracticeReport);
+// Practice Platform Coordinator & Reports (Admin, Faculty & HOD)
+router.post('/practice-questions/:platform', authorize('admin', 'hod'), addPracticeQuestion);
+router.delete('/practice-questions/:platform/:id', authorize('admin', 'hod'), deletePracticeQuestion);
+router.put('/practice-questions/:platform/:id', authorize('admin', 'hod'), editPracticeQuestion);
+router.post('/practice-questions/:platform/bulk', authorize('admin', 'hod'), bulkCreatePracticeQuestions);
+router.get('/practice-reports/student/:studentId', authorize('admin', 'faculty', 'hod'), getIndividualPracticeReport);
+router.get('/practice-reports/:platform', authorize('admin', 'faculty', 'hod'), getPracticeReport);
 
 module.exports = router;

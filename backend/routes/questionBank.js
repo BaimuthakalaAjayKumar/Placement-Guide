@@ -19,12 +19,12 @@ const { protect, authorize } = require('../middleware/auth');
 
 router.route('/')
   .get(protect, getQuestions)
-  .post(protect, authorize('admin'), createQuestion);
+  .post(protect, authorize('admin', 'faculty', 'hod'), createQuestion);
 
-router.post('/bulk', protect, authorize('admin'), bulkCreateQuestions);
+router.post('/bulk', protect, authorize('admin', 'faculty', 'hod'), bulkCreateQuestions);
 
 router.route('/submissions/report')
-  .get(protect, authorize('admin', 'faculty'), getAdminSubmissionReport);
+  .get(protect, authorize('admin', 'faculty', 'hod'), getAdminSubmissionReport);
 
 router.route('/submissions/:submissionId/report')
   .get(protect, getDetailedReport);
@@ -34,8 +34,8 @@ router.route('/run-sandbox')
 
 router.route('/:id')
   .get(protect, getQuestion)
-  .put(protect, authorize('admin'), updateQuestion)
-  .delete(protect, authorize('admin'), deleteQuestion);
+  .put(protect, authorize('admin', 'faculty', 'hod'), updateQuestion)
+  .delete(protect, authorize('admin', 'faculty', 'hod'), deleteQuestion);
 
 router.route('/:id/run')
   .post(protect, runCode);

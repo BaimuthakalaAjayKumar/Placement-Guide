@@ -5,7 +5,7 @@ const Notification = require('../models/Notification');
 const getStudentAcademicYear = (user) => user.academicYear || user.year || '';
 
 const canManageYear = (user, academicYear) => {
-  if (user.role === 'admin') return true;
+  if (user.role === 'admin' || user.role === 'hod') return true;
   if (user.role !== 'faculty') return false;
   if (!user.managedAcademicYears || user.managedAcademicYears.length === 0) return true;
   const targetYear = (academicYear || '').trim().toLowerCase();
@@ -13,7 +13,7 @@ const canManageYear = (user, academicYear) => {
 };
 
 const canManageScope = (user, academicYear, branch = '', section = '') => {
-  if (user.role === 'admin') return true;
+  if (user.role === 'admin' || user.role === 'hod') return true;
   if (user.role !== 'faculty') return false;
   if (!user.managedScopes || user.managedScopes.length === 0) {
     if (user.managedAcademicYears && user.managedAcademicYears.length > 0) {

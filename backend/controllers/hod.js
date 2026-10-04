@@ -3,6 +3,9 @@ const User = require('../models/User');
 const PlacementDrive = require('../models/PlacementDrive');
 const AptitudeTest = require('../models/AptitudeTest');
 const LabTask = require('../models/LabTask');
+const LabPracticeAttempt = require('../models/LabPracticeAttempt');
+const Subject = require('../models/Subject');
+const Project = require('../models/Project');
 const Doubt = require('../models/Doubt');
 const Notification = require('../models/Notification');
 const Resume = require('../models/Resume');
@@ -792,6 +795,403 @@ exports.exportDepartmentReport = async (req, res, next) => {
       count: reportData.length,
       department: branch,
       data: reportData
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// =========================================================================
+// 7. ACADEMIC SUBJECTS MANAGEMENT & ASSIGNMENT TO HOD / FACULTY
+// =========================================================================
+exports.getDepartmentSubjects = async (req, res, next) => {
+  try {
+    const branch = req.user.branch || 'IT';
+    const branchPatterns = getBranchPatterns(branch);
+
+    const subjects = await Subject.find({
+      $or: [
+        { branch: { $in: branchPatterns } },
+        { branch: { $in: ['', null, 'All', 'all'] } }
+      ],
+      isActive: true
+    }).sort({ academicYear: -1, name: 1 }).lean();
+
+    // Populate assigned teachers (from User.managedScopes)
+    const allStaff = await User.find({
+      role: { $in: ['faculty', 'hod'] }
+    }).select('name email role branch targetRole managedScopes').lean();
+
+    const formatted = subjects.map(subj => {
+      const assignedTeachers = [];
+      allStaff.forEach(staff => {
+        const hasScope = (staff.managedScopes || []).some(s =>
+          (s.subject && String(s.subject) === String(subj._id)) ||
+          ((!s.academicYear || s.academicYear.toLowerCase() === 'all' || s.academicYear === subj.academicYear) &&
+           (!s.branch || s.branch.toLowerCase() === 'all' || branchPatterns.some(bp => bp.test(s.branch))) &&
+           (!s.section || s.section.toLowerCase() === 'all' || s.section === subj.section))
+        );
+        if (hasScope) {
+          assignedTeachers.push({
+            id: staff._id,
+            name: staff.name,
+            role: staff.role,
+            designation: staff.targetRole || (staff.role === 'hod' ? 'Head of Department' : 'Faculty'),
+            email: staff.email
+          });
+        }
+      });
+
+      return {
+        _id: subj._id,
+        name: subj.name,
+        code: subj.code,
+        description: subj.description || '',
+        academicYear: subj.academicYear,
+        branch: subj.branch || branch,
+        section: subj.section || 'All',
+        notesCount: (subj.notes || []).length,
+        assignedTeachers,
+        createdAt: subj.createdAt
+      };
+    });
+
+    res.status(200).json({
+      success: true,
+      count: formatted.length,
+      data: formatted
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.createDepartmentSubject = async (req, res, next) => {
+  try {
+    const branch = req.user.branch || 'IT';
+    const { name, code, description, academicYear, section = 'All', assignedTo } = req.body;
+
+    if (!name || !code || !academicYear) {
+      return res.status(400).json({ success: false, error: 'Subject name, code, and academic year are required.' });
+    }
+
+    const existing = await Subject.findOne({
+      code: code.trim().toUpperCase(),
+      academicYear: academicYear.trim(),
+      branch: new RegExp(`^${branch}$`, 'i'),
+      section: section.trim()
+    });
+
+    if (existing) {
+      return res.status(409).json({ success: false, error: `Subject code "${code}" already exists for ${academicYear} section ${section}.` });
+    }
+
+    const subject = await Subject.create({
+      name: name.trim(),
+      code: code.trim().toUpperCase(),
+      description: description ? description.trim() : '',
+      academicYear: academicYear.trim(),
+      branch: branch.trim(),
+      section: section.trim(),
+      createdBy: req.user.id
+    });
+
+    // If assignedTo is specified (e.g. HOD themselves or Faculty ID)
+    if (assignedTo) {
+      const targetUser = await User.findById(assignedTo);
+      if (targetUser) {
+        targetUser.managedScopes = targetUser.managedScopes || [];
+        targetUser.managedScopes.push({
+          academicYear: academicYear.trim(),
+          branch: branch.trim(),
+          section: section.trim(),
+          subject: subject._id
+        });
+        await targetUser.save({ validateBeforeSave: false });
+      }
+    }
+
+    res.status(201).json({
+      success: true,
+      message: `Subject "${subject.name}" (${subject.code}) created successfully.`,
+      data: subject
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.assignSubjectTeacher = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { userId, action = 'assign' } = req.body; // userId can be HOD's own ID or Faculty ID
+
+    const subject = await Subject.findById(id);
+    if (!subject) {
+      return res.status(404).json({ success: false, error: 'Subject not found.' });
+    }
+
+    const targetUser = await User.findById(userId);
+    if (!targetUser) {
+      return res.status(404).json({ success: false, error: 'Faculty / HOD user not found.' });
+    }
+
+    targetUser.managedScopes = targetUser.managedScopes || [];
+
+    if (action === 'assign') {
+      const alreadyHas = targetUser.managedScopes.some(s =>
+        s.subject && String(s.subject) === String(subject._id)
+      );
+      if (!alreadyHas) {
+        targetUser.managedScopes.push({
+          academicYear: subject.academicYear,
+          branch: subject.branch || req.user.branch || 'IT',
+          section: subject.section || 'All',
+          subject: subject._id
+        });
+        await targetUser.save({ validateBeforeSave: false });
+      }
+      return res.status(200).json({
+        success: true,
+        message: `Assigned "${subject.name}" to ${targetUser.name} (${targetUser.role.toUpperCase()}) successfully.`
+      });
+    } else {
+      // Unassign
+      targetUser.managedScopes = targetUser.managedScopes.filter(s =>
+        !s.subject || String(s.subject) !== String(subject._id)
+      );
+      await targetUser.save({ validateBeforeSave: false });
+      return res.status(200).json({
+        success: true,
+        message: `Unassigned "${subject.name}" from ${targetUser.name} successfully.`
+      });
+    }
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.deleteDepartmentSubject = async (req, res, next) => {
+  try {
+    const subject = await Subject.findById(req.params.id);
+    if (!subject) {
+      return res.status(404).json({ success: false, error: 'Subject not found.' });
+    }
+    await Subject.findByIdAndDelete(req.params.id);
+    res.status(200).json({
+      success: true,
+      message: `Subject "${subject.name}" (${subject.code}) deleted successfully.`
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// =========================================================================
+// 8. STUDENTS PROJECTS & GRADING
+// =========================================================================
+exports.getDepartmentProjects = async (req, res, next) => {
+  try {
+    const branch = req.user.branch || 'IT';
+    const branchPatterns = getBranchPatterns(branch);
+
+    const projects = await Project.find({
+      $or: [
+        { branch: { $in: branchPatterns } },
+        { branch: { $in: ['', null, 'All', 'all'] } }
+      ]
+    })
+      .populate('student', 'name email rollNumber phone mobileNumber branch section academicYear year')
+      .populate('reviewedBy', 'name email role')
+      .sort({ updatedAt: -1 })
+      .lean();
+
+    // Filter projects where student belongs to IT branch if project branch wasn't set
+    const filtered = projects.filter(p => {
+      if (p.branch && branchPatterns.some(bp => bp.test(p.branch))) return true;
+      if (p.student?.branch && branchPatterns.some(bp => bp.test(p.student.branch))) return true;
+      return false;
+    });
+
+    res.status(200).json({
+      success: true,
+      count: filtered.length,
+      data: filtered
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.gradeStudentProject = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { grade, feedback, status = 'approved' } = req.body;
+
+    const project = await Project.findById(id).populate('student', 'name email');
+    if (!project) {
+      return res.status(404).json({ success: false, error: 'Project not found.' });
+    }
+
+    if (grade !== undefined) project.grade = Number(grade);
+    if (feedback !== undefined) project.feedback = feedback.trim();
+    if (status) project.status = status;
+    project.reviewedBy = req.user.id;
+    project.reviewedAt = new Date();
+
+    await project.save();
+
+    // Notify student
+    if (project.student?._id) {
+      await Notification.create({
+        recipient: project.student._id,
+        sender: req.user.id,
+        type: 'PROJECT_EVALUATED',
+        title: 'Project Evaluated by HOD',
+        message: `Your project "${project.title}" has been reviewed by ${req.user.name} (HOD). Status: ${status.toUpperCase()}, Grade: ${grade !== undefined ? grade : 'N/A'}/100.`,
+        actionLink: '/project-studio'
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: `Project "${project.title}" graded and updated successfully.`,
+      data: project
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// =========================================================================
+// 9. LAB TASKS & PRACTICE MANAGEMENT
+// =========================================================================
+exports.getDepartmentLabTasks = async (req, res, next) => {
+  try {
+    const branch = req.user.branch || 'IT';
+    const branchPatterns = getBranchPatterns(branch);
+
+    const tasks = await LabTask.find({
+      $or: [
+        { branch: { $in: branchPatterns } },
+        { branch: { $in: ['', null, 'All', 'all'] } }
+      ],
+      isActive: true
+    })
+      .populate('createdBy', 'name email role')
+      .sort({ createdAt: -1 })
+      .lean();
+
+    // Get submission counts for each task
+    const taskIds = tasks.map(t => t._id);
+    const attempts = await LabPracticeAttempt.aggregate([
+      { $match: { labTask: { $in: taskIds } } },
+      { $group: { _id: '$labTask', count: { $sum: 1 }, passedCount: { $sum: { $cond: [{ $eq: ['$status', 'passed'] }, 1, 0] } } } }
+    ]);
+
+    const statsMap = {};
+    attempts.forEach(a => { statsMap[String(a._id)] = a; });
+
+    const formatted = tasks.map(t => ({
+      ...t,
+      submissionsCount: statsMap[String(t._id)]?.count || 0,
+      passedSubmissions: statsMap[String(t._id)]?.passedCount || 0
+    }));
+
+    res.status(200).json({
+      success: true,
+      count: formatted.length,
+      data: formatted
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.createDepartmentLabTask = async (req, res, next) => {
+  try {
+    const branch = req.user.branch || 'IT';
+    const {
+      title,
+      description,
+      language = 'python',
+      academicYear = '4th Year',
+      section = 'All',
+      difficulty = 'medium',
+      starterCode = '',
+      testCases = [],
+      points = 10,
+      dueDate
+    } = req.body;
+
+    if (!title || !description) {
+      return res.status(400).json({ success: false, error: 'Task title and description are required.' });
+    }
+
+    const task = await LabTask.create({
+      title: title.trim(),
+      description: description.trim(),
+      language,
+      academicYear,
+      branch,
+      section,
+      difficulty,
+      starterCode,
+      testCases: Array.isArray(testCases) ? testCases : [],
+      points: Number(points) || 10,
+      dueDate: dueDate ? new Date(dueDate) : undefined,
+      createdBy: req.user.id
+    });
+
+    res.status(201).json({
+      success: true,
+      message: `Lab task "${task.title}" created successfully for ${branch} branch.`,
+      data: task
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.getLabTaskSubmissions = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const task = await LabTask.findById(id);
+    if (!task) {
+      return res.status(404).json({ success: false, error: 'Lab task not found.' });
+    }
+
+    const submissions = await LabPracticeAttempt.find({ labTask: id })
+      .populate('student', 'name email rollNumber phone mobileNumber branch section')
+      .sort({ createdAt: -1 })
+      .lean();
+
+    res.status(200).json({
+      success: true,
+      task: {
+        _id: task._id,
+        title: task.title,
+        language: task.language,
+        points: task.points
+      },
+      count: submissions.length,
+      data: submissions
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.deleteDepartmentLabTask = async (req, res, next) => {
+  try {
+    const task = await LabTask.findById(req.params.id);
+    if (!task) {
+      return res.status(404).json({ success: false, error: 'Lab task not found.' });
+    }
+    await LabTask.findByIdAndDelete(req.params.id);
+    res.status(200).json({
+      success: true,
+      message: `Lab task "${task.title}" deleted successfully.`
     });
   } catch (err) {
     next(err);

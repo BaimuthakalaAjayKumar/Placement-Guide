@@ -433,7 +433,15 @@ exports.changePassword = async (req, res, next) => {
     }
 
     const user = await User.findById(req.user.id).select('+password');
-    if (!user || !(await user.matchPassword(currentPassword))) {
+    if (!user) {
+      return res.status(404).json({ success: false, error: 'User account not found.' });
+    }
+
+    if (user.role === 'recruiter' || user.role === 'admin' || user.email === 'vaddeajaykumar2004@gmail.com') {
+      return res.status(403).json({ success: false, error: 'Password change is disabled for Super Administrator and Campus Recruiter accounts.' });
+    }
+
+    if (!(await user.matchPassword(currentPassword))) {
       return res.status(401).json({ success: false, error: 'Current password is incorrect.' });
     }
 

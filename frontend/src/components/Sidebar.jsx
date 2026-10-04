@@ -63,15 +63,15 @@ const Sidebar = () => {
         <span>GRIET Placement</span>
       </div>
 
-      {(user.role === 'admin' || user.role === 'faculty' || user.role === 'hod') && (
+      {(user.role === 'admin' || user.role === 'faculty') && (
         <div className="user-badge">
-          <div className="user-avatar" style={user.role === 'hod' ? { background: 'linear-gradient(135deg, #10b981, #0d9488)' } : {}}>
-            {user.role === 'hod' ? '🎓' : user.name.charAt(0).toUpperCase()}
+          <div className="user-avatar">
+            {user.name.charAt(0).toUpperCase()}
           </div>
           <div className="user-info">
             <span className="user-name">{user.name}</span>
             <span className="user-role">
-              {user.role === 'admin' ? 'Administrator' : user.role === 'hod' ? `HOD (${user.department || user.branch || 'IT'})` : 'Faculty'}
+              {user.role === 'admin' ? 'Administrator' : 'Faculty'}
             </span>
           </div>
         </div>
@@ -366,6 +366,14 @@ const Sidebar = () => {
                   </button>
 
                   <button
+                    onClick={() => { navigate('/change-password'); setIsUserMenuOpen(false); }}
+                    className="popover-item"
+                  >
+                    <svg className="popover-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
+                    <span>Change Password</span>
+                  </button>
+
+                  <button
                     onClick={() => { setShowContactModal(true); setIsUserMenuOpen(false); }}
                     className="popover-item"
                   >
@@ -415,7 +423,60 @@ const Sidebar = () => {
                 </div>
               </div>
             </div>
+            <button
+              onClick={() => navigate('/change-password')}
+              className="change-password-sidebar-btn"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+                width: '100%',
+                padding: '8px 12px',
+                borderRadius: '8px',
+                background: 'rgba(16, 185, 129, 0.12)',
+                border: '1px solid rgba(16, 185, 129, 0.25)',
+                color: '#6ee7b7',
+                fontSize: '12.5px',
+                fontWeight: '600',
+                cursor: 'pointer',
+                transition: 'all 0.2s'
+              }}
+            >
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
+              <span>Change Password</span>
+            </button>
             <button onClick={handleLogout} className="logout-btn" style={{ width: '100%' }}>
+              <svg viewBox="0 0 24 24" className="logout-icon"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" /></svg>
+              <span>Sign Out</span>
+            </button>
+          </>
+        ) : user.role === 'faculty' ? (
+          <>
+            <button
+              onClick={() => navigate('/change-password')}
+              className="change-password-sidebar-btn"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+                width: '100%',
+                padding: '8px 12px',
+                borderRadius: '8px',
+                background: 'rgba(255, 255, 255, 0.06)',
+                border: '1px solid rgba(255, 255, 255, 0.12)',
+                color: '#cbd5e1',
+                fontSize: '12.5px',
+                fontWeight: '500',
+                cursor: 'pointer',
+                transition: 'all 0.2s'
+              }}
+            >
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
+              <span>Change Password</span>
+            </button>
+            <button onClick={handleLogout} className="logout-btn">
               <svg viewBox="0 0 24 24" className="logout-icon"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" /></svg>
               <span>Sign Out</span>
             </button>

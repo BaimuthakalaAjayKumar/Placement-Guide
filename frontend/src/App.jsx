@@ -116,7 +116,7 @@ const AppRoutes = () => {
       <Route
         path="/change-password"
         element={
-          <PrivateRoute allowedRoles={['student', 'faculty', 'admin', 'recruiter', 'hod']}>
+          <PrivateRoute allowedRoles={['student', 'faculty', 'hod']}>
             <ChangePassword />
           </PrivateRoute>
         }
@@ -158,7 +158,7 @@ const AppRoutes = () => {
       <Route
         path="/discussion-forum"
         element={
-          <PrivateRoute allowedRoles={['student', 'faculty', 'admin']}>
+          <PrivateRoute allowedRoles={['student', 'faculty', 'admin', 'hod']}>
             <DiscussionForum />
           </PrivateRoute>
         }
@@ -166,7 +166,7 @@ const AppRoutes = () => {
       <Route
         path="/coding-playground"
         element={
-          <PrivateRoute allowedRoles={['student', 'faculty', 'admin']}>
+          <PrivateRoute allowedRoles={['student', 'faculty', 'admin', 'hod']}>
             <CodingPlayground />
           </PrivateRoute>
         }
@@ -174,7 +174,7 @@ const AppRoutes = () => {
       <Route
         path="/project-studio"
         element={
-          <PrivateRoute allowedRoles={['student']}>
+          <PrivateRoute allowedRoles={['student', 'faculty', 'admin', 'hod']}>
             <ProjectStudio />
           </PrivateRoute>
         }
@@ -182,7 +182,7 @@ const AppRoutes = () => {
       <Route
         path="/lab-practice"
         element={
-          <PrivateRoute allowedRoles={['student', 'faculty', 'admin']}>
+          <PrivateRoute allowedRoles={['student', 'faculty', 'admin', 'hod']}>
             <LabPractice />
           </PrivateRoute>
         }
@@ -342,7 +342,7 @@ const AppRoutes = () => {
       <Route
         path="/question-bank"
         element={
-          <PrivateRoute allowedRoles={['student', 'faculty', 'admin']}>
+          <PrivateRoute allowedRoles={['student', 'faculty', 'admin', 'hod']}>
             <QuestionBank />
           </PrivateRoute>
         }
@@ -350,7 +350,7 @@ const AppRoutes = () => {
       <Route
         path="/contests"
         element={
-          <PrivateRoute allowedRoles={['student', 'faculty', 'admin']}>
+          <PrivateRoute allowedRoles={['student', 'faculty', 'admin', 'hod']}>
             <Contests />
           </PrivateRoute>
         }
@@ -394,7 +394,7 @@ const AppRoutes = () => {
       <Route
         path="/placement-suite"
         element={
-          <PrivateRoute allowedRoles={['student', 'faculty', 'admin']}>
+          <PrivateRoute allowedRoles={['student', 'faculty', 'admin', 'hod']}>
             <PlacementSuitePage />
           </PrivateRoute>
         }
@@ -402,7 +402,7 @@ const AppRoutes = () => {
       <Route
         path="/contests/:id/workspace"
         element={
-          <PrivateRoute allowedRoles={['student']}>
+          <PrivateRoute allowedRoles={['student', 'faculty', 'admin', 'hod']}>
             <ContestWorkspace />
           </PrivateRoute>
         }
@@ -410,7 +410,7 @@ const AppRoutes = () => {
       <Route
         path="/contests/:id/report"
         element={
-          <PrivateRoute allowedRoles={['admin']}>
+          <PrivateRoute allowedRoles={['admin', 'faculty', 'hod']}>
             <ContestReport />
           </PrivateRoute>
         }
@@ -418,7 +418,7 @@ const AppRoutes = () => {
       <Route
         path="/contests/:id/leaderboard"
         element={
-          <PrivateRoute allowedRoles={['student', 'admin']}>
+          <PrivateRoute allowedRoles={['student', 'admin', 'faculty', 'hod']}>
             <ContestLeaderboard />
           </PrivateRoute>
         }

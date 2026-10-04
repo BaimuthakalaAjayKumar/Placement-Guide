@@ -53,15 +53,15 @@ const router = express.Router();
 router.use(protect);
 
 router.get('/subjects', getSubjects);
-router.post('/subjects', authorize('admin'), createSubject);
-router.delete('/subjects/:id', authorize('admin'), deleteSubject);
+router.post('/subjects', authorize('admin', 'hod'), createSubject);
+router.delete('/subjects/:id', authorize('admin', 'hod'), deleteSubject);
 router.get('/subjects/:id/notes', getSubjectNotes);
-router.post('/subjects/:id/notes', authorize('admin', 'faculty'), uploadNoteFile.single('pdfFile'), addSubjectNote);
-router.delete('/subjects/:id/notes/:noteId', authorize('admin', 'faculty'), deleteSubjectNote);
+router.post('/subjects/:id/notes', authorize('admin', 'faculty', 'hod'), uploadNoteFile.single('pdfFile'), addSubjectNote);
+router.delete('/subjects/:id/notes/:noteId', authorize('admin', 'faculty', 'hod'), deleteSubjectNote);
 router.get('/projects', getProjects);
 router.post('/projects', authorize('student'), createProject);
 router.put('/projects/:id', updateProject);
 router.post('/projects/:id/restore-version/:versionId', restoreProjectVersion);
-router.delete('/projects/:id', authorize('student'), deleteProject);
+router.delete('/projects/:id', authorize('student', 'admin', 'hod'), deleteProject);
 
 module.exports = router;

@@ -7,7 +7,7 @@ const { checkLabTaskPlagiarism } = require('../services/plagiarismService');
 const { logActivity } = require('../utils/auditLogger');
 
 const studentYear = user => user.academicYear || user.year || '';
-const canManage = (user, task) => user.role === 'admin' || (
+const canManage = (user, task) => user.role === 'admin' || user.role === 'hod' || (
   user.role === 'faculty' && (
     (task.createdBy && task.createdBy.toString() === user.id) ||
     (user.managedScopes && user.managedScopes.some(scope =>

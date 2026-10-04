@@ -131,9 +131,26 @@ const ChangePassword = () => {
               </div>
               <h2>Change Your Password</h2>
               <p>
-                Your account was initialized with a temporary password. Please set a new private password to continue securely.
+                {user?.role === 'admin' || user?.role === 'recruiter' 
+                  ? 'Password changes are restricted for Administrator and Recruiter roles.'
+                  : 'Update your account password securely.'}
               </p>
             </div>
+
+            {(user?.role === 'admin' || user?.role === 'recruiter') && (
+              <div style={{
+                background: 'rgba(239, 68, 68, 0.12)',
+                border: '1px solid rgba(239, 68, 68, 0.3)',
+                padding: '16px',
+                borderRadius: '8px',
+                color: '#fca5a5',
+                fontSize: '13.5px',
+                marginBottom: '16px',
+                lineHeight: '1.5'
+              }}>
+                🔒 <strong>Password Modification Restricted:</strong> Direct password changes are disabled for Super Administrator and Campus Recruiter accounts for institutional security compliance.
+              </div>
+            )}
 
             {/* User identity banner */}
             {user && (
@@ -181,6 +198,7 @@ const ChangePassword = () => {
             )}
 
             {/* Password change form */}
+            {!(user?.role === 'admin' || user?.role === 'recruiter') && (
             <form onSubmit={handleSubmit} className="cp-form">
               
               {/* Current Password Field */}
@@ -358,6 +376,7 @@ const ChangePassword = () => {
                 )}
               </button>
             </form>
+            )}
 
             {/* Footer with Sign Out option */}
             <div className="cp-footer">
