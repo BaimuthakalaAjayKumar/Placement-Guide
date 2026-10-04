@@ -11,6 +11,7 @@ const Profile = () => {
   const [bio, setBio] = useState(user?.bio || '');
   const [skillsText, setSkillsText] = useState(user?.skills?.join(', ') || '');
   const [rollNumber, setRollNumber] = useState(user?.rollNumber || '');
+  const [mobileNumber, setMobileNumber] = useState(user?.mobileNumber || user?.phone || '');
   const [branch, setBranch] = useState(user?.branch || '');
   const [year, setYear] = useState(user?.year || '');
   const [academicYear, setAcademicYear] = useState(user?.academicYear || '');
@@ -44,6 +45,7 @@ const Profile = () => {
       setBio(user.bio || '');
       setSkillsText(user.skills?.join(', ') || '');
       setRollNumber(user.rollNumber || '');
+      setMobileNumber(user.mobileNumber || user.phone || '');
       setBranch(user.branch || '');
       setYear(user.year || '');
       setAcademicYear(user.academicYear || '');
@@ -80,6 +82,8 @@ const Profile = () => {
         bio,
         skills: parsedSkills,
         rollNumber: rollNumber.trim(),
+        mobileNumber: mobileNumber.trim(),
+        phone: mobileNumber.trim(),
         branch: branch.trim(),
         year: year.trim(),
         academicYear: academicYear.trim(),
@@ -163,6 +167,27 @@ const Profile = () => {
                   <div className="meta-item animate-fade">
                     <span className="meta-label">Roll Number:</span>
                     <span className="meta-value">{user.rollNumber}</span>
+                  </div>
+                )}
+                <div className="meta-item animate-fade">
+                  <span className="meta-label">Mobile Number:</span>
+                  <span className="meta-value" style={{ color: user?.mobileNumber || user?.phone ? 'var(--text-primary)' : '#f59e0b', fontWeight: user?.mobileNumber || user?.phone ? '600' : 'normal' }}>
+                    {user?.mobileNumber || user?.phone || 'Not Added'}
+                  </span>
+                </div>
+                {(user?.mobileNumber || user?.phone) && (
+                  <div className="meta-item animate-fade" style={{ background: 'rgba(34, 197, 94, 0.08)', padding: '6px 10px', borderRadius: '6px', border: '1px solid rgba(34, 197, 94, 0.2)' }}>
+                    <span className="meta-label" style={{ color: '#22c55e', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                      <span>💬</span> WhatsApp Alerts Active
+                    </span>
+                    <a
+                      href={`https://api.whatsapp.com/send?phone=${(user.mobileNumber || user.phone).replace(/\D/g, '')}&text=Hello%20${encodeURIComponent(user.name)}%2C%20placement%20portal%20connected`}
+                      target="_blank"
+                      rel="noreferrer"
+                      style={{ fontSize: '11px', color: '#38bdf8', textDecoration: 'none', fontWeight: 'bold' }}
+                    >
+                      Test Chat
+                    </a>
                   </div>
                 )}
                 {user?.branch && (
@@ -273,6 +298,22 @@ const Profile = () => {
                       onChange={(e) => setRollNumber(e.target.value)}
                       placeholder="e.g. 21H11A0501"
                     />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label" htmlFor="mobileNumber">
+                      Mobile Number (for WhatsApp / SMS Messages)
+                    </label>
+                    <input
+                      type="tel"
+                      id="mobileNumber"
+                      className="form-control"
+                      value={mobileNumber}
+                      onChange={(e) => setMobileNumber(e.target.value)}
+                      placeholder="e.g. +91 9876543210 or 8074701052"
+                    />
+                    <small style={{ color: 'var(--text-secondary, #94a3b8)', fontSize: '11.5px', marginTop: '4px', display: 'block' }}>
+                      ⚡ Used by recruiters and placement cell to send test schedules, interview calls, and real-time WhatsApp updates.
+                    </small>
                   </div>
                   <div className="form-group">
                     <label className="form-label" htmlFor="branch">Branch</label>

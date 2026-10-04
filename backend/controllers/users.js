@@ -556,6 +556,17 @@ exports.getAllStudents = async (req, res, next) => {
 
     if (isMainAdmin) {
       students = await User.find({ role: 'student' }).sort({ readinessScore: -1 });
+    } else if (req.user.role === 'hod') {
+      const branchClean = (req.user.branch || 'IT').trim();
+      const branchPatterns = [new RegExp(`^${branchClean}$`, 'i')];
+      if (/^it$/i.test(branchClean)) {
+        branchPatterns.push(new RegExp('Information\\s*Technology', 'i'));
+        branchPatterns.push(new RegExp('\\bIT\\b', 'i'));
+      }
+      students = await User.find({
+        role: 'student',
+        branch: { $in: branchPatterns }
+      }).sort({ readinessScore: -1 });
     } else {
       // Scoped Faculty or Secondary Administrator: only show students in their assigned scope
       const scopes = req.user.managedScopes || [];

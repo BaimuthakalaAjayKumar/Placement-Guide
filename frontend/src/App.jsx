@@ -41,12 +41,14 @@ import LabPractice from './pages/LabPractice';
 import PlacementCalendar from './pages/PlacementCalendar';
 import PlacementSuitePage from './pages/PlacementSuitePage';
 import RecruiterDashboard from './pages/RecruiterDashboard';
+import HODDashboard from './pages/HODDashboard';
 
 // Helper for home route by role
 const getRoleHome = (role) => {
   if (role === 'admin') return '/admin';
   if (role === 'faculty') return '/faculty';
   if (role === 'recruiter') return '/recruiter';
+  if (role === 'hod') return '/hod';
   return '/dashboard';
 };
 
@@ -114,7 +116,7 @@ const AppRoutes = () => {
       <Route
         path="/change-password"
         element={
-          <PrivateRoute allowedRoles={['student', 'faculty', 'admin', 'recruiter']}>
+          <PrivateRoute allowedRoles={['student', 'faculty', 'admin', 'recruiter', 'hod']}>
             <ChangePassword />
           </PrivateRoute>
         }
@@ -356,7 +358,7 @@ const AppRoutes = () => {
       <Route
         path="/placement-calendar"
         element={
-          <PrivateRoute allowedRoles={['student', 'faculty', 'admin', 'recruiter']}>
+          <PrivateRoute allowedRoles={['student', 'faculty', 'admin', 'recruiter', 'hod']}>
             <PlacementCalendar />
           </PrivateRoute>
         }
@@ -374,6 +376,20 @@ const AppRoutes = () => {
       <Route
         path="/recruiter-dashboard"
         element={<Navigate to="/recruiter" replace />}
+      />
+
+      {/* HOD Routes */}
+      <Route
+        path="/hod"
+        element={
+          <PrivateRoute allowedRoles={['hod', 'admin']}>
+            <HODDashboard />
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/hod-dashboard"
+        element={<Navigate to="/hod" replace />}
       />
       <Route
         path="/placement-suite"

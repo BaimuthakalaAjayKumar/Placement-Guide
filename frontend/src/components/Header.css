@@ -203,6 +203,13 @@
   font-weight: 800;
 }
 
+.profile-role-badge.badge-hod {
+  color: #34d399 !important;
+  background: rgba(16, 185, 129, 0.22) !important;
+  border: 1px solid rgba(16, 185, 129, 0.5) !important;
+  font-weight: 800;
+}
+
 @media (max-width: 992px) {
   .main-header {
     width: 100%;

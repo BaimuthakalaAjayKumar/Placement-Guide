@@ -28,7 +28,7 @@ const UserSchema = new mongoose.Schema({
   },
   role: {
     type: String,
-    enum: ['student', 'faculty', 'admin', 'recruiter'],
+    enum: ['student', 'faculty', 'admin', 'recruiter', 'hod'],
     default: 'student'
   },
   companyName: {
@@ -72,6 +72,14 @@ const UserSchema = new mongoose.Schema({
     default: 'Software Engineer'
   },
   rollNumber: {
+    type: String,
+    default: ''
+  },
+  mobileNumber: {
+    type: String,
+    default: ''
+  },
+  phone: {
     type: String,
     default: ''
   },

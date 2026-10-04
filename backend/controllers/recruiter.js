@@ -279,6 +279,146 @@ exports.extendRecruiterAccount = async (req, res, next) => {
 };
 
 // =========================================================================
+// DRIVE SCHEDULING CONFLICT & DATE CLASH DETECTOR
+// =========================================================================
+
+/**
+ * Checks whether another recruiter or campus drive already booked the given calendar day
+ * for tests, interviews, or on-campus drives.
+ */
+const checkSchedulingConflict = async ({
+  targetDate,
+  taskType = 'Drive Event',
+  excludeDriveId = null,
+  currentCompany = '',
+  currentRecruiterId = null
+}) => {
+  if (!targetDate) return { hasConflict: false };
+
+  const parsed = new Date(targetDate);
+  if (isNaN(parsed.getTime())) return { hasConflict: false };
+
+  const startOfDay = new Date(parsed);
+  startOfDay.setHours(0, 0, 0, 0);
+
+  const endOfDay = new Date(parsed);
+  endOfDay.setHours(23, 59, 59, 999);
+
+  const driveQuery = {
+    $or: [
+      { 'dates.driveDate': { $gte: startOfDay, $lte: endOfDay } },
+      { 'dates.onlineTestDate': { $gte: startOfDay, $lte: endOfDay } },
+      { 'dates.interviewStartDate': { $gte: startOfDay, $lte: endOfDay } },
+      { 'applications.interviewSchedule.scheduledAt': { $gte: startOfDay, $lte: endOfDay } }
+    ]
+  };
+
+  if (excludeDriveId) {
+    driveQuery._id = { $ne: excludeDriveId };
+  }
+
+  const existingDrives = await PlacementDrive.find(driveQuery).select('companyName title role eligibility dates applications');
+
+  for (const d of existingDrives) {
+    const isSameCompany = currentCompany && d.companyName && d.companyName.trim().toLowerCase() === currentCompany.trim().toLowerCase();
+    if (!isSameCompany) {
+      let conflictingTask = 'Campus Placement Drive / Evaluation';
+      if (d.dates?.onlineTestDate && d.dates.onlineTestDate >= startOfDay && d.dates.onlineTestDate <= endOfDay) {
+        conflictingTask = 'Online Assessment / Technical Test';
+      } else if (d.dates?.interviewStartDate && d.dates.interviewStartDate >= startOfDay && d.dates.interviewStartDate <= endOfDay) {
+        conflictingTask = 'Technical Interview Rounds';
+      } else if (d.dates?.driveDate && d.dates.driveDate >= startOfDay && d.dates.driveDate <= endOfDay) {
+        conflictingTask = 'On-Campus Placement Drive';
+      } else {
+        const interviewApp = d.applications?.find(a => a.interviewSchedule?.scheduledAt >= startOfDay && a.interviewSchedule?.scheduledAt <= endOfDay);
+        if (interviewApp) {
+          conflictingTask = interviewApp.interviewSchedule?.roundName || 'Interview Assessment';
+        }
+      }
+
+      const branchesOccupied = d.eligibility?.allowedBranches?.length > 0 ? d.eligibility.allowedBranches.join(', ') : 'CSE, IT, ECE';
+      const batchesOccupied = d.eligibility?.allowedBatches?.length > 0 ? d.eligibility.allowedBatches.join(', ') : '2026/2025 Batches';
+      const formattedDay = parsed.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'short', day: 'numeric' });
+
+      return {
+        hasConflict: true,
+        conflict: {
+          conflictingCompany: d.companyName,
+          conflictingRole: d.role,
+          conflictingDriveTitle: d.title,
+          conflictingTask,
+          targetDate: parsed.toISOString().slice(0, 10),
+          formattedDate: formattedDay,
+          branchesOccupied,
+          batchesOccupied,
+          message: `Date Clash: ${formattedDay} is already booked by ${d.companyName} for ${conflictingTask} (${d.role}). Students of ${branchesOccupied} have a scheduled task on this date. Please select another date.`
+        }
+      };
+    }
+  }
+
+  // Also check PlacementEvent model
+  const eventQuery = {
+    startDateTime: { $lte: endOfDay },
+    endDateTime: { $gte: startOfDay },
+    eventType: { $in: ['aptitude_test', 'company_drive', 'mock_interview', 'workshop'] }
+  };
+
+  const existingEvents = await PlacementEvent.find(eventQuery);
+  for (const ev of existingEvents) {
+    const isSameCompany = currentCompany && ev.instructorOrCompany && ev.instructorOrCompany.trim().toLowerCase() === currentCompany.trim().toLowerCase();
+    if (!isSameCompany) {
+      const formattedDay = parsed.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'short', day: 'numeric' });
+      return {
+        hasConflict: true,
+        conflict: {
+          conflictingCompany: ev.instructorOrCompany || 'Campus Placement Partner',
+          conflictingRole: ev.title,
+          conflictingDriveTitle: ev.title,
+          conflictingTask: ev.eventType.replace(/_/g, ' ').toUpperCase(),
+          targetDate: parsed.toISOString().slice(0, 10),
+          formattedDate: formattedDay,
+          branchesOccupied: ev.targetAudience?.branches?.join(', ') || 'Campus Students',
+          batchesOccupied: ev.targetAudience?.batches?.join(', ') || 'All Batches',
+          message: `Date Clash: ${formattedDay} is already booked for '${ev.title}'. Students are already occupied with this placement schedule. Please select another date.`
+        }
+      };
+    }
+  }
+
+  return { hasConflict: false };
+};
+
+// @desc    Check if a specific test/drive/interview date clashes with another recruiter's event
+// @route   GET /api/recruiter/check-date-conflict
+// @access  Private (Recruiter, Admin)
+exports.checkDateConflict = async (req, res, next) => {
+  try {
+    const { date, type = 'Drive Event', excludeDriveId } = req.query;
+    if (!date) {
+      return res.status(400).json({ success: false, error: 'Please provide a date to check.' });
+    }
+
+    const currentCompany = req.user.companyName || '';
+    const conflictResult = await checkSchedulingConflict({
+      targetDate: date,
+      taskType: type,
+      excludeDriveId,
+      currentCompany,
+      currentRecruiterId: req.user._id
+    });
+
+    res.status(200).json({
+      success: true,
+      hasConflict: conflictResult.hasConflict,
+      conflict: conflictResult.conflict || null
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// =========================================================================
 // SUITABLE STUDENTS POOL (RECRUITER & ADMIN VIEW)
 // =========================================================================
 
@@ -287,6 +427,29 @@ exports.extendRecruiterAccount = async (req, res, next) => {
 // @access  Private (Recruiter, Admin)
 exports.getSuitableStudents = async (req, res, next) => {
   try {
+    // REQUIREMENT: In the Recruiter Dashboard, show the details of the students IF AND ONLY WHEN
+    // the recruiter adds the Placement Drive Details. Otherwise, lock/hide the talent pool.
+    if (req.user && req.user.role === 'recruiter') {
+      const recruiterDrivesCount = await PlacementDrive.countDocuments({
+        $or: [
+          { createdBy: req.user._id },
+          ...(req.user.companyName ? [{ companyName: new RegExp(`^${req.user.companyName.trim()}$`, 'i') }] : [])
+        ]
+      });
+
+      if (recruiterDrivesCount === 0) {
+        return res.status(200).json({
+          success: true,
+          count: 0,
+          totalStudents: 0,
+          hasPlacementDrive: false,
+          requiresDriveDetails: true,
+          message: 'Student talent pool is locked. Please add your Placement Drive Details first to unlock and view the students talent pool.',
+          data: []
+        });
+      }
+    }
+
     const {
       driveId,
       minCgpa: queryMinCgpa,
@@ -333,7 +496,7 @@ exports.getSuitableStudents = async (req, res, next) => {
 
     // Fetch all active students
     const students = await User.find({ role: 'student' })
-      .select('name email phone rollNumber branch section academicYear year bio skills targetRole readinessScore leetcodeStats codeforcesStats codechefStats hackerrankStats githubProfileUrl createdAt')
+      .select('name email phone mobileNumber rollNumber branch section academicYear year bio skills targetRole readinessScore leetcodeStats codeforcesStats codechefStats hackerrankStats githubProfileUrl createdAt')
       .lean();
 
     // Fetch latest resumes mapped by student ID
@@ -485,7 +648,8 @@ exports.getSuitableStudents = async (req, res, next) => {
         _id: student._id,
         name: student.name,
         email: student.email,
-        phone: student.phone || '',
+        phone: student.mobileNumber || student.phone || '',
+        mobileNumber: student.mobileNumber || student.phone || '',
         rollNumber: student.rollNumber || 'N/A',
         branch: student.branch || 'CSE',
         section: student.section || 'A',
@@ -750,6 +914,58 @@ exports.createDriveByRecruiter = async (req, res, next) => {
       driveStages: b.driveStages || ['Online Application', 'Aptitude & Coding Test', 'Technical Interview', 'HR Interview', 'Final Selection'],
       createdBy: req.user._id
     };
+
+    // Date conflict check on drive date
+    const driveConflict = await checkSchedulingConflict({
+      targetDate: driveDt,
+      taskType: 'On-Campus Placement Drive',
+      currentCompany: company,
+      currentRecruiterId: req.user._id
+    });
+    if (driveConflict.hasConflict) {
+      return res.status(409).json({
+        success: false,
+        conflict: true,
+        error: driveConflict.conflict.message,
+        conflictDetails: driveConflict.conflict
+      });
+    }
+
+    // Date conflict check on online test date (if provided)
+    if (b.dates?.onlineTestDate) {
+      const testConflict = await checkSchedulingConflict({
+        targetDate: b.dates.onlineTestDate,
+        taskType: 'Online Assessment / Test',
+        currentCompany: company,
+        currentRecruiterId: req.user._id
+      });
+      if (testConflict.hasConflict) {
+        return res.status(409).json({
+          success: false,
+          conflict: true,
+          error: testConflict.conflict.message,
+          conflictDetails: testConflict.conflict
+        });
+      }
+    }
+
+    // Date conflict check on interview start date (if provided)
+    if (b.dates?.interviewStartDate) {
+      const intConflict = await checkSchedulingConflict({
+        targetDate: b.dates.interviewStartDate,
+        taskType: 'Technical Interviews',
+        currentCompany: company,
+        currentRecruiterId: req.user._id
+      });
+      if (intConflict.hasConflict) {
+        return res.status(409).json({
+          success: false,
+          conflict: true,
+          error: intConflict.conflict.message,
+          conflictDetails: intConflict.conflict
+        });
+      }
+    }
 
     const drive = await PlacementDrive.create(driveData);
 
@@ -1035,6 +1251,22 @@ exports.conductDriveExam = async (req, res, next) => {
     }
 
     if (examDate) {
+      // Validate scheduling conflict across recruiters for this exam date
+      const conflictCheck = await checkSchedulingConflict({
+        targetDate: examDate,
+        taskType: 'Online Assessment Round',
+        excludeDriveId: drive._id,
+        currentCompany: drive.companyName,
+        currentRecruiterId: req.user._id
+      });
+      if (conflictCheck.hasConflict) {
+        return res.status(409).json({
+          success: false,
+          conflict: true,
+          error: conflictCheck.conflict.message,
+          conflictDetails: conflictCheck.conflict
+        });
+      }
       drive.dates.onlineTestDate = new Date(examDate);
     }
 
@@ -1353,6 +1585,25 @@ exports.bulkAdvanceCandidatesStage = async (req, res, next) => {
       offered: 'Offer Released'
     };
     const stageDisplay = stageNames[targetStage] || targetStage.replace(/_/g, ' ').toUpperCase();
+
+    if (interviewDate) {
+      // Validate scheduling conflict across recruiters for this interview date
+      const conflictCheck = await checkSchedulingConflict({
+        targetDate: interviewDate,
+        taskType: 'Technical / HR Interview Round',
+        excludeDriveId: drive._id,
+        currentCompany: drive.companyName,
+        currentRecruiterId: req.user._id
+      });
+      if (conflictCheck.hasConflict) {
+        return res.status(409).json({
+          success: false,
+          conflict: true,
+          error: conflictCheck.conflict.message,
+          conflictDetails: conflictCheck.conflict
+        });
+      }
+    }
 
     let scheduledAt = interviewDate
       ? (interviewTime ? new Date(`${interviewDate}T${interviewTime}`) : new Date(interviewDate))

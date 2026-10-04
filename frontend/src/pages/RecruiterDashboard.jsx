@@ -54,6 +54,35 @@ const RecruiterDashboard = () => {
     jobDescription: 'Full-time campus recruitment drive covering online aptitude test, coding assessment, and technical interview rounds.'
   });
 
+  // Date Clash / Conflict Detection States
+  const [driveConflictInfo, setDriveConflictInfo] = useState(null);
+  const [examConflictInfo, setExamConflictInfo] = useState(null);
+  const [bulkAdvanceConflictInfo, setBulkAdvanceConflictInfo] = useState(null);
+  const [checkingConflict, setCheckingConflict] = useState(false);
+
+  // Helper to check date availability across all recruiters
+  const checkDateClash = async (targetDate, type = 'Drive Event', excludeDriveId = '') => {
+    if (!targetDate) return null;
+    try {
+      setCheckingConflict(true);
+      const params = new URLSearchParams({ date: targetDate, type });
+      if (excludeDriveId) params.append('excludeDriveId', excludeDriveId);
+      const res = await fetch(`${API_URL}/recruiter/check-date-conflict?${params.toString()}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (data.hasConflict && data.conflict) {
+        return data.conflict;
+      }
+      return null;
+    } catch (err) {
+      console.warn('Error checking date clash:', err);
+      return null;
+    } finally {
+      setCheckingConflict(false);
+    }
+  };
+
   // Stage Advancement Modal State
   const [stageModal, setStageModal] = useState({
     isOpen: false,
@@ -218,10 +247,22 @@ const RecruiterDashboard = () => {
   // Handle Create Drive Submission
   const handleCreateDrive = async (e) => {
     e.preventDefault();
+    if (driveConflictInfo) {
+      setError(`Date Clash: ${driveConflictInfo.targetDate} is already booked by ${driveConflictInfo.conflictingCompany}. Please select another available date.`);
+      return;
+    }
     try {
       setActionLoading(true);
       setError('');
       setSuccessMsg('');
+
+      const clash = await checkDateClash(driveForm.driveDate, 'Placement Drive');
+      if (clash) {
+        setDriveConflictInfo(clash);
+        setError(`Date Clash: ${driveForm.driveDate} is already booked by ${clash.conflictingCompany} for ${clash.conflictingTask}. Please select another date.`);
+        setActionLoading(false);
+        return;
+      }
 
       const res = await fetch(`${API_URL}/recruiter/drives`, {
         method: 'POST',
@@ -251,8 +292,13 @@ const RecruiterDashboard = () => {
         sfx.playSuccess();
         setSuccessMsg(`🏢 Placement Drive for ${driveForm.role} published! Synced to campus calendar & notified eligible students.`);
         setShowCreateDriveModal(false);
+        setDriveConflictInfo(null);
         fetchMyDrives();
+        fetchSuitableStudents();
       } else {
+        if (data.conflictDetails) {
+          setDriveConflictInfo(data.conflictDetails);
+        }
         setError(data.error || 'Failed to post drive.');
       }
     } catch (err) {
@@ -448,10 +494,23 @@ const RecruiterDashboard = () => {
       return;
     }
 
+    if (examConflictInfo) {
+      setError(`Date Clash: ${examConflictInfo.targetDate} is already booked by ${examConflictInfo.conflictingCompany}. Please select another date.`);
+      return;
+    }
+
     try {
       setActionLoading(true);
       setError('');
       setSuccessMsg('');
+
+      const clash = await checkDateClash(examForm.examDate, 'Online Assessment', driveId);
+      if (clash) {
+        setExamConflictInfo(clash);
+        setError(`Date Clash Detected: ${examForm.examDate} is already booked by ${clash.conflictingCompany} for ${clash.conflictingTask}. Please select another date.`);
+        setActionLoading(false);
+        return;
+      }
 
       const res = await fetch(`${API_URL}/recruiter/drives/${driveId}/conduct-exam`, {
         method: 'POST',
@@ -471,12 +530,16 @@ const RecruiterDashboard = () => {
         sfx.playSuccess();
         setSuccessMsg(`📝 Exam '${examForm.examTitle}' scheduled! Email and WhatsApp notifications dispatched (including 8074701052).`);
         setShowConductExamModal(false);
+        setExamConflictInfo(null);
         setSelectedStudentIds([]);
         fetchMyDrives();
-        fetchSuitableStudents();
       } else {
+        if (data.conflictDetails) {
+          setExamConflictInfo(data.conflictDetails);
+        }
         setError(data.error || 'Failed to schedule exam.');
       }
+      fetchSuitableStudents();
     } catch (err) {
       setError('Could not schedule exam.');
     } finally {
@@ -599,6 +662,14 @@ const RecruiterDashboard = () => {
       setError('');
       setSuccessMsg('');
 
+      const clash = await checkDateClash(bulkAdvanceModal.interviewDate, 'Interview Round', driveId);
+      if (clash) {
+        setBulkAdvanceConflictInfo(clash);
+        setError(`Date Clash Detected: ${bulkAdvanceModal.interviewDate} is already booked by ${clash.conflictingCompany} for ${clash.conflictingTask}. Please select another date.`);
+        setActionLoading(false);
+        return;
+      }
+
       const res = await fetch(`${API_URL}/recruiter/drives/${driveId}/bulk-advance-stage`, {
         method: 'POST',
         headers: {
@@ -623,8 +694,12 @@ const RecruiterDashboard = () => {
         sfx.playSuccess();
         setSuccessMsg(`📢 Successfully advanced ${data.updatedCount} candidate(s) to ${bulkAdvanceModal.targetStage.replace(/_/g, ' ').toUpperCase()}! Email and WhatsApp notifications dispatched.`);
         setBulkAdvanceModal(prev => ({ ...prev, isOpen: false }));
+        setBulkAdvanceConflictInfo(null);
         fetchMyDrives();
       } else {
+        if (data.conflictDetails) {
+          setBulkAdvanceConflictInfo(data.conflictDetails);
+        }
         setError(data.error || 'Failed to advance candidates.');
       }
     } catch (err) {
@@ -821,6 +896,49 @@ const RecruiterDashboard = () => {
         {/* TAB 1: SUITABLE STUDENTS POOL */}
         {/* ========================================================================= */}
         {activeTab === 'students' && (
+          drives.length === 0 ? (
+            <div
+              className="glass-card"
+              style={{
+                padding: '4rem 2rem',
+                textAlign: 'center',
+                borderRadius: '16px',
+                background: 'linear-gradient(135deg, rgba(30, 41, 59, 0.9), rgba(15, 23, 42, 0.95))',
+                border: '1px solid rgba(168, 85, 247, 0.35)',
+                boxShadow: '0 10px 40px rgba(0,0,0,0.5)'
+              }}
+            >
+              <div style={{ fontSize: '3.5rem', marginBottom: '1.25rem' }}>🔒</div>
+              <h2 style={{ fontSize: '1.75rem', fontWeight: 800, color: '#f8fafc', marginBottom: '0.75rem' }}>
+                Student Talent Pool Locked
+              </h2>
+              <p style={{ color: '#94a3b8', maxWidth: '580px', margin: '0 auto 2rem', lineHeight: '1.6', fontSize: '1.05rem' }}>
+                Per campus placement guidelines, student contact details, mobile numbers, resumes, and academic records are visible <strong>if and only when your company adds Placement Drive Details</strong>.
+              </p>
+              <div style={{ display: 'inline-flex', flexDirection: 'column', gap: '14px', alignItems: 'center' }}>
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  style={{
+                    background: 'linear-gradient(135deg, #a855f7, #6366f1)',
+                    padding: '0.9rem 2.2rem',
+                    fontSize: '1.05rem',
+                    fontWeight: 700,
+                    borderRadius: '10px',
+                    boxShadow: '0 4px 25px rgba(168, 85, 247, 0.45)',
+                    border: 'none',
+                    cursor: 'pointer'
+                  }}
+                  onClick={() => setShowCreateDriveModal(true)}
+                >
+                  ➕ Add Placement Drive Details to Unlock Students
+                </button>
+                <span style={{ fontSize: '13px', color: '#64748b' }}>
+                  ⚡ Fill in role requirements, CTC, and eligibility to immediately unlock and message eligible candidates.
+                </span>
+              </div>
+            </div>
+          ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
             {/* Filter Panel */}
             <div className="talent-filter-panel glass-card">
@@ -1117,6 +1235,58 @@ const RecruiterDashboard = () => {
                         </div>
                       )}
 
+                      {/* Student Mobile & Quick Messaging Action */}
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        flexWrap: 'wrap',
+                        gap: '8px',
+                        background: 'rgba(0, 0, 0, 0.25)',
+                        padding: '8px 12px',
+                        borderRadius: '8px',
+                        marginTop: '8px',
+                        fontSize: '12px'
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <span style={{ color: '#94a3b8' }}>📱 Mobile:</span>
+                          <strong style={{ color: student.mobileNumber || student.phone ? '#38bdf8' : '#64748b' }}>
+                            {student.mobileNumber || student.phone || 'Not Added'}
+                          </strong>
+                        </div>
+
+                        {(student.mobileNumber || student.phone) && (
+                          <div style={{ display: 'flex', gap: '6px' }}>
+                            <a
+                              href={`https://api.whatsapp.com/send?phone=${(student.mobileNumber || student.phone).replace(/\D/g, '')}&text=Hello%20${encodeURIComponent(student.name)}%2C%20regarding%20campus%20placement%20with%20${encodeURIComponent(user?.companyName || 'our company')}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="btn btn-secondary btn-sm"
+                              style={{
+                                background: 'rgba(34, 197, 94, 0.15)',
+                                borderColor: 'rgba(34, 197, 94, 0.35)',
+                                color: '#22c55e',
+                                padding: '3px 8px',
+                                fontSize: '11px',
+                                textDecoration: 'none',
+                                fontWeight: 700
+                              }}
+                              title="Send WhatsApp Message"
+                            >
+                              💬 WhatsApp
+                            </a>
+                            <a
+                              href={`tel:${student.mobileNumber || student.phone}`}
+                              className="btn btn-secondary btn-sm"
+                              style={{ padding: '3px 8px', fontSize: '11px', textDecoration: 'none' }}
+                              title="Call Candidate"
+                            >
+                              📞 Call
+                            </a>
+                          </div>
+                        )}
+                      </div>
+
                       {/* Deployed Projects Section */}
                       {deployedList.length > 0 && (
                         <div className="student-deployed-projects-preview">
@@ -1279,6 +1449,7 @@ const RecruiterDashboard = () => {
               </div>
             )}
           </div>
+          )
         )}
 
         {/* ========================================================================= */}
@@ -1920,8 +2091,71 @@ const RecruiterDashboard = () => {
                       type="date"
                       required
                       value={driveForm.driveDate}
-                      onChange={(e) => setDriveForm({ ...driveForm, driveDate: e.target.value })}
+                      onChange={async (e) => {
+                        const val = e.target.value;
+                        setDriveForm(prev => ({ ...prev, driveDate: val }));
+                        if (val) {
+                          const conflict = await checkDateClash(val, 'Placement Drive');
+                          setDriveConflictInfo(conflict);
+                        } else {
+                          setDriveConflictInfo(null);
+                        }
+                      }}
                     />
+                    {driveConflictInfo && (
+                      <div style={{
+                        background: 'rgba(239, 68, 68, 0.12)',
+                        border: '1px solid rgba(239, 68, 68, 0.4)',
+                        borderRadius: '8px',
+                        padding: '10px 12px',
+                        marginTop: '8px',
+                        color: '#fca5a5',
+                        fontSize: '12px',
+                        lineHeight: '1.4'
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 'bold', color: '#f87171', marginBottom: '4px' }}>
+                          <span>🚨</span>
+                          <span>Date Already Occupied: {driveConflictInfo.formattedDate || driveConflictInfo.targetDate}</span>
+                        </div>
+                        <p style={{ margin: '3px 0 6px', color: '#e2e8f0' }}>
+                          <strong>{driveConflictInfo.conflictingCompany}</strong> already scheduled <strong>{driveConflictInfo.conflictingTask}</strong> ({driveConflictInfo.conflictingRole}).
+                        </p>
+                        <div style={{ background: 'rgba(0,0,0,0.25)', padding: '5px 8px', borderRadius: '4px', marginBottom: '6px', fontSize: '11px', color: '#94a3b8' }}>
+                          👥 <strong>What students have:</strong> {driveConflictInfo.branchesOccupied} students are booked for this event.
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px', flexWrap: 'wrap' }}>
+                          <span style={{ fontWeight: '600', color: '#f87171' }}>⚠️ Please select another date.</span>
+                          <div style={{ display: 'flex', gap: '6px' }}>
+                            <button
+                              type="button"
+                              className="btn btn-secondary btn-sm"
+                              style={{ fontSize: '10.5px', padding: '2px 6px' }}
+                              onClick={async () => {
+                                const nextDay = new Date(new Date(driveConflictInfo.targetDate).getTime() + 86400000).toISOString().slice(0, 10);
+                                setDriveForm(prev => ({ ...prev, driveDate: nextDay }));
+                                const c = await checkDateClash(nextDay, 'Placement Drive');
+                                setDriveConflictInfo(c);
+                              }}
+                            >
+                              +1 Day
+                            </button>
+                            <button
+                              type="button"
+                              className="btn btn-secondary btn-sm"
+                              style={{ fontSize: '10.5px', padding: '2px 6px' }}
+                              onClick={async () => {
+                                const plus2 = new Date(new Date(driveConflictInfo.targetDate).getTime() + 2 * 86400000).toISOString().slice(0, 10);
+                                setDriveForm(prev => ({ ...prev, driveDate: plus2 }));
+                                const c = await checkDateClash(plus2, 'Placement Drive');
+                                setDriveConflictInfo(c);
+                              }}
+                            >
+                              +2 Days
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   <div className="recruiter-form-group">
@@ -2170,8 +2404,35 @@ const RecruiterDashboard = () => {
                       type="date"
                       required
                       value={examForm.examDate}
-                      onChange={(e) => setExamForm({ ...examForm, examDate: e.target.value })}
+                      onChange={async (e) => {
+                        const val = e.target.value;
+                        setExamForm(prev => ({ ...prev, examDate: val }));
+                        if (val) {
+                          const conflict = await checkDateClash(val, 'Online Assessment', selectedDriveId);
+                          setExamConflictInfo(conflict);
+                        } else {
+                          setExamConflictInfo(null);
+                        }
+                      }}
                     />
+                    {examConflictInfo && (
+                      <div style={{
+                        background: 'rgba(239, 68, 68, 0.12)',
+                        border: '1px solid rgba(239, 68, 68, 0.4)',
+                        borderRadius: '8px',
+                        padding: '10px 12px',
+                        marginTop: '8px',
+                        color: '#fca5a5',
+                        fontSize: '12px'
+                      }}>
+                        <div style={{ fontWeight: 'bold', color: '#f87171', marginBottom: '3px' }}>
+                          🚨 Date Occupied: {examConflictInfo.conflictingCompany} has {examConflictInfo.conflictingTask} on this day.
+                        </div>
+                        <div style={{ fontSize: '11px', color: '#cbd5e1' }}>
+                          Students are scheduled for {examConflictInfo.conflictingCompany}. Please select another date.
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   <div className="recruiter-form-group">
@@ -2343,8 +2604,35 @@ const RecruiterDashboard = () => {
                     <input
                       type="date"
                       value={bulkAdvanceModal.interviewDate}
-                      onChange={(e) => setBulkAdvanceModal({ ...bulkAdvanceModal, interviewDate: e.target.value })}
+                      onChange={async (e) => {
+                        const val = e.target.value;
+                        setBulkAdvanceModal(prev => ({ ...prev, interviewDate: val }));
+                        if (val) {
+                          const conflict = await checkDateClash(val, 'Technical Interview', selectedDriveId);
+                          setBulkAdvanceConflictInfo(conflict);
+                        } else {
+                          setBulkAdvanceConflictInfo(null);
+                        }
+                      }}
                     />
+                    {bulkAdvanceConflictInfo && (
+                      <div style={{
+                        background: 'rgba(239, 68, 68, 0.12)',
+                        border: '1px solid rgba(239, 68, 68, 0.4)',
+                        borderRadius: '8px',
+                        padding: '10px 12px',
+                        marginTop: '8px',
+                        color: '#fca5a5',
+                        fontSize: '12px'
+                      }}>
+                        <div style={{ fontWeight: 'bold', color: '#f87171', marginBottom: '3px' }}>
+                          🚨 Date Occupied: {bulkAdvanceConflictInfo.conflictingCompany} has {bulkAdvanceConflictInfo.conflictingTask} on this day.
+                        </div>
+                        <div style={{ fontSize: '11px', color: '#cbd5e1' }}>
+                          Students have a scheduled event. Please select another date.
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   <div className="recruiter-form-group">

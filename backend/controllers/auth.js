@@ -27,8 +27,9 @@ const sendTokenResponse = (user, statusCode, res) => {
 // @access  Public
 exports.register = async (req, res, next) => {
   try {
-    const { name, email, password, leetcodeUsername, codeforcesUsername, codechefUsername, hackerrankUsername } = req.body;
+    const { name, email, password, leetcodeUsername, codeforcesUsername, codechefUsername, hackerrankUsername, mobileNumber, phone } = req.body;
     const normalizedRole = 'student'; // Force public registration to default role
+    const sanitizedMobile = (mobileNumber || phone || '').trim();
     const trimmedLeetCode = (leetcodeUsername || '').trim();
     const trimmedCodeforces = (codeforcesUsername || '').trim();
     const trimmedCodeChef = (codechefUsername || '').trim();
@@ -101,6 +102,8 @@ exports.register = async (req, res, next) => {
       email,
       password,
       role: normalizedRole,
+      mobileNumber: sanitizedMobile,
+      phone: sanitizedMobile,
       leetcodeUsername: trimmedLeetCode,
       leetcodeStats,
       codeforcesUsername: trimmedCodeforces,
@@ -303,6 +306,8 @@ exports.updateProfile = async (req, res, next) => {
       bio: req.body.bio,
       skills: req.body.skills,
       targetRole: req.body.targetRole,
+      mobileNumber: req.body.mobileNumber !== undefined ? req.body.mobileNumber : req.body.phone,
+      phone: req.body.phone !== undefined ? req.body.phone : req.body.mobileNumber,
       rollNumber: req.body.rollNumber,
       branch: req.body.branch,
       section: req.body.section,

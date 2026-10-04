@@ -66,6 +66,8 @@ const Login = () => {
         navigate('/faculty');
       } else if (result.user && result.user.role === 'recruiter') {
         navigate('/recruiter');
+      } else if (result.user && result.user.role === 'hod') {
+        navigate('/hod');
       } else {
         navigate('/dashboard');
       }

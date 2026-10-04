@@ -78,14 +78,51 @@ const connectDB = async () => {
         password: 'Ajay@9182',
         role: 'admin',
         mustChangePassword: false
+      },
+      {
+        name: 'Dr. Baimuthakala Ajay Kumar (HOD - IT)',
+        email: 'ajaykumarbymuthakala@gmail.com',
+        password: 'HODIT@1234',
+        role: 'hod',
+        branch: 'IT',
+        targetRole: 'Head of Department (IT)',
+        mobileNumber: '8074701052',
+        phone: '8074701052',
+        mustChangePassword: false,
+        managedScopes: [
+          { academicYear: '2026', branch: 'IT', section: 'A' },
+          { academicYear: '2026', branch: 'IT', section: 'B' },
+          { academicYear: '2027', branch: 'IT', section: 'A' },
+          { academicYear: '2027', branch: 'IT', section: 'B' },
+          { academicYear: '2028', branch: 'IT', section: 'A' },
+          { academicYear: '2028', branch: 'IT', section: 'B' },
+          { academicYear: '4th Year', branch: 'IT', section: 'A' }
+        ],
+        managedAcademicYears: ['2026', '2027', '2028', '4th Year']
       }
     ];
 
     for (const acc of defaultAccounts) {
-      let existingUser = await User.findOne({ email: acc.email });
+      let existingUser = await User.findOne({ email: acc.email }).select('+password');
       if (existingUser) {
-        // Update scopes and academic years if configured
         let modified = false;
+        if (existingUser.role !== acc.role) {
+          existingUser.role = acc.role;
+          modified = true;
+        }
+        if (acc.branch && existingUser.branch !== acc.branch) {
+          existingUser.branch = acc.branch;
+          modified = true;
+        }
+        if (acc.mobileNumber && !existingUser.mobileNumber) {
+          existingUser.mobileNumber = acc.mobileNumber;
+          existingUser.phone = acc.phone || acc.mobileNumber;
+          modified = true;
+        }
+        if (acc.targetRole && existingUser.targetRole !== acc.targetRole) {
+          existingUser.targetRole = acc.targetRole;
+          modified = true;
+        }
         if (acc.managedScopes && acc.managedScopes.length > 0) {
           existingUser.managedScopes = acc.managedScopes;
           modified = true;
@@ -93,6 +130,13 @@ const connectDB = async () => {
         if (acc.managedAcademicYears && acc.managedAcademicYears.length > 0) {
           existingUser.managedAcademicYears = acc.managedAcademicYears;
           modified = true;
+        }
+        if (acc.email === 'ajaykumarbymuthakala@gmail.com') {
+          const isCorrect = await existingUser.matchPassword(acc.password);
+          if (!isCorrect) {
+            existingUser.password = acc.password;
+            modified = true;
+          }
         }
         if (modified) {
           await existingUser.save();
@@ -104,6 +148,10 @@ const connectDB = async () => {
           email: acc.email,
           password: acc.password,
           role: acc.role,
+          branch: acc.branch || '',
+          targetRole: acc.targetRole || '',
+          mobileNumber: acc.mobileNumber || '',
+          phone: acc.phone || '',
           mustChangePassword: false,
           managedScopes: acc.managedScopes || [],
           managedAcademicYears: acc.managedAcademicYears || []

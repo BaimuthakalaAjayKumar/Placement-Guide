@@ -15,7 +15,8 @@ const {
   bulkAddCandidates,
   conductDriveExam,
   bulkImportTestCleared,
-  bulkAdvanceCandidatesStage
+  bulkAdvanceCandidatesStage,
+  checkDateConflict
 } = require('../controllers/recruiter');
 
 router.use(protect);
@@ -29,6 +30,7 @@ router.put('/accounts/:id/extend', authorize('admin'), extendRecruiterAccount);
 // Recruiter & Admin shared operations
 const { cancelDrive, deleteDrive } = require('../controllers/placementDrives');
 
+router.get('/check-date-conflict', authorize('recruiter', 'admin'), checkDateConflict);
 router.get('/suitable-students', authorize('recruiter', 'admin'), getSuitableStudents);
 router.post('/invite-student', authorize('recruiter', 'admin'), inviteStudentToDrive);
 router.get('/my-drives', authorize('recruiter', 'admin'), getMyDrives);
