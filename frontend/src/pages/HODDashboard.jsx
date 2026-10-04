@@ -398,7 +398,8 @@ const HODDashboard = () => {
     <>
       <Header title="HOD Executive Console" />
 
-      <div className="content-wrapper hod-dashboard-container animate-fade">
+      <div className="content-wrapper animate-fade">
+        <div className="hod-dashboard-container">
         {/* Alerts Banner */}
         {errorMsg && (
           <div className="hod-error-banner animate-fade">
@@ -1463,6 +1464,7 @@ const HODDashboard = () => {
             </div>
           </div>
         )}
+        </div>
       </div>
     </>
   );
