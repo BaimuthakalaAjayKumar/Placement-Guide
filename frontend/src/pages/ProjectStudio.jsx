@@ -3,6 +3,7 @@ import Editor from '@monaco-editor/react';
 import JSZip from 'jszip';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
+import { useAIContext } from '../context/AIContext';
 import Header from '../components/Header';
 import { API_URL } from '../config/api';
 import { PROJECT_TEMPLATES } from '../utils/projectTemplates';
@@ -28,6 +29,15 @@ const editorLanguage = (filePath) => {
 const ProjectStudio = () => {
   const { token, user } = useAuth();
   const { theme } = useTheme();
+  const {
+    setActiveProject,
+    setActiveFile: setAiActiveFile,
+    setSelectedText: setAiSelectedText,
+    addVisibleError,
+    openAgentWithAction,
+    selectedText: aiSelectedText
+  } = useAIContext();
+
   const [projects, setProjects] = useState([]);
   const [project, setProject] = useState(null);
   const [activeFile, setActiveFile] = useState(0);
@@ -208,6 +218,22 @@ const ProjectStudio = () => {
     }
   }, [user]);
 
+  useEffect(() => {
+    if (project) {
+      setActiveProject(project);
+    }
+  }, [project, setActiveProject]);
+
+  useEffect(() => {
+    if (currentFile) {
+      setAiActiveFile({
+        path: currentFile.path,
+        language: editorLanguage(currentFile.path),
+        content: currentFile.content
+      });
+    }
+  }, [currentFile, setAiActiveFile]);
+
   // Iframe console message listener
   useEffect(() => {
     const handlePreviewMessage = (e) => {
@@ -217,6 +243,7 @@ const ProjectStudio = () => {
         setDebugLogs(prev => [...prev.slice(-100), { level: e.data.level, message: `[${time}] ${e.data.message}` }]);
         if (e.data.level === 'error') {
           setPreviewStatus('error');
+          addVisibleError(e.data.message);
           setProblems(prev => [
             {
               file: e.data.filename ? e.data.filename.split('/').pop() : 'App.jsx',
@@ -2352,6 +2379,20 @@ const ProjectStudio = () => {
                                 >
                                   ⌨ Terminal
                                 </button>
+                                <button
+                                  type="button"
+                                  className="vsc-tab-action-btn"
+                                  onClick={() => openAgentWithAction(aiSelectedText ? 'EXPLAIN_SELECTION' : 'EXPLAIN_PROJECT')}
+                                  title="Ask CampusBridge AI Assistant"
+                                  style={{
+                                    background: 'rgba(99, 102, 241, 0.22)',
+                                    color: '#c7d2fe',
+                                    border: '1px solid rgba(99, 102, 241, 0.45)',
+                                    fontWeight: '700'
+                                  }}
+                                >
+                                  🤖 Ask AI {aiSelectedText ? '(Selection)' : ''}
+                                </button>
                               </div>
                             </div>
 
@@ -2386,6 +2427,32 @@ const ProjectStudio = () => {
                                     monacoRef.current = monaco;
                                     editor.onDidChangeCursorPosition(e => {
                                       setCursorPos({ line: e.position.lineNumber, col: e.position.column });
+                                    });
+                                    editor.onDidChangeCursorSelection(e => {
+                                      const model = editor.getModel();
+                                      if (model) {
+                                        const selected = model.getValueInRange(e.selection);
+                                        setAiSelectedText(selected || '');
+                                      }
+                                    });
+                                    // Register Monaco Context Menu Item for CampusBridge AI
+                                    editor.addAction({
+                                      id: 'cb-ai-ask-selection',
+                                      label: '🤖 Ask CampusBridge AI on Selection',
+                                      keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyMod.Alt | monaco.KeyCode.KeyA],
+                                      contextMenuGroupId: '1_modification',
+                                      contextMenuOrder: 1.5,
+                                      run: (ed) => {
+                                        const model = ed.getModel();
+                                        const sel = ed.getSelection();
+                                        const txt = model ? model.getValueInRange(sel) : '';
+                                        if (txt) {
+                                          setAiSelectedText(txt);
+                                          openAgentWithAction('EXPLAIN_SELECTION', 'Explain this selected code block and how to optimize or improve it.');
+                                        } else {
+                                          openAgentWithAction('EXPLAIN_PROJECT');
+                                        }
+                                      }
                                     });
                                   }}
                                   options={{
@@ -2663,6 +2730,32 @@ const ProjectStudio = () => {
                                           <span className="problem-location">{prob.file}:{prob.line}</span>
                                           <span className="problem-msg">{prob.message}</span>
                                         </div>
+                                        <button
+                                          type="button"
+                                          className="vsc-btn vsc-btn-sm"
+                                          style={{
+                                            marginLeft: 'auto',
+                                            background: 'rgba(239, 68, 68, 0.2)',
+                                            color: '#fca5a5',
+                                            border: '1px solid rgba(239, 68, 68, 0.4)',
+                                            padding: '3px 10px',
+                                            fontSize: '0.74rem',
+                                            borderRadius: '6px',
+                                            cursor: 'pointer',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '4px',
+                                            fontWeight: '700'
+                                          }}
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            addVisibleError(`${prob.file}:${prob.line} - ${prob.message}`);
+                                            openAgentWithAction('EXPLAIN_ERROR', `Explain this error in ${prob.file}:${prob.line}: "${prob.message}"`);
+                                          }}
+                                          title="Ask CampusBridge AI to Explain and Fix"
+                                        >
+                                          🤖 Ask AI to Explain
+                                        </button>
                                       </div>
                                     ))
                                   ) : (

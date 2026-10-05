@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { NavLink, useNavigate } from 'react-router-dom';
+import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { API_URL } from '../config/api';
 import './Sidebar.css';
@@ -7,6 +7,7 @@ import './Sidebar.css';
 const Sidebar = () => {
   const { user, token, logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [showContactModal, setShowContactModal] = useState(false);
   const menuRef = useRef(null);
@@ -80,9 +81,14 @@ const Sidebar = () => {
       <nav className="sidebar-nav">
         {user.role === 'student' && (
           <>
-            <NavLink to="/dashboard" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+            <NavLink to="/dashboard" className={({ isActive }) => `nav-link ${isActive && !location.search.includes('tab=achievements') ? 'active' : ''}`}>
               <svg viewBox="0 0 24 24" className="nav-icon"><rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" /><rect x="14" y="14" width="7" height="7" /><rect x="3" y="14" width="7" height="7" /></svg>
               <span>Dashboard</span>
+            </NavLink>
+
+            <NavLink to="/dashboard?tab=achievements" className={() => `nav-link ${location.search.includes('tab=achievements') ? 'active' : ''}`}>
+              <svg viewBox="0 0 24 24" className="nav-icon" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="8" r="7" /><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88" /></svg>
+              <span>Achievements</span>
             </NavLink>
 
             <NavLink to="/academics" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>

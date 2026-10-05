@@ -192,6 +192,7 @@ const peerMentorRoutes = require('./routes/peerMentors');
 const interviewExperienceRoutes = require('./routes/interviewExperiences');
 const recruiterRoutes = require('./routes/recruiter');
 const hodRoutes = require('./routes/hod');
+const achievementRoutes = require('./routes/achievements');
 
 // ============================================================
 // MOUNT API ROUTES
@@ -223,6 +224,7 @@ app.use('/api/peer-mentors', peerMentorRoutes);
 app.use('/api/interview-experiences', interviewExperienceRoutes);
 app.use('/api/recruiter', recruiterRoutes);
 app.use('/api/hod', hodRoutes);
+app.use('/api/achievements', achievementRoutes);
 
 // ============================================================
 // HEALTH CHECK

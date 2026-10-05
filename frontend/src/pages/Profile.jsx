@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import Header from '../components/Header';
+import { API_URL } from '../config/api';
 import './Profile.css';
 
 const Profile = () => {
+  const navigate = useNavigate();
   const { user, updateProfile } = useAuth();
 
   if (user?.role === 'admin') {
@@ -12,6 +14,7 @@ const Profile = () => {
   }
 
   // Profile settings state
+  const [achievementsData, setAchievementsData] = useState(null);
   const [targetRole, setTargetRole] = useState(user?.targetRole || 'Software Engineer');
   const [bio, setBio] = useState(user?.bio || '');
   const [skillsText, setSkillsText] = useState(user?.skills?.join(', ') || '');
@@ -67,6 +70,31 @@ const Profile = () => {
       setCodeforcesUsername(user.codeforcesUsername || '');
       setCodechefUsername(user.codechefUsername || '');
       setHackerrankUsername(user.hackerrankUsername || '');
+    }
+  }, [user]);
+
+  useEffect(() => {
+    const fetchAchievements = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        if (!token) return;
+        const res = await fetch(`${API_URL}/achievements/my`, {
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`
+          }
+        });
+        const json = await res.json();
+        if (json.success && json.data) {
+          setAchievementsData(json.data);
+        }
+      } catch (e) {
+        console.warn('Could not load profile achievements:', e.message);
+      }
+    };
+
+    if (user?.role === 'student') {
+      fetchAchievements();
     }
   }, [user]);
 
@@ -267,6 +295,107 @@ const Profile = () => {
                 </div>
               </div>
             </div>
+
+            {/* Achievements & Gamification Profile Summary */}
+            {user?.role === 'student' && (
+              <div className="glass-card achievements-profile-card mt-16 animate-fade" style={{ marginTop: '16px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+                  <h3 style={{ margin: 0, fontSize: '1rem', color: '#fff', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span>🏆</span> My Achievements
+                  </h3>
+                  <span style={{
+                    background: 'rgba(99, 102, 241, 0.2)',
+                    color: '#c7d2fe',
+                    padding: '2px 8px',
+                    borderRadius: '9999px',
+                    fontSize: '0.72rem',
+                    fontWeight: '800'
+                  }}>
+                    {achievementsData?.unlockedCount || 0} / {achievementsData?.totalBadges || 35}
+                  </span>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '14px' }}>
+                  <div style={{ background: 'rgba(15, 23, 42, 0.6)', padding: '10px', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.06)' }}>
+                    <span style={{ fontSize: '0.7rem', color: '#94a3b8', display: 'block' }}>⚡ Total Points</span>
+                    <strong style={{ fontSize: '1.05rem', color: '#fbbf24' }}>
+                      {(achievementsData?.totalPoints || 0).toLocaleString()} PTS
+                    </strong>
+                  </div>
+                  <div style={{ background: 'rgba(15, 23, 42, 0.6)', padding: '10px', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.06)' }}>
+                    <span style={{ fontSize: '0.7rem', color: '#94a3b8', display: 'block' }}>🔥 Current Streak</span>
+                    <strong style={{ fontSize: '1.05rem', color: '#f97316' }}>
+                      {achievementsData?.currentStreak || 0} Days
+                    </strong>
+                  </div>
+                  <div style={{ background: 'rgba(15, 23, 42, 0.6)', padding: '10px', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.06)' }}>
+                    <span style={{ fontSize: '0.7rem', color: '#94a3b8', display: 'block' }}>👑 Best Streak</span>
+                    <strong style={{ fontSize: '1.05rem', color: '#38bdf8' }}>
+                      {achievementsData?.longestStreak || 0} Days
+                    </strong>
+                  </div>
+                  <div style={{ background: 'rgba(15, 23, 42, 0.6)', padding: '10px', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.06)' }}>
+                    <span style={{ fontSize: '0.7rem', color: '#94a3b8', display: 'block' }}>💻 Problems Solved</span>
+                    <strong style={{ fontSize: '1.05rem', color: '#34d399' }}>
+                      {achievementsData?.totalProblemsSolved || 0}
+                    </strong>
+                  </div>
+                  <div style={{ background: 'rgba(15, 23, 42, 0.6)', padding: '10px', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.06)' }}>
+                    <span style={{ fontSize: '0.7rem', color: '#94a3b8', display: 'block' }}>🚀 Projects Done</span>
+                    <strong style={{ fontSize: '1.05rem', color: '#c084fc' }}>
+                      {achievementsData?.projectsApproved || 0}
+                    </strong>
+                  </div>
+                  <div style={{ background: 'rgba(15, 23, 42, 0.6)', padding: '10px', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.06)' }}>
+                    <span style={{ fontSize: '0.7rem', color: '#94a3b8', display: 'block' }}>🏆 Contests Done</span>
+                    <strong style={{ fontSize: '1.05rem', color: '#ec4899' }}>
+                      {achievementsData?.contestsCompleted || 0}
+                    </strong>
+                  </div>
+                </div>
+
+                {/* Top Badges Preview */}
+                {achievementsData?.achievements && (
+                  <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '14px' }}>
+                    {achievementsData.achievements.filter(a => a.isUnlocked).slice(0, 6).map(a => (
+                      <span
+                        key={a._id || a.slug}
+                        title={`${a.name} (${a.rarity})`}
+                        style={{
+                          fontSize: '1.2rem',
+                          background: 'rgba(255,255,255,0.08)',
+                          padding: '4px 8px',
+                          borderRadius: '8px',
+                          cursor: 'default'
+                        }}
+                      >
+                        {a.icon}
+                      </span>
+                    ))}
+                  </div>
+                )}
+
+                <button
+                  type="button"
+                  onClick={() => navigate('/dashboard?tab=achievements')}
+                  style={{
+                    width: '100%',
+                    background: 'linear-gradient(135deg, #6366f1 0%, #a855f7 100%)',
+                    color: '#ffffff',
+                    border: 'none',
+                    padding: '9px',
+                    borderRadius: '10px',
+                    fontWeight: '700',
+                    fontSize: '0.85rem',
+                    cursor: 'pointer',
+                    boxShadow: '0 4px 14px rgba(99, 102, 241, 0.35)',
+                    transition: 'all 0.2s ease'
+                  }}
+                >
+                  View All Achievements →
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Right Column: Edit Forms */}

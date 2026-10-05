@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
+import { useAIContext } from '../context/AIContext';
 import Header from '../components/Header';
 import { API_URL } from '../config/api';
 import Editor from '@monaco-editor/react';
@@ -50,6 +51,12 @@ const LANGUAGES = [
 const CodingPlayground = () => {
   const { token } = useAuth();
   const { theme } = useTheme();
+  const {
+    setActiveFile,
+    setSelectedText,
+    addVisibleError,
+    openAgentWithAction
+  } = useAIContext();
 
   const [language, setLanguage] = useState('cpp');
   const [code, setCode] = useState(TEMPLATES.cpp);
@@ -57,6 +64,14 @@ const CodingPlayground = () => {
   const [output, setOutput] = useState('');
   const [running, setRunning] = useState(false);
   const [stats, setStats] = useState(null);
+
+  useEffect(() => {
+    setActiveFile({
+      path: `playground.${language === 'cpp' ? 'cpp' : language === 'python' ? 'py' : language === 'javascript' ? 'js' : language}`,
+      language: language === 'cpp' || language === 'c' ? 'cpp' : language,
+      content: code
+    });
+  }, [code, language, setActiveFile]);
 
   const handleLanguageChange = (lang) => {
     setLanguage(lang);
@@ -86,6 +101,7 @@ const CodingPlayground = () => {
       if (data.success) {
         if (data.error) {
           setOutput(`Error: ${data.error}\n\n${data.stdout}`);
+          addVisibleError(data.error);
         } else {
           setOutput(data.stdout || '(Execution successful but returned no output)');
         }
@@ -127,12 +143,27 @@ const CodingPlayground = () => {
                     ))}
                   </select>
                 </div>
-                <button
-                  className="btn btn-secondary btn-sm"
-                  onClick={() => setCode(TEMPLATES[language] || '')}
-                >
-                  Reset Template
-                </button>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-sm"
+                    onClick={() => openAgentWithAction('GIVE_HINT', `Can you give me a conceptual hint for writing this ${language} code without giving the full solution?`)}
+                    style={{
+                      background: 'rgba(99, 102, 241, 0.2)',
+                      color: '#c7d2fe',
+                      border: '1px solid rgba(99, 102, 241, 0.4)',
+                      fontWeight: '700'
+                    }}
+                  >
+                    🤖 Ask AI for Hint
+                  </button>
+                  <button
+                    className="btn btn-secondary btn-sm"
+                    onClick={() => setCode(TEMPLATES[language] || '')}
+                  >
+                    Reset Template
+                  </button>
+                </div>
               </div>
 
               <div className="playground-editor-wrap">
@@ -197,6 +228,30 @@ const CodingPlayground = () => {
                 >
                   {output || '(Run code to see stdout results)'}
                 </pre>
+
+                {output && (output.startsWith('Error:') || output.startsWith('Server error:')) && (
+                  <button
+                    type="button"
+                    onClick={() => openAgentWithAction('EXPLAIN_ERROR', `Explain this execution error in my ${language} code:\n${output}`)}
+                    style={{
+                      marginTop: '8px',
+                      background: 'rgba(239, 68, 68, 0.2)',
+                      color: '#fca5a5',
+                      border: '1px solid rgba(239, 68, 68, 0.4)',
+                      padding: '7px 14px',
+                      borderRadius: '8px',
+                      fontSize: '0.8rem',
+                      fontWeight: '700',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      width: 'fit-content'
+                    }}
+                  >
+                    🤖 Ask AI to Explain &amp; Fix Error
+                  </button>
+                )}
               </div>
 
               {/* Action Button */}

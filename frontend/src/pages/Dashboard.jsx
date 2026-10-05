@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import Header from '../components/Header';
 import StudentAcademicsModule from '../components/StudentAcademicsModule';
+import AchievementsSection from '../components/AchievementsSection';
 import { API_URL } from '../config/api';
 import './Dashboard.css';
 
@@ -10,7 +11,7 @@ const Dashboard = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { token, user } = useAuth();
-  const [activeTab, setActiveTab] = useState('overview'); // 'overview' | 'academics'
+  const [activeTab, setActiveTab] = useState('overview'); // 'overview' | 'academics' | 'achievements'
   const [stats, setStats] = useState(null);
   const [practiceStats, setPracticeStats] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -22,6 +23,8 @@ const Dashboard = () => {
     const params = new URLSearchParams(location.search);
     if (params.get('tab') === 'academics') {
       setActiveTab('academics');
+    } else if (params.get('tab') === 'achievements') {
+      setActiveTab('achievements');
     }
   }, [location.search]);
   const [loadingAppliedJobs, setLoadingAppliedJobs] = useState(false);
@@ -709,10 +712,44 @@ const Dashboard = () => {
               Auto-Calc
             </span>
           </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('achievements')}
+            style={{
+              background: activeTab === 'achievements' ? 'linear-gradient(135deg, #a855f7 0%, #ec4899 100%)' : 'transparent',
+              color: activeTab === 'achievements' ? '#ffffff' : '#94a3b8',
+              border: 'none',
+              padding: '9px 18px',
+              borderRadius: '10px',
+              fontWeight: '700',
+              fontSize: '0.9rem',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              transition: 'all 0.2s ease',
+              boxShadow: activeTab === 'achievements' ? '0 4px 15px rgba(168, 85, 247, 0.4)' : 'none'
+            }}
+          >
+            <span>🏆</span> Badges &amp; Achievements
+            <span style={{
+              background: activeTab === 'achievements' ? 'rgba(0,0,0,0.25)' : 'rgba(168, 85, 247, 0.2)',
+              color: activeTab === 'achievements' ? '#ffffff' : '#c084fc',
+              padding: '2px 8px',
+              borderRadius: '9999px',
+              fontSize: '0.75rem',
+              fontWeight: '800'
+            }}>
+              Gamified
+            </span>
+          </button>
         </div>
 
         {activeTab === 'academics' ? (
           <StudentAcademicsModule />
+        ) : activeTab === 'achievements' ? (
+          <AchievementsSection />
         ) : (
           <div className="dashboard-grid-container">
 

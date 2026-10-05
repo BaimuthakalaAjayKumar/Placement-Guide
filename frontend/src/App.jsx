@@ -2,6 +2,7 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
+import { AIContextProvider } from './context/AIContext';
 
 // Components
 import Sidebar from './components/Sidebar';
@@ -531,7 +532,9 @@ function App() {
     <ThemeProvider>
       <AuthProvider>
         <Router>
-          <AppRoutes />
+          <AIContextProvider>
+            <AppRoutes />
+          </AIContextProvider>
         </Router>
       </AuthProvider>
     </ThemeProvider>
