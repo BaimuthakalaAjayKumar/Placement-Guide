@@ -449,7 +449,7 @@ const ContestWorkspace = () => {
             <div className="lc-badge">🏆 OFFICIAL LEETCODE CONTEST PROTOCOL</div>
             <h2>{contest.title}</h2>
             <p className="disclaimer-desc">
-              {contest.description || 'Welcome to the GRIET Internal Coding Contest. Please carefully review the official contest guidelines, scoring rules, 5-minute penalty system, and automated plagiarism detection protocols below before entering.'}
+              {contest.description || 'Welcome to the Campus Bridge Internal Coding Contest. Please carefully review the official contest guidelines, scoring rules, 5-minute penalty system, and automated plagiarism detection protocols below before entering.'}
             </p>
             <div className="lc-meta-strip">
               <span className="lc-meta-item">⏱️ Duration: <strong>{contest.duration} Mins</strong></span>

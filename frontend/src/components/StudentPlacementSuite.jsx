@@ -618,7 +618,7 @@ const StudentPlacementSuite = () => {
                         <div className="sig-line"></div>
                         <p className="sig-name">Dr. G. Karuna</p>
                         <p className="sig-title">Head — Training &amp; Placement Officer (TPO)</p>
-                        <p className="sig-dept">GRIET Placement Division</p>
+                        <p className="sig-dept">Campus Bridge Placement Division</p>
                       </div>
 
                       {/* Center: Official Holographic Gold Seal */}
@@ -626,7 +626,7 @@ const StudentPlacementSuite = () => {
                         <div className="gold-seal" onClick={handleCelebrate} title="Official Embossed Gold Seal">
                           <div className="seal-inner-circle">
                             <span className="seal-star">★ ★ ★</span>
-                            <span className="seal-org">GRIET</span>
+                            <span className="seal-org">CAMPUS BRIDGE</span>
                             <span className="seal-year">2026</span>
                             <span className="seal-status">VERIFIED</span>
                             <span className="seal-star">★ ★ ★</span>

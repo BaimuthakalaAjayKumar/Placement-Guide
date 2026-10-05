@@ -17,13 +17,13 @@ const sendInactivityWarningEmail = async (student, daysInactive) => {
   try {
     const portalUrl = getPortalUrl();
     const emailSubject = '⚠️ Urgent Placement Portal Alert: 5-Day Inactivity Warning';
-    const emailText = `Dear ${student.name},\n\nOur system detected that you have not logged in or practiced on the GRIET Placement Portal for ${daysInactive} consecutive days.\n\nConsistent daily preparation is critical for campus placement selection. Please note that accounts with 7 days of inactivity will be locked by the Administrator.\n\nPlease log in today to maintain your active account status: ${portalUrl}/login\n\nBest regards,\nTraining & Placement Cell / Main Admin`;
+    const emailText = `Dear ${student.name},\n\nOur system detected that you have not logged in or practiced on the Campus Bridge Portal for ${daysInactive} consecutive days.\n\nConsistent daily preparation is critical for campus placement selection. Please note that accounts with 7 days of inactivity will be locked by the Administrator.\n\nPlease log in today to maintain your active account status: ${portalUrl}/login\n\nBest regards,\nTraining & Placement Cell / Main Admin`;
 
     const emailHtml = `
       <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; background: #0f172a; color: #f8fafc; border-radius: 12px; overflow: hidden; border: 1px solid #334155;">
         <div style="background: linear-gradient(135deg, #f59e0b, #ef4444); padding: 24px; text-align: center;">
           <h1 style="margin: 0; color: #ffffff; font-size: 24px; font-weight: 800; letter-spacing: 0.5px;">⚠️ 5-DAY INACTIVITY WARNING</h1>
-          <p style="margin: 6px 0 0 0; color: #fef3c7; font-size: 14px;">GRIET Placement Preparation &amp; Training Cell</p>
+          <p style="margin: 6px 0 0 0; color: #fef3c7; font-size: 14px;">Campus Bridge Placement Preparation &amp; Training Cell</p>
         </div>
 
         <div style="padding: 26px 28px;">
@@ -111,7 +111,7 @@ const sendRiskWarningEmail = async (student, riskScore, flags = []) => {
     const portalUrl = getPortalUrl();
     const emailSubject = `⚠️ Urgent Placement Alert: Placement Risk Factor Warning (${riskScore}% > 40%)`;
     const flagsListText = (flags || []).slice(0, 4).map(f => `- ${f.title || f}: ${f.detail || ''}`).join('\n');
-    const emailText = `Dear ${student.name},\n\nOur Placement Risk Analysis Engine has detected that your current Placement Risk Factor is ${riskScore}%, which exceeds the warning threshold of 40%.\n\nContributing Factors:\n${flagsListText}\n\nIMPORTANT POLICY NOTICE:\nIf your Risk Factor reaches or exceeds 65%, your Student Dashboard will be AUTOMATICALLY LOCKED by the system. Once locked, only the Administrator or Main Admin can restore your access.\n\nPlease log in today to attempt practice tests and complete your resume:\n${portalUrl}/login\n\nTraining & Placement Cell, GRIET`;
+    const emailText = `Dear ${student.name},\n\nOur Placement Risk Analysis Engine has detected that your current Placement Risk Factor is ${riskScore}%, which exceeds the warning threshold of 40%.\n\nContributing Factors:\n${flagsListText}\n\nIMPORTANT POLICY NOTICE:\nIf your Risk Factor reaches or exceeds 65%, your Student Dashboard will be AUTOMATICALLY LOCKED by the system. Once locked, only the Administrator or Main Admin can restore your access.\n\nPlease log in today to attempt practice tests and complete your resume:\n${portalUrl}/login\n\nTraining & Placement Cell, Campus Bridge`;
 
     const flagsHtml = (flags || []).slice(0, 4).map(f => `
       <li style="margin-bottom: 6px; color: #cbd5e1;">
@@ -153,7 +153,7 @@ const sendRiskWarningEmail = async (student, riskScore, flags = []) => {
           </div>
 
           <p style="font-size: 12px; color: #64748b; border-top: 1px solid #334155; padding-top: 14px; margin-top: 24px; text-align: center;">
-            Training &amp; Placement Cell, Gokaraju Rangaraju Institute of Engineering &amp; Technology (GRIET).
+            Training &amp; Placement Cell, Campus Bridge.
           </p>
         </div>
       </div>
@@ -180,7 +180,7 @@ const sendRiskWarningWhatsApp = async (student, riskScore, flags = []) => {
     const phone = student.mobileNumber || student.phone || '8074701052';
     const topIssues = (flags || []).slice(0, 3).map(f => `• ${f.title || f}`).join('\n');
 
-    const msg = `⚠️ *GRIET PLACEMENT ALERT - RISK FACTOR WARNING (>40%)*\n\n` +
+    const msg = `⚠️ *CAMPUS BRIDGE PLACEMENT ALERT - RISK FACTOR WARNING (>40%)*\n\n` +
       `Dear *${student.name}*,\n\n` +
       `Our Placement Risk Engine has calculated your *Risk Factor at ${riskScore}%* (Exceeds the 40% warning limit).\n\n` +
       `🚨 *CRITICAL POLICY ALERT*:\n` +
@@ -189,7 +189,7 @@ const sendRiskWarningWhatsApp = async (student, riskScore, flags = []) => {
       `*Identified Issues*:\n${topIssues || '• Low assessment & coding engagement'}\n\n` +
       `Please log in immediately to take practice tests, complete your resume, and solve coding challenges:\n` +
       `🔗 ${portalUrl}/login\n\n` +
-      `— Training & Placement Cell, GRIET`;
+      `— Training & Placement Cell, Campus Bridge`;
 
     await sendWhatsAppMessage({
       to: phone,
@@ -219,7 +219,7 @@ const sendRiskLockEmail = async (student, riskScore, reason) => {
         <div style="padding: 26px 28px;">
           <p style="font-size: 16px; margin-top: 0;">Dear <strong>${student.name}</strong>,</p>
           <p style="font-size: 14px; line-height: 1.6; color: #cbd5e1;">
-            Your Student Dashboard on the <strong>GRIET Placement Preparation Portal has been AUTOMATICALLY LOCKED</strong> because your Placement Risk Factor has crossed the critical threshold of <strong>65%</strong>.
+            Your Student Dashboard on the <strong>Campus Bridge Placement Portal has been AUTOMATICALLY LOCKED</strong> because your Placement Risk Factor has crossed the critical threshold of <strong>65%</strong>.
           </p>
 
           <div style="background: #1e293b; border-left: 4px solid #ef4444; padding: 16px 20px; margin: 20px 0; border-radius: 6px;">
@@ -245,7 +245,7 @@ const sendRiskLockEmail = async (student, riskScore, reason) => {
           </div>
 
           <p style="font-size: 12px; color: #64748b; border-top: 1px solid #334155; padding-top: 14px; margin-top: 24px; text-align: center;">
-            Training &amp; Placement Cell, Gokaraju Rangaraju Institute of Engineering &amp; Technology (GRIET).
+            Training &amp; Placement Cell, Campus Bridge.
           </p>
         </div>
       </div>
@@ -269,7 +269,7 @@ const sendRiskLockWhatsApp = async (student, riskScore, reason) => {
   try {
     const portalUrl = getPortalUrl();
     const phone = student.mobileNumber || student.phone || '8074701052';
-    const msg = `🔒 *GRIET PLACEMENT ALERT - DASHBOARD LOCKED*\n\n` +
+    const msg = `🔒 *CAMPUS BRIDGE PLACEMENT ALERT - DASHBOARD LOCKED*\n\n` +
       `Dear *${student.name}*,\n\n` +
       `Your Student Placement Dashboard has been *AUTOMATICALLY LOCKED* because your Placement Risk Factor reached *${riskScore}%* (Exceeds 65% critical limit).\n\n` +
       `⛔ *Portal Access Suspended*:\n` +
@@ -279,7 +279,7 @@ const sendRiskLockWhatsApp = async (student, riskScore, reason) => {
       `• Email: ${process.env.SMTP_EMAIL || 'campusconnect.supportdesk@gmail.com'}\n` +
       `• Office: Training & Placement Cell, Admin Block\n` +
       `• Note: Faculty coordinators cannot revoke this lock.\n\n` +
-      `— Training & Placement Administration, GRIET`;
+      `— Training & Placement Administration, Campus Bridge`;
 
     await sendWhatsAppMessage({
       to: phone,
@@ -309,7 +309,7 @@ const sendDashboardLockedEmail = async (student, reason, adminName) => {
         <div style="padding: 26px 28px;">
           <p style="font-size: 16px; margin-top: 0;">Dear <strong>${student.name}</strong>,</p>
           <p style="font-size: 14px; line-height: 1.6; color: #cbd5e1;">
-            Your Student Dashboard on the <strong>GRIET Placement Preparation Portal has been locked</strong> by the <strong>Administrator / Main Admin</strong>.
+            Your Student Dashboard on the <strong>Campus Bridge Placement Portal has been locked</strong> by the <strong>Administrator / Main Admin</strong>.
           </p>
 
           <div style="background: #1e293b; border-left: 4px solid #ef4444; padding: 16px 20px; margin: 20px 0; border-radius: 6px;">
@@ -332,7 +332,7 @@ const sendDashboardLockedEmail = async (student, reason, adminName) => {
           </div>
 
           <p style="font-size: 12px; color: #64748b; border-top: 1px solid #334155; padding-top: 14px; margin-top: 24px; text-align: center;">
-            Training &amp; Placement Cell, Gokaraju Rangaraju Institute of Engineering &amp; Technology (GRIET).
+            Training &amp; Placement Cell, Campus Bridge.
           </p>
         </div>
       </div>
@@ -423,13 +423,13 @@ const sendDashboardUnlockedWhatsApp = async (student, adminName) => {
   try {
     const portalUrl = getPortalUrl();
     const phone = student.mobileNumber || student.phone || '8074701052';
-    const msg = `🔓 *GRIET PLACEMENT ALERT - DASHBOARD UNLOCKED*\n\n` +
+    const msg = `🔓 *CAMPUS BRIDGE PLACEMENT ALERT - DASHBOARD UNLOCKED*\n\n` +
       `Dear *${student.name}*,\n\n` +
       `Your Student Dashboard lock has been successfully *REVOKED* by *${adminName}* (Administrator / Main Admin).\n\n` +
       `Full access to placement assessments, coding playground, and drive applications is restored.\n` +
       `Please log in immediately and resume your practice:\n` +
       `🔗 ${portalUrl}/login\n\n` +
-      `— Training & Placement Administration, GRIET`;
+      `— Training & Placement Administration, Campus Bridge`;
 
     await sendWhatsAppMessage({
       to: phone,
@@ -1062,7 +1062,7 @@ exports.sendInterventionNotice = async (req, res, next) => {
         <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; background: #0f172a; color: #f8fafc; border-radius: 12px; overflow: hidden; border: 1px solid #334155;">
           <div style="background: linear-gradient(135deg, #f59e0b, #d97706); padding: 22px; text-align: center;">
             <h1 style="margin: 0; color: #ffffff; font-size: 22px;">⚠️ REMEDIAL INTERVENTION NOTICE</h1>
-            <p style="margin: 5px 0 0 0; color: #fef3c7; font-size: 13px;">From ${adminName} • GRIET Placement Cell</p>
+            <p style="margin: 5px 0 0 0; color: #fef3c7; font-size: 13px;">From ${adminName} • Campus Bridge Placement Cell</p>
           </div>
           <div style="padding: 26px 28px;">
             <p style="font-size: 15px; margin-top: 0;">Dear <strong>${student.name}</strong>,</p>

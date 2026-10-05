@@ -60,8 +60,8 @@ const ResetPassword = () => {
             <div className="auth-card glass-card animate-fade">
                 <div className="auth-header">
                     <div className="auth-logo">
-                        <img src="/college-logo.jpg" alt="GRIET Placement" className="auth-logo-img" />
-                        <span>GRIET Placement</span>
+                        <img src="/campus-bridge-logo.png" alt="Campus Bridge" className="auth-logo-img" />
+                        <span>Campus Bridge</span>
                     </div>
                     <h2>Create New Password</h2>
                     <p>Choose a strong, secure new password for your account</p>

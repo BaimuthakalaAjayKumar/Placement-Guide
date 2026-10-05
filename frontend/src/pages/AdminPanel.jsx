@@ -1009,7 +1009,7 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `GRIET_Placement_Applied_Jobs_Report_${new Date().toISOString().slice(0, 10)}.csv`;
+      a.download = `Campus_Bridge_Applied_Jobs_Report_${new Date().toISOString().slice(0, 10)}.csv`;
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -1045,7 +1045,7 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `GRIET_Applied_Jobs_Report_Fallback_${new Date().toISOString().slice(0, 10)}.csv`;
+        a.download = `Campus_Bridge_Applied_Jobs_Report_Fallback_${new Date().toISOString().slice(0, 10)}.csv`;
         document.body.appendChild(a);
         a.click();
         a.remove();
@@ -1166,7 +1166,7 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
       <!DOCTYPE html>
       <html>
       <head>
-        <title>GRIET Placement Applied Jobs Report - ${new Date().toISOString().slice(0, 10)}</title>
+        <title>Campus Bridge Applied Jobs Report - ${new Date().toISOString().slice(0, 10)}</title>
         <meta charset="utf-8" />
         <style>
           @page {
@@ -1364,7 +1364,7 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
         <div class="report-footer">
           <div style="font-size:11px;color:#64748b;">
             <div>* PRI: Placement Readiness Index calculated across academic and technical metrics.</div>
-            <div>Official document for GRIET Training and Placement Cell internal administration.</div>
+            <div>Official document for Campus Bridge Training and Placement Cell internal administration.</div>
           </div>
           <div style="display:flex;gap:30px;">
             <div class="sig-box">

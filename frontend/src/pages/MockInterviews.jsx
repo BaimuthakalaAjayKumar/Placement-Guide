@@ -1030,7 +1030,7 @@ const MockInterviews = () => {
             <div className="glass-card mb-20" style={{ padding: '1.25rem', borderLeft: '4px solid #10b981' }}>
               <h3 style={{ margin: '0 0 0.25rem 0', color: '#f8fafc' }}>Faculty & Senior Mentor Mock Feedback</h3>
               <p style={{ margin: 0, color: '#94a3b8', fontSize: '0.85rem' }}>
-                Review detailed ratings and actionable feedback provided directly by GRIET faculty and placement coordinators after offline and online mock evaluations.
+                Review detailed ratings and actionable feedback provided directly by Campus Bridge faculty and placement coordinators after offline and online mock evaluations.
               </p>
             </div>
 

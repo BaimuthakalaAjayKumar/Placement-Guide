@@ -262,8 +262,8 @@ exports.getPlacementCertificate = async (req, res, next) => {
       .toUpperCase();
 
     const certificate = {
-      institution: 'GRIET PLACEMENT PORTAL',
-      subHeader: 'Gokaraju Rangaraju Institute of Engineering and Technology (Autonomous)',
+      institution: 'CAMPUS BRIDGE',
+      subHeader: 'Placement Preparation & Career Acceleration Platform',
       certificateTitle: 'Placement Preparation Completion Certificate',
       studentId: student._id,
       studentName: student.name,
@@ -277,7 +277,7 @@ exports.getPlacementCertificate = async (req, res, next) => {
       isEligibleForDownload: completionPercent >= 75,
       requiredCutoff: 75,
       issueDate: new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }),
-      certificateId: `GRIET-CERT-${verificationHash}`,
+      certificateId: `CB-CERT-${verificationHash}`,
       verificationCode: `VERIFIED-${studentRoll}-${verificationHash.slice(0, 6)}`,
       criteria: [
         { label: 'Core Aptitude & CSE Tests', target: '5 Tests', completed: `${completedTests} Completed`, passed: completedTests >= 3 },
@@ -286,8 +286,8 @@ exports.getPlacementCertificate = async (req, res, next) => {
         { label: 'Mock Interview Sessions', target: '2 Mocks', completed: 'Cleared (Technical & HR)', passed: true }
       ],
       authorizedSignatories: [
-        { title: 'Training & Placement Officer (TPO)', name: 'Dr. G. Karuna', department: 'GRIET Placement Cell' },
-        { title: 'Principal & Dean Academics', name: 'Dr. J. Praveen', department: 'GRIET Autonomous' }
+        { title: 'Training & Placement Officer (TPO)', name: 'Dr. G. Karuna', department: 'Campus Bridge Placement Cell' },
+        { title: 'Principal & Dean Academics', name: 'Dr. J. Praveen', department: 'Campus Bridge Academic Directorate' }
       ]
     };
 

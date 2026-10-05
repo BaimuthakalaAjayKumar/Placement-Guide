@@ -15,7 +15,7 @@ const QUICK_PROMPTS = [
 
 const captureLiveScreenContext = () => {
   try {
-    const pageTitle = document.title || 'GRIET Placement Portal';
+    const pageTitle = document.title || 'Campus Bridge';
     const path = window.location.pathname;
 
     const context = {
@@ -68,7 +68,7 @@ const Chatbot = () => {
       id: 'welcome',
       role: 'assistant',
       source: 'ai',
-      text: `👋 **Hi! I am your GRIET Placement AI Assistant.**\n\nI can **interact directly with your live screen** to explain the problem you are solving, review your code, or resolve doubts on **Computer Science subjects** (DSA, DBMS, OS, OOP, CN).\n\nAsk whatever doubt you have or click any topic below:`,
+      text: `👋 **Hi! I am your Campus Bridge AI Assistant.**\n\nI can **interact directly with your live screen** to explain the problem you are solving, review your code, or resolve doubts on **Computer Science subjects** (DSA, DBMS, OS, OOP, CN).\n\nAsk whatever doubt you have or click any topic below:`,
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     }
   ]);
@@ -306,7 +306,7 @@ const Chatbot = () => {
               </div>
               <div className="chatbot-title-group">
                 <div className="chatbot-title-line">
-                  <h3>GRIET AI Assistant</h3>
+                  <h3>Campus Bridge AI Assistant</h3>
                 </div>
                 <span className="chatbot-status-subtitle">
                   {screenContextActive ? '🎯 Live Screen Reader Active' : 'Subject Doubts & Portal Guidance'}

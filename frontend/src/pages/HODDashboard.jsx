@@ -812,7 +812,7 @@ const HODDashboard = () => {
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = url;
-        link.setAttribute('download', `GRIET_IT_Department_Accreditation_Report_${new Date().toISOString().slice(0, 10)}.csv`);
+        link.setAttribute('download', `Campus_Bridge_IT_Department_Accreditation_Report_${new Date().toISOString().slice(0, 10)}.csv`);
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
@@ -852,7 +852,7 @@ const HODDashboard = () => {
           <div className="hod-hero-left">
             <div className="hod-badge-strip">
               <span className="hod-dept-tag">
-                🏛️ Department of Information Technology (IT) • GRIET Hyderabad
+                🏛️ Department of Information Technology (IT) • Campus Bridge
               </span>
               <span className="hod-tier-badge">
                 ⭐ NBA &amp; NAAC Tier-1 Autonomous
@@ -2464,7 +2464,7 @@ const HODDashboard = () => {
                   <span>📱 Mobile: <strong>{selectedStudentDetail.mobileNumber || selectedStudentDetail.phone || 'N/A'}</strong></span>
                   {(selectedStudentDetail.mobileNumber || selectedStudentDetail.phone) && (
                     <a
-                      href={`https://api.whatsapp.com/send?phone=${(selectedStudentDetail.mobileNumber || selectedStudentDetail.phone).replace(/\D/g, '')}&text=Hello%20${encodeURIComponent(selectedStudentDetail.name)}%2C%20from%20GRIET%20HOD%20Office`}
+                      href={`https://api.whatsapp.com/send?phone=${(selectedStudentDetail.mobileNumber || selectedStudentDetail.phone).replace(/\D/g, '')}&text=Hello%20${encodeURIComponent(selectedStudentDetail.name)}%2C%20from%20Campus%20Bridge%20HOD%20Office`}
                       target="_blank"
                       rel="noreferrer"
                       style={{

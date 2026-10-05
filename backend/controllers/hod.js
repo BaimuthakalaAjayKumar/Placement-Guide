@@ -674,7 +674,7 @@ exports.broadcastDepartmentMessage = async (req, res, next) => {
     // 1. Send dedicated WhatsApp message to specified phone 8074701052
     if (sendWhatsApp) {
       const waAnnouncement =
-`📢 *GRIET DEPARTMENT OF ${branch.toUpperCase()} - OFFICIAL NOTICE*
+`📢 *CAMPUS BRIDGE - DEPARTMENT OF ${branch.toUpperCase()} NOTICE*
 --------------------------------------------------
 *From:* Dr. Baimuthakala Ajay Kumar (HOD - ${branch})
 *Subject:* ${title}

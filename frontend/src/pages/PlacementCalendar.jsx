@@ -57,7 +57,7 @@ const generateRealisticEvents = () => {
       colorTag: 'purple',
       startDateTime: new Date(yr, mo, day + 2, 9, 30).toISOString(),
       endDateTime: new Date(yr, mo, day + 2, 17, 30).toISOString(),
-      venueOrLink: 'GRIET Auditorium / Online Portal',
+      venueOrLink: 'Campus Bridge Auditorium / Online Portal',
       instructorOrCompany: 'Tata Consultancy Services',
       creatorRole: 'admin',
       creatorName: 'Main Admin',
@@ -287,7 +287,7 @@ const PlacementCalendar = () => {
     startTime: '10:00',
     endDate: new Date().toISOString().slice(0, 10),
     endTime: '12:00',
-    venueOrLink: isStudent ? 'Personal Desk / Online' : 'GRIET Placement Cell / Online',
+    venueOrLink: isStudent ? 'Personal Desk / Online' : 'Campus Bridge Placement Cell / Online',
     instructorOrCompany: isFaculty ? (user?.name || 'Faculty Coordinator') : isAdmin ? 'Main Admin (TPO)' : (user?.name || 'Self'),
     targetRoles: isStudent ? ['student'] : ['student', 'faculty', 'admin'],
     targetBranches: ['All'],
@@ -500,7 +500,7 @@ const PlacementCalendar = () => {
         startTime: '10:00',
         endDate: new Date().toISOString().slice(0, 10),
         endTime: '12:00',
-        venueOrLink: isStudent ? 'Personal Desk / Online' : 'GRIET Placement Cell / Online',
+        venueOrLink: isStudent ? 'Personal Desk / Online' : 'Campus Bridge Placement Cell / Online',
         instructorOrCompany: isFaculty ? (user?.name || 'Faculty Coordinator') : isAdmin ? 'Main Admin (TPO)' : (user?.name || 'Self'),
         targetRoles: isStudent ? ['student'] : ['student', 'faculty', 'admin'],
         targetBranches: ['All'],
@@ -539,15 +539,15 @@ const PlacementCalendar = () => {
     const icsData = [
       'BEGIN:VCALENDAR',
       'VERSION:2.0',
-      'PRODID:-//GRIET Placement Portal//Placement Calendar//EN',
+      'PRODID:-//Campus Bridge//Placement Calendar//EN',
       'BEGIN:VEVENT',
-      `UID:${ev._id}@griet.ac.in`,
+      `UID:${ev._id}@campusbridge.edu`,
       `DTSTAMP:${formatICSDate(new Date())}`,
       `DTSTART:${formatICSDate(ev.startDateTime)}`,
       `DTEND:${formatICSDate(ev.endDateTime)}`,
       `SUMMARY:${ev.title}`,
       `DESCRIPTION:${ev.description || ''}`,
-      `LOCATION:${ev.venueOrLink || 'GRIET Placement Cell'}`,
+      `LOCATION:${ev.venueOrLink || 'Campus Bridge Placement Cell'}`,
       'END:VEVENT',
       'END:VCALENDAR'
     ].join('\r\n');
@@ -700,7 +700,7 @@ const PlacementCalendar = () => {
                     startTime: '10:00',
                     endDate: new Date().toISOString().slice(0, 10),
                     endTime: '12:00',
-                    venueOrLink: isStudent ? 'Personal Desk / Online' : 'GRIET Placement Cell / Online',
+                    venueOrLink: isStudent ? 'Personal Desk / Online' : 'Campus Bridge Placement Cell / Online',
                     instructorOrCompany: isFaculty ? (user?.name || 'Faculty Coordinator') : isAdmin ? 'Main Admin (TPO)' : (user?.name || 'Self'),
                     targetRoles: isStudent ? ['student'] : ['student', 'faculty', 'admin'],
                     targetBranches: ['All'],
@@ -1103,7 +1103,7 @@ const PlacementCalendar = () => {
                       <div className="spatial-meta-section">
                         <div className="spatial-venue-line">
                           <span>📍</span>
-                          <span>{ev.venueOrLink || 'GRIET Placement Cell'}</span>
+                          <span>{ev.venueOrLink || 'Campus Bridge Placement Cell'}</span>
                         </div>
 
                         <div className="spatial-audience-tags">
@@ -1192,7 +1192,7 @@ const PlacementCalendar = () => {
 
                         <h3 className="timeline-title">{ev.title}</h3>
                         <p className="timeline-desc">{ev.description}</p>
-                        <div className="timeline-venue">📍 {ev.venueOrLink || 'GRIET Placement Cell'}</div>
+                        <div className="timeline-venue">📍 {ev.venueOrLink || 'Campus Bridge Placement Cell'}</div>
                       </div>
 
                       <div className="timeline-buttons">
@@ -1576,7 +1576,7 @@ const PlacementCalendar = () => {
                         <div>
                           <span style={{ fontSize: '11px', color: '#94a3b8', display: 'block' }}>Venue / Mode</span>
                           <strong style={{ color: '#34d399', fontSize: '13px' }}>
-                            {selectedEventModal.venueOrLink || 'GRIET Campus'}
+                            {selectedEventModal.venueOrLink || 'Campus Bridge'}
                           </strong>
                         </div>
                       </div>

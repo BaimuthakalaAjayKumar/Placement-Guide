@@ -63,8 +63,8 @@ const HomePage = () => {
       {/* ── Navbar ── */}
       <nav className="home-navbar">
         <Link to="/" className="home-navbar-brand">
-          <img src="/college-logo.jpg" alt="GRIET" className="home-navbar-logo" />
-          <span className="home-navbar-title">GRIET Placement</span>
+          <img src="/campus-bridge-logo.png" alt="Campus Bridge" className="home-navbar-logo" />
+          <span className="home-navbar-title">Campus Bridge</span>
         </Link>
         <div className="home-navbar-actions">
           <button className="home-btn-ghost" onClick={() => navigate('/login')}>
@@ -86,7 +86,7 @@ const HomePage = () => {
           <div className="home-hero-text">
             <div className="home-hero-badge">
               <span className="home-hero-badge-dot" />
-              GRIET Placement Portal
+              Campus Bridge
             </div>
 
             <h1 className="home-hero-heading">
@@ -196,7 +196,7 @@ const HomePage = () => {
         <div className="home-cta-card">
           <h2 className="home-cta-title">Ready to Ace Your Placements?</h2>
           <p className="home-cta-desc">
-            Join your peers on GRIET's all-in-one placement preparation
+            Join your peers on Campus Bridge's all-in-one placement preparation
             platform. Sign up in seconds and start building your career today.
           </p>
           <button
@@ -225,7 +225,7 @@ const HomePage = () => {
       {/* ── Footer ── */}
       <footer className="home-footer">
         <p className="home-footer-text">
-          © {new Date().getFullYear()} GRIET Placement Portal. Built for students, by students.
+          © {new Date().getFullYear()} Campus Bridge. Built for students, by students.
         </p>
       </footer>
     </div>

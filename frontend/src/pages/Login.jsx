@@ -84,8 +84,8 @@ const Login = () => {
       <div className="auth-card glass-card animate-fade">
         <div className="auth-header">
           <div className="auth-logo">
-            <img src="/college-logo.jpg" alt="GRIET Placement" className="auth-logo-img" />
-            <span>GRIET Placement</span>
+            <img src="/campus-bridge-logo.png" alt="Campus Bridge" className="auth-logo-img" />
+            <span>Campus Bridge</span>
           </div>
           <h2>Welcome Back</h2>
           <p>Portal for Students, Faculty, Admins & Campus Recruiters</p>
@@ -188,7 +188,7 @@ const Login = () => {
         </form>
 
         <div className="auth-footer">
-          <span>New to GRIET Placement? </span>
+          <span>New to Campus Bridge? </span>
           <Link to="/register" className="auth-link">Create an Account</Link>
         </div>
       </div>

@@ -38,7 +38,7 @@ const notifyStudentsOnDrivePost = async (drive, specificTargetNumber = '80747010
 
     // 1. WhatsApp Message text
     const waText = 
-`🎓 *GRIET PLACEMENT DRIVE NOTIFICATION*
+`🎓 *CAMPUS BRIDGE PLACEMENT DRIVE NOTIFICATION*
 ----------------------------------------
 Hello! You have been selected & shortlisted for an On-Campus Placement Drive:
 
@@ -54,7 +54,7 @@ Please log in to your Placement Portal to review the drive schedule, practice mo
 🔗 https://placement-guide-nu.vercel.app/login
 
 Best of luck!
-- Placement & Training Officer, GRIET
+- Placement & Training Officer, Campus Bridge
 📱 Official WhatsApp Sender: +91 9182967014`;
 
     // 2. Email HTML template
@@ -62,7 +62,7 @@ Best of luck!
     const emailHtml = `
       <div style="font-family: 'Segoe UI', Arial, sans-serif; background: #0f172a; color: #f8fafc; padding: 28px; border-radius: 12px; max-width: 600px; margin: 0 auto; border: 1px solid #334155;">
         <div style="border-bottom: 2px solid #a855f7; padding-bottom: 12px; margin-bottom: 20px;">
-          <h2 style="color: #c084fc; margin: 0; font-size: 22px;">🎓 GRIET Campus Recruitment Drive</h2>
+          <h2 style="color: #c084fc; margin: 0; font-size: 22px;">🎓 Campus Bridge Recruitment Drive</h2>
           <p style="color: #94a3b8; font-size: 13px; margin: 4px 0 0 0;">Official Placement &amp; Training Cell Notification</p>
         </div>
 
@@ -113,7 +113,7 @@ Best of luck!
         </div>
 
         <p style="font-size: 12px; color: #64748b; border-top: 1px solid #334155; padding-top: 14px; margin-top: 24px; text-align: center;">
-          This is an automated notification from the GRIET Placement Portal. Official WhatsApp Sender: <strong>+91 9182967014</strong>. Contact Placement Office for assistance.
+          This is an automated notification from Campus Bridge. Official WhatsApp Sender: <strong>+91 9182967014</strong>. Contact Placement Office for assistance.
         </p>
       </div>
     `;
@@ -194,7 +194,7 @@ const notifyStudentsOnDriveDeadlineExtension = async (drive, oldDeadline, newDea
 
     // WhatsApp Message Content
     const waText = 
-`⏰ *GRIET PLACEMENT ALERT - DEADLINE EXTENDED!*
+`⏰ *CAMPUS BRIDGE PLACEMENT ALERT - DEADLINE EXTENDED!*
 ----------------------------------------
 Dear Candidate,
 
@@ -211,7 +211,7 @@ If you haven't registered yet, please log in and apply immediately before this e
 🔗 ${portalUrl}/job-board
 
 Best regards,
-Training & Placement Cell, GRIET
+Training & Placement Cell, Campus Bridge
 📱 Official WhatsApp Sender: +91 9182967014`;
 
     // 1. Dispatch WhatsApp message to the dedicated phone number (8074701052)
@@ -242,7 +242,7 @@ Training & Placement Cell, GRIET
       <div style="font-family: 'Segoe UI', Arial, sans-serif; background: #0f172a; color: #f8fafc; padding: 28px; border-radius: 12px; max-width: 600px; margin: 0 auto; border: 1px solid #334155;">
         <div style="background: linear-gradient(135deg, #f59e0b, #d97706); padding: 18px 24px; border-radius: 8px; margin-bottom: 20px; text-align: center;">
           <h2 style="color: #ffffff; margin: 0; font-size: 22px;">⏰ REGISTRATION DEADLINE EXTENDED</h2>
-          <p style="color: #fef3c7; font-size: 13px; margin: 4px 0 0 0;">GRIET Campus Recruitment Drive Alert</p>
+          <p style="color: #fef3c7; font-size: 13px; margin: 4px 0 0 0;">Campus Bridge Recruitment Drive Alert</p>
         </div>
 
         <p style="font-size: 15px; color: #e2e8f0;">Dear Candidate,</p>
@@ -283,7 +283,7 @@ Training & Placement Cell, GRIET
         </div>
 
         <p style="font-size: 12px; color: #64748b; border-top: 1px solid #334155; padding-top: 14px; margin-top: 24px; text-align: center;">
-          GRIET Training &amp; Placement Cell &bull; Official WhatsApp Sender: <strong>+91 9182967014</strong>
+          Campus Bridge Training &amp; Placement Cell &bull; Official WhatsApp Sender: <strong>+91 9182967014</strong>
         </p>
       </div>
     `;

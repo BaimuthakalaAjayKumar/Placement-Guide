@@ -278,7 +278,7 @@ exports.updateJobExpiry = async (req, res, next) => {
 
     // Formatted WhatsApp message for extended deadline
     const waText = 
-`⏰ *GRIET PLACEMENT ALERT: JOB DEADLINE EXTENDED*
+`⏰ *CAMPUS BRIDGE PLACEMENT ALERT: JOB DEADLINE EXTENDED*
 ----------------------------------------
 Hello! The application deadline for the following campus placement opportunity has been extended:
 
@@ -295,7 +295,7 @@ Hello! The application deadline for the following campus placement opportunity h
 https://placement-guide-nu.vercel.app/jobs
 
 Best regards,
-Placement & Training Directorate, GRIET Hyderabad`;
+Placement & Training Directorate, Campus Bridge`;
 
     // 1. Immediate WhatsApp notification to designated coordinator
     sendWhatsAppMessage({
@@ -962,7 +962,7 @@ exports.exportAppliedJobsCsv = async (req, res, next) => {
       )
     ].join('\r\n');
 
-    const filename = `griet_applied_jobs_report_${new Date().toISOString().slice(0, 10)}.csv`;
+    const filename = `campus_bridge_applied_jobs_report_${new Date().toISOString().slice(0, 10)}.csv`;
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     return res.status(200).send(csvContent);

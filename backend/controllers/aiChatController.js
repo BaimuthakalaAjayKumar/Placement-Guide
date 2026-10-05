@@ -1,6 +1,6 @@
 /**
  * AI Chatbot Controller
- * Answers subject-specific engineering questions and GRIET Placement Portal queries.
+ * Answers subject-specific engineering questions and Campus Bridge Placement Portal queries.
  */
 
 const KNOWLEDGE_BASE = [
@@ -125,7 +125,7 @@ Searches a **sorted** collection by repeatedly halving the search interval:
   // Website Portal Doubts
   {
     keywords: ['practice modules', 'practice module', 'how to take test', 'tests', 'aptitude tests'],
-    answer: `### 📝 How Practice Modules Work on GRIET Placement
+    answer: `### 📝 How Practice Modules Work on Campus Bridge
 1. **Navigate to Practice Modules** from the sidebar menu.
 2. Select either:
    - **Aptitude Modules**: Quantitative, Numerical, Logical Reasoning, and Advance Aptitude.
@@ -196,11 +196,11 @@ The student may ask doubts about the specific question, test, or code shown abov
 
     if (openaiApiKey && typeof openaiApiKey === 'string' && openaiApiKey.trim() !== '') {
       try {
-        const systemPrompt = `You are the official GRIET Placement AI Assistant, powered by ChatGPT.
+        const systemPrompt = `You are the official Campus Bridge AI Assistant, powered by ChatGPT.
 Your purpose is to help engineering students resolve doubts and prepare for technical placement drives.
 You answer:
 1. Technical and Computer Science subject doubts: Data Structures & Algorithms, Operating Systems, DBMS, OOPs, Computer Networks, System Design, Web Development (HTML, CSS, React, Node.js), Programming Languages (C, C++, Java, Python, JavaScript), and Quantitative/Logical Aptitude.
-2. GRIET Placement Preparation Portal guidance: explain Practice Modules (Aptitude & Core CSE tests), Coding Contests (LeetCode, Codeforces, CodeChef, HackerRank multi-platform sync), AI Resume Builder & Analyzer, Learning Roadmaps with Field Trackers & Study TODOs, and Coding Playground.
+2. Campus Bridge Placement Preparation Portal guidance: explain Practice Modules (Aptitude & Core CSE tests), Coding Contests (LeetCode, Codeforces, CodeChef, HackerRank multi-platform sync), AI Resume Builder & Analyzer, Learning Roadmaps with Field Trackers & Study TODOs, and Coding Playground.
 
 Guidelines:
 - Provide clear, well-structured, encouraging, and accurate answers.
@@ -268,10 +268,10 @@ Guidelines:
     if (apiKey) {
       try {
         const systemInstruction = `
-          You are the official GRIET Placement AI Assistant — an encouraging, intelligent mentor for engineering students.
+          You are the official Campus Bridge AI Assistant — an encouraging, intelligent mentor for engineering students.
           You answer:
           1. Computer Science subject doubts (DSA, DBMS, OS, OOP, Computer Networks, Web Dev, Java, C++, Python, SQL, Aptitude).
-          2. GRIET Placement Portal guidance: explain tools like Practice Modules (Aptitude & Core CSE tests), Coding Contests & multi-platform sync (LeetCode, Codeforces, CodeChef, HackerRank), AI Resume Builder & Analyzer, Learning Roadmaps with Field Trackers & Study TODOs, Coding Playground, and Discussion Forum.
+          2. Campus Bridge Placement Portal guidance: explain tools like Practice Modules (Aptitude & Core CSE tests), Coding Contests & multi-platform sync (LeetCode, Codeforces, CodeChef, HackerRank), AI Resume Builder & Analyzer, Learning Roadmaps with Field Trackers & Study TODOs, Coding Playground, and Discussion Forum.
           Format your answer using clean Markdown, bold highlights, bullet points, and code snippets where appropriate. Keep explanations clear, friendly, and concise.${screenContextPrompt}
         `;
 
@@ -326,7 +326,7 @@ Guidelines:
 
     // 3. Helpful Default Fallback
     const fallbackResponse = `### 💡 Ask AI Assistant (ChatGPT Connected)
-I'm your **GRIET Placement AI Assistant**, powered by **ChatGPT**!
+I'm your **Campus Bridge AI Assistant**, powered by **ChatGPT**!
 
 I can help resolve your doubts on:
 - **Core Computer Science**: DBMS (ACID, Normalization, SQL), Operating Systems (Processes, Deadlocks, Paging), OOPs (Pillars, Polymorphism), Computer Networks (OSI, TCP/IP, UDP).

@@ -1316,7 +1316,7 @@ exports.conductDriveExam = async (req, res, next) => {
 
     const formattedDate = examDate ? new Date(examDate).toLocaleDateString() : 'Scheduled Date';
     const waExamMsg =
-`📝 *GRIET CAMPUS PLACEMENT - ONLINE EXAM SCHEDULED*
+`📝 *CAMPUS BRIDGE PLACEMENT - ONLINE EXAM SCHEDULED*
 ------------------------------------------------
 Dear Candidate,
 The recruitment team from *${drive.companyName}* has scheduled your Online Exam:
@@ -1643,7 +1643,7 @@ exports.bulkAdvanceCandidatesStage = async (req, res, next) => {
 
     const formattedDate = interviewDate ? new Date(interviewDate).toLocaleDateString() : 'Scheduled Date';
     const waAdvanceMsg =
-`📢 *GRIET PLACEMENT UPDATE: ${stageDisplay.toUpperCase()}*
+`📢 *CAMPUS BRIDGE PLACEMENT UPDATE: ${stageDisplay.toUpperCase()}*
 -------------------------------------------------
 Dear Candidate,
 Your application for *${drive.companyName}* (${drive.role}) has advanced to:

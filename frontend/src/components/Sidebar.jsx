@@ -73,8 +73,8 @@ const Sidebar = () => {
   return (
     <aside className="sidebar">
       <div className="sidebar-logo">
-        <img src="/college-logo.jpg" alt="GRIET Placement" className="sidebar-logo-img" />
-        <span>GRIET Placement</span>
+        <img src="/campus-bridge-logo.png" alt="Campus Bridge" className="sidebar-logo-img" />
+        <span>Campus Bridge</span>
       </div>
 
       <nav className="sidebar-nav">
