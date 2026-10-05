@@ -54,7 +54,8 @@ Please log in to your Placement Portal to review the drive schedule, practice mo
 🔗 https://placement-guide-nu.vercel.app/login
 
 Best of luck!
-- Placement & Training Officer, GRIET`;
+- Placement & Training Officer, GRIET
+📱 Official WhatsApp Sender: +91 9182967014`;
 
     // 2. Email HTML template
     const emailSubject = `🎓 Campus Placement Drive Alert: ${company} is Hiring for ${role} (${pkg})`;
@@ -112,7 +113,7 @@ Best of luck!
         </div>
 
         <p style="font-size: 12px; color: #64748b; border-top: 1px solid #334155; padding-top: 14px; margin-top: 24px; text-align: center;">
-          This is an automated notification from the GRIET Placement Portal. Contact Placement Office for assistance.
+          This is an automated notification from the GRIET Placement Portal. Official WhatsApp Sender: <strong>+91 9182967014</strong>. Contact Placement Office for assistance.
         </p>
       </div>
     `;
@@ -210,7 +211,8 @@ If you haven't registered yet, please log in and apply immediately before this e
 🔗 ${portalUrl}/job-board
 
 Best regards,
-Training & Placement Cell, GRIET`;
+Training & Placement Cell, GRIET
+📱 Official WhatsApp Sender: +91 9182967014`;
 
     // 1. Dispatch WhatsApp message to the dedicated phone number (8074701052)
     await sendWhatsAppMessage({
@@ -279,6 +281,10 @@ Training & Placement Cell, GRIET`;
             🚀 Open Job Board &amp; Apply Now
           </a>
         </div>
+
+        <p style="font-size: 12px; color: #64748b; border-top: 1px solid #334155; padding-top: 14px; margin-top: 24px; text-align: center;">
+          GRIET Training &amp; Placement Cell &bull; Official WhatsApp Sender: <strong>+91 9182967014</strong>
+        </p>
       </div>
     `;
 
