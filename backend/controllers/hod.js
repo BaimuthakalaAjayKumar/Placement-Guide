@@ -1026,16 +1026,61 @@ exports.getDepartmentProjects = async (req, res, next) => {
 exports.gradeStudentProject = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { grade, feedback, status = 'approved' } = req.body;
+    const {
+      grade,
+      leadStudentGrade,
+      feedback,
+      codeSuggestions,
+      techSuggestions,
+      status = 'approved',
+      teamMembers
+    } = req.body;
 
     const project = await Project.findById(id).populate('student', 'name email');
     if (!project) {
       return res.status(404).json({ success: false, error: 'Project not found.' });
     }
 
-    if (grade !== undefined) project.grade = Number(grade);
+    if (grade !== undefined && grade !== null && grade !== '') {
+      project.grade = Number(grade);
+    }
+    if (leadStudentGrade !== undefined && leadStudentGrade !== null && leadStudentGrade !== '') {
+      project.leadStudentGrade = Number(leadStudentGrade);
+    }
     if (feedback !== undefined) project.feedback = feedback.trim();
+    if (codeSuggestions !== undefined) project.codeSuggestions = codeSuggestions.trim();
+    if (techSuggestions !== undefined) project.techSuggestions = techSuggestions.trim();
     if (status) project.status = status;
+
+    // Update individual team member grades if provided
+    if (Array.isArray(teamMembers) && teamMembers.length > 0) {
+      teamMembers.forEach(tm => {
+        const existing = (tm._id && project.teamMembers.id(tm._id)) ||
+          project.teamMembers.find(m => (m.email && m.email === tm.email) || (m.name && m.name === tm.name));
+        if (existing) {
+          if (tm.grade !== undefined && tm.grade !== null && tm.grade !== '') {
+            existing.grade = Number(tm.grade);
+          }
+          if (tm.feedback !== undefined) {
+            existing.feedback = tm.feedback;
+          }
+        }
+      });
+    }
+
+    // Append faculty suggestion entry for permanent audit trail
+    if (codeSuggestions || feedback || techSuggestions) {
+      project.facultySuggestions.push({
+        faculty: req.user.id,
+        facultyName: req.user.name || 'Head of Department',
+        facultyRole: 'hod',
+        codeSuggestion: codeSuggestions || '',
+        techSuggestion: techSuggestions || '',
+        generalFeedback: feedback || '',
+        suggestedAt: new Date()
+      });
+    }
+
     project.reviewedBy = req.user.id;
     project.reviewedAt = new Date();
 
@@ -1048,14 +1093,14 @@ exports.gradeStudentProject = async (req, res, next) => {
         sender: req.user.id,
         type: 'PROJECT_EVALUATED',
         title: 'Project Evaluated by HOD',
-        message: `Your project "${project.title}" has been reviewed by ${req.user.name} (HOD). Status: ${status.toUpperCase()}, Grade: ${grade !== undefined ? grade : 'N/A'}/100.`,
+        message: `Your project "${project.title}" has been reviewed by ${req.user.name || 'Head of Department'}. Status: ${status.toUpperCase()}, Grade: ${project.grade !== null && project.grade !== undefined ? project.grade : 'N/A'}/100.`,
         actionLink: '/project-studio'
       });
     }
 
     res.status(200).json({
       success: true,
-      message: `Project "${project.title}" graded and updated successfully.`,
+      message: `Project "${project.title}" graded and evaluated successfully.`,
       data: project
     });
   } catch (err) {

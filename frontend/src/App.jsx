@@ -240,7 +240,7 @@ const AppRoutes = () => {
       <Route
         path="/profile"
         element={
-          <PrivateRoute allowedRoles={['student']}>
+          <PrivateRoute allowedRoles={['student', 'faculty', 'admin', 'hod', 'recruiter']}>
             <Profile />
           </PrivateRoute>
         }

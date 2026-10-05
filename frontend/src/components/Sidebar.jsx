@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { API_URL } from '../config/api';
@@ -9,6 +9,20 @@ const Sidebar = () => {
   const navigate = useNavigate();
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [showContactModal, setShowContactModal] = useState(false);
+  const menuRef = useRef(null);
+
+  // Close popover when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (menuRef.current && !menuRef.current.contains(e.target)) {
+        setIsUserMenuOpen(false);
+      }
+    };
+    if (isUserMenuOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isUserMenuOpen]);
 
   // Contact Form state
   const [contactSubject, setContactSubject] = useState('');
@@ -62,20 +76,6 @@ const Sidebar = () => {
         <img src="/college-logo.jpg" alt="GRIET Placement" className="sidebar-logo-img" />
         <span>GRIET Placement</span>
       </div>
-
-      {(user.role === 'admin' || user.role === 'faculty') && (
-        <div className="user-badge">
-          <div className="user-avatar">
-            {user.name.charAt(0).toUpperCase()}
-          </div>
-          <div className="user-info">
-            <span className="user-name">{user.name}</span>
-            <span className="user-role">
-              {user.role === 'admin' ? 'Administrator' : 'Faculty'}
-            </span>
-          </div>
-        </div>
-      )}
 
       <nav className="sidebar-nav">
         {user.role === 'student' && (
@@ -340,153 +340,126 @@ const Sidebar = () => {
         )}
       </nav>
 
-      <div className="sidebar-footer" style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-        {user.role === 'student' ? (
-          <>
-            <div className="user-badge-container">
-              <div className="user-profile-badge-btn" onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}>
-                <div className="user-avatar">
-                  {user.name.charAt(0).toUpperCase()}
-                </div>
-                <div className="user-info">
-                  <span className="user-name">{user.name}</span>
-                  <span className="user-role">{user.targetRole || 'Student'}</span>
-                </div>
-                <span className="chevron-icon">›</span>
-              </div>
+      <div className="sidebar-footer" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+        <div className="user-badge-container" ref={menuRef}>
+          <div
+            className="user-profile-badge-btn"
+            onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
+            title="Click to view profile options"
+          >
+            <div
+              className="user-avatar"
+              style={
+                user.role === 'hod'
+                  ? { background: 'linear-gradient(135deg, #10b981, #0d9488)', color: '#fff', fontWeight: 'bold' }
+                  : user.role === 'recruiter'
+                  ? { background: 'linear-gradient(135deg, #2563eb, #06b6d4)', color: '#fff', fontWeight: 'bold' }
+                  : user.role === 'faculty'
+                  ? { background: 'linear-gradient(135deg, #8b5cf6, #6366f1)', color: '#fff', fontWeight: 'bold' }
+                  : user.role === 'admin'
+                  ? { background: 'linear-gradient(135deg, #f59e0b, #ef4444)', color: '#fff', fontWeight: 'bold' }
+                  : undefined
+              }
+            >
+              {user.role === 'hod'
+                ? '🎓'
+                : user.role === 'recruiter'
+                ? '🏢'
+                : user.role === 'admin'
+                ? '🛡️'
+                : (user.name ? user.name.charAt(0).toUpperCase() : 'U')}
+            </div>
+            <div className="user-info">
+              <span className="user-name">{user.name}</span>
+              <span
+                className="user-role"
+                style={{
+                  color:
+                    user.role === 'hod'
+                      ? '#34d399'
+                      : user.role === 'recruiter'
+                      ? '#60a5fa'
+                      : user.role === 'faculty'
+                      ? '#c084fc'
+                      : user.role === 'admin'
+                      ? '#fbbf24'
+                      : undefined,
+                  fontWeight: 600
+                }}
+              >
+                {user.role === 'hod'
+                  ? `HOD (${user.department || user.branch || 'IT'})`
+                  : user.role === 'recruiter'
+                  ? (user.companyName || 'Campus Recruiter')
+                  : user.role === 'faculty'
+                  ? (user.designation || 'Faculty Coordinator')
+                  : user.role === 'admin'
+                  ? 'Super Administrator'
+                  : (user.targetRole || 'Student')}
+              </span>
+            </div>
+            <span
+              className={`chevron-icon ${isUserMenuOpen ? 'open' : ''}`}
+              style={{
+                transform: isUserMenuOpen ? 'rotate(90deg)' : 'none',
+                transition: 'transform 0.2s',
+                color: '#94a3b8',
+                fontSize: '18px'
+              }}
+            >
+              ›
+            </span>
+          </div>
 
-              {isUserMenuOpen && (
-                <div className="user-popover-menu animate-fade">
-                  <button
-                    onClick={() => { navigate('/profile'); setIsUserMenuOpen(false); }}
-                    className="popover-item"
-                  >
-                    <svg className="popover-icon" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>
-                    <span>Profile</span>
-                  </button>
+          {isUserMenuOpen && (
+            <div className="user-popover-menu animate-fade">
+              <button
+                type="button"
+                onClick={() => { navigate('/profile'); setIsUserMenuOpen(false); }}
+                className="popover-item"
+              >
+                <svg className="popover-icon" viewBox="0 0 24 24">
+                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                  <circle cx="12" cy="7" r="4" />
+                </svg>
+                <span>Profile</span>
+              </button>
 
-                  <button
-                    onClick={() => { navigate('/change-password'); setIsUserMenuOpen(false); }}
-                    className="popover-item"
-                  >
-                    <svg className="popover-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
-                    <span>Change Password</span>
-                  </button>
-
-                  <button
-                    onClick={() => { setShowContactModal(true); setIsUserMenuOpen(false); }}
-                    className="popover-item"
-                  >
-                    <svg className="popover-icon" viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" /><polyline points="22,6 12,13 2,6" /></svg>
-                    <span>Contact Us</span>
-                  </button>
-                </div>
+              {user.role !== 'recruiter' && user.role !== 'admin' && (
+                <button
+                  type="button"
+                  onClick={() => { navigate('/change-password'); setIsUserMenuOpen(false); }}
+                  className="popover-item"
+                >
+                  <svg className="popover-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                    <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                  </svg>
+                  <span>Change Password</span>
+                </button>
               )}
+
+              <button
+                type="button"
+                onClick={() => { setShowContactModal(true); setIsUserMenuOpen(false); }}
+                className="popover-item"
+              >
+                <svg className="popover-icon" viewBox="0 0 24 24">
+                  <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
+                  <polyline points="22,6 12,13 2,6" />
+                </svg>
+                <span>Contact Support</span>
+              </button>
             </div>
-            <button onClick={handleLogout} className="logout-btn" style={{ width: '100%' }}>
-              <svg viewBox="0 0 24 24" className="logout-icon"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" /></svg>
-              <span>Sign Out</span>
-            </button>
-          </>
-        ) : user.role === 'recruiter' ? (
-          <>
-            <div className="user-badge-container">
-              <div className="user-profile-badge-btn" style={{ cursor: 'default' }}>
-                <div className="user-avatar" style={{ background: 'linear-gradient(135deg, #2563eb, #06b6d4)', color: '#fff', fontWeight: 'bold' }}>
-                  🏢
-                </div>
-                <div className="user-info">
-                  <span className="user-name">{user.name}</span>
-                  <span className="user-role" style={{ color: '#60a5fa', fontWeight: 600 }}>
-                    {user.companyName || 'Campus Recruiter'}
-                  </span>
-                </div>
-              </div>
-            </div>
-            <button onClick={handleLogout} className="logout-btn" style={{ width: '100%' }}>
-              <svg viewBox="0 0 24 24" className="logout-icon"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" /></svg>
-              <span>Sign Out</span>
-            </button>
-          </>
-        ) : user.role === 'hod' ? (
-          <>
-            <div className="user-badge-container">
-              <div className="user-profile-badge-btn" style={{ cursor: 'default' }}>
-                <div className="user-avatar" style={{ background: 'linear-gradient(135deg, #10b981, #0d9488)', color: '#fff', fontWeight: 'bold' }}>
-                  🎓
-                </div>
-                <div className="user-info">
-                  <span className="user-name">{user.name}</span>
-                  <span className="user-role" style={{ color: '#34d399', fontWeight: 600 }}>
-                    HOD ({user.department || user.branch || 'IT'})
-                  </span>
-                </div>
-              </div>
-            </div>
-            <button
-              onClick={() => navigate('/change-password')}
-              className="change-password-sidebar-btn"
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '8px',
-                width: '100%',
-                padding: '8px 12px',
-                borderRadius: '8px',
-                background: 'rgba(16, 185, 129, 0.12)',
-                border: '1px solid rgba(16, 185, 129, 0.25)',
-                color: '#6ee7b7',
-                fontSize: '12.5px',
-                fontWeight: '600',
-                cursor: 'pointer',
-                transition: 'all 0.2s'
-              }}
-            >
-              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
-              <span>Change Password</span>
-            </button>
-            <button onClick={handleLogout} className="logout-btn" style={{ width: '100%' }}>
-              <svg viewBox="0 0 24 24" className="logout-icon"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" /></svg>
-              <span>Sign Out</span>
-            </button>
-          </>
-        ) : user.role === 'faculty' ? (
-          <>
-            <button
-              onClick={() => navigate('/change-password')}
-              className="change-password-sidebar-btn"
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '8px',
-                width: '100%',
-                padding: '8px 12px',
-                borderRadius: '8px',
-                background: 'rgba(255, 255, 255, 0.06)',
-                border: '1px solid rgba(255, 255, 255, 0.12)',
-                color: '#cbd5e1',
-                fontSize: '12.5px',
-                fontWeight: '500',
-                cursor: 'pointer',
-                transition: 'all 0.2s'
-              }}
-            >
-              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
-              <span>Change Password</span>
-            </button>
-            <button onClick={handleLogout} className="logout-btn">
-              <svg viewBox="0 0 24 24" className="logout-icon"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" /></svg>
-              <span>Sign Out</span>
-            </button>
-          </>
-        ) : (
-          <button onClick={handleLogout} className="logout-btn">
-            <svg viewBox="0 0 24 24" className="logout-icon"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" /></svg>
-            <span>Sign Out</span>
-          </button>
-        )}
+          )}
+        </div>
+
+        <button onClick={handleLogout} className="logout-btn" style={{ width: '100%' }}>
+          <svg viewBox="0 0 24 24" className="logout-icon">
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" />
+          </svg>
+          <span>Sign Out</span>
+        </button>
       </div>
 
       {showContactModal && (

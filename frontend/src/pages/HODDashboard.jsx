@@ -110,9 +110,17 @@ const HODDashboard = () => {
   const [gradingProject, setGradingProject] = useState(null);
   const [gradeForm, setGradeForm] = useState({
     grade: 85,
+    leadStudentGrade: 85,
     feedback: '',
-    status: 'approved'
+    codeSuggestions: '',
+    techSuggestions: '',
+    status: 'approved',
+    teamMembers: []
   });
+  const [previewingLiveDemo, setPreviewingLiveDemo] = useState(null);
+  const [demoDeviceMode, setDemoDeviceMode] = useState('desktop');
+  const [demoKey, setDemoKey] = useState(0);
+  const [inModalPreviewOpen, setInModalPreviewOpen] = useState(false);
 
   // Lab Tasks & Practice State
   const [labs, setLabs] = useState([]);
@@ -368,6 +376,50 @@ const HODDashboard = () => {
     } finally {
       setProjectsLoading(false);
     }
+  };
+
+  const formatExternalUrl = (url) => {
+    if (!url) return '';
+    const trimmed = String(url).trim();
+    if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+      return trimmed;
+    }
+    return `https://${trimmed}`;
+  };
+
+  const getProjectLinks = (proj) => {
+    if (!proj) return { repoUrl: '', demoUrl: '', rawRepoUrl: '', rawDemoUrl: '' };
+    const rawRepo = proj.repositoryUrl || proj.githubRepoUrl || proj.repoUrl || (proj.student?.githubProfileUrl || '');
+    const rawDemo = proj.deploymentUrl || proj.previewUrl || proj.liveDemoUrl || '';
+    return {
+      repoUrl: formatExternalUrl(rawRepo),
+      rawRepoUrl: rawRepo,
+      demoUrl: formatExternalUrl(rawDemo),
+      rawDemoUrl: rawDemo
+    };
+  };
+
+  const openGradingModalForProject = (proj) => {
+    setGradingProject(proj);
+    setInModalPreviewOpen(false);
+    setGradeForm({
+      grade: proj.grade !== undefined && proj.grade !== null ? proj.grade : 85,
+      leadStudentGrade: proj.leadStudentGrade !== undefined && proj.leadStudentGrade !== null ? proj.leadStudentGrade : (proj.grade !== undefined && proj.grade !== null ? proj.grade : 85),
+      feedback: proj.feedback || '',
+      codeSuggestions: proj.codeSuggestions || '',
+      techSuggestions: proj.techSuggestions || '',
+      status: proj.status || 'approved',
+      teamMembers: (proj.teamMembers || []).map(m => ({
+        _id: m._id,
+        name: m.name,
+        rollNumber: m.rollNumber || '',
+        email: m.email || '',
+        role: m.role || 'Contributor',
+        contribution: m.contribution || '',
+        grade: m.grade !== undefined && m.grade !== null ? m.grade : (proj.grade || 85),
+        feedback: m.feedback || ''
+      }))
+    });
   };
 
   // Grade Project Submit
@@ -1822,9 +1874,9 @@ const HODDashboard = () => {
                     <thead>
                       <tr>
                         <th>Project Title &amp; Domain</th>
-                        <th>Student</th>
+                        <th>Student &amp; Team</th>
                         <th>Batch / Sec</th>
-                        <th>Links</th>
+                        <th>Live Demo &amp; GitHub Repo</th>
                         <th>Status</th>
                         <th>Grade</th>
                         <th>Evaluator</th>
@@ -1832,105 +1884,164 @@ const HODDashboard = () => {
                       </tr>
                     </thead>
                     <tbody>
-                      {filteredProjects.map(proj => (
-                        <tr key={proj._id}>
-                          <td>
-                            <strong>{proj.title}</strong>
-                            <div style={{ display: 'flex', gap: '6px', marginTop: '4px', flexWrap: 'wrap' }}>
-                              {proj.domain && (
-                                <span style={{ fontSize: '10px', background: 'rgba(56, 189, 248, 0.15)', color: '#38bdf8', padding: '1px 6px', borderRadius: '4px' }}>
-                                  {proj.domain}
+                      {filteredProjects.map(proj => {
+                        const { repoUrl, rawRepoUrl, demoUrl, rawDemoUrl } = getProjectLinks(proj);
+                        const techList = (proj.technologies && proj.technologies.length > 0 ? proj.technologies : proj.techStack || []);
+                        const teamMembersCount = (proj.teamMembers?.length || 0);
+
+                        return (
+                          <tr key={proj._id}>
+                            <td>
+                              <strong style={{ color: '#ffffff', fontSize: '13.5px' }}>{proj.title}</strong>
+                              <div style={{ display: 'flex', gap: '6px', marginTop: '4px', flexWrap: 'wrap' }}>
+                                {proj.domain && (
+                                  <span style={{ fontSize: '10px', background: 'rgba(56, 189, 248, 0.15)', color: '#38bdf8', padding: '1px 6px', borderRadius: '4px', fontWeight: 600 }}>
+                                    {proj.domain}
+                                  </span>
+                                )}
+                                {techList.slice(0, 3).map((tech, idx) => (
+                                  <span key={idx} style={{ fontSize: '10px', background: 'rgba(255,255,255,0.06)', color: '#cbd5e1', padding: '1px 6px', borderRadius: '4px' }}>
+                                    {tech}
+                                  </span>
+                                ))}
+                              </div>
+                            </td>
+                            <td>
+                              <strong style={{ color: '#f1f5f9' }}>{proj.student?.name || 'Unknown Student'}</strong>
+                              <div style={{ fontSize: '11px', color: '#94a3b8' }}>{proj.student?.rollNumber || proj.student?.email}</div>
+                              {teamMembersCount > 0 && (
+                                <span style={{ fontSize: '10px', background: 'rgba(99,102,241,0.15)', color: '#818cf8', padding: '1px 6px', borderRadius: '4px', display: 'inline-block', marginTop: '3px' }}>
+                                  👥 +{teamMembersCount} Team Member{teamMembersCount > 1 ? 's' : ''}
                                 </span>
                               )}
-                              {(proj.techStack || []).slice(0, 3).map((tech, idx) => (
-                                <span key={idx} style={{ fontSize: '10px', background: 'rgba(255,255,255,0.06)', color: '#cbd5e1', padding: '1px 6px', borderRadius: '4px' }}>
-                                  {tech}
-                                </span>
-                              ))}
-                            </div>
-                          </td>
-                          <td>
-                            <strong>{proj.student?.name || 'Unknown Student'}</strong>
-                            <div style={{ fontSize: '11px', color: '#94a3b8' }}>{proj.student?.rollNumber || proj.student?.email}</div>
-                          </td>
-                          <td>
-                            <span>{proj.student?.academicYear || '4th Year'}</span>
-                            <span style={{ fontSize: '11px', color: '#94a3b8', display: 'block' }}>Sec {proj.student?.section || 'A'}</span>
-                          </td>
-                          <td>
-                            <div style={{ display: 'flex', gap: '6px' }}>
-                              {proj.githubRepoUrl && (
-                                <a
-                                  href={proj.githubRepoUrl}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  style={{ color: '#38bdf8', fontSize: '11px', textDecoration: 'none', background: 'rgba(56,189,248,0.1)', padding: '2px 6px', borderRadius: '4px' }}
-                                >
-                                  📦 Repo
-                                </a>
-                              )}
-                              {proj.liveDemoUrl && (
-                                <a
-                                  href={proj.liveDemoUrl}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  style={{ color: '#34d399', fontSize: '11px', textDecoration: 'none', background: 'rgba(52,211,153,0.1)', padding: '2px 6px', borderRadius: '4px' }}
-                                >
-                                  🌐 Demo
-                                </a>
-                              )}
-                            </div>
-                          </td>
-                          <td>
-                            <span style={{
-                              fontSize: '11px',
-                              fontWeight: 700,
-                              padding: '2px 8px',
-                              borderRadius: '4px',
-                              textTransform: 'uppercase',
-                              background: proj.status === 'approved' ? 'rgba(34, 197, 94, 0.15)' : proj.status === 'changes_requested' ? 'rgba(245, 158, 11, 0.15)' : 'rgba(56, 189, 248, 0.15)',
-                              color: proj.status === 'approved' ? '#34d399' : proj.status === 'changes_requested' ? '#fbbf24' : '#38bdf8'
-                            }}>
-                              {proj.status ? proj.status.replace('_', ' ') : 'Draft'}
-                            </span>
-                          </td>
-                          <td>
-                            {proj.grade !== undefined && proj.grade !== null ? (
+                            </td>
+                            <td>
+                              <span>{proj.student?.academicYear || proj.academicYear || '4th Year'}</span>
+                              <span style={{ fontSize: '11px', color: '#94a3b8', display: 'block' }}>Sec {proj.student?.section || proj.section || 'A'}</span>
+                            </td>
+                            <td>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', minWidth: '130px' }}>
+                                {repoUrl && (
+                                  <a
+                                    href={repoUrl}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    style={{
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: '5px',
+                                      color: '#38bdf8',
+                                      fontSize: '11px',
+                                      fontWeight: 600,
+                                      textDecoration: 'none',
+                                      background: 'rgba(56, 189, 248, 0.12)',
+                                      border: '1px solid rgba(56, 189, 248, 0.28)',
+                                      padding: '2px 7px',
+                                      borderRadius: '4px',
+                                      width: 'fit-content'
+                                    }}
+                                    title={`Open GitHub Repository: ${rawRepoUrl}`}
+                                  >
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                                      <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/>
+                                    </svg>
+                                    <span>GitHub Repo ↗</span>
+                                  </a>
+                                )}
+                                {demoUrl && (
+                                  <div style={{ display: 'inline-flex', gap: '4px', flexWrap: 'wrap' }}>
+                                    <a
+                                      href={demoUrl}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      style={{
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '3px',
+                                        color: '#34d399',
+                                        fontSize: '11px',
+                                        fontWeight: 600,
+                                        textDecoration: 'none',
+                                        background: 'rgba(52, 211, 153, 0.12)',
+                                        border: '1px solid rgba(52, 211, 153, 0.28)',
+                                        padding: '2px 6px',
+                                        borderRadius: '4px'
+                                      }}
+                                      title={`Open Live Demo: ${rawDemoUrl}`}
+                                    >
+                                      <span>🌐 Live Demo ↗</span>
+                                    </a>
+                                    <button
+                                      type="button"
+                                      onClick={() => { setPreviewingLiveDemo(proj); setDemoDeviceMode('desktop'); }}
+                                      style={{
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '3px',
+                                        color: '#a78bfa',
+                                        fontSize: '11px',
+                                        fontWeight: 600,
+                                        background: 'rgba(167, 139, 250, 0.12)',
+                                        border: '1px solid rgba(167, 139, 250, 0.3)',
+                                        padding: '2px 6px',
+                                        borderRadius: '4px',
+                                        cursor: 'pointer'
+                                      }}
+                                      title="Interactive in-app live preview"
+                                    >
+                                      <span>👁️ Preview</span>
+                                    </button>
+                                  </div>
+                                )}
+                                {!repoUrl && !demoUrl && (
+                                  <span style={{ fontSize: '11px', color: '#64748b', fontStyle: 'italic' }}>No links submitted</span>
+                                )}
+                              </div>
+                            </td>
+                            <td>
                               <span style={{
-                                fontSize: '13px',
-                                fontWeight: 800,
-                                color: proj.grade >= 80 ? '#34d399' : proj.grade >= 60 ? '#38bdf8' : '#f87171'
+                                fontSize: '11px',
+                                fontWeight: 700,
+                                padding: '2px 8px',
+                                borderRadius: '4px',
+                                textTransform: 'uppercase',
+                                background: proj.status === 'approved' ? 'rgba(34, 197, 94, 0.15)' : proj.status === 'changes_requested' ? 'rgba(245, 158, 11, 0.15)' : proj.status === 'rejected' ? 'rgba(239, 68, 68, 0.15)' : 'rgba(56, 189, 248, 0.15)',
+                                color: proj.status === 'approved' ? '#34d399' : proj.status === 'changes_requested' ? '#fbbf24' : proj.status === 'rejected' ? '#f87171' : '#38bdf8'
                               }}>
-                                {proj.grade} / 100
+                                {proj.status ? proj.status.replace('_', ' ') : 'Draft'}
                               </span>
-                            ) : (
-                              <span style={{ color: '#94a3b8', fontSize: '11px' }}>Ungraded</span>
-                            )}
-                          </td>
-                          <td>
-                            <span style={{ fontSize: '11px', color: '#cbd5e1' }}>
-                              {proj.reviewedBy ? (proj.reviewedBy.name || 'Faculty') : '—'}
-                            </span>
-                          </td>
-                          <td>
-                            <button
-                              type="button"
-                              className="btn btn-secondary btn-sm"
-                              style={{ padding: '3px 8px', fontSize: '11px', color: '#c084fc', borderColor: 'rgba(192,132,252,0.4)' }}
-                              onClick={() => {
-                                setGradingProject(proj);
-                                setGradeForm({
-                                  grade: proj.grade !== undefined ? proj.grade : 85,
-                                  feedback: proj.feedback || '',
-                                  status: proj.status || 'approved'
-                                });
-                              }}
-                            >
-                              📝 Grade
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
+                            </td>
+                            <td>
+                              {proj.grade !== undefined && proj.grade !== null ? (
+                                <span style={{
+                                  fontSize: '13px',
+                                  fontWeight: 800,
+                                  color: proj.grade >= 80 ? '#34d399' : proj.grade >= 60 ? '#38bdf8' : '#f87171'
+                                }}>
+                                  {proj.grade} / 100
+                                </span>
+                              ) : (
+                                <span style={{ color: '#94a3b8', fontSize: '11px' }}>Ungraded</span>
+                              )}
+                            </td>
+                            <td>
+                              <span style={{ fontSize: '11px', color: '#cbd5e1' }}>
+                                {proj.reviewedBy ? (proj.reviewedBy.name || 'Faculty') : '—'}
+                              </span>
+                            </td>
+                            <td>
+                              <button
+                                type="button"
+                                className="btn btn-secondary btn-sm"
+                                style={{ padding: '4px 10px', fontSize: '11px', color: '#c084fc', borderColor: 'rgba(192,132,252,0.4)', fontWeight: 600 }}
+                                onClick={() => openGradingModalForProject(proj)}
+                              >
+                                📝 Grade &amp; Review
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
@@ -2604,74 +2715,556 @@ const HODDashboard = () => {
         {/* ========================================================================= */}
         {/* MODAL 7: GRADE & EVALUATE PROJECT */}
         {/* ========================================================================= */}
-        {gradingProject && (
-          <div className="hod-modal-backdrop" onClick={() => setGradingProject(null)}>
-            <div className="hod-modal-window" style={{ maxWidth: '640px' }} onClick={(e) => e.stopPropagation()}>
-              <div className="hod-modal-header">
-                <div>
-                  <h3 style={{ margin: 0 }}>📝 Evaluate Project: {gradingProject.title}</h3>
-                  <span style={{ fontSize: '12px', color: '#94a3b8' }}>
-                    Student: {gradingProject.student?.name} ({gradingProject.student?.rollNumber || gradingProject.student?.email})
-                  </span>
-                </div>
-                <button type="button" onClick={() => setGradingProject(null)}>✕</button>
-              </div>
+        {gradingProject && (() => {
+          const { repoUrl, rawRepoUrl, demoUrl, rawDemoUrl } = getProjectLinks(gradingProject);
+          const techList = (gradingProject.technologies && gradingProject.technologies.length > 0 ? gradingProject.technologies : gradingProject.techStack || []);
 
-              <form onSubmit={handleGradeProjectSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+          return (
+            <div className="hod-modal-backdrop" onClick={() => setGradingProject(null)}>
+              <div className="hod-modal-window" style={{ maxWidth: '880px', width: '92vw' }} onClick={(e) => e.stopPropagation()}>
+                <div className="hod-modal-header">
                   <div>
-                    <label className="form-label">Score / Marks (out of 100) *</label>
-                    <input
-                      type="number"
-                      required
-                      min="0"
-                      max="100"
-                      className="form-control"
-                      value={gradeForm.grade}
-                      onChange={(e) => setGradeForm(prev => ({ ...prev, grade: e.target.value }))}
-                      style={{ fontSize: '1.1rem', fontWeight: 700 }}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                      <h3 style={{ margin: 0 }}>📝 Evaluate Project: {gradingProject.title}</h3>
+                      {gradingProject.domain && (
+                        <span style={{ fontSize: '11px', background: 'rgba(56, 189, 248, 0.2)', color: '#38bdf8', padding: '2px 8px', borderRadius: '4px', fontWeight: 600 }}>
+                          {gradingProject.domain}
+                        </span>
+                      )}
+                    </div>
+                    <span style={{ fontSize: '12px', color: '#94a3b8', display: 'block', marginTop: '4px' }}>
+                      Lead Student: <strong>{gradingProject.student?.name}</strong> ({gradingProject.student?.rollNumber || gradingProject.student?.email}) • Branch: {gradingProject.branch || gradingProject.student?.branch || 'IT'} • Section {gradingProject.section || gradingProject.student?.section || 'A'}
+                    </span>
+                  </div>
+                  <button type="button" onClick={() => setGradingProject(null)}>✕</button>
+                </div>
+
+                {/* Quick Inspection Toolbar */}
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  flexWrap: 'wrap',
+                  gap: '8px',
+                  background: 'rgba(15, 23, 42, 0.8)',
+                  border: '1px solid rgba(255,255,255,0.08)',
+                  borderRadius: '10px',
+                  padding: '10px 14px',
+                  marginBottom: '16px'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: '12px', fontWeight: 700, color: '#cbd5e1' }}>Direct Inspection:</span>
+                    {repoUrl ? (
+                      <a
+                        href={repoUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          color: '#38bdf8',
+                          fontSize: '12px',
+                          fontWeight: 600,
+                          textDecoration: 'none',
+                          background: 'rgba(56, 189, 248, 0.15)',
+                          border: '1px solid rgba(56, 189, 248, 0.3)',
+                          padding: '5px 10px',
+                          borderRadius: '6px'
+                        }}
+                        title={`Open GitHub Repository: ${rawRepoUrl}`}
+                      >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                          <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/>
+                        </svg>
+                        <span>GitHub Repo ↗</span>
+                      </a>
+                    ) : (
+                      <span style={{ fontSize: '11px', color: '#64748b' }}>No GitHub repo</span>
+                    )}
+
+                    {demoUrl ? (
+                      <a
+                        href={demoUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          color: '#34d399',
+                          fontSize: '12px',
+                          fontWeight: 600,
+                          textDecoration: 'none',
+                          background: 'rgba(52, 211, 153, 0.15)',
+                          border: '1px solid rgba(52, 211, 153, 0.3)',
+                          padding: '5px 10px',
+                          borderRadius: '6px'
+                        }}
+                        title={`Open Live Demo: ${rawDemoUrl}`}
+                      >
+                        <span>🌐 Open Live Demo ↗</span>
+                      </a>
+                    ) : (
+                      <span style={{ fontSize: '11px', color: '#64748b' }}>No Live Demo URL</span>
+                    )}
+                  </div>
+
+                  {demoUrl && (
+                    <button
+                      type="button"
+                      onClick={() => setInModalPreviewOpen(prev => !prev)}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        background: inModalPreviewOpen ? '#6366f1' : 'rgba(99, 102, 241, 0.18)',
+                        color: '#ffffff',
+                        border: '1px solid rgba(99, 102, 241, 0.4)',
+                        padding: '5px 12px',
+                        borderRadius: '6px',
+                        fontSize: '12px',
+                        fontWeight: 600,
+                        cursor: 'pointer'
+                      }}
+                    >
+                      <span>{inModalPreviewOpen ? '✕ Hide Live Demo Preview' : '👁️ Preview Live Demo Inside Modal'}</span>
+                    </button>
+                  )}
+                </div>
+
+                {/* Embedded Live Preview (Collapsible) */}
+                {inModalPreviewOpen && demoUrl && (
+                  <div style={{
+                    marginBottom: '16px',
+                    borderRadius: '10px',
+                    overflow: 'hidden',
+                    border: '1px solid rgba(99, 102, 241, 0.3)',
+                    background: '#090d16'
+                  }}>
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '8px 12px',
+                      background: 'rgba(15, 23, 42, 0.95)',
+                      borderBottom: '1px solid rgba(255,255,255,0.08)',
+                      gap: '8px'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', overflow: 'hidden' }}>
+                        <span style={{ fontSize: '11px', color: '#94a3b8' }}>URL:</span>
+                        <code style={{ fontSize: '11.5px', color: '#38bdf8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {rawDemoUrl}
+                        </code>
+                      </div>
+                      <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                        <button
+                          type="button"
+                          onClick={() => setDemoKey(k => k + 1)}
+                          style={{
+                            background: 'rgba(255,255,255,0.08)',
+                            border: '1px solid rgba(255,255,255,0.15)',
+                            color: '#e2e8f0',
+                            padding: '3px 8px',
+                            fontSize: '11px',
+                            borderRadius: '4px',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          🔄 Reload
+                        </button>
+                        <a
+                          href={demoUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          style={{
+                            background: 'rgba(255,255,255,0.08)',
+                            border: '1px solid rgba(255,255,255,0.15)',
+                            color: '#e2e8f0',
+                            padding: '3px 8px',
+                            fontSize: '11px',
+                            borderRadius: '4px',
+                            textDecoration: 'none'
+                          }}
+                        >
+                          ↗ Open in Tab
+                        </a>
+                      </div>
+                    </div>
+                    <iframe
+                      key={demoKey}
+                      src={demoUrl}
+                      title="Project In-Modal Live Demo"
+                      style={{
+                        width: '100%',
+                        height: '380px',
+                        border: 'none',
+                        background: '#ffffff',
+                        display: 'block'
+                      }}
+                      sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
                     />
                   </div>
+                )}
+
+                {/* Project Description & Tech Stack */}
+                <div style={{
+                  background: 'rgba(255,255,255,0.03)',
+                  border: '1px solid rgba(255,255,255,0.06)',
+                  borderRadius: '8px',
+                  padding: '12px 14px',
+                  marginBottom: '16px'
+                }}>
+                  <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '8px' }}>
+                    {techList.map((t, idx) => (
+                      <span key={idx} style={{ fontSize: '11px', background: 'rgba(99,102,241,0.15)', color: '#c7d2fe', padding: '2px 8px', borderRadius: '4px' }}>
+                        {t}
+                      </span>
+                    ))}
+                  </div>
+                  <p style={{ margin: 0, fontSize: '13px', color: '#cbd5e1', lineHeight: 1.5 }}>
+                    {gradingProject.description || 'No description provided by the student.'}
+                  </p>
+                </div>
+
+                {/* Milestones if present */}
+                {Array.isArray(gradingProject.milestones) && gradingProject.milestones.length > 0 && (
+                  <div style={{ marginBottom: '16px' }}>
+                    <label className="form-label" style={{ fontSize: '12px', color: '#94a3b8' }}>Project Milestones Track:</label>
+                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '4px' }}>
+                      {gradingProject.milestones.map((m, idx) => (
+                        <div key={idx} style={{
+                          background: 'rgba(15, 23, 42, 0.6)',
+                          border: '1px solid rgba(255,255,255,0.08)',
+                          padding: '6px 10px',
+                          borderRadius: '6px',
+                          fontSize: '12px'
+                        }}>
+                          <span style={{ fontWeight: 600, color: '#f8fafc' }}>{m.title}</span>
+                          <span style={{
+                            marginLeft: '8px',
+                            fontSize: '10px',
+                            padding: '1px 6px',
+                            borderRadius: '3px',
+                            background: m.status === 'completed' ? 'rgba(34, 197, 94, 0.2)' : m.status === 'in_progress' ? 'rgba(56, 189, 248, 0.2)' : 'rgba(255,255,255,0.1)',
+                            color: m.status === 'completed' ? '#34d399' : m.status === 'in_progress' ? '#38bdf8' : '#94a3b8'
+                          }}>
+                            {m.status ? m.status.replace('_', ' ') : 'planned'}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Team Members Individual Grading (if present) */}
+                {Array.isArray(gradeForm.teamMembers) && gradeForm.teamMembers.length > 0 && (
+                  <div style={{
+                    background: 'rgba(15, 23, 42, 0.7)',
+                    border: '1px solid rgba(99, 102, 241, 0.2)',
+                    borderRadius: '8px',
+                    padding: '12px 14px',
+                    marginBottom: '16px'
+                  }}>
+                    <label className="form-label" style={{ fontSize: '13px', color: '#818cf8', fontWeight: 700, margin: '0 0 8px 0', display: 'block' }}>
+                      👥 Team Members Individual Grades &amp; Evaluation:
+                    </label>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                      {gradeForm.teamMembers.map((member, idx) => (
+                        <div key={idx} style={{
+                          display: 'grid',
+                          gridTemplateColumns: '1.2fr 100px 1.5fr',
+                          gap: '10px',
+                          alignItems: 'center',
+                          padding: '8px 10px',
+                          background: 'rgba(255,255,255,0.02)',
+                          border: '1px solid rgba(255,255,255,0.06)',
+                          borderRadius: '6px'
+                        }}>
+                          <div>
+                            <strong style={{ fontSize: '13px', color: '#f8fafc' }}>{member.name}</strong>
+                            <div style={{ fontSize: '11px', color: '#94a3b8' }}>
+                              {member.rollNumber ? `${member.rollNumber} • ` : ''}{member.role || 'Member'}
+                            </div>
+                            {member.contribution && (
+                              <div style={{ fontSize: '10.5px', color: '#cbd5e1', fontStyle: 'italic', marginTop: '2px' }}>
+                                Contribution: {member.contribution}
+                              </div>
+                            )}
+                          </div>
+                          <div>
+                            <input
+                              type="number"
+                              min="0"
+                              max="100"
+                              className="form-control"
+                              placeholder="Score"
+                              value={member.grade}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setGradeForm(prev => {
+                                  const updated = [...prev.teamMembers];
+                                  updated[idx] = { ...updated[idx], grade: val };
+                                  return { ...prev, teamMembers: updated };
+                                });
+                              }}
+                              style={{ padding: '0.4rem 0.6rem', fontSize: '12px' }}
+                            />
+                          </div>
+                          <div>
+                            <input
+                              type="text"
+                              className="form-control"
+                              placeholder="Member specific remarks..."
+                              value={member.feedback || ''}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setGradeForm(prev => {
+                                  const updated = [...prev.teamMembers];
+                                  updated[idx] = { ...updated[idx], feedback: val };
+                                  return { ...prev, teamMembers: updated };
+                                });
+                              }}
+                              style={{ padding: '0.4rem 0.6rem', fontSize: '12px' }}
+                            />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <form onSubmit={handleGradeProjectSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
+                    <div>
+                      <label className="form-label">Overall Project Score (out of 100) *</label>
+                      <input
+                        type="number"
+                        required
+                        min="0"
+                        max="100"
+                        className="form-control"
+                        value={gradeForm.grade}
+                        onChange={(e) => setGradeForm(prev => ({ ...prev, grade: e.target.value }))}
+                        style={{ fontSize: '1.15rem', fontWeight: 800, color: '#34d399' }}
+                      />
+                    </div>
+                    <div>
+                      <label className="form-label">Lead Student Score (out of 100)</label>
+                      <input
+                        type="number"
+                        min="0"
+                        max="100"
+                        className="form-control"
+                        value={gradeForm.leadStudentGrade}
+                        onChange={(e) => setGradeForm(prev => ({ ...prev, leadStudentGrade: e.target.value }))}
+                        style={{ fontSize: '1.15rem', fontWeight: 800, color: '#38bdf8' }}
+                      />
+                    </div>
+                    <div>
+                      <label className="form-label">Review Status *</label>
+                      <select
+                        className="form-control"
+                        value={gradeForm.status}
+                        onChange={(e) => setGradeForm(prev => ({ ...prev, status: e.target.value }))}
+                        style={{ background: '#1e293b', border: '1px solid #334155', borderRadius: '8px', color: '#fff', padding: '0.65rem' }}
+                      >
+                        <option value="approved">✅ Approved</option>
+                        <option value="under_review">🔍 Under Review</option>
+                        <option value="changes_requested">⚠️ Changes Requested</option>
+                        <option value="rejected">❌ Rejected</option>
+                      </select>
+                    </div>
+                  </div>
+
                   <div>
-                    <label className="form-label">Review Status *</label>
-                    <select
+                    <label className="form-label">HOD Architectural &amp; Code Quality Suggestions</label>
+                    <textarea
+                      rows="2"
                       className="form-control"
-                      value={gradeForm.status}
-                      onChange={(e) => setGradeForm(prev => ({ ...prev, status: e.target.value }))}
-                      style={{ background: '#1e293b', border: '1px solid #334155', borderRadius: '8px', color: '#fff', padding: '0.65rem' }}
+                      value={gradeForm.codeSuggestions}
+                      onChange={(e) => setGradeForm(prev => ({ ...prev, codeSuggestions: e.target.value }))}
+                      placeholder="e.g. Optimize state management, split monolithic controllers, add unit tests with Jest, use HTTPS for production deployment..."
+                      style={{ background: '#1e293b', border: '1px solid #334155', borderRadius: '8px', color: '#fff', padding: '0.65rem', fontSize: '13px' }}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="form-label">HOD Feedback &amp; Recommendations</label>
+                    <textarea
+                      rows="3"
+                      className="form-control"
+                      value={gradeForm.feedback}
+                      onChange={(e) => setGradeForm(prev => ({ ...prev, feedback: e.target.value }))}
+                      placeholder="Provide constructive evaluation on system architecture, test coverage, project execution, and presentation..."
+                      style={{ background: '#1e293b', border: '1px solid #334155', borderRadius: '8px', color: '#fff', padding: '0.65rem', fontSize: '13px' }}
+                    />
+                  </div>
+
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '6px' }}>
+                    <button type="button" className="btn btn-secondary" onClick={() => setGradingProject(null)}>
+                      Cancel
+                    </button>
+                    <button type="submit" className="btn btn-primary" disabled={actionLoading}>
+                      {actionLoading ? 'Saving...' : '💾 Save Grade & Notify Student'}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* ========================================================================= */}
+        {/* MODAL 7B: DEDICATED LIVE DEMO INSPECTOR */}
+        {/* ========================================================================= */}
+        {previewingLiveDemo && (() => {
+          const { repoUrl, rawRepoUrl, demoUrl, rawDemoUrl } = getProjectLinks(previewingLiveDemo);
+
+          return (
+            <div className="hod-modal-backdrop" onClick={() => setPreviewingLiveDemo(null)}>
+              <div className="hod-modal-window preview-modal" onClick={(e) => e.stopPropagation()}>
+                <div className="hod-modal-header" style={{ marginBottom: '10px' }}>
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                      <h3 style={{ margin: 0 }}>🌐 Live Demo Inspector: {previewingLiveDemo.title}</h3>
+                      {previewingLiveDemo.domain && (
+                        <span style={{ fontSize: '11px', background: 'rgba(56, 189, 248, 0.2)', color: '#38bdf8', padding: '2px 8px', borderRadius: '4px', fontWeight: 600 }}>
+                          {previewingLiveDemo.domain}
+                        </span>
+                      )}
+                    </div>
+                    <span style={{ fontSize: '12px', color: '#94a3b8' }}>
+                      Submitted by: <strong>{previewingLiveDemo.student?.name}</strong> ({previewingLiveDemo.student?.rollNumber || previewingLiveDemo.student?.email}) • Branch: {previewingLiveDemo.branch || previewingLiveDemo.student?.branch || 'IT'}
+                    </span>
+                  </div>
+                  <button type="button" onClick={() => setPreviewingLiveDemo(null)}>✕</button>
+                </div>
+
+                {/* Toolbar */}
+                <div className="demo-toolbar">
+                  <div className="demo-url-bar" title={rawDemoUrl}>
+                    <span style={{ color: '#94a3b8' }}>🔒 URL:</span>
+                    <span>{rawDemoUrl}</span>
+                  </div>
+
+                  {/* Device Switcher */}
+                  <div className="demo-viewport-toggle">
+                    <button
+                      type="button"
+                      className={`demo-viewport-btn ${demoDeviceMode === 'desktop' ? 'active' : ''}`}
+                      onClick={() => setDemoDeviceMode('desktop')}
                     >
-                      <option value="approved">✅ Approved</option>
-                      <option value="under_review">🔍 Under Review</option>
-                      <option value="changes_requested">⚠️ Changes Requested</option>
-                      <option value="rejected">❌ Rejected</option>
-                    </select>
+                      💻 Desktop
+                    </button>
+                    <button
+                      type="button"
+                      className={`demo-viewport-btn ${demoDeviceMode === 'tablet' ? 'active' : ''}`}
+                      onClick={() => setDemoDeviceMode('tablet')}
+                    >
+                      📱 Tablet (768px)
+                    </button>
+                    <button
+                      type="button"
+                      className={`demo-viewport-btn ${demoDeviceMode === 'mobile' ? 'active' : ''}`}
+                      onClick={() => setDemoDeviceMode('mobile')}
+                    >
+                      📱 Mobile (375px)
+                    </button>
+                  </div>
+
+                  {/* Frame Action Controls */}
+                  <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                    <button
+                      type="button"
+                      className="demo-viewport-btn"
+                      onClick={() => setDemoKey(k => k + 1)}
+                      style={{ background: 'rgba(255,255,255,0.06)' }}
+                      title="Reload application frame"
+                    >
+                      🔄 Reload
+                    </button>
+                    {demoUrl && (
+                      <a
+                        href={demoUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="demo-viewport-btn"
+                        style={{ background: 'rgba(52, 211, 153, 0.15)', color: '#34d399', textDecoration: 'none' }}
+                        title="Open in external browser window"
+                      >
+                        ↗ Open External
+                      </a>
+                    )}
+                    {repoUrl && (
+                      <a
+                        href={repoUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="demo-viewport-btn"
+                        style={{ background: 'rgba(56, 189, 248, 0.15)', color: '#38bdf8', textDecoration: 'none' }}
+                        title="Open GitHub code repository"
+                      >
+                        🐙 GitHub Repo
+                      </a>
+                    )}
                   </div>
                 </div>
 
-                <div>
-                  <label className="form-label">HOD Feedback &amp; Recommendations</label>
-                  <textarea
-                    rows="4"
-                    className="form-control"
-                    value={gradeForm.feedback}
-                    onChange={(e) => setGradeForm(prev => ({ ...prev, feedback: e.target.value }))}
-                    placeholder="Provide constructive feedback on system architecture, test coverage, code quality, and presentation..."
-                    style={{ background: '#1e293b', border: '1px solid #334155', borderRadius: '8px', color: '#fff', padding: '0.75rem' }}
-                  />
+                {/* Device Frame */}
+                <div className="demo-iframe-container">
+                  <div
+                    className="demo-iframe-wrapper"
+                    style={{
+                      width: demoDeviceMode === 'mobile' ? '375px' : demoDeviceMode === 'tablet' ? '768px' : '100%'
+                    }}
+                  >
+                    {demoUrl ? (
+                      <iframe
+                        key={demoKey}
+                        src={demoUrl}
+                        title="Student Live Project Demo"
+                        className="demo-iframe"
+                        sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+                      />
+                    ) : (
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#64748b' }}>
+                        No live demo URL provided for this project.
+                      </div>
+                    )}
+                  </div>
                 </div>
 
-                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '10px' }}>
-                  <button type="button" className="btn btn-secondary" onClick={() => setGradingProject(null)}>
-                    Cancel
-                  </button>
-                  <button type="submit" className="btn btn-primary" disabled={actionLoading}>
-                    {actionLoading ? 'Saving...' : '💾 Save Grade & Notify Student'}
-                  </button>
+                {/* Footer Actions */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '14px', flexWrap: 'wrap', gap: '10px' }}>
+                  <div style={{ fontSize: '12px', color: '#94a3b8' }}>
+                    💡 Viewing in responsive container: <strong>{demoDeviceMode.toUpperCase()}</strong>
+                  </div>
+                  <div style={{ display: 'flex', gap: '10px' }}>
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      onClick={() => setPreviewingLiveDemo(null)}
+                    >
+                      Close Inspector
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-primary"
+                      onClick={() => {
+                        const proj = previewingLiveDemo;
+                        setPreviewingLiveDemo(null);
+                        openGradingModalForProject(proj);
+                      }}
+                    >
+                      📝 Grade This Project Now
+                    </button>
+                  </div>
                 </div>
-              </form>
+              </div>
             </div>
-          </div>
-        )}
+          );
+        })()}
 
         {/* ========================================================================= */}
         {/* MODAL 8: CREATE LAB TASK */}

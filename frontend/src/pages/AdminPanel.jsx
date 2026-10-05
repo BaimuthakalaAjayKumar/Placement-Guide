@@ -3229,13 +3229,41 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
                   required
                 />
               </div>
-              <p className="card-desc">Matching students will receive an in-app notification and email about the new deadline.</p>
+
+              {/* WhatsApp Alert Trigger Notice */}
+              <div style={{
+                background: 'rgba(34, 197, 94, 0.12)',
+                border: '1px solid rgba(34, 197, 94, 0.3)',
+                padding: '10px 14px',
+                borderRadius: '8px',
+                marginBottom: '14px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px'
+              }}>
+                <span style={{ fontSize: '1.4rem' }}>💬</span>
+                <div>
+                  <strong style={{ color: '#22c55e', fontSize: '13px', display: 'block' }}>
+                    Automated WhatsApp Alert Enabled
+                  </strong>
+                  <span style={{ color: '#cbd5e1', fontSize: '11.5px', lineHeight: '1.4', display: 'block' }}>
+                    Extending this deadline triggers optimized instant WhatsApp broadcasts to <strong>8074701052</strong> and all eligible batch candidates with registered numbers.
+                  </span>
+                </div>
+              </div>
+
+              <p className="card-desc">Matching students will also receive in-app notifications and email alerts about the updated deadline.</p>
               <div className="modal-actions">
                 <button type="button" className="btn btn-secondary" onClick={() => setSelectedJobForExpiry(null)}>
                   Cancel
                 </button>
-                <button type="submit" className="btn btn-primary" disabled={updatingJobExpiry}>
-                  {updatingJobExpiry ? 'Updating...' : 'Update & Notify Students'}
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  disabled={updatingJobExpiry}
+                  style={{ background: 'linear-gradient(135deg, #10b981, #059669)', border: 'none', fontWeight: 700 }}
+                >
+                  {updatingJobExpiry ? 'Updating & Triggering WhatsApp...' : '🚀 Extend Deadline & Dispatch WhatsApp'}
                 </button>
               </div>
             </form>

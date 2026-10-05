@@ -155,13 +155,17 @@ const Profile = () => {
                 </div>
                 <h2>{user?.name}</h2>
                 <p className="student-email">{user?.email}</p>
-                <div className="profile-role-pill">{user?.role === 'admin' ? 'Administrator' : targetRole}</div>
+                <div className="profile-role-pill">
+                  {user?.role === 'hod' ? 'Head of Department' : user?.role === 'admin' ? 'Administrator' : user?.role === 'recruiter' ? 'Campus Recruiter' : user?.role === 'faculty' ? (user?.designation || 'Faculty Coordinator') : targetRole}
+                </div>
               </div>
 
               <div className="student-meta-list">
                 <div className="meta-item">
                   <span className="meta-label">Account Type:</span>
-                  <span className="meta-value">{user?.role === 'admin' ? 'Admin' : 'Student'}</span>
+                  <span className="meta-value" style={{ textTransform: 'capitalize', fontWeight: 700 }}>
+                    {user?.role === 'hod' ? 'HOD' : user?.role === 'admin' ? 'Super Administrator' : user?.role === 'recruiter' ? 'Recruiter' : user?.role === 'faculty' ? 'Faculty' : 'Student'}
+                  </span>
                 </div>
                 {user?.rollNumber && (
                   <div className="meta-item animate-fade">

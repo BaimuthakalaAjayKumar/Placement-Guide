@@ -2,6 +2,8 @@ const Job = require('../models/Job');
 const User = require('../models/User');
 const Notification = require('../models/Notification');
 const sendEmail = require('../utils/sendEmail');
+const { sendWhatsAppMessage } = require('../utils/sendWhatsApp');
+const { logActivity } = require('../utils/auditLogger');
 
 // Seed default jobs if database has none
 const seedDefaultJobs = async () => {
@@ -258,13 +260,15 @@ exports.updateJobExpiry = async (req, res, next) => {
     if (job.targetBatch && job.targetBatch !== 'All') {
       studentQuery.year = job.targetBatch.trim();
     }
-    const students = await User.find(studentQuery).select('_id name email');
+    const students = await User.find(studentQuery).select('_id name email phone mobileNumber branch academicYear year');
     const formattedExpiry = expiryDate.toLocaleDateString('en-IN', {
+      weekday: 'short',
       day: 'numeric',
       month: 'short',
       year: 'numeric'
     });
 
+    // In-app notifications
     await Notification.insertMany(students.map(student => ({
       user: student._id,
       type: 'job_update',
@@ -272,18 +276,88 @@ exports.updateJobExpiry = async (req, res, next) => {
       metadata: { jobId: job._id, expiresAt: expiryDate }
     })));
 
+    // Formatted WhatsApp message for extended deadline
+    const waText = 
+`⏰ *GRIET PLACEMENT ALERT: JOB DEADLINE EXTENDED*
+----------------------------------------
+Hello! The application deadline for the following campus placement opportunity has been extended:
+
+🏢 *Company:* ${job.company}
+💼 *Role:* ${job.title}
+💰 *Package:* ${job.salary || 'Competitive CTC'}
+⏰ *New Extended Deadline:* ${formattedExpiry}
+📍 *Location:* ${job.location || 'Hyderabad / Pan-India'}
+🎯 *Target Batch:* ${job.targetBatch || 'All Batches'}
+
+⚠️ If you have not applied yet, please log in and submit your application before the extended deadline expires!
+
+🔗 View & Apply on Placement Portal:
+https://placement-guide-nu.vercel.app/jobs
+
+Best regards,
+Placement & Training Directorate, GRIET Hyderabad`;
+
+    // 1. Immediate WhatsApp notification to designated coordinator
+    sendWhatsAppMessage({
+      to: '8074701052',
+      studentName: 'Placement Coordinator',
+      driveTitle: `${job.company} - ${job.title}`,
+      message: waText
+    }).catch(err => console.warn('WhatsApp error for coordinator on job extension:', err.message));
+
+    // 2. Optimized asynchronous WhatsApp batch dispatch to eligible students
+    setImmediate(async () => {
+      try {
+        const studentsWithPhone = students.filter(s => {
+          const ph = (s.mobileNumber || s.phone || '').replace(/\D/g, '');
+          return ph.length >= 10;
+        });
+
+        const chunkSize = 8;
+        for (let i = 0; i < studentsWithPhone.length; i += chunkSize) {
+          const chunk = studentsWithPhone.slice(i, i + chunkSize);
+          await Promise.allSettled(chunk.map(student => {
+            const phone = student.mobileNumber || student.phone;
+            return sendWhatsAppMessage({
+              to: phone,
+              studentName: student.name,
+              driveTitle: `${job.company} - ${job.title}`,
+              message: waText
+            });
+          }));
+        }
+        console.log(`[WHATSAPP EXTENSION NOTIFICATION]: Dispatched to ${studentsWithPhone.length} students.`);
+      } catch (waErr) {
+        console.warn('[WHATSAPP EXTENSION ERROR]:', waErr.message);
+      }
+    });
+
+    // 3. Email notifications
     students.forEach(student => {
       sendEmail({
         to: student.email,
-        subject: `Application deadline extended: ${job.title}`,
+        subject: `Application deadline extended: ${job.title} at ${job.company}`,
         text: `Hello ${student.name},\n\nThe application deadline for ${job.title} at ${job.company} has been extended to ${formattedExpiry}. Log in to PrepPortal to view the job and apply.\n\nBest regards,\nPrepPortal Team`
       }).catch(err => console.error(`Error sending job deadline update to ${student.email}:`, err.message));
     });
 
+    // 4. Audit Log
+    try {
+      await logActivity({
+        user: req.user,
+        action: 'JOB_DEADLINE_EXTENDED',
+        category: 'Placement Operations',
+        description: `Admin extended application deadline for ${job.company} (${job.title}) to ${formattedExpiry}`,
+        details: { jobId: job._id, expiresAt: expiryDate, notifiedStudentsCount: students.length },
+        req
+      });
+    } catch (e) {}
+
     res.status(200).json({
       success: true,
-      message: `Job deadline updated and ${students.length} student notification(s) sent.`,
-      data: job
+      message: `Job deadline extended to ${formattedExpiry}. WhatsApp alerts and ${students.length} student notification(s) dispatched successfully.`,
+      data: job,
+      whatsAppAlertSent: true
     });
   } catch (err) {
     next(err);
