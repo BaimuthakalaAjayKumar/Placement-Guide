@@ -232,6 +232,31 @@ const UserSchema = new mongoose.Schema({
     type: Date,
     default: Date.now
   },
+  isLocked: {
+    type: Boolean,
+    default: false
+  },
+  lockReason: {
+    type: String,
+    default: ''
+  },
+  lockedAt: {
+    type: Date,
+    default: null
+  },
+  lockedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    default: null
+  },
+  lockedByName: {
+    type: String,
+    default: ''
+  },
+  inactivityWarningSentAt: {
+    type: Date,
+    default: null
+  },
   resetPasswordToken: String,
   resetPasswordExpire: Date,
   createdAt: {

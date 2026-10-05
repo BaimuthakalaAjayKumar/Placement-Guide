@@ -161,6 +161,15 @@ exports.login = async (req, res, next) => {
       });
     }
 
+    // Check if student account is locked by Administrator / Main Admin
+    if (user.role === 'student' && user.isLocked) {
+      return res.status(403).json({
+        success: false,
+        isLocked: true,
+        error: `Your Student Dashboard is locked due to ${user.lockReason || '7+ days of inactivity'}. Please contact the College Administrator or Main Admin to restore your access.`
+      });
+    }
+
     // Extract client network IP and browser agent
     const clientIp = extractClientIp(req);
     const userAgent = extractUserAgent(req);

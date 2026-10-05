@@ -78,6 +78,78 @@ const PrivateRoute = ({ children, allowedRoles }) => {
     return <Navigate to="/change-password" replace />;
   }
 
+  // Check if Student Dashboard has been locked by Administrator & Main Admin
+  if (user.role === 'student' && user.isLocked) {
+    return (
+      <div className="main-container">
+        <Sidebar />
+        <div className="student-locked-screen-wrap">
+          <div className="student-locked-modal-card">
+            <div className="locked-icon-badge">🔒</div>
+            <h1 className="locked-title">Student Dashboard Locked</h1>
+            <div className="locked-policy-tag">Inactivity Policy Enforced (7+ Days)</div>
+            <p className="locked-desc">
+              Your access to the Student Placement Dashboard has been locked by the
+              <strong> Administrator &amp; Main Admin</strong>.
+            </p>
+
+            <div className="locked-details-box">
+              <div className="locked-info-row">
+                <span>Account Name:</span>
+                <strong>{user.name}</strong>
+              </div>
+              <div className="locked-info-row">
+                <span>Email / Roll:</span>
+                <strong>{user.rollNumber || user.email}</strong>
+              </div>
+              <div className="locked-info-row">
+                <span>Lock Reason:</span>
+                <strong style={{ color: '#F87171' }}>{user.lockReason || 'Extended platform inactivity (7+ days)'}</strong>
+              </div>
+              <div className="locked-info-row">
+                <span>Locked By:</span>
+                <strong>{user.lockedByName || 'College Administrator / Main Admin'}</strong>
+              </div>
+              {user.lockedAt && (
+                <div className="locked-info-row">
+                  <span>Date Locked:</span>
+                  <strong>{new Date(user.lockedAt).toLocaleDateString()}</strong>
+                </div>
+              )}
+            </div>
+
+            <div className="locked-instructions">
+              <h4>📋 How to Restore Dashboard Access:</h4>
+              <p>
+                1. Contact the Training &amp; Placement Cell or Main Admin (<a href="mailto:vaddeajaykumar2004@gmail.com">vaddeajaykumar2004@gmail.com</a>).<br />
+                2. Explain the circumstances for the inactive period.<br />
+                3. Once authorized and unlocked by the Administrator, click <strong>"Check Unlock Status"</strong> below.
+              </p>
+            </div>
+
+            <div className="locked-actions-row">
+              <button
+                className="btn-refresh-lock-status"
+                onClick={() => window.location.reload()}
+              >
+                🔄 Check Unlock Status
+              </button>
+              <button
+                className="btn-locked-logout"
+                onClick={() => {
+                  localStorage.clear();
+                  window.location.href = '/login';
+                }}
+              >
+                🚪 Sign Out
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="main-container">
       <Sidebar />

@@ -1,7 +1,12 @@
 const express = require('express');
 const router = express.Router();
 const { protect, authorize } = require('../middleware/auth');
-const { getAtRiskStudents, sendInterventionNotice } = require('../controllers/atRisk');
+const {
+  getAtRiskStudents,
+  sendInterventionNotice,
+  toggleStudentDashboardLock,
+  autoLockInactiveStudents
+} = require('../controllers/atRisk');
 
 router.use(protect);
 router.use(authorize('faculty', 'admin'));
@@ -10,5 +15,7 @@ router.get('/students', getAtRiskStudents);
 router.get('/summary', getAtRiskStudents);
 router.post('/notify', sendInterventionNotice);
 router.post('/intervention', sendInterventionNotice);
+router.post('/toggle-lock', toggleStudentDashboardLock);
+router.post('/auto-lock-inactive', autoLockInactiveStudents);
 
 module.exports = router;

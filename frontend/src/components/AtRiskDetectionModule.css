@@ -704,3 +704,276 @@
     padding: 0.8rem 0;
   }
 }
+
+/* ==========================================================================
+   INACTIVITY & DASHBOARD LOCK STYLES (5-DAY ALERT & 7-DAY LOCK POLICY)
+   ========================================================================== */
+
+.at-risk-toast-banner {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(6, 78, 59, 0.4));
+  border: 1px solid rgba(16, 185, 129, 0.4);
+  color: #34D399;
+  padding: 0.8rem 1.4rem;
+  border-radius: 10px;
+  font-weight: 600;
+  font-size: 0.92rem;
+  animation: fadeIn 0.3s ease;
+}
+
+.btn-auto-lock {
+  background: linear-gradient(135deg, #EF4444, #B91C1C);
+  border: 1px solid rgba(239, 68, 68, 0.5);
+  color: #FFFFFF;
+  padding: 0.6rem 1.2rem;
+  border-radius: 10px;
+  font-size: 0.88rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.25);
+}
+
+.btn-auto-lock:hover {
+  background: linear-gradient(135deg, #DC2626, #991B1B);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(239, 68, 68, 0.4);
+}
+
+.inactivity-policy-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  background: rgba(15, 23, 42, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 0.8rem 1.2rem;
+  flex-wrap: wrap;
+}
+
+.policy-pill-step {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  background: rgba(245, 158, 11, 0.1);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  padding: 0.4rem 0.8rem;
+  border-radius: 8px;
+  font-size: 0.82rem;
+  color: #FCD34D;
+}
+
+.policy-pill-step.urgent {
+  background: rgba(239, 68, 68, 0.12);
+  border-color: rgba(239, 68, 68, 0.35);
+  color: #FCA5A5;
+}
+
+.policy-pill-step.success {
+  background: rgba(16, 185, 129, 0.12);
+  border-color: rgba(16, 185, 129, 0.35);
+  color: #6EE7B7;
+}
+
+.step-num {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  font-weight: 800;
+  background: rgba(0, 0, 0, 0.35);
+  padding: 0.15rem 0.45rem;
+  border-radius: 4px;
+}
+
+.policy-arrow {
+  color: #64748B;
+  font-weight: 700;
+}
+
+.at-risk-kpi-card.warning-email {
+  border-color: rgba(245, 158, 11, 0.4);
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.1), rgba(18, 24, 38, 0.85));
+}
+
+.at-risk-kpi-card.danger-locked {
+  border-color: rgba(239, 68, 68, 0.5);
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.15), rgba(18, 24, 38, 0.85));
+}
+
+/* Card Locked State */
+.at-risk-student-card.card-locked {
+  border-color: rgba(239, 68, 68, 0.6);
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.08), rgba(18, 24, 38, 0.9));
+  box-shadow: 0 4px 18px rgba(239, 68, 68, 0.15);
+}
+
+.student-avatar-ring.avatar-locked {
+  background: rgba(239, 68, 68, 0.2);
+  border-color: #EF4444;
+  color: #EF4444;
+}
+
+.lock-badge-pill.locked {
+  background: rgba(239, 68, 68, 0.2);
+  border: 1px solid #EF4444;
+  color: #F87171;
+  font-size: 0.72rem;
+  font-weight: 800;
+  padding: 0.2rem 0.6rem;
+  border-radius: 20px;
+  letter-spacing: 0.5px;
+}
+
+.inactivity-status-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.inactivity-pill {
+  font-size: 0.74rem;
+  font-weight: 700;
+  padding: 0.2rem 0.6rem;
+  border-radius: 6px;
+}
+
+.inactivity-pill.critical {
+  background: rgba(239, 68, 68, 0.18);
+  border: 1px solid rgba(239, 68, 68, 0.5);
+  color: #F87171;
+}
+
+.inactivity-pill.warning {
+  background: rgba(245, 158, 11, 0.18);
+  border: 1px solid rgba(245, 158, 11, 0.5);
+  color: #FBBF24;
+}
+
+.inactivity-pill.normal {
+  background: rgba(16, 185, 129, 0.12);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  color: #34D399;
+}
+
+.email-notified-tag {
+  background: rgba(99, 102, 241, 0.18);
+  border: 1px solid rgba(99, 102, 241, 0.4);
+  color: #A5B4FC;
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 0.15rem 0.5rem;
+  border-radius: 4px;
+}
+
+.lock-reason-note {
+  margin-top: 0.5rem;
+  font-size: 0.78rem;
+  color: #FCA5A5;
+  background: rgba(239, 68, 68, 0.1);
+  padding: 0.35rem 0.65rem;
+  border-radius: 6px;
+  border-left: 3px solid #EF4444;
+}
+
+/* Action Buttons */
+.btn-lock-action {
+  background: rgba(239, 68, 68, 0.12);
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  color: #FCA5A5;
+  padding: 0.55rem 1rem;
+  border-radius: 8px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-lock-action:hover {
+  background: #EF4444;
+  color: #FFFFFF;
+}
+
+.btn-lock-action.urgent-lock {
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.25), rgba(220, 38, 38, 0.4));
+  border-color: #EF4444;
+  color: #FFFFFF;
+  box-shadow: 0 0 10px rgba(239, 68, 68, 0.3);
+}
+
+.btn-unlock-action {
+  background: linear-gradient(135deg, #10B981, #059669);
+  border: 1px solid rgba(16, 185, 129, 0.5);
+  color: #FFFFFF;
+  padding: 0.55rem 1rem;
+  border-radius: 8px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.25);
+}
+
+.btn-unlock-action:hover {
+  background: linear-gradient(135deg, #059669, #047857);
+  transform: translateY(-1px);
+}
+
+/* Lock Modal Content */
+.lock-window {
+  max-width: 520px;
+}
+
+.lock-modal-summary-box {
+  background: rgba(15, 23, 42, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  padding: 0.9rem 1.2rem;
+  margin-bottom: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.summary-item {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.85rem;
+  color: #94A3B8;
+}
+
+.summary-item strong {
+  color: #FFFFFF;
+}
+
+.btn-confirm-lock {
+  background: linear-gradient(135deg, #EF4444, #B91C1C);
+  border: none;
+  color: #FFFFFF;
+  padding: 0.65rem 1.4rem;
+  border-radius: 8px;
+  font-size: 0.88rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-confirm-lock:hover {
+  background: #DC2626;
+}
+
+.btn-confirm-unlock {
+  background: linear-gradient(135deg, #10B981, #059669);
+  border: none;
+  color: #FFFFFF;
+  padding: 0.65rem 1.4rem;
+  border-radius: 8px;
+  font-size: 0.88rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-confirm-unlock:hover {
+  background: #059669;
+}
+
