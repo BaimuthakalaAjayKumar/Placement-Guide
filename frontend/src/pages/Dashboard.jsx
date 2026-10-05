@@ -1,19 +1,29 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import Header from '../components/Header';
+import StudentAcademicsModule from '../components/StudentAcademicsModule';
 import { API_URL } from '../config/api';
 import './Dashboard.css';
 
 const Dashboard = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { token, user } = useAuth();
+  const [activeTab, setActiveTab] = useState('overview'); // 'overview' | 'academics'
   const [stats, setStats] = useState(null);
   const [practiceStats, setPracticeStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [curriculumSubjects, setCurriculumSubjects] = useState([]);
   const [appliedJobs, setAppliedJobs] = useState([]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    if (params.get('tab') === 'academics') {
+      setActiveTab('academics');
+    }
+  }, [location.search]);
   const [loadingAppliedJobs, setLoadingAppliedJobs] = useState(false);
   const [appliedJobsFilter, setAppliedJobsFilter] = useState('all');
 
@@ -637,7 +647,74 @@ const Dashboard = () => {
           </button>
         </div>
 
-        <div className="dashboard-grid-container">
+        {/* Student View Switcher: Overview vs Academics & CGPA */}
+        <div style={{
+          display: 'flex',
+          gap: '10px',
+          marginBottom: '1.5rem',
+          background: 'rgba(15, 23, 42, 0.65)',
+          padding: '8px',
+          borderRadius: '14px',
+          border: '1px solid rgba(255, 255, 255, 0.08)',
+          width: 'fit-content'
+        }}>
+          <button
+            type="button"
+            onClick={() => setActiveTab('overview')}
+            style={{
+              background: activeTab === 'overview' ? '#6366f1' : 'transparent',
+              color: activeTab === 'overview' ? '#ffffff' : '#94a3b8',
+              border: 'none',
+              padding: '9px 18px',
+              borderRadius: '10px',
+              fontWeight: '700',
+              fontSize: '0.9rem',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              transition: 'all 0.2s ease'
+            }}
+          >
+            <span>📊</span> Placement &amp; Practice Overview
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('academics')}
+            style={{
+              background: activeTab === 'academics' ? '#10B981' : 'transparent',
+              color: activeTab === 'academics' ? '#ffffff' : '#94a3b8',
+              border: 'none',
+              padding: '9px 18px',
+              borderRadius: '10px',
+              fontWeight: '700',
+              fontSize: '0.9rem',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              transition: 'all 0.2s ease'
+            }}
+          >
+            <span>🎓</span> Academics &amp; CGPA Hub
+            <span style={{
+              background: activeTab === 'academics' ? 'rgba(0,0,0,0.25)' : 'rgba(16, 185, 129, 0.2)',
+              color: activeTab === 'academics' ? '#ffffff' : '#34d399',
+              padding: '2px 8px',
+              borderRadius: '9999px',
+              fontSize: '0.75rem',
+              fontWeight: '800'
+            }}>
+              Auto-Calc
+            </span>
+          </button>
+        </div>
+
+        {activeTab === 'academics' ? (
+          <StudentAcademicsModule />
+        ) : (
+          <div className="dashboard-grid-container">
 
           {/* Left Column: Core Stats */}
           <div className="dashboard-main-column">
@@ -1689,6 +1766,7 @@ const Dashboard = () => {
             </div>
           </div>
         </div>
+        )}
       </div>
 
       {/* Live Query Resolution Modal */}

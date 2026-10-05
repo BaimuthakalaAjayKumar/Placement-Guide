@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { API_URL } from '../config/api';
 import Header from '../components/Header';
 import AtRiskDetectionModule from '../components/AtRiskDetectionModule';
 import FacultyTestBuilder from '../components/FacultyTestBuilder';
+import FacultyMarksManager from '../components/FacultyMarksManager';
 
 import PlacementStatsExport from '../components/PlacementStatsExport';
 import './FacultyDashboard.css';
@@ -21,12 +22,21 @@ const LAB_LANGUAGES = [
 
 const FacultyDashboard = () => {
     const { user } = useAuth();
-    const [activeTab, setActiveTab] = useState('students'); // 'students' | 'subjects' | 'projects' | 'labs' | 'at-risk' | 'test-builder'
+    const location = useLocation();
+    const [activeTab, setActiveTab] = useState('students'); // 'students' | 'subjects' | 'projects' | 'labs' | 'at-risk' | 'test-builder' | 'academics'
+    const [selectedStudentForMarks, setSelectedStudentForMarks] = useState(null);
     const [atRiskBannerCount, setAtRiskBannerCount] = useState(0);
     const [students, setStudents] = useState([]);
     const [subjects, setSubjects] = useState([]);
     const [projects, setProjects] = useState([]);
     const [labTasks, setLabTasks] = useState([]);
+
+    useEffect(() => {
+        const params = new URLSearchParams(location.search);
+        if (params.get('tab') === 'academics') {
+            setActiveTab('academics');
+        }
+    }, [location.search]);
 
     useEffect(() => {
         const fetchRiskBanner = async () => {
@@ -2275,6 +2285,13 @@ const FacultyDashboard = () => {
                         >
                             🛠️ Faculty Test Builder
                         </button>
+                        <button
+                            className={`faculty-tab-btn ${activeTab === 'academics' ? 'active' : ''}`}
+                            style={activeTab === 'academics' ? { borderColor: '#10B981', color: '#34D399' } : {}}
+                            onClick={() => { setActiveTab('academics'); setError(null); setSuccessMsg(''); }}
+                        >
+                            🎓 Marks &amp; CGPA Evaluator
+                        </button>
 
                         <button
                             className={`faculty-tab-btn ${activeTab === 'placement-export' ? 'active' : ''}`}
@@ -2359,6 +2376,14 @@ const FacultyDashboard = () => {
                     {/* TAB: FACULTY TEST BUILDER */}
                     {activeTab === 'test-builder' && (
                         <FacultyTestBuilder />
+                    )}
+
+                    {/* TAB: ACADEMIC MARKS & AUTOMATIC CGPA EVALUATOR */}
+                    {activeTab === 'academics' && (
+                        <FacultyMarksManager
+                            preselectedStudentId={selectedStudentForMarks}
+                            onBack={() => setActiveTab('students')}
+                        />
                     )}
 
 
@@ -2472,12 +2497,38 @@ const FacultyDashboard = () => {
                                                                 </span>
                                                             </td>
                                                             <td>
-                                                                <button
-                                                                    className={`btn-view ${isViewingThisStudent ? 'active' : ''}`}
-                                                                    onClick={() => viewProgress(student)}
-                                                                >
-                                                                    {isViewingThisStudent ? '🔼 Hide Progress' : 'View Full Progress'}
-                                                                </button>
+                                                                <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                                                                    <button
+                                                                        className={`btn-view ${isViewingThisStudent ? 'active' : ''}`}
+                                                                        onClick={() => viewProgress(student)}
+                                                                    >
+                                                                        {isViewingThisStudent ? '🔼 Hide' : 'View Progress'}
+                                                                    </button>
+                                                                    <button
+                                                                        type="button"
+                                                                        style={{
+                                                                            background: 'rgba(16, 185, 129, 0.15)',
+                                                                            border: '1px solid rgba(16, 185, 129, 0.35)',
+                                                                            color: '#34d399',
+                                                                            padding: '6px 10px',
+                                                                            borderRadius: '8px',
+                                                                            fontSize: '12px',
+                                                                            fontWeight: '600',
+                                                                            cursor: 'pointer',
+                                                                            whiteSpace: 'nowrap',
+                                                                            transition: 'all 0.2s ease'
+                                                                        }}
+                                                                        onClick={() => {
+                                                                            setSelectedStudentForMarks(student._id);
+                                                                            setActiveTab('academics');
+                                                                            setError(null);
+                                                                            setSuccessMsg('');
+                                                                        }}
+                                                                        title="Enter Subject Marks & Auto-Calculate CGPA"
+                                                                    >
+                                                                        🎓 Marks &amp; CGPA
+                                                                    </button>
+                                                                </div>
                                                             </td>
                                                         </tr>
                                                     );

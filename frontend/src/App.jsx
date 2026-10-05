@@ -40,6 +40,7 @@ import ChangePassword from './pages/ChangePassword';
 import LabPractice from './pages/LabPractice';
 import PlacementCalendar from './pages/PlacementCalendar';
 import PlacementSuitePage from './pages/PlacementSuitePage';
+import AcademicsPage from './pages/AcademicsPage';
 import RecruiterDashboard from './pages/RecruiterDashboard';
 import HODDashboard from './pages/HODDashboard';
 
@@ -480,6 +481,14 @@ const AppRoutes = () => {
         element={
           <PrivateRoute allowedRoles={['student', 'faculty', 'admin', 'hod']}>
             <PlacementSuitePage />
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/academics"
+        element={
+          <PrivateRoute allowedRoles={['student', 'faculty', 'admin', 'hod']}>
+            <AcademicsPage />
           </PrivateRoute>
         }
       />

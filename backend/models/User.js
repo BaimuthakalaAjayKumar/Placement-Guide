@@ -177,6 +177,7 @@ const UserSchema = new mongoose.Schema({
   sgpaSem6: { type: Number, default: 0 },
   sgpaSem7: { type: Number, default: 0 },
   sgpaSem8: { type: Number, default: 0 },
+  cgpa: { type: Number, default: 0 },
   savedJobs: [{
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Job'
