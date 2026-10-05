@@ -542,6 +542,11 @@ const JobBoard = () => {
                               ⭐ {drive.tier}
                             </span>
                           )}
+                          {drive.deadlineExtended && (
+                            <span className="job-pill" style={{ borderColor: 'rgba(245, 158, 11, 0.5)', background: 'rgba(245, 158, 11, 0.15)', color: '#fbbf24', fontSize: '11px', fontWeight: 'bold' }}>
+                              ⏰ Extended Deadline
+                            </span>
+                          )}
                         </div>
                         <h2 className="drive-role-title">
                           {drive.role || drive.title} <span style={{ color: '#94a3b8', fontWeight: 400, fontSize: '1.05rem' }}>at {drive.companyName}</span>
@@ -582,9 +587,9 @@ const JobBoard = () => {
                       </div>
                       <div className="drive-meta-item">
                         <span className="lbl">⏳ Reg Deadline</span>
-                        <span className="val" style={{ color: isDeadlinePassed ? '#f87171' : '#38bdf8' }}>
+                        <span className="val" style={{ color: isDeadlinePassed ? '#f87171' : (drive.deadlineExtended ? '#fbbf24' : '#38bdf8'), fontWeight: drive.deadlineExtended ? 700 : 'normal' }}>
                           {drive.dates?.registrationDeadline ? new Date(drive.dates.registrationDeadline).toLocaleDateString() : 'Open'}
-                          {isDeadlinePassed && ' (Expired)'}
+                          {isDeadlinePassed ? ' (Expired)' : (drive.deadlineExtended ? ' ⚡ Extended' : '')}
                         </span>
                       </div>
                       <div className="drive-meta-item">

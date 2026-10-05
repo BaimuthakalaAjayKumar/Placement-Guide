@@ -122,6 +122,11 @@ const PlacementDriveSchema = new mongoose.Schema({
     type: [String],
     default: ['Online Application', 'Aptitude & Coding Test', 'Technical Interview', 'HR Interview', 'Final Selection']
   },
+  // Deadline extension tracking
+  deadlineExtended: { type: Boolean, default: false },
+  previousDeadline: { type: Date },
+  deadlineExtendedAt: { type: Date },
+  deadlineExtensionReason: { type: String, default: '' },
   applications: [CandidateApplicationSchema],
   createdBy: {
     type: mongoose.Schema.Types.ObjectId,

@@ -2,7 +2,7 @@ const PlacementDrive = require('../models/PlacementDrive');
 const User = require('../models/User');
 const Notification = require('../models/Notification');
 const { logActivity } = require('../utils/auditLogger');
-const { notifyStudentsOnDrivePost } = require('../utils/placementNotifier');
+const { notifyStudentsOnDrivePost, notifyStudentsOnDriveDeadlineExtension } = require('../utils/placementNotifier');
 
 // Helper to compute student match score against a drive
 const calculateDriveMatch = (student, drive) => {
@@ -567,6 +567,238 @@ exports.deleteDrive = async (req, res, next) => {
     res.status(200).json({
       success: true,
       message: 'Placement drive removed successfully'
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// @desc    Update placement drive details
+// @route   PUT /api/placement-drives/:id
+// @access  Private (Admin, or Recruiter who created it)
+exports.updateDrive = async (req, res, next) => {
+  try {
+    const drive = await PlacementDrive.findById(req.params.id);
+    if (!drive) {
+      return res.status(404).json({ success: false, error: 'Placement drive not found' });
+    }
+
+    const creatorId = drive.createdBy?._id ? String(drive.createdBy._id) : String(drive.createdBy || '');
+    const isOwner = creatorId === String(req.user.id) ||
+      (req.user.role === 'recruiter' && req.user.companyName && drive.companyName && req.user.companyName.trim().toLowerCase() === drive.companyName.trim().toLowerCase());
+    if (req.user.role !== 'admin' && !isOwner) {
+      return res.status(403).json({ success: false, error: 'Not authorized to update this placement drive' });
+    }
+
+    const b = req.body;
+    const oldDeadline = drive.dates?.registrationDeadline;
+
+    // Updatable fields
+    if (b.companyName) drive.companyName = b.companyName.trim();
+    if (b.companyLogo !== undefined) drive.companyLogo = b.companyLogo;
+    if (b.companyWebsite !== undefined) drive.companyWebsite = b.companyWebsite;
+    if (b.tier) drive.tier = b.tier;
+    if (b.title || b.driveTitle) drive.title = (b.title || b.driveTitle).trim();
+    if (b.role) drive.role = b.role.trim();
+    if (b.packageDetails || b.packageLPA) {
+      drive.packageDetails = (b.packageDetails || (String(b.packageLPA).toUpperCase().includes('LPA') ? String(b.packageLPA) : `${b.packageLPA} LPA`)).trim();
+    }
+    if (b.location) drive.location = b.location.trim();
+    if (b.jobDescription || b.description) drive.jobDescription = (b.jobDescription || b.description).trim();
+    if (b.status) drive.status = b.status;
+
+    if (b.skillsRequired || b.requiredSkills) {
+      let skillsArr = b.skillsRequired || b.requiredSkills;
+      if (typeof skillsArr === 'string') {
+        skillsArr = skillsArr.split(',').map(s => s.trim()).filter(Boolean);
+      }
+      drive.skillsRequired = skillsArr;
+    }
+
+    if (b.eligibility) {
+      if (b.eligibility.minCgpa !== undefined) drive.eligibility.minCgpa = Number(b.eligibility.minCgpa);
+      if (b.eligibility.maxActiveBacklogs !== undefined || b.eligibility.maxBacklogs !== undefined) {
+        drive.eligibility.maxActiveBacklogs = Number(b.eligibility.maxActiveBacklogs ?? b.eligibility.maxBacklogs);
+      }
+      if (b.eligibility.allowedBranches) {
+        let branches = b.eligibility.allowedBranches;
+        if (typeof branches === 'string') branches = branches.split(',').map(s => s.trim()).filter(Boolean);
+        drive.eligibility.allowedBranches = branches;
+      }
+      if (b.eligibility.allowedBatches) {
+        let batches = b.eligibility.allowedBatches;
+        if (typeof batches === 'string') batches = batches.split(',').map(s => s.trim()).filter(Boolean);
+        drive.eligibility.allowedBatches = batches;
+      }
+    }
+
+    // Check deadline changes
+    const newRegDeadline = b.dates?.registrationDeadline || b.registrationDeadline || b.deadline;
+    let deadlineWasExtended = false;
+
+    if (newRegDeadline) {
+      const parsedNewDeadline = new Date(newRegDeadline);
+      if (!isNaN(parsedNewDeadline.getTime())) {
+        if (!oldDeadline || parsedNewDeadline.getTime() !== new Date(oldDeadline).getTime()) {
+          drive.previousDeadline = oldDeadline;
+          drive.dates.registrationDeadline = parsedNewDeadline;
+          drive.deadlineExtended = true;
+          drive.deadlineExtendedAt = new Date();
+          drive.deadlineExtensionReason = b.deadlineExtensionReason || b.notes || 'Deadline updated by administrator';
+          deadlineWasExtended = true;
+
+          // If drive was closed and new deadline is in the future, automatically reopen applications
+          if (drive.status === 'applications_closed' && parsedNewDeadline > new Date()) {
+            drive.status = 'applications_open';
+          }
+        }
+      }
+    }
+
+    if (b.dates?.driveDate || b.driveDate) {
+      drive.dates.driveDate = new Date(b.dates?.driveDate || b.driveDate);
+    }
+    if (b.dates?.onlineTestDate) {
+      drive.dates.onlineTestDate = new Date(b.dates.onlineTestDate);
+    }
+    if (b.dates?.interviewStartDate) {
+      drive.dates.interviewStartDate = new Date(b.dates.interviewStartDate);
+    }
+
+    await drive.save();
+
+    // Sync calendar event
+    try {
+      const PlacementEvent = require('../models/PlacementEvent');
+      await PlacementEvent.updateMany(
+        { relatedDrive: drive._id },
+        {
+          title: `${drive.companyName}: ${drive.role} Campus Drive`,
+          description: `Package: ${drive.packageDetails} | Reg Deadline: ${new Date(drive.dates.registrationDeadline).toLocaleDateString()} | ${drive.jobDescription.slice(0, 140)}...`,
+          venueOrLink: drive.location || 'Campus Placement Cell',
+          instructorOrCompany: drive.companyName,
+          targetAudience: {
+            roles: ['student', 'faculty', 'admin'],
+            branches: drive.eligibility?.allowedBranches || ['All'],
+            batches: drive.eligibility?.allowedBatches || ['All']
+          }
+        }
+      );
+    } catch (calErr) {
+      console.warn('Could not sync calendar on drive update:', calErr.message);
+    }
+
+    // Send WhatsApp & Email alerts if deadline was extended or notifyRequested
+    if (deadlineWasExtended || b.broadcastWhatsApp) {
+      notifyStudentsOnDriveDeadlineExtension(
+        drive,
+        oldDeadline,
+        drive.dates.registrationDeadline,
+        drive.deadlineExtensionReason,
+        '8074701052'
+      ).catch(err => console.warn('Deadline notification dispatch error:', err.message));
+    }
+
+    await logActivity({
+      user: req.user,
+      action: 'DRIVE_UPDATED',
+      category: 'Placement Operations',
+      description: `${req.user.role === 'admin' ? 'Admin' : 'Recruiter'} updated placement drive: ${drive.companyName} (${drive.role})`,
+      details: { driveId: drive._id, deadlineWasExtended },
+      req
+    });
+
+    res.status(200).json({
+      success: true,
+      message: deadlineWasExtended 
+        ? `Placement drive updated and deadline extended to ${new Date(drive.dates.registrationDeadline).toLocaleDateString()}! WhatsApp & Email alerts sent.`
+        : 'Placement drive updated successfully',
+      data: drive
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// @desc    Explicitly extend registration deadline for placement drive and broadcast WhatsApp alerts
+// @route   PUT /api/placement-drives/:id/extend-deadline
+// @access  Private (Admin, or Recruiter who created it)
+exports.extendDriveDeadline = async (req, res, next) => {
+  try {
+    const { newDeadline, notes, broadcastWhatsApp = true } = req.body;
+    if (!newDeadline) {
+      return res.status(400).json({ success: false, error: 'Please provide a valid new registration deadline' });
+    }
+
+    const parsedDeadline = new Date(newDeadline);
+    if (isNaN(parsedDeadline.getTime())) {
+      return res.status(400).json({ success: false, error: 'Invalid date format for new deadline' });
+    }
+
+    const drive = await PlacementDrive.findById(req.params.id);
+    if (!drive) {
+      return res.status(404).json({ success: false, error: 'Placement drive not found' });
+    }
+
+    // Permission check
+    const creatorId = drive.createdBy?._id ? String(drive.createdBy._id) : String(drive.createdBy || '');
+    const isOwner = creatorId === String(req.user.id) ||
+      (req.user.role === 'recruiter' && req.user.companyName && drive.companyName && req.user.companyName.trim().toLowerCase() === drive.companyName.trim().toLowerCase());
+    if (req.user.role !== 'admin' && !isOwner) {
+      return res.status(403).json({ success: false, error: 'Not authorized to extend deadline for this placement drive' });
+    }
+
+    const oldDeadline = drive.dates?.registrationDeadline;
+    drive.previousDeadline = oldDeadline;
+    drive.dates.registrationDeadline = parsedDeadline;
+    drive.deadlineExtended = true;
+    drive.deadlineExtendedAt = new Date();
+    drive.deadlineExtensionReason = notes || 'Registration deadline extended to accommodate more student applications';
+
+    // If drive status was applications_closed, reopen it
+    if (drive.status === 'applications_closed' && parsedDeadline > new Date()) {
+      drive.status = 'applications_open';
+    }
+
+    await drive.save();
+
+    // Sync placement calendar event
+    try {
+      const PlacementEvent = require('../models/PlacementEvent');
+      await PlacementEvent.updateMany(
+        { relatedDrive: drive._id },
+        {
+          description: `Package: ${drive.packageDetails} | Extended Reg Deadline: ${parsedDeadline.toLocaleDateString()} | ${drive.jobDescription.slice(0, 140)}...`
+        }
+      );
+    } catch (e) {}
+
+    // Dispatch WhatsApp and Email notifications to students and coordinator (8074701052)
+    let notifResult = null;
+    if (broadcastWhatsApp !== false) {
+      notifResult = await notifyStudentsOnDriveDeadlineExtension(
+        drive,
+        oldDeadline,
+        parsedDeadline,
+        notes || '',
+        '8074701052'
+      );
+    }
+
+    await logActivity({
+      user: req.user,
+      action: 'DRIVE_DEADLINE_EXTENDED',
+      category: 'Placement Operations',
+      description: `${req.user.role === 'admin' ? 'Admin' : 'Recruiter'} extended registration deadline for ${drive.companyName} (${drive.role}) to ${parsedDeadline.toLocaleDateString()}`,
+      details: { driveId: drive._id, oldDeadline, newDeadline: parsedDeadline, notes },
+      req
+    });
+
+    res.status(200).json({
+      success: true,
+      message: `Registration deadline successfully extended to ${parsedDeadline.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}. WhatsApp & Email alerts dispatched!`,
+      data: drive,
+      notificationSummary: notifResult
     });
   } catch (err) {
     next(err);

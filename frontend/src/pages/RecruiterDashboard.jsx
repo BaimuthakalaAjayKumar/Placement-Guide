@@ -60,6 +60,16 @@ const RecruiterDashboard = () => {
   const [bulkAdvanceConflictInfo, setBulkAdvanceConflictInfo] = useState(null);
   const [checkingConflict, setCheckingConflict] = useState(false);
 
+  // Deadline Extension Modal State
+  const [deadlineModal, setDeadlineModal] = useState({
+    isOpen: false,
+    drive: null,
+    newDeadline: '',
+    notes: '',
+    broadcastWhatsApp: true,
+    submitting: false
+  });
+
   // Helper to check date availability across all recruiters
   const checkDateClash = async (targetDate, type = 'Drive Event', excludeDriveId = '') => {
     if (!targetDate) return null;
@@ -372,6 +382,62 @@ const RecruiterDashboard = () => {
       setError('An error occurred while deleting the placement drive.');
     } finally {
       setActionLoading(false);
+    }
+  };
+
+  const handleOpenDeadlineModal = (drive) => {
+    const current = drive.dates?.registrationDeadline || drive.deadline;
+    const currentDt = current ? new Date(current) : new Date();
+    const baseTime = Math.max(currentDt.getTime(), Date.now());
+    const defaultNew = new Date(baseTime + 3 * 86400000);
+    const pad = (n) => String(n).padStart(2, '0');
+    const defaultStr = `${defaultNew.getFullYear()}-${pad(defaultNew.getMonth() + 1)}-${pad(defaultNew.getDate())}T${pad(defaultNew.getHours())}:${pad(defaultNew.getMinutes())}`;
+
+    setDeadlineModal({
+      isOpen: true,
+      drive,
+      newDeadline: defaultStr,
+      notes: 'Registration deadline extended by recruiter to accommodate more student applicants.',
+      broadcastWhatsApp: true,
+      submitting: false
+    });
+  };
+
+  const handleExtendDeadlineSubmit = async (e) => {
+    e.preventDefault();
+    if (!deadlineModal.drive || !deadlineModal.newDeadline) return;
+
+    try {
+      setDeadlineModal(prev => ({ ...prev, submitting: true }));
+      setError('');
+      setSuccessMsg('');
+
+      const res = await fetch(`${API_URL}/placement-drives/${deadlineModal.drive._id}/extend-deadline`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          newDeadline: deadlineModal.newDeadline,
+          notes: deadlineModal.notes,
+          broadcastWhatsApp: deadlineModal.broadcastWhatsApp
+        })
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        sfx.playSuccess();
+        setSuccessMsg(data.message || `⏰ Registration deadline for "${deadlineModal.drive.companyName || deadlineModal.drive.role}" extended successfully! WhatsApp & Email alerts dispatched.`);
+        setDeadlineModal({ isOpen: false, drive: null, newDeadline: '', notes: '', broadcastWhatsApp: true, submitting: false });
+        fetchMyDrives();
+      } else {
+        setError(data.error || 'Failed to extend registration deadline.');
+      }
+    } catch (err) {
+      setError('An error occurred while extending the registration deadline.');
+    } finally {
+      setDeadlineModal(prev => ({ ...prev, submitting: false }));
     }
   };
 
@@ -1604,6 +1670,23 @@ const RecruiterDashboard = () => {
                         </div>
 
                         <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                          <button
+                            type="button"
+                            className="btn btn-secondary btn-sm"
+                            style={{
+                              background: 'rgba(245, 158, 11, 0.15)',
+                              color: '#fbbf24',
+                              border: '1px solid rgba(245, 158, 11, 0.4)',
+                              fontSize: '11px',
+                              padding: '4px 10px',
+                              fontWeight: 700
+                            }}
+                            disabled={actionLoading}
+                            onClick={() => handleOpenDeadlineModal(drive)}
+                            title="Extend registration deadline & send WhatsApp alert"
+                          >
+                            ⏳ Extend Deadline
+                          </button>
                           {drive.status !== 'cancelled' && (
                             <button
                               type="button"
@@ -1780,6 +1863,26 @@ const RecruiterDashboard = () => {
 
               {currentDrive && (
                 <div style={{ marginLeft: 'auto', display: 'flex', gap: '8px' }}>
+                  <button
+                    type="button"
+                    className="btn btn-sm"
+                    style={{
+                      background: 'rgba(245, 158, 11, 0.2)',
+                      color: '#fbbf24',
+                      border: '1px solid rgba(245, 158, 11, 0.5)',
+                      fontSize: '11px',
+                      padding: '5px 12px',
+                      fontWeight: 700,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px'
+                    }}
+                    disabled={actionLoading}
+                    onClick={() => handleOpenDeadlineModal(currentDrive)}
+                    title="Extend registration deadline and dispatch WhatsApp & Email alerts"
+                  >
+                    ⏳ Extend Deadline &amp; WhatsApp Alert
+                  </button>
                   {currentDrive.status !== 'cancelled' && (
                     <button
                       type="button"
@@ -2955,6 +3058,118 @@ const RecruiterDashboard = () => {
                   {selectedStudentIds.includes(selectedStudentDetail._id) ? 'Deselect Candidate' : '✓ Select for Exam / Pipeline'}
                 </button>
               </div>
+            </div>
+          </div>
+        )}
+        {/* Recruiter Deadline Extension Modal */}
+        {deadlineModal.isOpen && deadlineModal.drive && (
+          <div className="modal-overlay" onClick={() => !deadlineModal.submitting && setDeadlineModal(prev => ({ ...prev, isOpen: false }))}>
+            <div className="modal-content" style={{ maxWidth: '560px' }} onClick={e => e.stopPropagation()}>
+              <div className="modal-header">
+                <div>
+                  <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span>⏰</span> Extend Drive Registration Deadline
+                  </h3>
+                  <p style={{ margin: '4px 0 0 0', fontSize: '13px', color: '#94a3b8' }}>
+                    {deadlineModal.drive.companyName} — {deadlineModal.drive.role || deadlineModal.drive.title}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  className="close-btn"
+                  disabled={deadlineModal.submitting}
+                  onClick={() => setDeadlineModal(prev => ({ ...prev, isOpen: false }))}
+                >
+                  ✕
+                </button>
+              </div>
+
+              <form onSubmit={handleExtendDeadlineSubmit} className="stage-form" style={{ marginTop: '16px' }}>
+                <div style={{ background: 'rgba(245, 158, 11, 0.1)', border: '1px solid rgba(245, 158, 11, 0.3)', borderRadius: '10px', padding: '12px 16px', fontSize: '13px', color: '#fef3c7', marginBottom: '14px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                    <span style={{ color: '#fbbf24', fontWeight: 600 }}>Current Deadline:</span>
+                    <span style={{ fontWeight: 700 }}>
+                      {deadlineModal.drive.dates?.registrationDeadline || deadlineModal.drive.deadline
+                        ? new Date(deadlineModal.drive.dates?.registrationDeadline || deadlineModal.drive.deadline).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+                        : 'Not specified'}
+                    </span>
+                  </div>
+                  <div style={{ fontSize: '12px', color: '#cbd5e1' }}>
+                    Extending will allow eligible students who missed the previous cutoff to submit applications and view the drive.
+                  </div>
+                </div>
+
+                <div className="form-group" style={{ marginBottom: '14px' }}>
+                  <label style={{ fontWeight: 700, color: '#f8fafc', display: 'block', marginBottom: '6px' }}>
+                    New Extended Deadline (Date &amp; Time) <span style={{ color: '#f87171' }}>*</span>
+                  </label>
+                  <input
+                    type="datetime-local"
+                    required
+                    value={deadlineModal.newDeadline}
+                    onChange={e => setDeadlineModal(prev => ({ ...prev, newDeadline: e.target.value }))}
+                    style={{ width: '100%', fontSize: '14px', padding: '10px 12px', background: '#0f172a', border: '1px solid #334155', borderRadius: '8px', color: '#fff' }}
+                  />
+                </div>
+
+                <div className="form-group" style={{ marginBottom: '14px' }}>
+                  <label style={{ fontWeight: 700, color: '#f8fafc', display: 'block', marginBottom: '6px' }}>
+                    Extension Reason / Notes for Candidates
+                  </label>
+                  <textarea
+                    rows={2}
+                    placeholder="e.g. Deadline extended to accommodate more applicant profiles..."
+                    value={deadlineModal.notes}
+                    onChange={e => setDeadlineModal(prev => ({ ...prev, notes: e.target.value }))}
+                    style={{ width: '100%', fontSize: '13px', padding: '8px 12px', background: '#0f172a', border: '1px solid #334155', borderRadius: '8px', color: '#fff' }}
+                  />
+                </div>
+
+                <div style={{ background: 'rgba(16, 185, 129, 0.1)', border: '1px solid rgba(16, 185, 129, 0.25)', borderRadius: '10px', padding: '12px 14px', marginBottom: '16px' }}>
+                  <label style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', cursor: 'pointer', margin: 0 }}>
+                    <input
+                      type="checkbox"
+                      checked={deadlineModal.broadcastWhatsApp}
+                      onChange={e => setDeadlineModal(prev => ({ ...prev, broadcastWhatsApp: e.target.checked }))}
+                      style={{ marginTop: '3px', width: '18px', height: '18px', accentColor: '#10b981' }}
+                    />
+                    <div>
+                      <strong style={{ color: '#34d399', fontSize: '13px' }}>
+                        📱 Broadcast Instant WhatsApp &amp; Email Notifications
+                      </strong>
+                      <p style={{ margin: '2px 0 0 0', fontSize: '12px', color: '#94a3b8' }}>
+                        Dispatches instant WhatsApp notifications and official emails to all eligible candidates and T&amp;P coordinator (<strong>8074701052</strong>).
+                      </p>
+                    </div>
+                  </label>
+                </div>
+
+                <div className="modal-actions" style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    disabled={deadlineModal.submitting}
+                    onClick={() => setDeadlineModal(prev => ({ ...prev, isOpen: false }))}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="btn btn-primary"
+                    disabled={deadlineModal.submitting}
+                    style={{
+                      background: 'linear-gradient(135deg, #f59e0b, #d97706)',
+                      border: 'none',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      fontWeight: 700
+                    }}
+                  >
+                    {deadlineModal.submitting ? '⏳ Dispatching...' : '🚀 Extend Deadline & Alert Candidates'}
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
         )}

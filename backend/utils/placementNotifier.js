@@ -20,7 +20,7 @@ const notifyStudentsOnDrivePost = async (drive, specificTargetNumber = '80747010
     }
 
     const students = await User.find(query)
-      .select('name email phone rollNumber branch cgpa academicDetails')
+      .select('name email phone mobileNumber rollNumber branch cgpa academicDetails')
       .lean();
 
     // Filter by CGPA
@@ -62,7 +62,7 @@ Best of luck!
       <div style="font-family: 'Segoe UI', Arial, sans-serif; background: #0f172a; color: #f8fafc; padding: 28px; border-radius: 12px; max-width: 600px; margin: 0 auto; border: 1px solid #334155;">
         <div style="border-bottom: 2px solid #a855f7; padding-bottom: 12px; margin-bottom: 20px;">
           <h2 style="color: #c084fc; margin: 0; font-size: 22px;">🎓 GRIET Campus Recruitment Drive</h2>
-          <p style="color: #94a3b8; font-size: 13px; margin: 4px 0 0 0;">Official Placement & Training Cell Notification</p>
+          <p style="color: #94a3b8; font-size: 13px; margin: 4px 0 0 0;">Official Placement &amp; Training Cell Notification</p>
         </div>
 
         <p style="font-size: 15px; line-height: 1.5; color: #e2e8f0;">
@@ -125,7 +125,7 @@ Best of luck!
       driveTitle: `${company} - ${role}`
     });
 
-    // 4. Send emails & in-app notifications to eligible students
+    // 4. Send emails & in-app notifications & WhatsApp to eligible students
     for (const student of eligibleStudents) {
       // Send Email
       if (student.email) {
@@ -140,9 +140,10 @@ Best of luck!
       }
 
       // If student has a mobile number registered, send WhatsApp as well
-      if (student.phone && student.phone !== specificTargetNumber) {
+      const studentPhone = student.mobileNumber || student.phone;
+      if (studentPhone && String(studentPhone).replace(/\D/g, '') !== String(specificTargetNumber).replace(/\D/g, '')) {
         sendWhatsAppMessage({
-          to: student.phone,
+          to: studentPhone,
           message: waText,
           studentName: student.name,
           driveTitle: `${company} - ${role}`
@@ -175,4 +176,155 @@ Best of luck!
   }
 };
 
-module.exports = { notifyStudentsOnDrivePost };
+/**
+ * Dispatches WhatsApp, Email, and In-App notifications when a drive's registration deadline is extended
+ */
+const notifyStudentsOnDriveDeadlineExtension = async (drive, oldDeadline, newDeadline, notes = '', specificTargetNumber = '8074701052') => {
+  try {
+    const minCgpa = drive.eligibility?.minCgpa || 6.0;
+    const allowedBranches = drive.eligibility?.allowedBranches || [];
+    const company = drive.companyName || 'Campus Recruiter';
+    const role = drive.role || drive.title || 'Software Engineer';
+    const pkg = drive.packageDetails || 'Competitive Package';
+    const portalUrl = process.env.FRONTEND_URL || 'https://placement-guide-nu.vercel.app';
+
+    const oldDeadlineFormatted = oldDeadline ? new Date(oldDeadline).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Previous Deadline';
+    const newDeadlineFormatted = new Date(newDeadline).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+
+    // WhatsApp Message Content
+    const waText = 
+`⏰ *GRIET PLACEMENT ALERT - DEADLINE EXTENDED!*
+----------------------------------------
+Dear Candidate,
+
+Good news! The registration deadline for the on-campus recruitment drive by *${company}* has been *EXTENDED*.
+
+🏢 *Company:* ${company}
+💼 *Role:* ${role}
+💰 *Package (CTC):* ${pkg}
+📅 *Previous Deadline:* ${oldDeadlineFormatted}
+⏳ *NEW EXTENDED DEADLINE:* *${newDeadlineFormatted}*
+🎯 *Eligibility:* Min ${minCgpa} CGPA | Branches: ${allowedBranches.length > 0 ? allowedBranches.join(', ') : 'All Eligible'}
+${notes ? `📝 *Note from T&P:* ${notes}\n` : ''}
+If you haven't registered yet, please log in and apply immediately before this extended window closes:
+🔗 ${portalUrl}/job-board
+
+Best regards,
+Training & Placement Cell, GRIET`;
+
+    // 1. Dispatch WhatsApp message to the dedicated phone number (8074701052)
+    await sendWhatsAppMessage({
+      to: specificTargetNumber,
+      message: waText,
+      studentName: 'Placement Coordinator / Student',
+      driveTitle: `${company} - ${role} (Deadline Extended)`
+    });
+
+    // 2. Query eligible students
+    const query = { role: 'student' };
+    if (allowedBranches.length > 0 && !allowedBranches.includes('ALL') && !allowedBranches.includes('All')) {
+      query.branch = { $in: allowedBranches.map(b => new RegExp(`^${b}$`, 'i')) };
+    }
+
+    const students = await User.find(query)
+      .select('name email phone mobileNumber rollNumber branch cgpa academicDetails')
+      .lean();
+
+    const eligibleStudents = students.filter(s => {
+      const cgpa = s.cgpa || s.academicDetails?.cgpa || 7.5;
+      return cgpa >= minCgpa;
+    });
+
+    const emailSubject = `⏰ DEADLINE EXTENDED: ${company} Campus Drive (${role}) — Apply before ${newDeadlineFormatted}`;
+    const emailHtml = `
+      <div style="font-family: 'Segoe UI', Arial, sans-serif; background: #0f172a; color: #f8fafc; padding: 28px; border-radius: 12px; max-width: 600px; margin: 0 auto; border: 1px solid #334155;">
+        <div style="background: linear-gradient(135deg, #f59e0b, #d97706); padding: 18px 24px; border-radius: 8px; margin-bottom: 20px; text-align: center;">
+          <h2 style="color: #ffffff; margin: 0; font-size: 22px;">⏰ REGISTRATION DEADLINE EXTENDED</h2>
+          <p style="color: #fef3c7; font-size: 13px; margin: 4px 0 0 0;">GRIET Campus Recruitment Drive Alert</p>
+        </div>
+
+        <p style="font-size: 15px; color: #e2e8f0;">Dear Candidate,</p>
+        <p style="font-size: 14px; line-height: 1.6; color: #cbd5e1;">
+          The registration deadline for <strong>${company}</strong> has been officially <strong>extended</strong> by the Placement Cell.
+        </p>
+
+        <div style="background: #1e293b; border-left: 4px solid #f59e0b; padding: 16px; margin: 18px 0; border-radius: 6px;">
+          <table style="width: 100%; font-size: 13.5px; border-collapse: collapse;">
+            <tr>
+              <td style="color: #94a3b8; padding: 5px 0; width: 45%;">Company:</td>
+              <td style="color: #ffffff; font-weight: bold; padding: 5px 0;">${company}</td>
+            </tr>
+            <tr>
+              <td style="color: #94a3b8; padding: 5px 0;">Designation:</td>
+              <td style="color: #38bdf8; font-weight: bold; padding: 5px 0;">${role}</td>
+            </tr>
+            <tr>
+              <td style="color: #94a3b8; padding: 5px 0;">Package (CTC):</td>
+              <td style="color: #34d399; font-weight: bold; padding: 5px 0;">${pkg}</td>
+            </tr>
+            <tr>
+              <td style="color: #94a3b8; padding: 5px 0;">Previous Deadline:</td>
+              <td style="color: #ef4444; text-decoration: line-through; padding: 5px 0;">${oldDeadlineFormatted}</td>
+            </tr>
+            <tr>
+              <td style="color: #fbbf24; font-weight: bold; padding: 5px 0;">NEW Extended Deadline:</td>
+              <td style="color: #fbbf24; font-weight: 800; font-size: 15px; padding: 5px 0;">${newDeadlineFormatted}</td>
+            </tr>
+          </table>
+          ${notes ? `<p style="margin: 10px 0 0 0; font-size: 12.5px; color: #cbd5e1;"><strong>Note:</strong> ${notes}</p>` : ''}
+        </div>
+
+        <div style="text-align: center; margin: 24px 0 14px 0;">
+          <a href="${portalUrl}/job-board" style="background: linear-gradient(135deg, #f59e0b, #d97706); color: #ffffff; text-decoration: none; padding: 12px 28px; border-radius: 8px; font-weight: bold; font-size: 14px; display: inline-block;">
+            🚀 Open Job Board &amp; Apply Now
+          </a>
+        </div>
+      </div>
+    `;
+
+    // 3. Dispatch to all eligible students
+    for (const student of eligibleStudents) {
+      if (student.email) {
+        sendEmail({
+          to: student.email,
+          subject: emailSubject,
+          text: `Deadline Extended for ${company} (${role}). New Deadline: ${newDeadlineFormatted}. Apply: ${portalUrl}/job-board`,
+          html: emailHtml
+        }).catch(() => {});
+      }
+
+      const studentPhone = student.mobileNumber || student.phone;
+      if (studentPhone && String(studentPhone).replace(/\D/g, '') !== String(specificTargetNumber).replace(/\D/g, '')) {
+        sendWhatsAppMessage({
+          to: studentPhone,
+          message: waText,
+          studentName: student.name,
+          driveTitle: `${company} - ${role}`
+        }).catch(() => {});
+      }
+
+      Notification.create({
+        user: student._id,
+        type: 'job_update',
+        message: `⏰ Deadline Extended: The registration deadline for ${company} (${role}) has been extended to ${newDeadlineFormatted}!`,
+        metadata: {
+          driveId: drive._id,
+          company,
+          role,
+          newDeadline
+        }
+      }).catch(() => {});
+    }
+
+    return {
+      success: true,
+      eligibleCount: eligibleStudents.length,
+      specificWhatsAppSentTo: specificTargetNumber
+    };
+  } catch (error) {
+    console.error('Error in notifyStudentsOnDriveDeadlineExtension:', error);
+    return { success: false, error: error.message };
+  }
+};
+
+module.exports = { notifyStudentsOnDrivePost, notifyStudentsOnDriveDeadlineExtension };

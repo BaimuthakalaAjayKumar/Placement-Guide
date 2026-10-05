@@ -8,7 +8,9 @@ const {
   applyToDrive,
   updateCandidateStage,
   cancelDrive,
-  deleteDrive
+  deleteDrive,
+  updateDrive,
+  extendDriveDeadline
 } = require('../controllers/placementDrives');
 
 router.use(protect);
@@ -16,6 +18,8 @@ router.use(protect);
 router.get('/', getDrives);
 router.get('/:id', getDriveById);
 router.post('/', authorize('admin'), createDrive);
+router.put('/:id', authorize('admin', 'recruiter'), updateDrive);
+router.put('/:id/extend-deadline', authorize('admin', 'recruiter'), extendDriveDeadline);
 router.put('/:id/cancel', authorize('admin', 'recruiter'), cancelDrive);
 router.delete('/:id', authorize('admin', 'recruiter'), deleteDrive);
 router.post('/:id/apply', authorize('student'), applyToDrive);
