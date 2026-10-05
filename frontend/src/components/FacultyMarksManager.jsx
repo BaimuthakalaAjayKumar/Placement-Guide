@@ -640,69 +640,109 @@ const FacultyMarksManager = ({ preselectedStudentId, onBack }) => {
           )}
         </div>
       ) : (
-        /* ── Main Two-Column Layout (Student Selector & Marks Entry) ── */
-        <div className="faculty-marks-grid">
-        {/* Left Column: Student Selector */}
-        <div className="students-selector-card glass-card">
-          <div className="selector-head">
-            <h3>Select Student</h3>
-            <span className="student-count">{filteredStudents.length} Students</span>
+        /* ── Vertical Flow Layout: Whole Students First -> Spacer -> Details of Selected Student ── */
+        <div className="faculty-marks-vertical-container">
+          {/* 1. Top Section: Whole Students (Full-Width Responsive Cards Grid) */}
+          <div className="students-selector-top-card glass-card">
+            <div className="selector-top-head">
+              <div className="selector-head-info">
+                <div className="title-with-badge">
+                  <h3>👥 Students in Your Evaluation Scope</h3>
+                  <span className="student-count">{filteredStudents.length} Students</span>
+                </div>
+                <p className="selector-subtitle">
+                  Select a student from the cards below to load their marks sheet, semester curriculum, and live CGPA evaluator.
+                </p>
+              </div>
+
+              <div className="search-box-top">
+                <input
+                  type="text"
+                  placeholder="🔍 Search student by name, roll no, or email..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="student-search-input"
+                />
+              </div>
+            </div>
+
+            <div className="students-grid-scroll-wrap">
+              {loadingStudents ? (
+                <div className="students-loading-state" style={{ padding: '2rem', textAlign: 'center', color: '#94a3b8' }}>
+                  <div className="spinner-loader sm" style={{ margin: '0 auto 8px' }}></div>
+                  <p>Loading students in your assigned scope...</p>
+                </div>
+              ) : filteredStudents.length > 0 ? (
+                <div className="students-cards-grid">
+                  {filteredStudents.map(st => {
+                    const isSelected = selectedStudent?._id === st._id;
+                    const cgpaVal = (st.overallCgpa || st.cgpa || 0).toFixed(2);
+                    return (
+                      <div
+                        key={st._id}
+                        className={`student-item-grid-card ${isSelected ? 'active' : ''}`}
+                        onClick={() => {
+                          setSelectedStudent(st);
+                          setStatusMsg({ type: '', text: '' });
+                        }}
+                        role="button"
+                        tabIndex={0}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            setSelectedStudent(st);
+                            setStatusMsg({ type: '', text: '' });
+                          }
+                        }}
+                      >
+                        <div className="st-card-top-row">
+                          <div className="st-avatar-badge">
+                            {st.name ? st.name.charAt(0).toUpperCase() : 'S'}
+                          </div>
+                          <div className="st-cgpa-pill">
+                            <span className="lbl">CGPA</span>
+                            <strong className="val">{cgpaVal}</strong>
+                          </div>
+                        </div>
+
+                        <div className="st-card-body">
+                          <h4 className="st-card-name" title={st.name}>{st.name}</h4>
+                          <div className="st-card-meta">
+                            {st.rollNumber && <span className="meta-chip roll">🆔 {st.rollNumber}</span>}
+                            <span className="meta-chip branch">🏫 {st.branch || 'Engineering'}{st.section ? ` (${st.section})` : ''}</span>
+                            {st.academicYear && <span className="meta-chip year">🎓 {st.academicYear}</span>}
+                          </div>
+                        </div>
+
+                        {isSelected && (
+                          <div className="st-card-active-footer">
+                            <span>● Selected for Evaluation</span>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="no-data-note" style={{ padding: '1.5rem', textAlign: 'center', color: '#94a3b8' }}>
+                  No matching student records found for "{searchQuery}".
+                </p>
+              )}
+            </div>
           </div>
 
-          <div className="search-box">
-            <input
-              type="text"
-              placeholder="Search by name, roll no, or email..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="student-search-input"
-            />
-          </div>
+          {/* 2. Space between Whole Students and Selected Student Details */}
+          <div className="faculty-section-spacer"></div>
 
-          <div className="students-scroll-list">
-            {loadingStudents ? (
-              <p className="loading-note">Loading students in your scope...</p>
-            ) : filteredStudents.length > 0 ? (
-              filteredStudents.map(st => {
-                const isSelected = selectedStudent?._id === st._id;
-                return (
-                  <div
-                    key={st._id}
-                    className={`student-item-pill ${isSelected ? 'active' : ''}`}
-                    onClick={() => {
-                      setSelectedStudent(st);
-                      setStatusMsg({ type: '', text: '' });
-                    }}
-                  >
-                    <div className="st-info">
-                      <strong>{st.name}</strong>
-                      <span className="st-meta">
-                        {st.rollNumber ? `🆔 ${st.rollNumber}` : st.email} • {st.branch} {st.section ? `Sec ${st.section}` : ''}
-                      </span>
+          {/* 3. Details of Selected Student (Full Width Below) */}
+          <div className="marks-sheet-card glass-card full-width">
+            {selectedStudent ? (
+              <form onSubmit={handleSaveMarks}>
+                {/* Selected Student Banner */}
+                <div className="active-student-banner">
+                  <div className="student-profile-strip">
+                    <div className="student-avatar-box">
+                      {selectedStudent.name ? selectedStudent.name.charAt(0).toUpperCase() : 'S'}
                     </div>
-                    <div className="st-cgpa-chip">
-                      <span className="lbl">CGPA</span>
-                      <strong className="val">{(st.overallCgpa || st.cgpa || 0).toFixed(2)}</strong>
-                    </div>
-                  </div>
-                );
-              })
-            ) : (
-              <p className="no-data-note">No matching student records found.</p>
-            )}
-          </div>
-        </div>
-
-        {/* Right Column: Marks Entry Sheet */}
-        <div className="marks-sheet-card glass-card">
-          {selectedStudent ? (
-            <form onSubmit={handleSaveMarks}>
-              {/* Selected Student Banner */}
-              <div className="active-student-banner">
-                <div className="student-profile-strip">
-                  <div className="student-avatar-box">
-                    {selectedStudent.name ? selectedStudent.name.charAt(0).toUpperCase() : 'S'}
-                  </div>
                   <div>
                     <h3 className="banner-name">{selectedStudent.name}</h3>
                     <div className="banner-details">
@@ -933,7 +973,7 @@ const FacultyMarksManager = ({ preselectedStudentId, onBack }) => {
             <div className="no-student-selected">
               <span className="icon">👥</span>
               <h3>No Student Selected</h3>
-              <p>Please select a student from the list on the left to enter marks and evaluate their academic record.</p>
+              <p>Please select a student from the cards above to enter marks and evaluate their academic record.</p>
             </div>
           )}
         </div>

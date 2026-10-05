@@ -145,40 +145,55 @@
   line-height: 1;
 }
 
-/* ── Two-Column Layout ── */
-.faculty-marks-grid {
-  display: grid;
-  grid-template-columns: 340px 1fr;
-  gap: 1.5rem;
-  align-items: start;
-}
-
-@media (max-width: 1024px) {
-  .faculty-marks-grid {
-    grid-template-columns: 1fr;
-  }
-}
-
-/* Left Column: Student Selector */
-.students-selector-card {
-  padding: 1.5rem;
+/* ── Vertical Flow Layout: Whole Students Top -> Spacer -> Details Below ── */
+.faculty-marks-vertical-container {
   display: flex;
   flex-direction: column;
-  max-height: 800px;
+  width: 100%;
 }
 
-.selector-head {
+/* 1. Top Section: Whole Students (Full-Width Card) */
+.students-selector-top-card {
+  padding: 1.5rem 1.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.selector-top-head {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 1rem;
+  flex-wrap: wrap;
+  gap: 1.25rem;
 }
 
-.selector-head h3 {
-  font-size: 1.1rem;
+.selector-head-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.selector-head-info .title-with-badge {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.selector-head-info h3 {
+  font-size: 1.25rem;
   font-weight: 700;
   color: #f1f5f9;
   margin: 0;
+}
+
+.selector-subtitle {
+  color: #94a3b8;
+  font-size: 0.875rem;
+  margin: 0;
+  line-height: 1.4;
 }
 
 .student-count {
@@ -186,23 +201,25 @@
   background: rgba(99, 102, 241, 0.2);
   color: #a5b4fc;
   border: 1px solid rgba(99, 102, 241, 0.3);
-  padding: 0.2rem 0.55rem;
+  padding: 0.2rem 0.65rem;
   border-radius: 9999px;
   font-weight: 600;
 }
 
-.search-box {
-  margin-bottom: 1rem;
+.search-box-top {
+  min-width: 320px;
+  max-width: 480px;
+  flex: 1;
 }
 
 .student-search-input {
   width: 100%;
-  padding: 0.7rem 1rem;
-  background: rgba(15, 23, 42, 0.6);
+  padding: 0.75rem 1.1rem;
+  background: rgba(15, 23, 42, 0.75);
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 10px;
   color: #f8fafc;
-  font-size: 0.85rem;
+  font-size: 0.875rem;
   transition: all 0.2s ease;
   box-sizing: border-box;
 }
@@ -211,110 +228,174 @@
   outline: none;
   border-color: #6366f1;
   box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.25);
-  background: rgba(15, 23, 42, 0.85);
+  background: rgba(15, 23, 42, 0.95);
 }
 
-.students-scroll-list {
+.students-grid-scroll-wrap {
+  max-height: 380px;
   overflow-y: auto;
-  max-height: 650px;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  padding-right: 0.25rem;
+  padding-right: 4px;
 }
 
-.students-scroll-list::-webkit-scrollbar {
-  width: 5px;
+.students-grid-scroll-wrap::-webkit-scrollbar {
+  width: 6px;
 }
 
-.students-scroll-list::-webkit-scrollbar-thumb {
+.students-grid-scroll-wrap::-webkit-scrollbar-thumb {
   background: rgba(255, 255, 255, 0.15);
   border-radius: 4px;
 }
 
-.student-item-pill {
+.students-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1rem;
+}
+
+.student-item-grid-card {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 14px;
+  padding: 1.1rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  position: relative;
+}
+
+.student-item-grid-card:hover {
+  background: rgba(255, 255, 255, 0.07);
+  border-color: rgba(99, 102, 241, 0.4);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px -6px rgba(0, 0, 0, 0.6);
+}
+
+.student-item-grid-card.active {
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.22) 0%, rgba(56, 189, 248, 0.12) 100%);
+  border-color: #6366f1;
+  box-shadow: 0 0 0 1.5px #6366f1, 0 10px 30px -5px rgba(99, 102, 241, 0.35);
+}
+
+.st-card-top-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 0.85rem 1rem;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.st-avatar-badge {
+  width: 40px;
+  height: 40px;
   border-radius: 12px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.student-item-pill:hover {
-  background: rgba(255, 255, 255, 0.07);
-  border-color: rgba(99, 102, 241, 0.4);
-  transform: translateX(3px);
-}
-
-.student-item-pill.active {
-  background: linear-gradient(135deg, rgba(99, 102, 241, 0.2), rgba(56, 189, 248, 0.1));
-  border-color: #6366f1;
-  box-shadow: 0 4px 15px rgba(99, 102, 241, 0.25);
-}
-
-.st-info {
+  background: linear-gradient(135deg, #6366f1, #3b82f6);
+  color: #ffffff;
   display: flex;
-  flex-direction: column;
-  gap: 0.2rem;
-  overflow: hidden;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 1.1rem;
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
 }
 
-.st-info strong {
-  color: #f1f5f9;
-  font-size: 0.9rem;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-  overflow: hidden;
-}
-
-.st-meta {
-  font-size: 0.75rem;
-  color: #94a3b8;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-  overflow: hidden;
-}
-
-.st-cgpa-chip {
+.st-cgpa-pill {
   display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  background: rgba(15, 23, 42, 0.7);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  padding: 0.25rem 0.55rem;
+  align-items: center;
+  gap: 5px;
+  background: rgba(15, 23, 42, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 4px 9px;
   border-radius: 8px;
-  min-width: 50px;
 }
 
-.st-cgpa-chip .lbl {
+.st-cgpa-pill .lbl {
   font-size: 0.65rem;
   color: #94a3b8;
-  font-weight: 600;
-  text-transform: uppercase;
+  font-weight: 700;
+  letter-spacing: 0.5px;
 }
 
-.st-cgpa-chip .val {
+.st-cgpa-pill .val {
   font-size: 0.95rem;
   color: #38bdf8;
   font-weight: 800;
 }
 
-.loading-note, .no-data-note {
-  color: #94a3b8;
-  font-size: 0.85rem;
-  text-align: center;
-  padding: 2rem 1rem;
-}
-
-/* Right Column: Marks Sheet */
-.marks-sheet-card {
-  padding: 1.75rem;
+.st-card-body {
   display: flex;
   flex-direction: column;
+  gap: 0.4rem;
+}
+
+.st-card-name {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #f8fafc;
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.st-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.meta-chip {
+  font-size: 0.72rem;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: #cbd5e1;
+  padding: 2px 7px;
+  border-radius: 5px;
+}
+
+.meta-chip.roll {
+  color: #a5b4fc;
+  border-color: rgba(99, 102, 241, 0.3);
+}
+
+.meta-chip.branch {
+  color: #67e8f9;
+  border-color: rgba(6, 182, 212, 0.3);
+}
+
+.meta-chip.year {
+  color: #fde047;
+  border-color: rgba(234, 179, 8, 0.3);
+}
+
+.st-card-active-footer {
+  margin-top: auto;
+  padding-top: 0.5rem;
+  border-top: 1px solid rgba(99, 102, 241, 0.3);
+  font-size: 0.78rem;
+  color: #818cf8;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* 2. Space between Whole Students and Selected Student Details */
+.faculty-section-spacer {
+  height: 32px;
+  width: 100%;
+}
+
+/* 3. Details of Selected Student (Full-Width Card) */
+.marks-sheet-card {
+  padding: 2rem 2.25rem;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.marks-sheet-card.full-width {
+  width: 100%;
 }
 
 .no-student-selected {
