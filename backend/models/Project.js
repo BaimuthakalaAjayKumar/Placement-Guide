@@ -95,6 +95,13 @@ const ProjectSchema = new mongoose.Schema({
   lastUpdatedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   lastUpdatedByName: { type: String, default: '' },
   versionHistory: { type: [ProjectVersionSchema], default: [] },
+  projectType: { type: String, default: 'standard', trim: true },
+  template: { type: String, default: '', trim: true },
+  runtime: { type: String, default: '', trim: true },
+  entryPoint: { type: String, default: '', trim: true },
+  packageManager: { type: String, default: 'npm', trim: true },
+  lastRunStatus: { type: String, default: '' },
+  lastRunAt: { type: Date },
   reviewedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   reviewedAt: { type: Date }
 }, { timestamps: true });

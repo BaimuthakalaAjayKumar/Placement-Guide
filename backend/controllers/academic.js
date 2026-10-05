@@ -604,6 +604,11 @@ exports.createProject = async (req, res, next) => {
       previewUrl,
       deploymentUrl,
       milestones: Array.isArray(req.body.milestones) ? req.body.milestones : [],
+      projectType: req.body.projectType || 'standard',
+      template: req.body.template || '',
+      runtime: req.body.runtime || '',
+      entryPoint: req.body.entryPoint || '',
+      packageManager: req.body.packageManager || 'npm',
       student: req.user.id,
       academicYear,
       branch,
@@ -645,7 +650,8 @@ exports.updateProject = async (req, res, next) => {
     const studentFields = [
       'title', 'description', 'goals', 'technologies', 'teamMembers',
       'files', 'repositoryUrl', 'previewUrl', 'deploymentUrl', 'milestones',
-      'academicYear', 'branch', 'section'
+      'academicYear', 'branch', 'section', 'projectType', 'template',
+      'runtime', 'entryPoint', 'packageManager', 'lastRunStatus', 'lastRunAt'
     ];
 
     if (canEditProject) {
@@ -686,8 +692,8 @@ exports.updateProject = async (req, res, next) => {
       project.lastUpdatedBy = req.user.id;
       project.lastUpdatedByName = req.user.name || (isOwner ? 'Lead Student' : 'Team Member');
 
-      // Create snapshot version history if files or deployment changed or requested
-      if (codeOrDeployChanged || req.body.saveVersion === true || (req.body.files && (!project.versionHistory || project.versionHistory.length === 0))) {
+      // Create snapshot version history if files or deployment changed or requested (skip on autosaves)
+      if (!req.body.isAutosave && (codeOrDeployChanged || req.body.saveVersion === true || (req.body.files && (!project.versionHistory || project.versionHistory.length === 0)))) {
         project.versionHistory = project.versionHistory || [];
         const nextVersionNumber = (project.versionHistory.length > 0
           ? Math.max(...project.versionHistory.map(v => v.versionNumber || 0))

@@ -318,3 +318,149 @@ exports.getFacultyStudents = async (req, res, next) => {
     next(err);
   }
 };
+
+/**
+ * @desc    Bulk Import & Auto-Calculate Academic Records from CSV / JSON data
+ * @route   POST /api/academics/bulk-import
+ * @access  Private (faculty, admin, hod)
+ */
+exports.bulkImportMarks = async (req, res, next) => {
+  try {
+    const { rows } = req.body;
+    if (!Array.isArray(rows) || rows.length === 0) {
+      return res.status(400).json({ success: false, error: 'No data rows provided for import.' });
+    }
+
+    const studentSemMap = new Map();
+
+    for (const row of rows) {
+      const rollNumber = (row.rollNumber || row.RollNumber || '').trim().toUpperCase();
+      const email = (row.email || row.Email || '').trim().toLowerCase();
+      const semester = parseInt(row.semester || row.Semester || 1, 10);
+      const subjectCode = (row.subjectCode || row.SubjectCode || '').trim().toUpperCase();
+      const subjectName = (row.subjectName || row.SubjectName || subjectCode || 'Subject').trim();
+      const credits = parseFloat(row.credits || row.Credits || 3);
+      const marks = Math.min(100, Math.max(0, parseFloat(row.marks || row.Marks || 0)));
+
+      if (!rollNumber && !email) continue;
+      if (isNaN(semester) || semester < 1 || semester > 8) continue;
+
+      const key = `${rollNumber || email}__sem_${semester}`;
+      if (!studentSemMap.has(key)) {
+        studentSemMap.set(key, {
+          rollNumber,
+          email,
+          semester,
+          subjects: []
+        });
+      }
+
+      studentSemMap.get(key).subjects.push({
+        subjectCode,
+        subjectName,
+        credits: isNaN(credits) ? 3 : credits,
+        marks: isNaN(marks) ? 0 : marks
+      });
+    }
+
+    if (studentSemMap.size === 0) {
+      return res.status(400).json({ success: false, error: 'No valid student marks entries found in data.' });
+    }
+
+    const processedList = [];
+    const errors = [];
+
+    for (const [, entry] of studentSemMap.entries()) {
+      try {
+        let student = null;
+        if (entry.rollNumber) {
+          student = await User.findOne({
+            role: 'student',
+            rollNumber: new RegExp(`^${entry.rollNumber}$`, 'i')
+          });
+        }
+        if (!student && entry.email) {
+          student = await User.findOne({
+            role: 'student',
+            email: new RegExp(`^${entry.email}$`, 'i')
+          });
+        }
+
+        if (!student) {
+          errors.push(`Student with Roll "${entry.rollNumber}" / Email "${entry.email}" not found.`);
+          continue;
+        }
+
+        const record = await getOrCreateAcademicRecord(student._id);
+
+        const evaluatedSubjects = entry.subjects.map(sub => {
+          const { grade, gradePoint, passed } = calculateSubjectGrade(sub.marks);
+          return {
+            subjectName: sub.subjectName,
+            subjectCode: sub.subjectCode,
+            credits: sub.credits,
+            marks: sub.marks,
+            grade,
+            gradePoint,
+            passed
+          };
+        });
+
+        const { sgpa, totalCredits, passedCredits, arrears } = calculateSemesterSgpa(evaluatedSubjects);
+
+        let semRecord = record.semesters.find(s => s.semester === entry.semester);
+        if (semRecord) {
+          semRecord.subjects = evaluatedSubjects;
+          semRecord.totalCredits = totalCredits;
+          semRecord.sgpa = sgpa;
+          semRecord.isPublished = true;
+          semRecord.evaluatorName = req.user.name || 'Faculty / Admin';
+          semRecord.updatedAt = new Date();
+        } else {
+          record.semesters.push({
+            semester: entry.semester,
+            subjects: evaluatedSubjects,
+            totalCredits,
+            sgpa,
+            isPublished: true,
+            evaluatorName: req.user.name || 'Faculty / Admin',
+            updatedAt: new Date()
+          });
+        }
+
+        const { cgpa, totalCreditsEarned, totalArrears } = calculateOverallCgpa(record.semesters);
+        record.overallCgpa = cgpa;
+        record.totalCreditsEarned = totalCreditsEarned;
+        record.totalArrears = totalArrears;
+        await record.save();
+
+        const semKey = `sgpaSem${entry.semester}`;
+        student[semKey] = sgpa;
+        student.cgpa = cgpa;
+        await student.save();
+
+        processedList.push({
+          studentId: student._id,
+          name: student.name,
+          rollNumber: student.rollNumber,
+          semester: entry.semester,
+          semesterSgpa: sgpa,
+          overallCgpa: cgpa,
+          subjectsCount: evaluatedSubjects.length
+        });
+      } catch (procErr) {
+        errors.push(`Error processing ${entry.rollNumber || entry.email}: ${procErr.message}`);
+      }
+    }
+
+    res.status(200).json({
+      success: true,
+      message: `Bulk import completed. Successfully updated ${processedList.length} semester records.`,
+      processedCount: processedList.length,
+      processed: processedList,
+      errors
+    });
+  } catch (err) {
+    next(err);
+  }
+};

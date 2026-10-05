@@ -3,11 +3,20 @@
    Modern, Glassmorphism & Cyberpunk Aesthetics for Student Academics & CGPA
    ========================================================================== */
 
+.academics-content {
+  margin-left: var(--sidebar-width) !important;
+  width: calc(100% - var(--sidebar-width)) !important;
+  max-width: calc(100% - var(--sidebar-width)) !important;
+  box-sizing: border-box !important;
+}
+
 .academics-module-root {
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
   width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .academics-loading-box {

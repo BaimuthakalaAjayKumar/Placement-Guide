@@ -4,7 +4,8 @@ const {
   getStudentAcademicRecord,
   saveSemesterMarks,
   getCurriculum,
-  getFacultyStudents
+  getFacultyStudents,
+  bulkImportMarks
 } = require('../controllers/academics');
 const { protect, authorize } = require('../middleware/auth');
 
@@ -20,6 +21,9 @@ router.get('/student/:studentId', getStudentAcademicRecord);
 
 // Faculty & Admin: Enter marks with automatic Grade, SGPA, Credits, and CGPA calculation
 router.post('/save-marks', authorize('faculty', 'admin', 'hod'), saveSemesterMarks);
+
+// Faculty & Admin: Bulk Import Students Academic Results in a single attempt
+router.post('/bulk-import', authorize('faculty', 'admin', 'hod'), bulkImportMarks);
 
 // Branch & semester default curriculum
 router.get('/curriculum/:branch/:semester', getCurriculum);

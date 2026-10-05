@@ -464,15 +464,37 @@ exports.runSandboxCode = async (req, res, next) => {
     const testCases = [{ input: input || '', output: '' }];
     const evalResult = await evaluateCode(code, language, testCases, 4000, 128, 'Sandbox Play');
 
-    const result = evalResult.results[0];
+    const result = (evalResult && evalResult.results && evalResult.results[0]) ? evalResult.results[0] : {};
+
+    let normalizedStatus = 'SUCCESS';
+    if (!result.error && (result.status === 'Accepted' || !result.status || result.status === 'Sandbox Play')) {
+      normalizedStatus = 'SUCCESS';
+    } else if (result.status === 'Compilation Error' || (result.error && result.error.toLowerCase().includes('compil'))) {
+      normalizedStatus = 'COMPILATION_ERROR';
+    } else if (result.status === 'Time Limit Exceeded' || (result.error && result.error.includes('Time Limit Exceeded'))) {
+      normalizedStatus = 'TIME_LIMIT_EXCEEDED';
+    } else if (result.status === 'Memory Limit Exceeded') {
+      normalizedStatus = 'MEMORY_LIMIT_EXCEEDED';
+    } else if (result.status === 'Runtime Error') {
+      normalizedStatus = 'RUNTIME_ERROR';
+    } else if (result.error) {
+      normalizedStatus = 'EXECUTION_ERROR';
+    }
+
+    const executionTimeSec = Number(((result.timeMs || 10) / 1000).toFixed(2));
+    const memoryBytes = (result.memoryKb || 1024) * 1024;
 
     res.status(200).json({
       success: true,
-      stdout: result.actualOutput,
-      status: result.status,
-      timeMs: result.timeMs,
-      memoryKb: result.memoryKb,
-      error: result.status === 'Runtime Error' || result.status === 'Time Limit Exceeded' ? result.status : null
+      status: normalizedStatus,
+      rawStatus: result.status,
+      stdout: result.actualOutput || '',
+      stderr: result.error || '',
+      executionTime: executionTimeSec,
+      timeMs: result.timeMs || 10,
+      memory: memoryBytes,
+      memoryKb: result.memoryKb || 1024,
+      error: result.error || (normalizedStatus !== 'SUCCESS' ? normalizedStatus : null)
     });
   } catch (err) {
     next(err);

@@ -27,9 +27,142 @@ const FacultyMarksManager = ({ preselectedStudentId, onBack }) => {
   const [statusMsg, setStatusMsg] = useState({ type: '', text: '' });
   const [studentRecord, setStudentRecord] = useState(null);
 
+  // Bulk Import States
+  const [activeMode, setActiveMode] = useState('manual'); // 'manual' | 'bulk-import'
+  const [importRows, setImportRows] = useState([]);
+  const [importFileName, setImportFileName] = useState('');
+  const [importing, setImporting] = useState(false);
+  const [importSuccessReport, setImportSuccessReport] = useState(null);
+  const [importError, setImportError] = useState('');
+
   const getAuthHeaders = () => {
     const token = localStorage.getItem('token');
     return { headers: { Authorization: `Bearer ${token}` } };
+  };
+
+  // Download Sample CSV Template
+  const handleDownloadSampleCsv = () => {
+    const csvContent =
+`RollNumber,Email,Semester,SubjectCode,SubjectName,Credits,Marks
+23241A1201,student1@college.edu,1,CS101,Programming for Problem Solving,4,88
+23241A1201,student1@college.edu,1,MA101,Linear Algebra & Calculus,4,82
+23241A1201,student1@college.edu,1,PH101,Engineering Physics,3,91
+23241A1201,student1@college.edu,1,CS102P,Programming Lab,1.5,85
+23241A1201,student1@college.edu,1,PH102P,Physics Lab,1.5,92
+23241A1202,student2@college.edu,1,CS101,Programming for Problem Solving,4,74
+23241A1202,student2@college.edu,1,MA101,Linear Algebra & Calculus,4,68
+23241A1202,student2@college.edu,1,PH101,Engineering Physics,3,79
+23241A1202,student2@college.edu,1,CS102P,Programming Lab,1.5,80
+23241A1202,student2@college.edu,1,PH102P,Physics Lab,1.5,86`;
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', 'campusbridge_academic_results_sample.csv');
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  // Parse Uploaded CSV / Text File
+  const handleFileUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setImportFileName(file.name);
+    setImportError('');
+    setImportSuccessReport(null);
+
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      try {
+        const text = evt.target?.result;
+        if (!text || typeof text !== 'string') {
+          setImportError('Failed to read file contents.');
+          return;
+        }
+
+        const lines = text.split(/\r\n|\n/).filter(line => line.trim() !== '');
+        if (lines.length < 2) {
+          setImportError('File contains no data rows.');
+          return;
+        }
+
+        // Header parsing
+        const headers = lines[0].split(',').map(h => h.trim().toLowerCase().replace(/[^a-z0-9]/g, ''));
+
+        const parsed = [];
+        for (let i = 1; i < lines.length; i++) {
+          const cols = lines[i].split(',').map(c => c.trim().replace(/^["']|["']$/g, ''));
+          if (cols.length < 4) continue;
+
+          const rowObj = {};
+          headers.forEach((h, idx) => {
+            rowObj[h] = cols[idx] || '';
+          });
+
+          const rollNumber = rowObj.rollnumber || rowObj.rollno || rowObj.roll || cols[0] || '';
+          const email = rowObj.email || cols[1] || '';
+          const semester = parseInt(rowObj.semester || rowObj.sem || cols[2] || 1, 10);
+          const subjectCode = rowObj.subjectcode || rowObj.code || cols[3] || '';
+          const subjectName = rowObj.subjectname || rowObj.subject || rowObj.name || cols[4] || subjectCode;
+          const credits = parseFloat(rowObj.credits || rowObj.credit || cols[5] || 3);
+          const marks = Math.min(100, Math.max(0, parseFloat(rowObj.marks || rowObj.mark || cols[6] || 0)));
+
+          if (rollNumber || email) {
+            parsed.push({
+              rollNumber,
+              email,
+              semester: isNaN(semester) ? 1 : semester,
+              subjectCode,
+              subjectName,
+              credits: isNaN(credits) ? 3 : credits,
+              marks: isNaN(marks) ? 0 : marks
+            });
+          }
+        }
+
+        if (parsed.length === 0) {
+          setImportError('No valid rows could be parsed. Please check template column headers.');
+        } else {
+          setImportRows(parsed);
+        }
+      } catch (err) {
+        setImportError(`File parsing failed: ${err.message}`);
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  // Deploy Bulk Import
+  const handleDeployBulkImport = async () => {
+    if (importRows.length === 0) return;
+    setImporting(true);
+    setImportError('');
+    setImportSuccessReport(null);
+
+    try {
+      const res = await axios.post(`${API_URL}/academics/bulk-import`, { rows: importRows }, getAuthHeaders());
+      if (res.data?.success) {
+        setImportSuccessReport(res.data);
+        setStatusMsg({
+          type: 'success',
+          text: `✓ Bulk Import Successful: ${res.data.processedCount} student semester academic records updated!`
+        });
+
+        // Refresh faculty student roster
+        const stRes = await axios.get(`${API_URL}/academics/students`, getAuthHeaders());
+        if (stRes.data?.success) {
+          setStudents(stRes.data.data || []);
+        }
+      }
+    } catch (err) {
+      setImportError(err.response?.data?.error || 'Bulk deployment failed. Please check student roll numbers.');
+    } finally {
+      setImporting(false);
+    }
   };
 
   // Helper to calculate grade & point from marks
@@ -285,8 +418,230 @@ const FacultyMarksManager = ({ preselectedStudentId, onBack }) => {
         </div>
       )}
 
-      {/* ── Main Two-Column Layout (Student Selector & Marks Entry) ── */}
-      <div className="faculty-marks-grid">
+      {/* ── Mode Switcher Tab ── */}
+      <div className="faculty-mode-switch glass-card">
+        <button
+          type="button"
+          className={`btn-mode-tab ${activeMode === 'manual' ? 'active' : ''}`}
+          onClick={() => setActiveMode('manual')}
+        >
+          <span>📝</span> Individual Student Marks Evaluation
+        </button>
+
+        <button
+          type="button"
+          className={`btn-mode-tab ${activeMode === 'bulk-import' ? 'active' : ''}`}
+          onClick={() => setActiveMode('bulk-import')}
+        >
+          <span>📥</span> Bulk Import Academic Results (CSV / Excel)
+          <span className="badge-new-pill">Single Attempt Deploy</span>
+        </button>
+      </div>
+
+      {activeMode === 'bulk-import' ? (
+        <div className="bulk-import-workspace animate-fade">
+          {/* Step 1: Download Template */}
+          <div className="bulk-step-card glass-card">
+            <div className="step-card-header">
+              <div className="step-title-box">
+                <h3><span>📥</span> Step 1: Download Standard Academic CSV Template</h3>
+                <p>
+                  Download the official import template pre-populated with required headers. Fill in student marks (0 - 100) and course credits, then upload it below.
+                </p>
+              </div>
+              <button
+                type="button"
+                className="btn-download-sample"
+                onClick={handleDownloadSampleCsv}
+              >
+                <span>⬇️</span> Download Example Import File (.csv)
+              </button>
+            </div>
+
+            <div className="sample-columns-grid">
+              <div className="sample-col-tag">
+                <code>RollNumber</code>
+                <span>e.g. 23241A1201</span>
+              </div>
+              <div className="sample-col-tag">
+                <code>Email</code>
+                <span>e.g. student@college.edu</span>
+              </div>
+              <div className="sample-col-tag">
+                <code>Semester</code>
+                <span>Semester 1 to 8</span>
+              </div>
+              <div className="sample-col-tag">
+                <code>SubjectCode</code>
+                <span>e.g. CS101, MA101</span>
+              </div>
+              <div className="sample-col-tag">
+                <code>SubjectName</code>
+                <span>Full Subject Title</span>
+              </div>
+              <div className="sample-col-tag">
+                <code>Credits</code>
+                <span>e.g. 4, 3, 1.5</span>
+              </div>
+              <div className="sample-col-tag">
+                <code>Marks</code>
+                <span>Marks 0 to 100</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Step 2: Upload File */}
+          <div className="bulk-step-card glass-card">
+            <div className="step-title-box">
+              <h3><span>📤</span> Step 2: Upload Completed Academic Results File</h3>
+              <p>Upload your completed .csv or excel-exported text file. The system will validate and compute all grades automatically.</p>
+            </div>
+
+            <label className="bulk-upload-dropzone">
+              <input
+                type="file"
+                accept=".csv,text/csv,text/plain"
+                onChange={handleFileUpload}
+                style={{ display: 'none' }}
+              />
+              <span className="dropzone-icon">📁</span>
+              <span className="dropzone-main-text">
+                {importFileName ? `Selected: ${importFileName}` : 'Click or Drop Completed Academic Results CSV Here'}
+              </span>
+              <span className="dropzone-sub-text">
+                Supports .CSV files exported from Excel, Google Sheets, or College ERP
+              </span>
+              {importRows.length > 0 && (
+                <div className="file-status-pill">
+                  <span>✓ {importRows.length} subject mark entries parsed successfully</span>
+                </div>
+              )}
+            </label>
+
+            {importError && (
+              <div className="status-banner error animate-fade" style={{ marginTop: '0.5rem' }}>
+                <span>⚠️ {importError}</span>
+              </div>
+            )}
+          </div>
+
+          {/* Step 3: Parsed Results Preview & Deploy */}
+          {importRows.length > 0 && (
+            <div className="bulk-step-card glass-card animate-fade">
+              <div className="bulk-preview-meta">
+                <div className="step-title-box">
+                  <h3><span>⚡</span> Step 3: Verification &amp; Live Evaluation Preview</h3>
+                  <p>All Subject Grades and Grade Points have been pre-computed using the 10-point standard scale.</p>
+                </div>
+                <div className="preview-stats-badges">
+                  <span className="preview-badge">Total Rows: <strong>{importRows.length}</strong></span>
+                  <span className="preview-badge">
+                    Unique Students: <strong>{new Set(importRows.map(r => r.rollNumber || r.email)).size}</strong>
+                  </span>
+                  <span className="preview-badge">
+                    Semesters: <strong>{Array.from(new Set(importRows.map(r => r.semester))).join(', ')}</strong>
+                  </span>
+                </div>
+              </div>
+
+              <div className="table-responsive" style={{ maxHeight: '350px' }}>
+                <table className="faculty-marks-table">
+                  <thead>
+                    <tr>
+                      <th>#</th>
+                      <th>Student Roll / Email</th>
+                      <th>Sem</th>
+                      <th>Subject Code</th>
+                      <th>Subject Name</th>
+                      <th style={{ textAlign: 'center' }}>Credits</th>
+                      <th style={{ textAlign: 'center' }}>Marks</th>
+                      <th style={{ textAlign: 'center' }}>Auto Grade</th>
+                      <th style={{ textAlign: 'center' }}>Grade Pts</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {importRows.slice(0, 50).map((row, idx) => {
+                      const { grade, point, color } = getGradeInfo(row.marks);
+                      return (
+                        <tr key={idx}>
+                          <td>{idx + 1}</td>
+                          <td><strong>{row.rollNumber || row.email}</strong></td>
+                          <td><span className="code-pill">Sem {row.semester}</span></td>
+                          <td><code>{row.subjectCode}</code></td>
+                          <td>{row.subjectName}</td>
+                          <td style={{ textAlign: 'center' }}>{row.credits}</td>
+                          <td style={{ textAlign: 'center', fontWeight: 'bold', color: '#38bdf8' }}>{row.marks}</td>
+                          <td style={{ textAlign: 'center' }}>
+                            <span className="grade-badge" style={{ background: `${color}25`, color, borderColor: `${color}70` }}>
+                              {grade}
+                            </span>
+                          </td>
+                          <td style={{ textAlign: 'center', fontWeight: 'bold' }}>{point}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+              {importRows.length > 50 && (
+                <small style={{ color: '#94a3b8', fontStyle: 'italic' }}>
+                  Showing first 50 rows of {importRows.length} total entries.
+                </small>
+              )}
+
+              {/* Step 4: Deploy & Replicate */}
+              <div className="sheet-submit-bar" style={{ marginTop: '1rem' }}>
+                <div className="submit-info">
+                  <span>
+                    ⚡ Clicking "Deploy &amp; Replicate" will instantly compute Semester SGPA, calculate cumulative CGPA across all semesters, and update both Academic Records and Student Dashboards immediately.
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  className="btn-deploy-bulk"
+                  onClick={handleDeployBulkImport}
+                  disabled={importing}
+                >
+                  {importing ? (
+                    <>
+                      <span className="spinner-loader sm"></span>
+                      Deploying &amp; Calculating Academic Records...
+                    </>
+                  ) : (
+                    '🚀 Deploy & Replicate Student Academic Records'
+                  )}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Success Report */}
+          {importSuccessReport && (
+            <div className="bulk-results-card glass-card animate-fade">
+              <h3><span>🎉</span> Deployment Complete</h3>
+              <p style={{ color: '#e2e8f0', margin: 0 }}>
+                {importSuccessReport.message}
+              </p>
+              <div className="results-grid">
+                {(importSuccessReport.processed || []).map((st, i) => (
+                  <div key={i} className="result-student-card">
+                    <div>
+                      <div className="result-st-name">{st.name}</div>
+                      <div className="result-st-roll">{st.rollNumber} • Sem {st.semester} ({st.subjectsCount} subjects)</div>
+                    </div>
+                    <div>
+                      <div className="result-st-sgpa">{st.semesterSgpa.toFixed(2)} SGPA</div>
+                      <div className="result-st-cgpa">CGPA: {st.overallCgpa.toFixed(2)}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      ) : (
+        /* ── Main Two-Column Layout (Student Selector & Marks Entry) ── */
+        <div className="faculty-marks-grid">
         {/* Left Column: Student Selector */}
         <div className="students-selector-card glass-card">
           <div className="selector-head">
@@ -583,6 +938,7 @@ const FacultyMarksManager = ({ preselectedStudentId, onBack }) => {
           )}
         </div>
       </div>
+      )}
     </div>
   );
 };

@@ -797,12 +797,13 @@ h1, h2, h3, h4, h5 {
   margin-top: var(--header-height);
   min-height: calc(100vh - var(--header-height));
   width: calc(100% - var(--sidebar-width));
+  max-width: calc(100% - var(--sidebar-width));
+  box-sizing: border-box;
 }
 
-@media (max-width: 992px) {
+@media (max-width: 768px) {
   .content-wrapper {
-    margin-left: 0;
-    width: 100%;
+    padding: 16px;
   }
 }
 
