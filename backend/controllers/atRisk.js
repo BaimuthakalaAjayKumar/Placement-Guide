@@ -207,7 +207,7 @@ const sendRiskLockEmail = async (student, riskScore, reason) => {
   try {
     const portalUrl = getPortalUrl();
     const emailSubject = `🔒 Immediate Action Required: Student Dashboard Locked (Risk Factor: ${riskScore}%)`;
-    const emailText = `Dear ${student.name},\n\nYour Student Placement Dashboard has been AUTOMATICALLY LOCKED by the system because your Placement Risk Factor reached ${riskScore}%, which exceeds the critical limit of 65%.\n\nReason: ${reason}\n\nHOW TO REVOKE THIS LOCK:\nAs per college policy, to remove the lock on your account, you MUST contact either the Placement Administrator or Main Admin.\n\nAdmin Email: vaddeajaykumar2004@gmail.com\nOffice: Training & Placement Cell, Admin Block\n\nPortal: ${portalUrl}`;
+    const emailText = `Dear ${student.name},\n\nYour Student Placement Dashboard has been AUTOMATICALLY LOCKED by the system because your Placement Risk Factor reached ${riskScore}%, which exceeds the critical limit of 65%.\n\nReason: ${reason}\n\nHOW TO REVOKE THIS LOCK:\nAs per college policy, to remove the lock on your account, you MUST contact either the Placement Administrator or Main Admin.\n\nAdmin Email: ${process.env.SMTP_EMAIL || 'campusconnect.supportdesk@gmail.com'}\nOffice: Training & Placement Cell, Admin Block\n\nPortal: ${portalUrl}`;
 
     const emailHtml = `
       <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; background: #0f172a; color: #f8fafc; border-radius: 12px; overflow: hidden; border: 1px solid #334155;">
@@ -238,7 +238,7 @@ const sendRiskLockEmail = async (student, riskScore, reason) => {
               As per college placement guidelines, this lock can <strong>ONLY be revoked by the Placement Administrator or Main Admin</strong>. Faculty coordinators do not have unlocking authority.
             </p>
             <ol style="margin: 0; padding-left: 20px; color: #e2e8f0;">
-              <li>Contact the Main Admin or Training &amp; Placement Cell (<a href="mailto:vaddeajaykumar2004@gmail.com" style="color: #60a5fa;">vaddeajaykumar2004@gmail.com</a>).</li>
+              <li>Contact the Main Admin or Training &amp; Placement Cell (<a href="mailto:${process.env.SMTP_EMAIL || 'campusconnect.supportdesk@gmail.com'}" style="color: #60a5fa;">${process.env.SMTP_EMAIL || 'campusconnect.supportdesk@gmail.com'}</a>).</li>
               <li>Present justification and a committed preparation schedule for aptitude and coding.</li>
               <li>Once verified and approved, the Main Admin will remove the lock on your dashboard.</li>
             </ol>
@@ -276,7 +276,7 @@ const sendRiskLockWhatsApp = async (student, riskScore, reason) => {
       `Practice assessments, coding challenges, and campus drive applications are disabled.\n\n` +
       `📋 *How to Revoke This Lock*:\n` +
       `As per college placement policy, you MUST contact either the *Administrator* or *Main Admin* to remove that account lock:\n` +
-      `• Email: vaddeajaykumar2004@gmail.com\n` +
+      `• Email: ${process.env.SMTP_EMAIL || 'campusconnect.supportdesk@gmail.com'}\n` +
       `• Office: Training & Placement Cell, Admin Block\n` +
       `• Note: Faculty coordinators cannot revoke this lock.\n\n` +
       `— Training & Placement Administration, GRIET`;
@@ -325,7 +325,7 @@ const sendDashboardLockedEmail = async (student, reason, adminName) => {
           <div style="background: #111827; padding: 14px 18px; border-radius: 8px; margin: 18px 0; border: 1px solid #1f2937; font-size: 13px; line-height: 1.6; color: #94a3b8;">
             <strong style="color: #f1f5f9;">Next Steps to Restore Access:</strong>
             <ol style="margin: 8px 0 0 0; padding-left: 20px;">
-              <li>Contact either the Placement Administrator or Main Admin (<a href="mailto:vaddeajaykumar2004@gmail.com" style="color: #60a5fa;">vaddeajaykumar2004@gmail.com</a>).</li>
+              <li>Contact either the Placement Administrator or Main Admin (<a href="mailto:${process.env.SMTP_EMAIL || 'campusconnect.supportdesk@gmail.com'}" style="color: #60a5fa;">${process.env.SMTP_EMAIL || 'campusconnect.supportdesk@gmail.com'}</a>).</li>
               <li>Provide justification for the academic or preparation deficit.</li>
               <li>Once verified, the Administrator or Main Admin will unlock your dashboard.</li>
             </ol>

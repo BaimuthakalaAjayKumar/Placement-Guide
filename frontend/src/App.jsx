@@ -132,7 +132,7 @@ const PrivateRoute = ({ children, allowedRoles }) => {
                 As per college placement regulations, this lock can <strong>ONLY be revoked by an Administrator or the Main Admin</strong>. Faculty coordinators do not have unlocking authority.
               </p>
               <p style={{ marginTop: '0.5rem' }}>
-                1. Contact the Training &amp; Placement Administrator or Main Admin (<a href="mailto:vaddeajaykumar2004@gmail.com">vaddeajaykumar2004@gmail.com</a>) or visit the T&amp;P Cell (Admin Block, Ground Floor).<br />
+                1. Contact the Training &amp; Placement Administrator or Main Admin (<a href="mailto:campusconnect.supportdesk@gmail.com">campusconnect.supportdesk@gmail.com</a>) or visit the T&amp;P Cell (Admin Block, Ground Floor).<br />
                 2. Review your assessment deficit and commit to the recommended remedial preparation schedule.<br />
                 3. Once approved, the Administrator or Main Admin will remove the lock on your dashboard.<br />
                 4. Click <strong>"Check Unlock Status"</strong> below to refresh your access.

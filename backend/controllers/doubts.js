@@ -63,7 +63,7 @@ exports.createDoubt = async (req, res, next) => {
             await doubt.populate('student', 'name email');
 
             // Notify Admin by Email
-            const adminEmail = process.env.SMTP_EMAIL || 'admin@prepportal.com';
+            const adminEmail = process.env.SMTP_EMAIL || 'campusconnect.supportdesk@gmail.com';
             sendEmail({
                 to: adminEmail,
                 subject: `📬 New Student Query: ${subject}`,
@@ -177,7 +177,7 @@ exports.submitContactUs = async (req, res, next) => {
             return res.status(400).json({ success: false, error: 'Subject and message are required.' });
         }
 
-        const adminEmail = process.env.SMTP_EMAIL || 'admin@prepportal.com';
+        const adminEmail = process.env.SMTP_EMAIL || 'campusconnect.supportdesk@gmail.com';
 
         sendEmail({
             to: adminEmail,

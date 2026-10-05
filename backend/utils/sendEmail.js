@@ -23,9 +23,12 @@ const sendEmail = async (options) => {
     }
   });
 
+  const senderEmail = process.env.SMTP_EMAIL || 'campusconnect.supportdesk@gmail.com';
+  const senderName = process.env.SMTP_FROM_NAME || 'CampusConnect Placement Cell';
+
   // Define message options
   const message = {
-    from: `PrepPortal Admin <${process.env.SMTP_EMAIL}>`,
+    from: options.from || `${senderName} <${senderEmail}>`,
     to: options.to,
     subject: options.subject,
     text: options.text,
