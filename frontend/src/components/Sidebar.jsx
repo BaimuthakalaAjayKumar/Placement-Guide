@@ -340,12 +340,12 @@ const Sidebar = () => {
         )}
       </nav>
 
-      <div className="sidebar-footer" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+      <div className="sidebar-footer">
         <div className="user-badge-container" ref={menuRef}>
           <div
             className="user-profile-badge-btn"
             onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
-            title="Click to view profile options"
+            title="Click to view account options (Profile, Password, Support, Sign Out)"
           >
             <div
               className="user-avatar"
@@ -413,17 +413,19 @@ const Sidebar = () => {
 
           {isUserMenuOpen && (
             <div className="user-popover-menu animate-fade">
-              <button
-                type="button"
-                onClick={() => { navigate('/profile'); setIsUserMenuOpen(false); }}
-                className="popover-item"
-              >
-                <svg className="popover-icon" viewBox="0 0 24 24">
-                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                  <circle cx="12" cy="7" r="4" />
-                </svg>
-                <span>Profile</span>
-              </button>
+              {user.role !== 'admin' && (
+                <button
+                  type="button"
+                  onClick={() => { navigate('/profile'); setIsUserMenuOpen(false); }}
+                  className="popover-item"
+                >
+                  <svg className="popover-icon" viewBox="0 0 24 24">
+                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                    <circle cx="12" cy="7" r="4" />
+                  </svg>
+                  <span>Profile</span>
+                </button>
+              )}
 
               {user.role !== 'recruiter' && user.role !== 'admin' && (
                 <button
@@ -450,16 +452,23 @@ const Sidebar = () => {
                 </svg>
                 <span>Contact Support</span>
               </button>
+
+              <div className="popover-divider" />
+
+              <button
+                type="button"
+                onClick={() => { setIsUserMenuOpen(false); handleLogout(); }}
+                className="popover-item popover-logout-item logout"
+                title="Sign out of your account"
+              >
+                <svg viewBox="0 0 24 24" className="popover-icon">
+                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" />
+                </svg>
+                <span>Sign Out</span>
+              </button>
             </div>
           )}
         </div>
-
-        <button onClick={handleLogout} className="logout-btn" style={{ width: '100%' }}>
-          <svg viewBox="0 0 24 24" className="logout-icon">
-            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" />
-          </svg>
-          <span>Sign Out</span>
-        </button>
       </div>
 
       {showContactModal && (

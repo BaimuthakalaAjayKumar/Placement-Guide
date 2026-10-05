@@ -246,14 +246,15 @@
 
 .user-popover-menu {
   position: absolute;
-  bottom: calc(100% + 12px);
+  bottom: calc(100% + 10px);
   left: 0;
-  width: 215px;
-  background: rgba(15, 23, 42, 0.95);
+  width: 100%;
+  min-width: 215px;
+  background: rgba(15, 23, 42, 0.98);
   backdrop-filter: blur(16px);
   border: 1px solid var(--border-color);
   border-radius: var(--border-radius-sm);
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(99, 102, 241, 0.1);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(99, 102, 241, 0.15);
   padding: 6px;
   z-index: 999;
   display: flex;
@@ -284,28 +285,30 @@
 }
 
 .popover-icon {
-  width: 15px;
-  height: 15px;
+  width: 16px;
+  height: 16px;
   fill: none;
   stroke: currentColor;
   stroke-width: 2;
   stroke-linecap: round;
   stroke-linejoin: round;
+  flex-shrink: 0;
 }
 
 .popover-divider {
   height: 1px;
-  background: var(--border-color);
-  margin: 4px 0;
+  background: rgba(255, 255, 255, 0.1);
+  margin: 5px 0;
 }
 
 .popover-item.logout {
-  color: var(--text-muted);
+  color: #f87171;
+  font-weight: 600;
 }
 
 .popover-item.logout:hover {
-  color: #ff4b4b;
-  background: rgba(255, 75, 75, 0.1);
+  color: #ffffff;
+  background: rgba(239, 68, 68, 0.22);
 }
 
 /* Contact Modal Styles */
@@ -381,5 +384,8 @@
 }
 [data-theme="light"] .popover-item { color: #000000 !important; }
 [data-theme="light"] .popover-item:hover { color: #000000 !important; background: #f1f5f9; }
+[data-theme="light"] .popover-divider { background: #e2e8f0; }
+[data-theme="light"] .popover-item.logout { color: #dc2626 !important; }
+[data-theme="light"] .popover-item.logout:hover { color: #b91c1c !important; background: #fee2e2 !important; }
 [data-theme="light"] .contact-success-state h4 { color: #000000 !important; }
 

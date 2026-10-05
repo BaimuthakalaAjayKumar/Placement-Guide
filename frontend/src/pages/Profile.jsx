@@ -1,10 +1,15 @@
 import React, { useState, useEffect } from 'react';
+import { Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import Header from '../components/Header';
 import './Profile.css';
 
 const Profile = () => {
   const { user, updateProfile } = useAuth();
+
+  if (user?.role === 'admin') {
+    return <Navigate to="/admin" replace />;
+  }
 
   // Profile settings state
   const [targetRole, setTargetRole] = useState(user?.targetRole || 'Software Engineer');

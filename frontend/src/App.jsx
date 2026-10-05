@@ -324,7 +324,7 @@ const AppRoutes = () => {
       <Route
         path="/profile"
         element={
-          <PrivateRoute allowedRoles={['student', 'faculty', 'admin', 'hod', 'recruiter']}>
+          <PrivateRoute allowedRoles={['student', 'faculty', 'hod', 'recruiter']}>
             <Profile />
           </PrivateRoute>
         }
