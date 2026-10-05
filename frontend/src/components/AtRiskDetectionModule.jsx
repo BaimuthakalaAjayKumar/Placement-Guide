@@ -112,12 +112,19 @@ const AtRiskDetectionModule = ({ userRole = 'faculty', onSelectStudent }) => {
 
   // Open Lock / Unlock Modal
   const openLockModal = (student, isLocking) => {
+    if (!isLocking && userRole !== 'admin') {
+      alert('🔒 Access Restricted: As per college placement policy, only the Administrator or Main Admin is authorized to revoke student dashboard locks. Faculty coordinators cannot remove locks.');
+      return;
+    }
+
     setLockModal({
       isOpen: true,
       student,
       isLocking,
       reason: isLocking
-        ? (student.metrics?.daysInactive >= 7
+        ? (student.riskScore > 65
+            ? `Placement Risk Factor reached ${student.riskScore}% (Exceeded 65% critical limit)`
+            : student.metrics?.daysInactive >= 7
             ? `Inactive for ${student.metrics?.daysInactive} days (Exceeded 7-day policy threshold)`
             : 'Dashboard access locked by Administrator')
         : '',
@@ -177,7 +184,7 @@ const AtRiskDetectionModule = ({ userRole = 'faculty', onSelectStudent }) => {
     }
   };
 
-  // Batch Auto-Lock 7+ days
+  // Batch Auto-Lock 7+ days Inactive
   const handleAutoLock7Days = async () => {
     const eligibleStudents = (data.students || []).filter(s => !s.isLocked && s.metrics?.daysInactive >= 7);
     if (eligibleStudents.length === 0) {
@@ -203,6 +210,32 @@ const AtRiskDetectionModule = ({ userRole = 'faculty', onSelectStudent }) => {
     }
   };
 
+  // Batch Auto-Lock Risk Factor > 65%
+  const handleAutoLockHighRisk = async () => {
+    const eligibleStudents = (data.students || []).filter(s => !s.isLocked && s.riskScore > 65);
+    if (eligibleStudents.length === 0) {
+      alert('All students with Risk Factor > 65% have already been automatically locked.');
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Found ${eligibleStudents.length} student(s) with Placement Risk Factor > 65%.\n\nDo you want to enforce AUTOMATIC LOCK on their Student Dashboards and dispatch alerts to their Email and WhatsApp?`
+    );
+    if (!confirmed) return;
+
+    try {
+      setLoading(true);
+      const res = await axios.post(`${API_URL}/at-risk/auto-lock-high-risk`, {}, getAuthHeaders());
+      if (res.data?.success) {
+        alert(res.data.message || `Successfully locked ${res.data.lockedCount} students with Risk Factor > 65%.`);
+        fetchAtRiskSummary();
+      }
+    } catch (err) {
+      alert(err.response?.data?.error || 'Failed to auto-lock high risk students.');
+      setLoading(false);
+    }
+  };
+
   // Filter students
   const filteredStudents = (data.students || []).filter(s => {
     const matchesSearch = !searchTerm ||
@@ -211,15 +244,18 @@ const AtRiskDetectionModule = ({ userRole = 'faculty', onSelectStudent }) => {
       (s.rollNo && s.rollNo.toLowerCase().includes(searchTerm.toLowerCase()));
 
     const matchesRisk = selectedRiskLevel === 'all' ||
-      (selectedRiskLevel === 'high' && s.riskLevel === 'High') ||
+      (selectedRiskLevel === 'high' && (s.riskLevel === 'High' || s.riskLevel === 'Critical' || s.riskScore > 65)) ||
       (selectedRiskLevel === 'medium' && s.riskLevel === 'Medium') ||
       (selectedRiskLevel === 'low' && s.riskLevel === 'Low');
 
     const matchesStatus = selectedStatus === 'all' ||
       (selectedStatus === 'locked' && s.isLocked) ||
+      (selectedStatus === 'risk65' && s.riskScore > 65) ||
+      (selectedStatus === 'risk40' && s.riskScore > 40) ||
+      (selectedStatus === 'warned' && s.warningSent) ||
       (selectedStatus === 'inactive7' && s.metrics?.daysInactive >= 7) ||
       (selectedStatus === 'inactive5' && s.metrics?.daysInactive >= 5) ||
-      (selectedStatus === 'active' && !s.isLocked && (s.metrics?.daysInactive || 0) < 5);
+      (selectedStatus === 'active' && !s.isLocked && s.riskScore <= 40 && (s.metrics?.daysInactive || 0) < 5);
 
     const matchesBranch = selectedBranch === 'all' || (s.branch && s.branch.toLowerCase() === selectedBranch.toLowerCase());
     const matchesBatch = selectedBatch === 'all' || (s.batch && String(s.batch).includes(selectedBatch));
@@ -246,20 +282,27 @@ const AtRiskDetectionModule = ({ userRole = 'faculty', onSelectStudent }) => {
           <div>
             <h2 className="at-risk-main-title">Automated Student At-Risk &amp; Inactivity Detection Engine</h2>
             <p className="at-risk-subtitle">
-              Automated multi-factor monitoring: sends automatic email notifications at <strong>5 days of inactivity</strong>, flags stagnation, and enforces <strong>dashboard locking at 7 days</strong> by Administrator &amp; Main Admin.
+              Automated multi-factor monitoring: dispatches warning notifications to student <strong>Email &amp; WhatsApp at Risk Factor &gt; 40%</strong>, and enforces <strong>automated dashboard locking at Risk Factor &gt; 65%</strong>. Revocation strictly requires Administrator or Main Admin clearance.
             </p>
           </div>
         </div>
         <div className="at-risk-header-actions">
           <button
+            className="btn-auto-lock-risk"
+            onClick={handleAutoLockHighRisk}
+            title="Enforce automated dashboard locking for all students with Risk Factor > 65%"
+          >
+            ⚡ Auto-Lock High Risk (&gt;65%)
+          </button>
+          <button
             className="btn-auto-lock"
             onClick={handleAutoLock7Days}
             title="Automatically lock student dashboards for those with 7+ days of inactivity"
           >
-            ⚡ Auto-Lock Inactive (7+ Days)
+            ⏱️ Auto-Lock 7+ Days Inactive
           </button>
           <button className="btn-refresh" onClick={fetchAtRiskSummary} disabled={loading}>
-            {loading ? 'Analyzing...' : '🔄 Refresh Risk Heuristics'}
+            {loading ? 'Analyzing...' : '🔄 Refresh Risk Data'}
           </button>
         </div>
       </div>
@@ -268,64 +311,79 @@ const AtRiskDetectionModule = ({ userRole = 'faculty', onSelectStudent }) => {
       <div className="inactivity-policy-banner">
         <div className="policy-pill-step">
           <span className="step-num">Step 1</span>
-          <span className="step-text"><strong>5 Days Inactive:</strong> Automatic email warning sent to student registered email</span>
+          <span className="step-text"><strong>Risk &gt; 40%:</strong> Warning notification dispatched to student registered Email &amp; WhatsApp</span>
         </div>
         <span className="policy-arrow">→</span>
         <div className="policy-pill-step urgent">
           <span className="step-num">Step 2</span>
-          <span className="step-text"><strong>7 Days Inactive:</strong> Dashboard lock enforced by Administrator &amp; Main Admin</span>
+          <span className="step-text"><strong>Risk &gt; 65% (or 7d Inactive):</strong> Student Dashboard automatically LOCKED by system policy</span>
         </div>
         <span className="policy-arrow">→</span>
         <div className="policy-pill-step success">
           <span className="step-num">Step 3</span>
-          <span className="step-text"><strong>Reinstatement:</strong> One-click unlock &amp; restoration by Main Admin</span>
+          <span className="step-text"><strong>Revocation:</strong> Student must contact Administrator or Main Admin to remove lock</span>
         </div>
       </div>
 
       {/* KPI Cards Row */}
       <div className="at-risk-kpi-grid">
-        <div className="at-risk-kpi-card highlight-attention">
+        <div
+          className="at-risk-kpi-card danger-locked"
+          onClick={() => setSelectedStatus('risk65')}
+          style={{ cursor: 'pointer' }}
+          title="Click to filter students with Risk Factor > 65%"
+        >
+          <div className="kpi-icon">🚨</div>
+          <div className="kpi-body">
+            <span className="kpi-value">{data.stats?.riskOver65Count || 0}</span>
+            <span className="kpi-label">Risk Factor &gt; 65%</span>
+            <span className="kpi-subtext">Auto-Locked by Policy</span>
+          </div>
+        </div>
+
+        <div
+          className="at-risk-kpi-card warning-email"
+          onClick={() => setSelectedStatus('risk40')}
+          style={{ cursor: 'pointer' }}
+          title="Click to filter students with Risk Factor > 40%"
+        >
           <div className="kpi-icon">⚠️</div>
           <div className="kpi-body">
-            <span className="kpi-value">{data.stats?.atRiskCount || 0}</span>
-            <span className="kpi-label">Students Require Attention</span>
-            <span className="kpi-subtext">Triggered urgent remedial threshold</span>
+            <span className="kpi-value">{data.stats?.riskOver40Count || 0}</span>
+            <span className="kpi-label">Risk Factor &gt; 40%</span>
+            <span className="kpi-subtext">Email &amp; WhatsApp Alerted</span>
           </div>
         </div>
 
-        <div className="at-risk-kpi-card warning-email">
-          <div className="kpi-icon">📧</div>
-          <div className="kpi-body">
-            <span className="kpi-value">{data.stats?.inactive5Days || 0}</span>
-            <span className="kpi-label">5+ Days Inactive</span>
-            <span className="kpi-subtext">Automated email warning dispatched</span>
-          </div>
-        </div>
-
-        <div className="at-risk-kpi-card danger-locked">
+        <div
+          className="at-risk-kpi-card danger-locked"
+          onClick={() => setSelectedStatus('locked')}
+          style={{ cursor: 'pointer' }}
+          title="Click to filter all locked dashboards"
+        >
           <div className="kpi-icon">🔒</div>
           <div className="kpi-body">
             <span className="kpi-value">{data.stats?.lockedCount || 0}</span>
             <span className="kpi-label">Dashboards Locked</span>
-            <span className="kpi-subtext">Enforced by Admin</span>
+            <span className="kpi-subtext">Admin Revocation Required</span>
           </div>
         </div>
 
-        <div className="at-risk-kpi-card danger">
-          <div className="kpi-icon">🔴</div>
+        <div className="at-risk-kpi-card highlight-attention">
+          <div className="kpi-icon">📋</div>
           <div className="kpi-body">
-            <span className="kpi-value">{data.stats?.highRisk || 0}</span>
-            <span className="kpi-label">High Risk Level</span>
-            <span className="kpi-subtext">Risk score &ge; 50/100</span>
+            <span className="kpi-value">{data.stats?.atRiskCount || 0}</span>
+            <span className="kpi-label">Requires Attention</span>
+            <span className="kpi-subtext">High / Critical risk</span>
           </div>
         </div>
 
-        <div className="at-risk-kpi-card warning">
-          <div className="kpi-icon">🟠</div>
+        <div className="at-risk-kpi-card warning-email">
+          <div className="kpi-icon">⏱️</div>
           <div className="kpi-body">
-            <span className="kpi-value">{data.stats?.mediumRisk || 0}</span>
-            <span className="kpi-label">Moderate Risk</span>
-            <span className="kpi-subtext">Risk score 30 - 49/100</span>
+            <span className="kpi-value">{data.stats?.inactive7Days || 0}</span>
+            <span className="kpi-label">7+ Days Inactive</span>
+            <span className="kpi-subtext">Severe inactivity</span>
           </div>
         </div>
 
@@ -334,7 +392,7 @@ const AtRiskDetectionModule = ({ userRole = 'faculty', onSelectStudent }) => {
           <div className="kpi-body">
             <span className="kpi-value">{data.stats?.lowRisk || 0}</span>
             <span className="kpi-label">Stable / On Track</span>
-            <span className="kpi-subtext">Active &amp; progressing steadily</span>
+            <span className="kpi-subtext">Low risk score</span>
           </div>
         </div>
 
@@ -363,16 +421,19 @@ const AtRiskDetectionModule = ({ userRole = 'faculty', onSelectStudent }) => {
 
         <div className="filter-dropdowns">
           <select value={selectedStatus} onChange={(e) => setSelectedStatus(e.target.value)}>
-            <option value="all">All Inactivity &amp; Lock Statuses</option>
-            <option value="locked">🔒 Locked Dashboards Only ({data.stats?.lockedCount || 0})</option>
-            <option value="inactive7">🚨 Inactive 7+ Days (Lock Eligible)</option>
-            <option value="inactive5">⚠️ Inactive 5+ Days (Warned)</option>
-            <option value="active">🟢 Active / Progressing</option>
+            <option value="all">All Statuses</option>
+            <option value="risk65">🚨 Risk Factor &gt; 65% (Auto-Locked) ({data.stats?.riskOver65Count || 0})</option>
+            <option value="risk40">⚠️ Risk Factor &gt; 40% (Warning Active) ({data.stats?.riskOver40Count || 0})</option>
+            <option value="locked">🔒 All Locked Dashboards ({data.stats?.lockedCount || 0})</option>
+            <option value="warned">📧 Mail &amp; 💬 WhatsApp Dispatched ({data.stats?.warningSentCount || 0})</option>
+            <option value="inactive7">⏱️ Inactive 7+ Days</option>
+            <option value="inactive5">⚠️ Inactive 5+ Days</option>
+            <option value="active">🟢 Active &amp; On Track</option>
           </select>
 
           <select value={selectedRiskLevel} onChange={(e) => setSelectedRiskLevel(e.target.value)}>
             <option value="all">All Risk Levels</option>
-            <option value="high">🔴 High Risk Only</option>
+            <option value="high">🔴 High / Critical Risk</option>
             <option value="medium">🟠 Moderate Risk Only</option>
             <option value="low">🟢 Stable Only</option>
           </select>
@@ -441,6 +502,14 @@ const AtRiskDetectionModule = ({ userRole = 'faculty', onSelectStudent }) => {
                         <span className="lock-badge-pill locked">
                           🔒 DASHBOARD LOCKED
                         </span>
+                      ) : student.riskScore > 65 ? (
+                        <span className="lock-badge-pill critical">
+                          🚨 Risk &gt; 65% (Critical)
+                        </span>
+                      ) : student.riskScore > 40 ? (
+                        <span className="risk-badge-pill warning">
+                          ⚠️ Risk &gt; 40% (Warning)
+                        </span>
                       ) : (
                         <span className={`risk-badge-pill ${student.riskLevel.toLowerCase()}`}>
                           {isHigh ? '🔴 High Risk' : isMedium ? '🟠 Moderate Risk' : '🟢 Stable'}
@@ -455,15 +524,25 @@ const AtRiskDetectionModule = ({ userRole = 'faculty', onSelectStudent }) => {
                       <span className="meta-chip highlight">CGPA: {student.metrics?.cgpa || 'N/A'}</span>
                     </div>
 
-                    {/* Inactivity Status Badges */}
+                    {/* Inactivity & Risk Factor Status Badges */}
                     <div className="inactivity-status-row">
+                      {student.riskScore > 65 ? (
+                        <span className="inactivity-pill critical">
+                          🚨 Risk Factor: {student.riskScore}% (&gt;65% Critical Lock)
+                        </span>
+                      ) : student.riskScore > 40 ? (
+                        <span className="inactivity-pill warning">
+                          ⚠️ Risk Factor: {student.riskScore}% (&gt;40% Warning Active)
+                        </span>
+                      ) : null}
+
                       {is7DaysInactive ? (
                         <span className="inactivity-pill critical">
-                          🚨 Inactive: {daysInactive} Days (Lock Eligible)
+                          ⏱️ Inactive: {daysInactive} Days (7d Limit)
                         </span>
                       ) : is5DaysInactive ? (
                         <span className="inactivity-pill warning">
-                          ⚠️ Inactive: {daysInactive} Days (5-Day Email Dispatched)
+                          ⏱️ Inactive: {daysInactive} Days (5d Warned)
                         </span>
                       ) : (
                         <span className="inactivity-pill normal">
@@ -471,9 +550,9 @@ const AtRiskDetectionModule = ({ userRole = 'faculty', onSelectStudent }) => {
                         </span>
                       )}
 
-                      {student.inactivityWarningSentAt && (
-                        <span className="email-notified-tag" title="5-day warning email was delivered">
-                          ✉️ Warning Sent
+                      {(student.riskWarningSentAt || student.warningSent) && (
+                        <span className="email-notified-tag" title="Alert dispatched to student registered Email & WhatsApp">
+                          ✉️ Email &amp; 💬 WhatsApp Sent
                         </span>
                       )}
                     </div>
@@ -490,7 +569,9 @@ const AtRiskDetectionModule = ({ userRole = 'faculty', onSelectStudent }) => {
                 <div className="student-flags-col">
                   <div className="flags-header">
                     <span className="flags-label">Detected Risk Factors</span>
-                    <span className="risk-score-tag">Risk Score: {student.riskScore}/100</span>
+                    <span className={`risk-score-tag ${student.riskScore > 65 ? 'score-critical' : student.riskScore > 40 ? 'score-warning' : ''}`}>
+                      Risk Score: {student.riskScore}/100
+                    </span>
                   </div>
                   <div className="flags-pills-wrap">
                     {student.flags && student.flags.length > 0 ? (
@@ -513,20 +594,30 @@ const AtRiskDetectionModule = ({ userRole = 'faculty', onSelectStudent }) => {
 
                 {/* Right: Intervention & Lock Actions */}
                 <div className="student-actions-col">
-                  {/* Lock / Unlock Toggle Button for Administrator & Main Admin */}
+                  {/* Lock / Unlock Toggle Button: Restricted to Administrator & Main Admin for Revocation */}
                   {isLocked ? (
-                    <button
-                      className="btn-unlock-action"
-                      onClick={() => openLockModal(student, false)}
-                      title="Restore full dashboard access for this student"
-                    >
-                      🔓 Unlock Dashboard
-                    </button>
+                    userRole === 'admin' ? (
+                      <button
+                        className="btn-unlock-action"
+                        onClick={() => openLockModal(student, false)}
+                        title="Restore full dashboard access for this student (Admin Only)"
+                      >
+                        🔓 Unlock Dashboard (Admin)
+                      </button>
+                    ) : (
+                      <button
+                        className="btn-locked-restricted"
+                        onClick={() => alert(`Student ${student.name}'s Dashboard is locked. As per college policy, to remove this lock they have to contact the Administrator or Main Admin.`)}
+                        title="Only Administrator or Main Admin can remove dashboard locks"
+                      >
+                        🔒 Locked (Admin Revocation)
+                      </button>
+                    )
                   ) : (
                     <button
-                      className={`btn-lock-action ${is7DaysInactive ? 'urgent-lock' : ''}`}
+                      className={`btn-lock-action ${student.riskScore > 65 || is7DaysInactive ? 'urgent-lock' : ''}`}
                       onClick={() => openLockModal(student, true)}
-                      title={is7DaysInactive ? 'Enforce 7-day inactivity lock policy' : 'Lock student dashboard access'}
+                      title={student.riskScore > 65 ? 'Enforce Risk Factor > 65% Lock Policy' : is7DaysInactive ? 'Enforce 7-day inactivity lock policy' : 'Lock student dashboard access'}
                     >
                       🔒 Lock Dashboard
                     </button>
@@ -535,7 +626,7 @@ const AtRiskDetectionModule = ({ userRole = 'faculty', onSelectStudent }) => {
                   <button
                     className="btn-intervene"
                     onClick={() => openIntervention(student)}
-                    title="Send immediate faculty notice or counseling request"
+                    title="Send immediate notice or counseling request via Email & WhatsApp"
                   >
                     🔔 Intervene &amp; Notify
                   </button>
@@ -564,7 +655,7 @@ const AtRiskDetectionModule = ({ userRole = 'faculty', onSelectStudent }) => {
                 <span className="modal-icon">{lockModal.isLocking ? '🔒' : '🔓'}</span>
                 <div>
                   <h3 className="modal-heading">
-                    {lockModal.isLocking ? 'Lock Student Dashboard' : 'Unlock Student Dashboard'}
+                    {lockModal.isLocking ? 'Lock Student Dashboard' : 'Revoke Dashboard Lock (Admin)'}
                   </h3>
                   <span className="modal-sub">
                     Authorized Action by Administrator &amp; Main Admin for {lockModal.student?.name} ({lockModal.student?.rollNo || lockModal.student?.email})
@@ -585,12 +676,12 @@ const AtRiskDetectionModule = ({ userRole = 'faculty', onSelectStudent }) => {
                 <h4>
                   {lockModal.isLocking
                     ? 'Student Dashboard Successfully Locked!'
-                    : 'Student Dashboard Successfully Restored!'}
+                    : 'Student Dashboard Lock Successfully Revoked!'}
                 </h4>
                 <p>
                   {lockModal.isLocking
-                    ? 'The student will be blocked from accessing dashboard modules and has been notified via official email.'
-                    : 'The student can now log in and resume preparation immediately.'}
+                    ? 'The student will be blocked from accessing dashboard modules and has been notified via official Email and WhatsApp.'
+                    : 'Full access has been restored. 3-day grace period granted. Notification dispatched to student Email and WhatsApp.'}
                 </p>
               </div>
             ) : (
@@ -601,6 +692,12 @@ const AtRiskDetectionModule = ({ userRole = 'faculty', onSelectStudent }) => {
                     <strong>{lockModal.student?.name}</strong>
                   </div>
                   <div className="summary-item">
+                    <span>Risk Factor Score:</span>
+                    <strong style={{ color: (lockModal.student?.riskScore || 0) > 65 ? '#EF4444' : (lockModal.student?.riskScore || 0) > 40 ? '#F59E0B' : '#10B981' }}>
+                      {lockModal.student?.riskScore || 0}%
+                    </strong>
+                  </div>
+                  <div className="summary-item">
                     <span>Inactivity Duration:</span>
                     <strong style={{ color: (lockModal.student?.metrics?.daysInactive || 0) >= 7 ? '#EF4444' : '#F59E0B' }}>
                       {lockModal.student?.metrics?.daysInactive || 0} Days
@@ -609,7 +706,9 @@ const AtRiskDetectionModule = ({ userRole = 'faculty', onSelectStudent }) => {
                   <div className="summary-item">
                     <span>Policy Status:</span>
                     <span>
-                      {(lockModal.student?.metrics?.daysInactive || 0) >= 7
+                      {(lockModal.student?.riskScore || 0) > 65
+                        ? '🚨 Meets Risk Factor > 65% Auto-Lock Criterion'
+                        : (lockModal.student?.metrics?.daysInactive || 0) >= 7
                         ? '🚨 Meets 7-Day Inactivity Lock Criterion'
                         : '⚠️ Administrator Discretionary Lock'}
                     </span>
@@ -623,10 +722,20 @@ const AtRiskDetectionModule = ({ userRole = 'faculty', onSelectStudent }) => {
                       rows={3}
                       required
                       value={lockModal.reason}
-                      placeholder="e.g. Inactive for 7+ days (Automated Policy Compliance)..."
+                      placeholder="e.g. Placement Risk Factor reached 75% (>65% critical policy limit)..."
                       onChange={(e) => setLockModal(prev => ({ ...prev, reason: e.target.value }))}
                     />
                     <div className="quick-templates-wrap" style={{ marginTop: '0.5rem' }}>
+                      <button
+                        type="button"
+                        className="template-btn"
+                        onClick={() => setLockModal(prev => ({
+                          ...prev,
+                          reason: `Placement Risk Factor reached ${lockModal.student?.riskScore || 70}% (Exceeded 65% critical limit)`
+                        }))}
+                      >
+                        Risk Factor &gt; 65% Lock
+                      </button>
                       <button
                         type="button"
                         className="template-btn"
@@ -645,7 +754,7 @@ const AtRiskDetectionModule = ({ userRole = 'faculty', onSelectStudent }) => {
                           reason: 'Repeated non-attendance in mandatory placement tests & mock sessions'
                         }))}
                       >
-                        Attendance Non-Compliance
+                        Assessment Non-Compliance
                       </button>
                     </div>
                   </div>
@@ -653,7 +762,7 @@ const AtRiskDetectionModule = ({ userRole = 'faculty', onSelectStudent }) => {
 
                 {!lockModal.isLocking && (
                   <p style={{ color: '#CBD5E1', fontSize: '0.9rem', lineHeight: '1.5' }}>
-                    Unlocking will immediately restore full portal access for <strong>{lockModal.student?.name}</strong> and send an access restoration email.
+                    Revoking this lock will immediately restore full portal access for <strong>{lockModal.student?.name}</strong>, grant a 3-day grace period, and dispatch restoration notifications via <strong>Email and WhatsApp</strong>.
                   </p>
                 )}
 

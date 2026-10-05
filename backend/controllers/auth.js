@@ -161,13 +161,9 @@ exports.login = async (req, res, next) => {
       });
     }
 
-    // Check if student account is locked by Administrator / Main Admin
+    // If student account is locked by policy, update session and send token so App.jsx renders the locked recovery screen
     if (user.role === 'student' && user.isLocked) {
-      return res.status(403).json({
-        success: false,
-        isLocked: true,
-        error: `Your Student Dashboard is locked due to ${user.lockReason || '7+ days of inactivity'}. Please contact the College Administrator or Main Admin to restore your access.`
-      });
+      console.log(`[AUTH] Student ${user.email} logged in with LOCKED status. Presenting locked recovery interface.`);
     }
 
     // Extract client network IP and browser agent

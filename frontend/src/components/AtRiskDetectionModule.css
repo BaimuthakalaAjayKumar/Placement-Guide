@@ -977,3 +977,68 @@
   background: #059669;
 }
 
+/* Auto Lock High Risk (>65%) Header Button */
+.btn-auto-lock-risk {
+  background: linear-gradient(135deg, #EF4444, #B91C1C);
+  border: 1px solid rgba(239, 68, 68, 0.6);
+  color: #FFFFFF;
+  padding: 0.6rem 1.1rem;
+  border-radius: 10px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 14px rgba(239, 68, 68, 0.35);
+}
+
+.btn-auto-lock-risk:hover {
+  background: #DC2626;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px rgba(239, 68, 68, 0.5);
+}
+
+/* Restricted Lock Button (Non-Admin View) */
+.btn-locked-restricted {
+  background: rgba(239, 68, 68, 0.12);
+  border: 1px dashed rgba(239, 68, 68, 0.55);
+  color: #FCA5A5;
+  padding: 0.55rem 0.9rem;
+  border-radius: 8px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-locked-restricted:hover {
+  background: rgba(239, 68, 68, 0.22);
+  border-color: #EF4444;
+  color: #FFFFFF;
+}
+
+/* Critical & Warning Score Badges */
+.risk-score-tag.score-critical {
+  color: #EF4444 !important;
+  font-weight: 800;
+  text-shadow: 0 0 10px rgba(239, 68, 68, 0.4);
+}
+
+.risk-score-tag.score-warning {
+  color: #F59E0B !important;
+  font-weight: 800;
+}
+
+.lock-badge-pill.critical {
+  background: rgba(239, 68, 68, 0.22);
+  border: 1px solid #EF4444;
+  color: #FCA5A5;
+  font-size: 0.72rem;
+  font-weight: 800;
+  padding: 0.2rem 0.6rem;
+  border-radius: 20px;
+  letter-spacing: 0.4px;
+}
+

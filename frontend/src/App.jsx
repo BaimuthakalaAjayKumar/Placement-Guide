@@ -80,6 +80,8 @@ const PrivateRoute = ({ children, allowedRoles }) => {
 
   // Check if Student Dashboard has been locked by Administrator & Main Admin
   if (user.role === 'student' && user.isLocked) {
+    const isRiskLock = user.lockReason?.toLowerCase().includes('risk') || user.lockReason?.includes('65');
+
     return (
       <div className="main-container">
         <Sidebar />
@@ -87,10 +89,14 @@ const PrivateRoute = ({ children, allowedRoles }) => {
           <div className="student-locked-modal-card">
             <div className="locked-icon-badge">🔒</div>
             <h1 className="locked-title">Student Dashboard Locked</h1>
-            <div className="locked-policy-tag">Inactivity Policy Enforced (7+ Days)</div>
+            <div className="locked-policy-tag">
+              {isRiskLock
+                ? '🚨 High Placement Risk Policy Enforced (>65% Risk Factor)'
+                : '⚠️ Placement Policy Compliance Lock'}
+            </div>
             <p className="locked-desc">
-              Your access to the Student Placement Dashboard has been locked by the
-              <strong> Administrator &amp; Main Admin</strong>.
+              Your access to the Student Placement Dashboard has been locked due to high placement risk or inactivity.
+              To revoke this lock, you must contact either the <strong>Administrator</strong> or <strong>Main Admin</strong>.
             </p>
 
             <div className="locked-details-box">
@@ -104,11 +110,13 @@ const PrivateRoute = ({ children, allowedRoles }) => {
               </div>
               <div className="locked-info-row">
                 <span>Lock Reason:</span>
-                <strong style={{ color: '#F87171' }}>{user.lockReason || 'Extended platform inactivity (7+ days)'}</strong>
+                <strong style={{ color: '#F87171' }}>
+                  {user.lockReason || 'Placement Risk Factor exceeded 65% critical threshold'}
+                </strong>
               </div>
               <div className="locked-info-row">
                 <span>Locked By:</span>
-                <strong>{user.lockedByName || 'College Administrator / Main Admin'}</strong>
+                <strong>{user.lockedByName || 'Automated Risk Engine (Admin Enforcement)'}</strong>
               </div>
               {user.lockedAt && (
                 <div className="locked-info-row">
@@ -119,11 +127,15 @@ const PrivateRoute = ({ children, allowedRoles }) => {
             </div>
 
             <div className="locked-instructions">
-              <h4>📋 How to Restore Dashboard Access:</h4>
+              <h4>📋 Mandatory Procedure to Revoke Dashboard Lock:</h4>
               <p>
-                1. Contact the Training &amp; Placement Cell or Main Admin (<a href="mailto:vaddeajaykumar2004@gmail.com">vaddeajaykumar2004@gmail.com</a>).<br />
-                2. Explain the circumstances for the inactive period.<br />
-                3. Once authorized and unlocked by the Administrator, click <strong>"Check Unlock Status"</strong> below.
+                As per college placement regulations, this lock can <strong>ONLY be revoked by an Administrator or the Main Admin</strong>. Faculty coordinators do not have unlocking authority.
+              </p>
+              <p style={{ marginTop: '0.5rem' }}>
+                1. Contact the Training &amp; Placement Administrator or Main Admin (<a href="mailto:vaddeajaykumar2004@gmail.com">vaddeajaykumar2004@gmail.com</a>) or visit the T&amp;P Cell (Admin Block, Ground Floor).<br />
+                2. Review your assessment deficit and commit to the recommended remedial preparation schedule.<br />
+                3. Once approved, the Administrator or Main Admin will remove the lock on your dashboard.<br />
+                4. Click <strong>"Check Unlock Status"</strong> below to refresh your access.
               </p>
             </div>
 

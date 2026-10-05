@@ -340,6 +340,22 @@ server.listen(PORT, '0.0.0.0', () => {
       process.env.NODE_ENV || 'development'
     } mode on port ${PORT}`
   );
+
+  // Initialize automated 24/7 At-Risk Assessment & Policy Enforcement Engine
+  try {
+    const { runAutomatedRiskCheck } = require('./controllers/atRisk');
+    // Initial evaluation 15 seconds after boot
+    setTimeout(() => {
+      runAutomatedRiskCheck().catch(err => console.warn('Startup risk check warning:', err.message));
+    }, 15000);
+    // Recurring evaluation every 30 minutes
+    setInterval(() => {
+      runAutomatedRiskCheck().catch(err => console.warn('Periodic risk check warning:', err.message));
+    }, 30 * 60 * 1000);
+    console.log('[AT-RISK ENGINE] 24/7 Automated Risk Policy Engine initialized.');
+  } catch (err) {
+    console.warn('Failed to initialize At-Risk Engine on server:', err.message);
+  }
 });
 
 // ============================================================

@@ -5,7 +5,8 @@ const {
   getAtRiskStudents,
   sendInterventionNotice,
   toggleStudentDashboardLock,
-  autoLockInactiveStudents
+  autoLockInactiveStudents,
+  autoLockHighRiskStudents
 } = require('../controllers/atRisk');
 
 router.use(protect);
@@ -17,5 +18,6 @@ router.post('/notify', sendInterventionNotice);
 router.post('/intervention', sendInterventionNotice);
 router.post('/toggle-lock', toggleStudentDashboardLock);
 router.post('/auto-lock-inactive', autoLockInactiveStudents);
+router.post('/auto-lock-high-risk', autoLockHighRiskStudents);
 
 module.exports = router;

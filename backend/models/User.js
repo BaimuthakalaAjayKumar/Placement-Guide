@@ -257,6 +257,26 @@ const UserSchema = new mongoose.Schema({
     type: Date,
     default: null
   },
+  riskScore: {
+    type: Number,
+    default: 0
+  },
+  riskLevel: {
+    type: String,
+    default: 'Low'
+  },
+  riskWarningSentAt: {
+    type: Date,
+    default: null
+  },
+  lastRiskWarningScore: {
+    type: Number,
+    default: 0
+  },
+  lockExemptionUntil: {
+    type: Date,
+    default: null
+  },
   resetPasswordToken: String,
   resetPasswordExpire: Date,
   createdAt: {

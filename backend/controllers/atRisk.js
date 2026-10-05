@@ -5,6 +5,7 @@ const MockInterview = require('../models/MockInterview');
 const Notification = require('../models/Notification');
 const { logActivity } = require('../utils/auditLogger');
 const sendEmail = require('../utils/sendEmail');
+const { sendWhatsAppMessage } = require('../utils/sendWhatsApp');
 
 // Helper to get portal base URL for email links
 const getPortalUrl = () => {
@@ -104,12 +105,199 @@ const sendInactivityWarningEmail = async (student, daysInactive) => {
   }
 };
 
+// Helper: Dispatch Risk Factor > 40% Warning Email
+const sendRiskWarningEmail = async (student, riskScore, flags = []) => {
+  try {
+    const portalUrl = getPortalUrl();
+    const emailSubject = `⚠️ Urgent Placement Alert: Placement Risk Factor Warning (${riskScore}% > 40%)`;
+    const flagsListText = (flags || []).slice(0, 4).map(f => `- ${f.title || f}: ${f.detail || ''}`).join('\n');
+    const emailText = `Dear ${student.name},\n\nOur Placement Risk Analysis Engine has detected that your current Placement Risk Factor is ${riskScore}%, which exceeds the warning threshold of 40%.\n\nContributing Factors:\n${flagsListText}\n\nIMPORTANT POLICY NOTICE:\nIf your Risk Factor reaches or exceeds 65%, your Student Dashboard will be AUTOMATICALLY LOCKED by the system. Once locked, only the Administrator or Main Admin can restore your access.\n\nPlease log in today to attempt practice tests and complete your resume:\n${portalUrl}/login\n\nTraining & Placement Cell, GRIET`;
+
+    const flagsHtml = (flags || []).slice(0, 4).map(f => `
+      <li style="margin-bottom: 6px; color: #cbd5e1;">
+        <strong style="color: #f1f5f9;">${f.title || f}:</strong> <span style="color: #94a3b8;">${f.detail || ''}</span>
+      </li>
+    `).join('');
+
+    const emailHtml = `
+      <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; background: #0f172a; color: #f8fafc; border-radius: 12px; overflow: hidden; border: 1px solid #334155;">
+        <div style="background: linear-gradient(135deg, #f59e0b, #d97706); padding: 24px; text-align: center;">
+          <h1 style="margin: 0; color: #ffffff; font-size: 22px; font-weight: 800; letter-spacing: 0.5px;">⚠️ PLACEMENT RISK FACTOR WARNING</h1>
+          <p style="margin: 6px 0 0 0; color: #fef3c7; font-size: 14px;">Current Risk Factor: <strong>${riskScore}%</strong> (Threshold: &gt;40%)</p>
+        </div>
+
+        <div style="padding: 26px 28px;">
+          <p style="font-size: 16px; margin-top: 0;">Dear <strong>${student.name}</strong>,</p>
+          <p style="font-size: 14px; line-height: 1.6; color: #cbd5e1;">
+            Our automated monitoring system detected that your <strong>Placement Risk Factor has reached ${riskScore}%</strong>. This metric reflects your platform engagement, assessment performance, and placement readiness.
+          </p>
+
+          <div style="background: #1e293b; border-left: 4px solid #ef4444; padding: 16px 20px; margin: 20px 0; border-radius: 6px;">
+            <h4 style="margin: 0 0 8px 0; color: #f87171; font-size: 15px;">🚨 Mandatory Institutional Policy: 65% Auto-Lock Rule</h4>
+            <p style="margin: 0; font-size: 13px; color: #cbd5e1; line-height: 1.6;">
+              If your Risk Factor reaches or exceeds <strong>65%</strong>, your <strong>Student Dashboard will be AUTOMATICALLY LOCKED</strong> by the portal. Once locked, <strong>only the Administrator or Main Admin</strong> is authorized to remove the lock. Faculty coordinators cannot revoke the lock.
+            </p>
+          </div>
+
+          <div style="background: #111827; padding: 16px 20px; border-radius: 8px; margin: 18px 0; border: 1px solid #1f2937;">
+            <h5 style="margin: 0 0 10px 0; color: #fbbf24; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px;">Key Deficits Impacting Your Score:</h5>
+            <ul style="margin: 0; padding-left: 18px; font-size: 13px; line-height: 1.6;">
+              ${flagsHtml || '<li style="color: #94a3b8;">Inactivity and incomplete practice assessments.</li>'}
+            </ul>
+          </div>
+
+          <div style="text-align: center; margin: 28px 0 16px 0;">
+            <a href="${portalUrl}/login" style="background: linear-gradient(135deg, #f59e0b, #d97706); color: #ffffff; text-decoration: none; padding: 13px 32px; border-radius: 8px; font-weight: bold; font-size: 14px; display: inline-block; box-shadow: 0 4px 14px rgba(245, 158, 11, 0.4);">
+              🚀 Log In &amp; Resume Preparation Now
+            </a>
+          </div>
+
+          <p style="font-size: 12px; color: #64748b; border-top: 1px solid #334155; padding-top: 14px; margin-top: 24px; text-align: center;">
+            Training &amp; Placement Cell, Gokaraju Rangaraju Institute of Engineering &amp; Technology (GRIET).
+          </p>
+        </div>
+      </div>
+    `;
+
+    if (student.email) {
+      await sendEmail({
+        to: student.email,
+        subject: emailSubject,
+        text: emailText,
+        html: emailHtml
+      });
+      console.log(`[AT-RISK] >40% Risk Warning Email dispatched to ${student.email}`);
+    }
+  } catch (err) {
+    console.warn(`[AT-RISK] Failed to send risk warning email to ${student.email}:`, err.message);
+  }
+};
+
+// Helper: Dispatch Risk Factor > 40% Warning WhatsApp Message
+const sendRiskWarningWhatsApp = async (student, riskScore, flags = []) => {
+  try {
+    const portalUrl = getPortalUrl();
+    const phone = student.mobileNumber || student.phone || '8074701052';
+    const topIssues = (flags || []).slice(0, 3).map(f => `• ${f.title || f}`).join('\n');
+
+    const msg = `⚠️ *GRIET PLACEMENT ALERT - RISK FACTOR WARNING (>40%)*\n\n` +
+      `Dear *${student.name}*,\n\n` +
+      `Our Placement Risk Engine has calculated your *Risk Factor at ${riskScore}%* (Exceeds the 40% warning limit).\n\n` +
+      `🚨 *CRITICAL POLICY ALERT*:\n` +
+      `If your Risk Factor reaches *65%*, your Student Dashboard will be *AUTOMATICALLY LOCKED*.\n` +
+      `To revoke a locked dashboard, you will have to contact either the *Administrator* or *Main Admin*.\n\n` +
+      `*Identified Issues*:\n${topIssues || '• Low assessment & coding engagement'}\n\n` +
+      `Please log in immediately to take practice tests, complete your resume, and solve coding challenges:\n` +
+      `🔗 ${portalUrl}/login\n\n` +
+      `— Training & Placement Cell, GRIET`;
+
+    await sendWhatsAppMessage({
+      to: phone,
+      message: msg,
+      studentName: student.name
+    });
+    console.log(`[WHATSAPP] 40% Risk Warning dispatched to ${student.name} (${phone})`);
+  } catch (err) {
+    console.warn(`[WHATSAPP] Failed to send 40% risk warning to ${student.name}:`, err.message);
+  }
+};
+
+// Helper: Dispatch Risk Factor > 65% Lock Email
+const sendRiskLockEmail = async (student, riskScore, reason) => {
+  try {
+    const portalUrl = getPortalUrl();
+    const emailSubject = `🔒 Immediate Action Required: Student Dashboard Locked (Risk Factor: ${riskScore}%)`;
+    const emailText = `Dear ${student.name},\n\nYour Student Placement Dashboard has been AUTOMATICALLY LOCKED by the system because your Placement Risk Factor reached ${riskScore}%, which exceeds the critical limit of 65%.\n\nReason: ${reason}\n\nHOW TO REVOKE THIS LOCK:\nAs per college policy, to remove the lock on your account, you MUST contact either the Placement Administrator or Main Admin.\n\nAdmin Email: vaddeajaykumar2004@gmail.com\nOffice: Training & Placement Cell, Admin Block\n\nPortal: ${portalUrl}`;
+
+    const emailHtml = `
+      <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; background: #0f172a; color: #f8fafc; border-radius: 12px; overflow: hidden; border: 1px solid #334155;">
+        <div style="background: linear-gradient(135deg, #dc2626, #7f1d1d); padding: 24px; text-align: center;">
+          <h1 style="margin: 0; color: #ffffff; font-size: 24px; font-weight: 800;">🔒 STUDENT DASHBOARD LOCKED</h1>
+          <p style="margin: 6px 0 0 0; color: #fee2e2; font-size: 14px;">Risk Factor Policy Enforcement (Score: <strong>${riskScore}%</strong> &gt; 65%)</p>
+        </div>
+
+        <div style="padding: 26px 28px;">
+          <p style="font-size: 16px; margin-top: 0;">Dear <strong>${student.name}</strong>,</p>
+          <p style="font-size: 14px; line-height: 1.6; color: #cbd5e1;">
+            Your Student Dashboard on the <strong>GRIET Placement Preparation Portal has been AUTOMATICALLY LOCKED</strong> because your Placement Risk Factor has crossed the critical threshold of <strong>65%</strong>.
+          </p>
+
+          <div style="background: #1e293b; border-left: 4px solid #ef4444; padding: 16px 20px; margin: 20px 0; border-radius: 6px;">
+            <h4 style="margin: 0 0 6px 0; color: #f87171; font-size: 15px;">Lock Reason</h4>
+            <p style="margin: 0; font-size: 14px; color: #e2e8f0; font-weight: 600;">
+              ${reason || `Placement Risk Factor reached ${riskScore}% (>65% critical threshold)`}
+            </p>
+            <p style="margin: 6px 0 0 0; font-size: 12px; color: #94a3b8;">
+              Enforcement Mode: Automated Risk Policy Engine (Admin Mandate)
+            </p>
+          </div>
+
+          <div style="background: #111827; padding: 16px 20px; border-radius: 8px; margin: 18px 0; border: 1px solid #1f2937; font-size: 13px; line-height: 1.6; color: #cbd5e1;">
+            <strong style="color: #f1f5f9; font-size: 14px;">📋 Mandatory Procedure to Revoke Dashboard Lock:</strong>
+            <p style="margin: 8px 0 10px 0; color: #94a3b8;">
+              As per college placement guidelines, this lock can <strong>ONLY be revoked by the Placement Administrator or Main Admin</strong>. Faculty coordinators do not have unlocking authority.
+            </p>
+            <ol style="margin: 0; padding-left: 20px; color: #e2e8f0;">
+              <li>Contact the Main Admin or Training &amp; Placement Cell (<a href="mailto:vaddeajaykumar2004@gmail.com" style="color: #60a5fa;">vaddeajaykumar2004@gmail.com</a>).</li>
+              <li>Present justification and a committed preparation schedule for aptitude and coding.</li>
+              <li>Once verified and approved, the Main Admin will remove the lock on your dashboard.</li>
+            </ol>
+          </div>
+
+          <p style="font-size: 12px; color: #64748b; border-top: 1px solid #334155; padding-top: 14px; margin-top: 24px; text-align: center;">
+            Training &amp; Placement Cell, Gokaraju Rangaraju Institute of Engineering &amp; Technology (GRIET).
+          </p>
+        </div>
+      </div>
+    `;
+
+    if (student.email) {
+      await sendEmail({
+        to: student.email,
+        subject: emailSubject,
+        text: emailText,
+        html: emailHtml
+      });
+    }
+  } catch (err) {
+    console.warn(`[AT-RISK] Failed to send risk lock email to ${student.email}:`, err.message);
+  }
+};
+
+// Helper: Dispatch Risk Factor > 65% Lock WhatsApp Message
+const sendRiskLockWhatsApp = async (student, riskScore, reason) => {
+  try {
+    const portalUrl = getPortalUrl();
+    const phone = student.mobileNumber || student.phone || '8074701052';
+    const msg = `🔒 *GRIET PLACEMENT ALERT - DASHBOARD LOCKED*\n\n` +
+      `Dear *${student.name}*,\n\n` +
+      `Your Student Placement Dashboard has been *AUTOMATICALLY LOCKED* because your Placement Risk Factor reached *${riskScore}%* (Exceeds 65% critical limit).\n\n` +
+      `⛔ *Portal Access Suspended*:\n` +
+      `Practice assessments, coding challenges, and campus drive applications are disabled.\n\n` +
+      `📋 *How to Revoke This Lock*:\n` +
+      `As per college placement policy, you MUST contact either the *Administrator* or *Main Admin* to remove that account lock:\n` +
+      `• Email: vaddeajaykumar2004@gmail.com\n` +
+      `• Office: Training & Placement Cell, Admin Block\n` +
+      `• Note: Faculty coordinators cannot revoke this lock.\n\n` +
+      `— Training & Placement Administration, GRIET`;
+
+    await sendWhatsAppMessage({
+      to: phone,
+      message: msg,
+      studentName: student.name
+    });
+    console.log(`[WHATSAPP] Risk Lock notification dispatched to ${student.name} (${phone})`);
+  } catch (err) {
+    console.warn(`[WHATSAPP] Failed to send risk lock WA to ${student.name}:`, err.message);
+  }
+};
+
 // Helper: Dispatch Dashboard Locked Notification Email
 const sendDashboardLockedEmail = async (student, reason, adminName) => {
   try {
     const portalUrl = getPortalUrl();
     const emailSubject = '🔒 Urgent: Your Student Dashboard Has Been Locked';
-    const emailText = `Dear ${student.name},\n\nYour Student Dashboard has been locked by the Administrator / Main Admin (${adminName}).\nReason: ${reason}\n\nTo restore your access, please contact your College Administrator or Training & Placement Officer.\n\nPortal: ${portalUrl}`;
+    const emailText = `Dear ${student.name},\n\nYour Student Dashboard has been locked by the Administrator / Main Admin (${adminName}).\nReason: ${reason}\n\nTo restore your access, please contact your College Administrator or Main Admin.\n\nPortal: ${portalUrl}`;
 
     const emailHtml = `
       <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; background: #0f172a; color: #f8fafc; border-radius: 12px; overflow: hidden; border: 1px solid #334155;">
@@ -127,7 +315,7 @@ const sendDashboardLockedEmail = async (student, reason, adminName) => {
           <div style="background: #1e293b; border-left: 4px solid #ef4444; padding: 16px 20px; margin: 20px 0; border-radius: 6px;">
             <h4 style="margin: 0 0 6px 0; color: #f87171; font-size: 15px;">Lock Justification</h4>
             <p style="margin: 0; font-size: 14px; color: #e2e8f0; font-weight: 600;">
-              ${reason || 'Prolonged platform inactivity (7+ days threshold reached)'}
+              ${reason || 'High Risk Factor (>65%) or Prolonged Inactivity'}
             </p>
             <p style="margin: 6px 0 0 0; font-size: 12px; color: #94a3b8;">
               Action Authorized By: ${adminName || 'Main Admin / TPO Coordinator'}
@@ -137,9 +325,9 @@ const sendDashboardLockedEmail = async (student, reason, adminName) => {
           <div style="background: #111827; padding: 14px 18px; border-radius: 8px; margin: 18px 0; border: 1px solid #1f2937; font-size: 13px; line-height: 1.6; color: #94a3b8;">
             <strong style="color: #f1f5f9;">Next Steps to Restore Access:</strong>
             <ol style="margin: 8px 0 0 0; padding-left: 20px;">
-              <li>Contact your assigned Faculty Coordinator or Training &amp; Placement Cell.</li>
-              <li>Provide justification for the period of inactivity.</li>
-              <li>Once approved, the Main Admin will unlock your dashboard.</li>
+              <li>Contact either the Placement Administrator or Main Admin (<a href="mailto:vaddeajaykumar2004@gmail.com" style="color: #60a5fa;">vaddeajaykumar2004@gmail.com</a>).</li>
+              <li>Provide justification for the academic or preparation deficit.</li>
+              <li>Once verified, the Administrator or Main Admin will unlock your dashboard.</li>
             </ol>
           </div>
 
@@ -179,19 +367,23 @@ const sendDashboardUnlockedEmail = async (student, adminName) => {
   try {
     const portalUrl = getPortalUrl();
     const emailSubject = '🔓 Access Restored: Your Student Dashboard Has Been Unlocked';
-    const emailText = `Dear ${student.name},\n\nYour Student Dashboard access has been restored by ${adminName}.\nPlease log in immediately and resume your placement preparation:\n${portalUrl}/login`;
+    const emailText = `Dear ${student.name},\n\nYour Student Dashboard access has been restored by ${adminName} (Administrator / Main Admin).\nPlease log in immediately and resume your placement preparation:\n${portalUrl}/login`;
 
     const emailHtml = `
       <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; background: #0f172a; color: #f8fafc; border-radius: 12px; overflow: hidden; border: 1px solid #334155;">
         <div style="background: linear-gradient(135deg, #10b981, #059669); padding: 24px; text-align: center;">
           <h1 style="margin: 0; color: #ffffff; font-size: 24px; font-weight: 800;">🔓 DASHBOARD UNLOCKED</h1>
-          <p style="margin: 6px 0 0 0; color: #d1fae5; font-size: 14px;">Access Successfully Restored</p>
+          <p style="margin: 6px 0 0 0; color: #d1fae5; font-size: 14px;">Access Successfully Restored by ${adminName}</p>
         </div>
 
         <div style="padding: 26px 28px;">
           <p style="font-size: 16px; margin-top: 0;">Dear <strong>${student.name}</strong>,</p>
           <p style="font-size: 14px; line-height: 1.6; color: #cbd5e1;">
             We are pleased to inform you that your <strong>Student Dashboard has been unlocked by ${adminName}</strong>. You now have full access to placement drives, aptitude assessments, and mock interviews.
+          </p>
+
+          <p style="font-size: 13px; color: #34d399;">
+            ✅ A 3-day grace period has been granted. Please maintain active daily preparation to keep your risk factor below 40%.
           </p>
 
           <div style="text-align: center; margin: 28px 0 16px 0;">
@@ -223,6 +415,30 @@ const sendDashboardUnlockedEmail = async (student, adminName) => {
     });
   } catch (err) {
     console.warn(`[AT-RISK] Failed to send unlock email to ${student.email}:`, err.message);
+  }
+};
+
+// Helper: Dispatch Dashboard Unlocked Notification WhatsApp
+const sendDashboardUnlockedWhatsApp = async (student, adminName) => {
+  try {
+    const portalUrl = getPortalUrl();
+    const phone = student.mobileNumber || student.phone || '8074701052';
+    const msg = `🔓 *GRIET PLACEMENT ALERT - DASHBOARD UNLOCKED*\n\n` +
+      `Dear *${student.name}*,\n\n` +
+      `Your Student Dashboard lock has been successfully *REVOKED* by *${adminName}* (Administrator / Main Admin).\n\n` +
+      `Full access to placement assessments, coding playground, and drive applications is restored.\n` +
+      `Please log in immediately and resume your practice:\n` +
+      `🔗 ${portalUrl}/login\n\n` +
+      `— Training & Placement Administration, GRIET`;
+
+    await sendWhatsAppMessage({
+      to: phone,
+      message: msg,
+      studentName: student.name
+    });
+    console.log(`[WHATSAPP] Dashboard Unlock notification dispatched to ${student.name} (${phone})`);
+  } catch (err) {
+    console.warn(`[WHATSAPP] Failed to send unlock WA to ${student.name}:`, err.message);
   }
 };
 
@@ -415,10 +631,100 @@ const evaluateStudentRisk = async (students) => {
     const sems = [student.sgpaSem1, student.sgpaSem2, student.sgpaSem3, student.sgpaSem4, student.sgpaSem5, student.sgpaSem6, student.sgpaSem7, student.sgpaSem8].filter(Boolean);
     const calculatedCgpa = sems.length > 0 ? (sems.reduce((a, b) => a + b, 0) / sems.length).toFixed(2) : (student.cgpa || 'N/A');
 
+    // Final Risk Score (0 - 100)
+    const finalRiskScore = Math.min(Math.round(riskScore), 100);
+
     // Categorize
     let riskLevel = 'Low';
-    if (riskScore >= 50) riskLevel = 'High';
-    else if (riskScore >= 30) riskLevel = 'Medium';
+    if (finalRiskScore >= 65) riskLevel = 'Critical';
+    else if (finalRiskScore >= 50) riskLevel = 'High';
+    else if (finalRiskScore >= 30) riskLevel = 'Medium';
+
+    // ============================================================
+    // RULE 1: RISK FACTOR > 65% -> AUTOMATICALLY LOCK STUDENT DASHBOARD
+    // Revocation requirement: Must contact Administrator or Main Admin
+    // ============================================================
+    if (finalRiskScore > 65) {
+      const isGraceExempt = student.lockExemptionUntil && new Date() < new Date(student.lockExemptionUntil);
+      if (!student.isLocked && !isGraceExempt) {
+        student.isLocked = true;
+        student.lockReason = `Automated Policy Lock: Placement Risk Factor reached ${finalRiskScore}% (Exceeds 65% critical policy limit)`;
+        student.lockedAt = new Date();
+        student.lockedByName = 'Automated Risk Engine (Admin Enforcement)';
+
+        // Persist lock status to User record
+        await User.findByIdAndUpdate(student._id, {
+          isLocked: true,
+          lockReason: student.lockReason,
+          lockedAt: student.lockedAt,
+          lockedByName: student.lockedByName,
+          riskScore: finalRiskScore,
+          riskLevel
+        });
+
+        // Dispatch Email & WhatsApp & In-App Notification
+        sendRiskLockEmail(student, finalRiskScore, student.lockReason).catch(e => console.error('Risk lock email error:', e));
+        sendRiskLockWhatsApp(student, finalRiskScore, student.lockReason).catch(e => console.error('Risk lock WA error:', e));
+
+        await Notification.create({
+          user: student._id,
+          type: 'general',
+          message: `🔒 Account Alert: Your Student Dashboard has been automatically locked because your Placement Risk Factor reached ${finalRiskScore}% (>65%). Please contact either the Administrator or Main Admin to remove this lock.`,
+          metadata: {
+            type: 'DASHBOARD_LOCKED_RISK_OVER_65',
+            riskScore: finalRiskScore,
+            reason: student.lockReason
+          }
+        }).catch(() => {});
+      }
+
+      flags.unshift({
+        code: 'RISK_OVER_65_LOCKED',
+        severity: 'critical',
+        title: 'Risk Factor > 65% (Critical Lock)',
+        detail: `Placement Risk Factor is ${finalRiskScore}%. Student Dashboard is automatically locked by system policy.`
+      });
+    }
+    // ============================================================
+    // RULE 2: RISK FACTOR > 40% -> SEND WARNING NOTIFICATION VIA MAIL & WHATSAPP
+    // ============================================================
+    else if (finalRiskScore > 40 && !student.isLocked) {
+      const lastWarnAt = student.riskWarningSentAt ? new Date(student.riskWarningSentAt).getTime() : 0;
+      const TWENTY_FOUR_HOURS = 24 * 60 * 60 * 1000;
+      const needsWarning = !lastWarnAt || (now - lastWarnAt > TWENTY_FOUR_HOURS) || (finalRiskScore >= (student.lastRiskWarningScore || 0) + 10);
+
+      if (needsWarning) {
+        sendRiskWarningEmail(student, finalRiskScore, flags).catch(e => console.error('Risk warning email error:', e));
+        sendRiskWarningWhatsApp(student, finalRiskScore, flags).catch(e => console.error('Risk warning WA error:', e));
+
+        await Notification.create({
+          user: student._id,
+          type: 'general',
+          message: `⚠️ Urgent Risk Warning: Your Placement Risk Factor has reached ${finalRiskScore}% (>40%). If it reaches 65%, your Student Dashboard will be automatically locked.`,
+          metadata: {
+            type: 'RISK_FACTOR_WARNING_OVER_40',
+            riskScore: finalRiskScore
+          }
+        }).catch(() => {});
+
+        await User.findByIdAndUpdate(student._id, {
+          riskWarningSentAt: new Date(),
+          lastRiskWarningScore: finalRiskScore,
+          riskScore: finalRiskScore,
+          riskLevel
+        });
+
+        student.riskWarningSentAt = new Date();
+        student.lastRiskWarningScore = finalRiskScore;
+      }
+
+      flags.unshift({
+        code: 'RISK_OVER_40_WARNING',
+        severity: 'high',
+        title: 'Risk Factor > 40% (Warning Sent)',
+        detail: `Placement Risk Factor is ${finalRiskScore}%. Warning dispatched to Student Email & WhatsApp.`
+      });
+    }
 
     const stringFlags = flags.map(f => `${f.title}: ${f.detail}`);
 
@@ -427,11 +733,14 @@ const evaluateStudentRisk = async (students) => {
       _id: String(student._id),
       name: student.name,
       email: student.email,
+      phone: student.mobileNumber || student.phone || '8074701052',
       rollNo: student.rollNumber || 'N/A',
       branch: student.branch || 'N/A',
       batch: student.academicYear || student.year || 'N/A',
       riskLevel,
-      riskScore: Math.min(riskScore, 100),
+      riskScore: finalRiskScore,
+      isRiskOver65: finalRiskScore > 65,
+      isRiskOver40: finalRiskScore > 40,
       flags: stringFlags,
       detailedFlags: flags,
       metrics: {
@@ -446,16 +755,23 @@ const evaluateStudentRisk = async (students) => {
       lockedAt: student.lockedAt || null,
       lockedByName: student.lockedByName || '',
       inactivityWarningSentAt: student.inactivityWarningSentAt || null,
-      eligibleForLock: daysSinceActive >= 7,
-      warningSent: !!student.inactivityWarningSentAt && (new Date(student.inactivityWarningSentAt).getTime() >= lastActiveTime),
+      riskWarningSentAt: student.riskWarningSentAt || null,
+      lockExemptionUntil: student.lockExemptionUntil || null,
+      eligibleForLock: daysSinceActive >= 7 || finalRiskScore > 65,
+      warningSent: Boolean(
+        (student.riskWarningSentAt && finalRiskScore > 40) ||
+        (student.inactivityWarningSentAt && daysSinceActive >= 5)
+      ),
       recommendedAction: student.isLocked
-        ? 'Account currently locked. Main Admin can review & unlock.'
+        ? 'Account locked. Only Administrator or Main Admin can remove lock.'
+        : finalRiskScore > 65
+        ? 'Risk Factor > 65%. Automated lock enforced by policy.'
+        : finalRiskScore > 40
+        ? 'Risk Factor > 40%. Warning active (Email & WhatsApp dispatched).'
         : daysSinceActive >= 7
         ? 'Severe Inactivity (7+ days). Recommended to Lock Student Dashboard.'
         : daysSinceActive >= 5
         ? 'Inactive 5+ days. Notification dispatched to student email.'
-        : riskLevel === 'High'
-        ? 'Urgent faculty intervention & remedial guidance required.'
         : 'Monitor progress and encourage active portal engagement.'
     });
   }
@@ -486,16 +802,19 @@ exports.getAtRiskStudents = async (req, res, next) => {
     if (section && section !== 'All' && section !== 'all') query.section = new RegExp(`^${section.trim()}$`, 'i');
 
     const students = await User.find(query)
-      .select('name email rollNumber branch section academicYear year totalActiveSeconds lastActiveAt lastLoginAt createdAt readinessScore leetcodeStats codechefStats hackerrankStats isLocked lockReason lockedAt lockedByName inactivityWarningSentAt sgpaSem1 sgpaSem2 sgpaSem3 sgpaSem4 sgpaSem5 sgpaSem6 sgpaSem7 sgpaSem8')
+      .select('name email mobileNumber phone rollNumber branch section academicYear year totalActiveSeconds lastActiveAt lastLoginAt createdAt readinessScore leetcodeStats codechefStats hackerrankStats isLocked lockReason lockedAt lockedByName inactivityWarningSentAt riskWarningSentAt lastRiskWarningScore lockExemptionUntil sgpaSem1 sgpaSem2 sgpaSem3 sgpaSem4 sgpaSem5 sgpaSem6 sgpaSem7 sgpaSem8')
       .lean();
 
     const evaluated = await evaluateStudentRisk(students);
 
     // Compute KPI Summary Stats
-    const highRiskList = evaluated.filter(s => s.riskLevel === 'High');
+    const riskOver65List = evaluated.filter(s => s.riskScore > 65);
+    const riskOver40List = evaluated.filter(s => s.riskScore > 40);
+    const highRiskList = evaluated.filter(s => s.riskLevel === 'High' || s.riskLevel === 'Critical');
     const mediumRiskList = evaluated.filter(s => s.riskLevel === 'Medium');
     const lowRiskList = evaluated.filter(s => s.riskLevel === 'Low');
     const lockedList = evaluated.filter(s => s.isLocked);
+    const warnedList = evaluated.filter(s => s.warningSent);
     const inactive5List = evaluated.filter(s => s.metrics.daysInactive >= 5 && s.metrics.daysInactive < 7);
     const inactive7List = evaluated.filter(s => s.metrics.daysInactive >= 7);
 
@@ -506,6 +825,12 @@ exports.getAtRiskStudents = async (req, res, next) => {
 
     if (filterStatus === 'locked') {
       filtered = filtered.filter(s => s.isLocked);
+    } else if (filterStatus === 'risk65') {
+      filtered = filtered.filter(s => s.riskScore > 65);
+    } else if (filterStatus === 'risk40') {
+      filtered = filtered.filter(s => s.riskScore > 40);
+    } else if (filterStatus === 'warned') {
+      filtered = filtered.filter(s => s.warningSent);
     } else if (filterStatus === 'inactive7') {
       filtered = filtered.filter(s => s.metrics.daysInactive >= 7);
     } else if (filterStatus === 'inactive5') {
@@ -516,11 +841,14 @@ exports.getAtRiskStudents = async (req, res, next) => {
       success: true,
       stats: {
         atRiskCount: highRiskList.length + mediumRiskList.length,
+        riskOver65Count: riskOver65List.length,
+        riskOver40Count: riskOver40List.length,
         highRisk: highRiskList.length,
         mediumRisk: mediumRiskList.length,
         lowRisk: lowRiskList.length,
         totalAssessed: evaluated.length,
         lockedCount: lockedList.length,
+        warningSentCount: warnedList.length,
         inactive5Days: inactive5List.length,
         inactive7Days: inactive7List.length
       },
@@ -551,30 +879,47 @@ exports.toggleStudentDashboardLock = async (req, res, next) => {
       return res.status(404).json({ success: false, error: 'Student account not found' });
     }
 
-    const adminName = req.user?.name || (req.user?.role === 'admin' ? 'Main Admin' : 'Placement Coordinator');
     const lockStatus = Boolean(isLocked);
+
+    // ============================================================
+    // MANDATORY POLICY RESTRICTION:
+    // Only Administrator or Main Admin is authorized to REVOKE (unlock) a student dashboard lock!
+    // ============================================================
+    if (!lockStatus && req.user.role !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        error: 'Access Denied: Only an Administrator or Main Admin is authorized to revoke student dashboard locks. Faculty coordinators cannot remove locks.'
+      });
+    }
+
+    const adminName = req.user?.name || (req.user?.role === 'admin' ? 'Main Admin' : 'Placement Coordinator');
 
     // Update Student Lock State
     student.isLocked = lockStatus;
     if (lockStatus) {
-      student.lockReason = reason || 'Locked due to prolonged platform inactivity (7+ days)';
+      student.lockReason = reason || `Locked by ${adminName}: Placement Risk Factor / Inactivity Policy`;
       student.lockedAt = new Date();
       student.lockedBy = req.user._id;
       student.lockedByName = adminName;
+      student.lockExemptionUntil = null;
     } else {
       student.lockReason = '';
       student.lockedAt = null;
       student.lockedBy = null;
       student.lockedByName = '';
+      // Grant 3-day grace exemption from automated re-locking
+      student.lockExemptionUntil = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000);
     }
 
     await student.save({ validateBeforeSave: false });
 
-    // Send Email & In-App Notification
+    // Send Email & WhatsApp & In-App Notification
     if (lockStatus) {
       await sendDashboardLockedEmail(student, student.lockReason, adminName);
+      await sendRiskLockWhatsApp(student, student.riskScore || 70, student.lockReason);
     } else {
       await sendDashboardUnlockedEmail(student, adminName);
+      await sendDashboardUnlockedWhatsApp(student, adminName);
     }
 
     // Audit Logging
@@ -582,12 +927,13 @@ exports.toggleStudentDashboardLock = async (req, res, next) => {
       user: req.user,
       action: lockStatus ? 'STUDENT_DASHBOARD_LOCKED' : 'STUDENT_DASHBOARD_UNLOCKED',
       category: 'Student Governance & Access',
-      description: `${adminName} ${lockStatus ? 'LOCKED' : 'UNLOCKED'} Student Dashboard for ${student.name} (${student.rollNumber || student.email}). Reason: ${student.lockReason || 'Restored by Admin'}`,
+      description: `${adminName} ${lockStatus ? 'LOCKED' : 'REVOKED LOCK on'} Student Dashboard for ${student.name} (${student.rollNumber || student.email}). Reason: ${student.lockReason || 'Restored by Administrator'}`,
       details: {
         studentId: student._id,
         studentEmail: student.email,
         isLocked: lockStatus,
-        reason: student.lockReason
+        reason: student.lockReason,
+        revokedByAdmin: !lockStatus
       },
       req
     });
@@ -761,3 +1107,54 @@ exports.sendInterventionNotice = async (req, res, next) => {
     next(err);
   }
 };
+
+// @desc    Auto-Lock all students with Placement Risk Factor > 65% (Administrator batch action)
+// @route   POST /api/at-risk/auto-lock-high-risk
+// @access  Private (Admin)
+exports.autoLockHighRiskStudents = async (req, res, next) => {
+  try {
+    const adminName = req.user?.name || 'Main Admin';
+    const students = await User.find({ role: 'student', isLocked: { $ne: true } })
+      .select('name email mobileNumber phone rollNumber branch section academicYear year totalActiveSeconds lastActiveAt lastLoginAt createdAt readinessScore leetcodeStats codechefStats hackerrankStats isLocked lockReason lockedAt lockedByName inactivityWarningSentAt riskWarningSentAt lastRiskWarningScore lockExemptionUntil sgpaSem1 sgpaSem2 sgpaSem3 sgpaSem4 sgpaSem5 sgpaSem6 sgpaSem7 sgpaSem8')
+      .lean();
+
+    const evaluated = await evaluateStudentRisk(students);
+    const lockedCandidates = evaluated.filter(s => s.riskScore > 65);
+
+    // Audit Logging
+    await logActivity({
+      user: req.user,
+      action: 'BATCH_AUTO_LOCK_HIGH_RISK_STUDENTS',
+      category: 'Student Governance & Access',
+      description: `${adminName} executed auto-lock for ${lockedCandidates.length} students with Risk Factor > 65%`,
+      details: { lockedCount: lockedCandidates.length, lockedStudents: lockedCandidates },
+      req
+    });
+
+    res.status(200).json({
+      success: true,
+      message: `Evaluated ${students.length} students. ${lockedCandidates.length} students have Risk Factor > 65% and were automatically locked.`,
+      lockedCount: lockedCandidates.length,
+      lockedStudents: lockedCandidates
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// Background runner for automated risk factor evaluation and enforcement (24/7 background worker)
+exports.runAutomatedRiskCheck = async () => {
+  try {
+    const students = await User.find({ role: 'student' })
+      .select('name email mobileNumber phone rollNumber branch section academicYear year totalActiveSeconds lastActiveAt lastLoginAt createdAt readinessScore leetcodeStats codechefStats hackerrankStats isLocked lockReason lockedAt lockedByName inactivityWarningSentAt riskWarningSentAt lastRiskWarningScore lockExemptionUntil sgpaSem1 sgpaSem2 sgpaSem3 sgpaSem4 sgpaSem5 sgpaSem6 sgpaSem7 sgpaSem8')
+      .lean();
+
+    if (!students || students.length === 0) return;
+
+    await evaluateStudentRisk(students);
+    console.log(`[AT-RISK ENGINE] Completed background risk check for ${students.length} students (Auto-lock > 65%, Warn > 40% via Email & WhatsApp).`);
+  } catch (err) {
+    console.warn('[AT-RISK ENGINE] Background risk evaluation error:', err.message);
+  }
+};
+
