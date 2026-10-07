@@ -17,8 +17,46 @@ const AuditLogSchema = new mongoose.Schema({
   },
   userRole: {
     type: String,
-    enum: ['student', 'faculty', 'admin'],
+    enum: [
+      'student',
+      'faculty',
+      'admin',
+      'recruiter',
+      'hod',
+      'super_admin',
+      'campus_admin',
+      'administrator',
+      'placement_officer',
+      'auditor'
+    ],
     default: 'student'
+  },
+  campusId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Campus',
+    default: null,
+    index: true
+  },
+  departmentId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Department',
+    default: null,
+    index: true
+  },
+  resource: {
+    type: String,
+    default: '',
+    index: true
+  },
+  resourceId: {
+    type: String,
+    default: '',
+    index: true
+  },
+  result: {
+    type: String,
+    enum: ['SUCCESS', 'FAILURE', 'DENIED', ''],
+    default: 'SUCCESS'
   },
   rollNumber: {
     type: String,

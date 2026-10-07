@@ -2,6 +2,7 @@ const MockInterview = require('../models/MockInterview');
 const User = require('../models/User');
 const { InterviewRole, InterviewTechnology } = require('../models/InterviewMetadata');
 const aiService = require('../services/aiService');
+const { getCampusFilter } = require('../utils/scopeFilter');
 
 const questionBank = {
   'Software Engineer': {
@@ -570,11 +571,21 @@ exports.getInterviewHistory = async (req, res, next) => {
 
 exports.getAdminInterviewReports = async (req, res, next) => {
   try {
-    if (req.user.role !== 'admin') {
+    const adminRoles = ['admin', 'super_admin', 'campus_admin', 'administrator'];
+    if (!adminRoles.includes(req.user.role)) {
       return res.status(403).json({ success: false, error: 'Only admins can access interview reports' });
     }
 
-    const interviews = await MockInterview.find()
+    const campusFilter = getCampusFilter(req.user);
+    let interviewQuery = {};
+
+    if (campusFilter.campusId) {
+      const campusUsers = await User.find({ campusId: campusFilter.campusId }).select('_id');
+      const userIds = campusUsers.map(u => u._id);
+      interviewQuery.user = { $in: userIds };
+    }
+
+    const interviews = await MockInterview.find(interviewQuery)
       .populate('user', 'name email targetRole role')
       .sort({ createdAt: -1 });
 

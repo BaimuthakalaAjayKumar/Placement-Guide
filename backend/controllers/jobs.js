@@ -4,6 +4,7 @@ const Notification = require('../models/Notification');
 const sendEmail = require('../utils/sendEmail');
 const { sendWhatsAppMessage } = require('../utils/sendWhatsApp');
 const { logActivity } = require('../utils/auditLogger');
+const { getCampusFilter } = require('../utils/scopeFilter');
 
 // Seed default jobs if database has none
 const seedDefaultJobs = async () => {
@@ -671,21 +672,18 @@ exports.getAppliedJobs = async (req, res, next) => {
   }
 };
 
-// @desc    Update application status (Admin/Faculty, or Student updating own application)
+// @desc    Update application status (Admin/Faculty/Recruiter, or Student updating own application)
 // @route   PUT /api/jobs/:id/status
 // @access  Private
 exports.updateApplicationStatus = async (req, res, next) => {
   try {
+    if (!req.user) {
+      return res.status(401).json({ success: false, error: 'Authentication required' });
+    }
+
     let { studentId, status } = req.body;
     if (!status) {
       return res.status(400).json({ success: false, error: 'Please provide status' });
-    }
-
-    // Role check: if student, they can only update their own status
-    if (req.user.role === 'student') {
-      studentId = req.user.id;
-    } else if (!studentId) {
-      return res.status(400).json({ success: false, error: 'Please provide studentId' });
     }
 
     // Normalize status: replace spaces with underscores and lowercase
@@ -696,6 +694,55 @@ exports.updateApplicationStatus = async (req, res, next) => {
         success: false,
         error: `Invalid status "${status}". Allowed values: ${validStatuses.join(', ')}`
       });
+    }
+
+    // Determine target Job first
+    const job = await Job.findById(req.params.id);
+    if (!job) {
+      return res.status(404).json({ success: false, error: 'Job not found' });
+    }
+
+    const callerRole = req.user.role;
+
+    // Role check & ownership validation:
+    if (callerRole === 'student') {
+      // Student attempting to change another student's application -> 403 Forbidden
+      if (req.body.studentId && req.body.studentId.toString() !== req.user.id.toString()) {
+        return res.status(403).json({
+          success: false,
+          error: 'Students are not authorized to modify another student\'s application status.'
+        });
+      }
+      studentId = req.user.id;
+    } else {
+      // Non-student callers must explicitly supply the target studentId
+      if (!studentId) {
+        return res.status(400).json({ success: false, error: 'Please provide studentId' });
+      }
+
+      // Check caller authority
+      const isStaff = ['admin', 'super_admin', 'campus_admin', 'administrator', 'faculty', 'hod'].includes(callerRole);
+      const isRecruiter = callerRole === 'recruiter';
+
+      if (!isStaff && !isRecruiter) {
+        return res.status(403).json({
+          success: false,
+          error: 'You are not authorized to update job application status.'
+        });
+      }
+
+      // If caller is a recruiter, verify company ownership
+      if (isRecruiter) {
+        const userCompany = (req.user.companyName || '').trim().toLowerCase();
+        const jobCompany = (job.company || '').trim().toLowerCase();
+
+        if (!userCompany || !jobCompany || userCompany !== jobCompany) {
+          return res.status(403).json({
+            success: false,
+            error: 'Recruiters are not authorized to update applications for another company\'s job listing.'
+          });
+        }
+      }
     }
 
     const student = await User.findById(studentId);
@@ -711,11 +758,10 @@ exports.updateApplicationStatus = async (req, res, next) => {
     application.status = normalizedStatus;
     await student.save();
 
-    // If updated by Admin/Faculty, notify the student
-    if (req.user.role !== 'student') {
+    // If updated by Admin/Faculty/Recruiter, notify the student
+    if (callerRole !== 'student') {
       try {
-        const job = await Job.findById(req.params.id);
-        const jobTitle = job ? `${job.title} at ${job.company}` : 'Job Application';
+        const jobTitle = `${job.title} at ${job.company}`;
         const displayStatus = normalizedStatus.replace('_', ' ').toUpperCase();
         await Notification.create({
           user: student._id,
@@ -746,8 +792,11 @@ exports.getAppliedJobsReport = async (req, res, next) => {
   try {
     const { status, jobId, branch, academicYear, search } = req.query;
 
+    const campusFilter = getCampusFilter(req.user);
+
     const query = {
-      'appliedJobs.0': { $exists: true }
+      'appliedJobs.0': { $exists: true },
+      ...campusFilter
     };
 
     if (branch && branch !== 'all') {
@@ -861,8 +910,11 @@ exports.exportAppliedJobsCsv = async (req, res, next) => {
   try {
     const { status, jobId, branch, academicYear, search } = req.query;
 
+    const campusFilter = getCampusFilter(req.user);
+
     const query = {
-      'appliedJobs.0': { $exists: true }
+      'appliedJobs.0': { $exists: true },
+      ...campusFilter
     };
     if (branch && branch !== 'all') query.branch = branch;
     if (academicYear && academicYear !== 'all') query.academicYear = academicYear;

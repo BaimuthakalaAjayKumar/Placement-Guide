@@ -337,6 +337,20 @@ exports.updateProfile = async (req, res, next) => {
       key => fieldsToUpdate[key] === undefined && delete fieldsToUpdate[key]
     );
 
+    // Phase 8H: Security restriction - prevent students from self-updating official academic metrics
+    if (req.user.role === 'student') {
+      delete fieldsToUpdate.sgpaSem1;
+      delete fieldsToUpdate.sgpaSem2;
+      delete fieldsToUpdate.sgpaSem3;
+      delete fieldsToUpdate.sgpaSem4;
+      delete fieldsToUpdate.sgpaSem5;
+      delete fieldsToUpdate.sgpaSem6;
+      delete fieldsToUpdate.sgpaSem7;
+      delete fieldsToUpdate.sgpaSem8;
+      delete fieldsToUpdate.branch;
+      delete fieldsToUpdate.academicYear;
+    }
+
     // If leetcodeUsername is changing, verify and sync stats!
     if (req.body.leetcodeUsername !== undefined && req.body.leetcodeUsername !== req.user.leetcodeUsername) {
       const username = req.body.leetcodeUsername;

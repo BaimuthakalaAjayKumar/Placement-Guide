@@ -454,7 +454,9 @@ const Profile = () => {
                     </small>
                   </div>
                   <div className="form-group">
-                    <label className="form-label" htmlFor="branch">Branch</label>
+                    <label className="form-label" htmlFor="branch">
+                      Branch {user?.role === 'student' && <span style={{ fontSize: '11px', color: '#94a3b8' }}>(Managed by Academic Administration)</span>}
+                    </label>
                     <input
                       type="text"
                       id="branch"
@@ -462,6 +464,9 @@ const Profile = () => {
                       value={branch}
                       onChange={(e) => setBranch(e.target.value)}
                       placeholder="e.g. CSE"
+                      disabled={user?.role === 'student'}
+                      readOnly={user?.role === 'student'}
+                      style={user?.role === 'student' ? { background: 'rgba(15, 23, 42, 0.6)', cursor: 'not-allowed', color: '#94a3b8' } : {}}
                     />
                   </div>
                   <div className="form-group">
@@ -476,7 +481,9 @@ const Profile = () => {
                     />
                   </div>
                   <div className="form-group">
-                    <label className="form-label" htmlFor="academicYear">Academic Year</label>
+                    <label className="form-label" htmlFor="academicYear">
+                      Academic Year {user?.role === 'student' && <span style={{ fontSize: '11px', color: '#94a3b8' }}>(Managed by Academic Administration)</span>}
+                    </label>
                     <input
                       type="text"
                       id="academicYear"
@@ -484,6 +491,9 @@ const Profile = () => {
                       value={academicYear}
                       onChange={(e) => setAcademicYear(e.target.value)}
                       placeholder="e.g. 4th Year"
+                      disabled={user?.role === 'student'}
+                      readOnly={user?.role === 'student'}
+                      style={user?.role === 'student' ? { background: 'rgba(15, 23, 42, 0.6)', cursor: 'not-allowed', color: '#94a3b8' } : {}}
                     />
                   </div>
                   <div className="form-group">
@@ -542,7 +552,7 @@ const Profile = () => {
                     <h3>Academic Performance (SGPAs)</h3>
                   </div>
                   <p className="section-desc">
-                    Enter your semester-wise SGPA scores. Your overall CGPA will be computed automatically.
+                    Official semester-wise SGPA scores verified by Academic Coordinators &amp; Faculty. Read-only for student self-service.
                   </p>
 
                   <div className="academics-cgpa-banner" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(99, 102, 241, 0.1)', border: '1px solid rgba(99, 102, 241, 0.2)', padding: '12px 16px', borderRadius: '8px', marginBottom: '20px' }}>
@@ -574,6 +584,9 @@ const Profile = () => {
                             step="0.01"
                             placeholder="0.00"
                             value={val || ''}
+                            disabled={user?.role === 'student'}
+                            readOnly={user?.role === 'student'}
+                            style={user?.role === 'student' ? { background: 'rgba(15, 23, 42, 0.6)', cursor: 'not-allowed', color: '#94a3b8' } : {}}
                             onChange={(e) => {
                               const inputVal = e.target.value;
                               if (inputVal === '') {

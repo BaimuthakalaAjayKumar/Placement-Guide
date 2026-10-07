@@ -47,10 +47,12 @@ import HODDashboard from './pages/HODDashboard';
 
 // Helper for home route by role
 const getRoleHome = (role) => {
-  if (role === 'admin') return '/admin';
+  if (['admin', 'super_admin', 'campus_admin', 'administrator'].includes(role)) return '/admin';
+  if (role === 'placement_officer') return '/job-opportunities';
   if (role === 'faculty') return '/faculty';
   if (role === 'recruiter') return '/recruiter';
   if (role === 'hod') return '/hod';
+  if (role === 'auditor') return '/audit-logs';
   return '/dashboard';
 };
 
@@ -72,12 +74,17 @@ const PrivateRoute = ({ children, allowedRoles }) => {
     return <Navigate to="/login" replace />;
   }
 
-  if (allowedRoles && !allowedRoles.includes(user.role)) {
-    return <Navigate to={getRoleHome(user.role)} replace />;
-  }
-
   if (user.mustChangePassword && location.pathname !== '/change-password') {
     return <Navigate to="/change-password" replace />;
+  }
+
+  if (allowedRoles) {
+    const isRolePermitted =
+      allowedRoles.includes(user.role) ||
+      (allowedRoles.includes('admin') && ['super_admin', 'campus_admin', 'administrator'].includes(user.role));
+    if (!isRolePermitted) {
+      return <Navigate to={getRoleHome(user.role)} replace />;
+    }
   }
 
   // Check if Student Dashboard has been locked by Administrator & Main Admin
@@ -202,7 +209,7 @@ const AppRoutes = () => {
       <Route
         path="/change-password"
         element={
-          <PrivateRoute allowedRoles={['student', 'faculty', 'hod']}>
+          <PrivateRoute allowedRoles={['student', 'faculty', 'hod', 'admin', 'super_admin', 'campus_admin', 'administrator', 'recruiter', 'placement_officer', 'auditor']}>
             <ChangePassword />
           </PrivateRoute>
         }
@@ -312,8 +319,8 @@ const AppRoutes = () => {
       <Route
         path="/jobs"
         element={
-          user?.role === 'admin' ? (
-            <PrivateRoute allowedRoles={['admin']}>
+          ['admin', 'super_admin', 'campus_admin', 'administrator', 'placement_officer'].includes(user?.role) ? (
+            <PrivateRoute allowedRoles={['admin', 'placement_officer']}>
               <AdminPanel defaultTab="job-opportunities" />
             </PrivateRoute>
           ) : (
@@ -326,7 +333,7 @@ const AppRoutes = () => {
       <Route
         path="/profile"
         element={
-          <PrivateRoute allowedRoles={['student', 'faculty', 'hod', 'recruiter']}>
+          <PrivateRoute allowedRoles={['student', 'faculty', 'hod', 'recruiter', 'admin', 'placement_officer', 'auditor']}>
             <Profile />
           </PrivateRoute>
         }
@@ -349,7 +356,7 @@ const AppRoutes = () => {
       <Route
         path="/job-opportunities"
         element={
-          <PrivateRoute allowedRoles={['admin']}>
+          <PrivateRoute allowedRoles={['admin', 'placement_officer']}>
             <AdminPanel defaultTab="job-opportunities" />
           </PrivateRoute>
         }
@@ -357,7 +364,7 @@ const AppRoutes = () => {
       <Route
         path="/applied-jobs-report"
         element={
-          <PrivateRoute allowedRoles={['admin', 'faculty']}>
+          <PrivateRoute allowedRoles={['admin', 'faculty', 'placement_officer']}>
             <AdminPanel defaultTab="applied-jobs" />
           </PrivateRoute>
         }
@@ -365,7 +372,7 @@ const AppRoutes = () => {
       <Route
         path="/job-postings"
         element={
-          <PrivateRoute allowedRoles={['admin']}>
+          <PrivateRoute allowedRoles={['admin', 'placement_officer']}>
             <AdminPanel defaultTab="job-opportunities" />
           </PrivateRoute>
         }
@@ -373,7 +380,7 @@ const AppRoutes = () => {
       <Route
         path="/manage-jobs"
         element={
-          <PrivateRoute allowedRoles={['admin']}>
+          <PrivateRoute allowedRoles={['admin', 'placement_officer']}>
             <AdminPanel defaultTab="job-opportunities" />
           </PrivateRoute>
         }
@@ -389,7 +396,7 @@ const AppRoutes = () => {
       <Route
         path="/audit-logs"
         element={
-          <PrivateRoute allowedRoles={['admin']}>
+          <PrivateRoute allowedRoles={['admin', 'auditor']}>
             <AdminPanel defaultTab="audit-logs" />
           </PrivateRoute>
         }
@@ -413,7 +420,7 @@ const AppRoutes = () => {
       <Route
         path="/plagiarism-audit"
         element={
-          <PrivateRoute allowedRoles={['admin', 'faculty']}>
+          <PrivateRoute allowedRoles={['admin', 'faculty', 'auditor']}>
             <PlagiarismAudit />
           </PrivateRoute>
         }

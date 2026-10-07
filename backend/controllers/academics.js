@@ -7,6 +7,14 @@ const {
   calculateOverallCgpa,
   DEFAULT_CURRICULUM
 } = require('../utils/gradeCalculator');
+const {
+  getCampusFilter,
+  canAccessCampus,
+  getManagedScopeFilter,
+  combineScopeFilters,
+  canAccessStudentAcademicScope,
+  getBranchPatterns
+} = require('../utils/scopeFilter');
 
 /**
  * Helper to ensure student has an AcademicRecord initialized
@@ -106,6 +114,28 @@ exports.getStudentAcademicRecord = async (req, res, next) => {
       });
     }
 
+    if (req.user.role !== 'student') {
+      const student = await User.findById(studentId);
+      if (!student) {
+        return res.status(404).json({
+          success: false,
+          error: 'Student record not found.'
+        });
+      }
+      if (!canAccessCampus(req.user, student.campusId)) {
+        return res.status(403).json({
+          success: false,
+          error: 'Unauthorized to view student academic record across campuses'
+        });
+      }
+      if (!canAccessStudentAcademicScope(req.user, student)) {
+        return res.status(403).json({
+          success: false,
+          error: 'Forbidden: Student is outside your authorized academic scope or department.'
+        });
+      }
+    }
+
     const record = await getOrCreateAcademicRecord(studentId);
 
     res.status(200).json({
@@ -145,6 +175,20 @@ exports.saveSemesterMarks = async (req, res, next) => {
       return res.status(404).json({
         success: false,
         error: 'Student record not found.'
+      });
+    }
+
+    if (!canAccessCampus(req.user, student.campusId)) {
+      return res.status(403).json({
+        success: false,
+        error: 'Forbidden: Cannot enter marks for a student outside your campus.'
+      });
+    }
+
+    if (!canAccessStudentAcademicScope(req.user, student)) {
+      return res.status(403).json({
+        success: false,
+        error: 'Forbidden: Student is outside your authorized academic scope or department.'
       });
     }
 
@@ -269,15 +313,32 @@ exports.getCurriculum = async (req, res, next) => {
 // @access  Private (Faculty, Admin, HOD)
 exports.getFacultyStudents = async (req, res, next) => {
   try {
-    const query = { role: 'student' };
+    const campusFilter = getCampusFilter(req.user);
+    let query = { role: 'student', ...campusFilter };
 
-    // If faculty, filter by faculty branch/section if assigned
+    // If faculty, filter by faculty managedScopes or legacy branch/section
     if (req.user.role === 'faculty') {
-      if (req.user.branch) {
-        query.branch = req.user.branch;
+      if (Array.isArray(req.user.managedScopes) && req.user.managedScopes.length > 0) {
+        const scopeFilter = getManagedScopeFilter(req.user);
+        query = combineScopeFilters(query, scopeFilter);
+      } else {
+        if (req.user.branch) {
+          query.branch = req.user.branch;
+        }
+        if (req.user.section) {
+          query.section = req.user.section;
+        }
       }
-      if (req.user.section) {
-        query.section = req.user.section;
+    } else if (req.user.role === 'hod') {
+      const hodBranch = req.user.branch || 'IT';
+      const branchPatterns = getBranchPatterns(hodBranch);
+      if (req.user.departmentId) {
+        query.$or = [
+          { departmentId: req.user.departmentId },
+          { branch: { $in: branchPatterns } }
+        ];
+      } else {
+        query.branch = { $in: branchPatterns };
       }
     }
 
@@ -388,6 +449,16 @@ exports.bulkImportMarks = async (req, res, next) => {
 
         if (!student) {
           errors.push(`Student with Roll "${entry.rollNumber}" / Email "${entry.email}" not found.`);
+          continue;
+        }
+
+        if (!canAccessCampus(req.user, student.campusId)) {
+          errors.push(`Student with Roll "${entry.rollNumber}" / Email "${entry.email}" belongs to another campus.`);
+          continue;
+        }
+
+        if (!canAccessStudentAcademicScope(req.user, student)) {
+          errors.push(`Student with Roll "${entry.rollNumber}" / Email "${entry.email}" is outside your authorized academic scope or department.`);
           continue;
         }
 

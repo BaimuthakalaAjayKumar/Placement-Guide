@@ -20,11 +20,11 @@ router.use(protect);
 router.post('/heartbeat', recordHeartbeat);
 router.post('/activity', recordActivity);
 
-// Admin-only management and inspection routes
-router.get('/logs', authorize('admin'), getAuditLogs);
-router.get('/student-sessions', authorize('admin'), getStudentSessions);
-router.get('/student/:id/timeline', authorize('admin'), getStudentTimeline);
-router.get('/stats', authorize('admin'), getAuditStats);
+// Admin and Auditor inspection routes
+router.get('/logs', authorize('admin', 'auditor'), getAuditLogs);
+router.get('/student-sessions', authorize('admin', 'auditor'), getStudentSessions);
+router.get('/student/:id/timeline', authorize('admin', 'auditor'), getStudentTimeline);
+router.get('/stats', authorize('admin', 'auditor'), getAuditStats);
 router.delete('/logs', authorize('admin'), clearAuditLogs);
 
 module.exports = router;

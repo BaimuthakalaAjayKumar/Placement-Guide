@@ -30,3 +30,16 @@ build/
 
 # Misc
 *.log
+
+# Agent & Tooling metadata
+.agent/
+.agents/
+.gemini/
+.gsd/
+adapters/
+scripts/
+GSD-STYLE.md
+PROJECT_RULES.md
+VERSION
+model_capabilities.yaml
+

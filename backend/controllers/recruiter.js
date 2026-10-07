@@ -9,6 +9,7 @@ const { logActivity } = require('../utils/auditLogger');
 const sendEmail = require('../utils/sendEmail');
 const { sendWhatsAppMessage } = require('../utils/sendWhatsApp');
 const { notifyStudentsOnDrivePost } = require('../utils/placementNotifier');
+const { canRecruiterAccessDrive } = require('../utils/scopeFilter');
 
 // Helper to generate secure random temporary password
 const generateTempPassword = (length = 10) => {
@@ -86,6 +87,7 @@ exports.createTemporaryCredentials = async (req, res, next) => {
       isTemporaryAccount: true,
       tempPasswordPlain: tempPassword,
       recruiterNotes: (recruiterNotes || '').trim(),
+      campusId: req.user.campusId || req.body.campusId || undefined,
       mustChangePassword: false
     });
 
@@ -469,9 +471,18 @@ exports.getSuitableStudents = async (req, res, next) => {
     let targetSkills = querySkills ? querySkills.split(',').map(s => s.trim().toLowerCase()).filter(Boolean) : [];
     let driveObj = null;
 
-    // If driveId is provided, load default cutoffs from the drive
+    // If driveId is provided, load default cutoffs from the drive after ownership validation
     if (driveId) {
       driveObj = await PlacementDrive.findById(driveId);
+      if (!driveObj) {
+        return res.status(404).json({ success: false, error: 'Placement drive not found' });
+      }
+      if (!canRecruiterAccessDrive(req.user, driveObj)) {
+        return res.status(403).json({
+          success: false,
+          error: 'Not authorized to access suitable students for this placement drive.'
+        });
+      }
       if (driveObj) {
         if (targetMinCgpa === null) targetMinCgpa = driveObj.eligibility?.minCgpa ?? 6.5;
         if (targetBranches.length === 0 && driveObj.eligibility?.allowedBranches?.length > 0) {
@@ -494,9 +505,14 @@ exports.getSuitableStudents = async (req, res, next) => {
     if (targetBranches.length === 0) targetBranches = ['ALL'];
     if (targetBatches.length === 0) targetBatches = ['ALL'];
 
-    // Fetch all active students
-    const students = await User.find({ role: 'student' })
-      .select('name email phone mobileNumber rollNumber branch section academicYear year bio skills targetRole readinessScore leetcodeStats codeforcesStats codechefStats hackerrankStats githubProfileUrl createdAt')
+    // Fetch active students (scoped to campus if recruiter has an assigned campusId)
+    const studentQuery = { role: 'student' };
+    if (req.user.campusId) {
+      studentQuery.campusId = req.user.campusId;
+    }
+
+    const students = await User.find(studentQuery)
+      .select('name email phone mobileNumber rollNumber branch section academicYear year bio skills targetRole readinessScore leetcodeStats codeforcesStats codechefStats hackerrankStats githubProfileUrl createdAt campusId')
       .lean();
 
     // Fetch latest resumes mapped by student ID
@@ -644,12 +660,27 @@ exports.getSuitableStudents = async (req, res, next) => {
       const studentProjects = projectMap[String(student._id)] || [];
       const deployedProjects = studentProjects.filter(p => p.deploymentUrl);
 
+      // PII Redaction for unapplied students (Phase 8G privacy protection)
+      const isAuthorizedCaller = req.user.role === 'admin' || hasApplied;
+      const safePhone = isAuthorizedCaller ? (student.mobileNumber || student.phone || '') : null;
+      const safeResumeUrl = isAuthorizedCaller ? (resMeta.resumeUrl || '') : '';
+      const safeResumeFile = isAuthorizedCaller
+        ? (resMeta.fileName || '')
+        : (resMeta.resumeUrl ? 'Uploaded Resume' : '');
+      const safeLatestResume = resMeta.resumeUrl ? {
+        filePath: isAuthorizedCaller ? resMeta.resumeUrl : null,
+        fileName: safeResumeFile,
+        score: resMeta.resumeScore || 0,
+        skills: resMeta.skills || [],
+        uploadedAt: resMeta.uploadedAt
+      } : null;
+
       return {
         _id: student._id,
         name: student.name,
         email: student.email,
-        phone: student.mobileNumber || student.phone || '',
-        mobileNumber: student.mobileNumber || student.phone || '',
+        phone: safePhone,
+        mobileNumber: safePhone,
         rollNumber: student.rollNumber || 'N/A',
         branch: student.branch || 'CSE',
         section: student.section || 'A',
@@ -661,17 +692,11 @@ exports.getSuitableStudents = async (req, res, next) => {
         readinessScore: student.readinessScore || 0,
         leetcodeStats: student.leetcodeStats || { totalSolved: 0 },
         githubProfileUrl: student.githubProfileUrl || '',
-        resumeUrl: resMeta.resumeUrl || '',
-        resumeFileName: resMeta.fileName || '',
+        resumeUrl: safeResumeUrl,
+        resumeFileName: safeResumeFile,
         resumeScore: resMeta.resumeScore || 0,
         resumeSkills: resMeta.skills || [],
-        latestResume: resMeta.resumeUrl ? {
-          filePath: resMeta.resumeUrl,
-          fileName: resMeta.fileName,
-          score: resMeta.resumeScore,
-          skills: resMeta.skills,
-          uploadedAt: resMeta.uploadedAt
-        } : null,
+        latestResume: safeLatestResume,
         projects: studentProjects,
         deployedProjects: deployedProjects.length > 0 ? deployedProjects : studentProjects,
         isCgpaEligible,
@@ -759,6 +784,13 @@ exports.inviteStudentToDrive = async (req, res, next) => {
     const drive = await PlacementDrive.findById(driveId);
     if (!drive) {
       return res.status(404).json({ success: false, error: 'Placement drive not found' });
+    }
+
+    if (!canRecruiterAccessDrive(req.user, drive)) {
+      return res.status(403).json({
+        success: false,
+        error: 'Not authorized to invite students for this placement drive.'
+      });
     }
 
     const student = await User.findById(studentId);
@@ -1049,6 +1081,13 @@ exports.updateCandidateRecruiterStage = async (req, res, next) => {
       return res.status(404).json({ success: false, error: 'Placement drive not found' });
     }
 
+    if (!canRecruiterAccessDrive(req.user, drive)) {
+      return res.status(403).json({
+        success: false,
+        error: 'Not authorized to update candidate stage for this placement drive.'
+      });
+    }
+
     const appIndex = drive.applications.findIndex(a => String(a.student) === String(studentId));
     if (appIndex === -1) {
       return res.status(404).json({ success: false, error: 'Candidate application not found for this drive' });
@@ -1124,10 +1163,30 @@ exports.exportRecruiterCSV = async (req, res, next) => {
   try {
     const { driveId, minCgpa = 6.5 } = req.query;
 
+    // Recruiters MUST supply driveId. Universal student database dumping is strictly prohibited.
+    if (req.user.role === 'recruiter' && !driveId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Please provide a valid driveId. Recruiters must export applicants for a specific placement drive.'
+      });
+    }
+
     let studentsToExport = [];
+    let drive = null;
 
     if (driveId) {
-      const drive = await PlacementDrive.findById(driveId);
+      drive = await PlacementDrive.findById(driveId);
+      if (!drive) {
+        return res.status(404).json({ success: false, error: 'Placement drive not found' });
+      }
+
+      if (!canRecruiterAccessDrive(req.user, drive)) {
+        return res.status(403).json({
+          success: false,
+          error: 'Not authorized to export applicants for this placement drive.'
+        });
+      }
+
       if (drive && drive.applications) {
         studentsToExport = drive.applications.map(a => ({
           Name: a.studentName,
@@ -1158,6 +1217,20 @@ exports.exportRecruiterCSV = async (req, res, next) => {
           Skills: (s.skills || []).join('; ')
         }));
     }
+
+    // Audit Log for CSV export
+    await logActivity({
+      user: req.user,
+      action: 'RECRUITER_CSV_EXPORTED',
+      category: 'Placement Operations',
+      description: `${req.user.name} exported ${studentsToExport.length} applicant records for ${drive ? drive.companyName : 'all'} drive`,
+      details: {
+        driveId: drive ? drive._id : null,
+        companyName: drive ? drive.companyName : req.user.companyName,
+        exportedCount: studentsToExport.length
+      },
+      req
+    });
 
     if (studentsToExport.length === 0) {
       return res.status(200).send('No student records found matching export criteria');
@@ -1195,6 +1268,13 @@ exports.bulkAddCandidates = async (req, res, next) => {
       return res.status(404).json({ success: false, error: 'Placement drive not found' });
     }
 
+    if (!canRecruiterAccessDrive(req.user, drive)) {
+      return res.status(403).json({
+        success: false,
+        error: 'Not authorized to add candidates to this placement drive.'
+      });
+    }
+
     const students = await User.find({ _id: { $in: studentIds } });
     let addedCount = 0;
 
@@ -1217,6 +1297,15 @@ exports.bulkAddCandidates = async (req, res, next) => {
     }
 
     await drive.save();
+
+    await logActivity({
+      user: req.user,
+      action: 'RECRUITER_CANDIDATES_BULK_ADDED',
+      category: 'Placement Operations',
+      description: `${req.user.name} enrolled ${addedCount} candidate(s) into pipeline for ${drive.companyName} drive`,
+      details: { driveId: drive._id, addedCount },
+      req
+    });
 
     res.status(200).json({
       success: true,
@@ -1248,6 +1337,13 @@ exports.conductDriveExam = async (req, res, next) => {
     const drive = await PlacementDrive.findById(driveId);
     if (!drive) {
       return res.status(404).json({ success: false, error: 'Placement drive not found' });
+    }
+
+    if (!canRecruiterAccessDrive(req.user, drive)) {
+      return res.status(403).json({
+        success: false,
+        error: 'Not authorized to schedule exams for this placement drive.'
+      });
     }
 
     if (examDate) {
@@ -1379,6 +1475,15 @@ Please login to your portal 15 minutes before the exam window:
       }).catch(() => {});
     }
 
+    await logActivity({
+      user: req.user,
+      action: 'RECRUITER_EXAM_SCHEDULED',
+      category: 'Placement Operations',
+      description: `${req.user.name} scheduled exam '${examTitle}' for ${targetApplications.length} candidate(s) in ${drive.companyName} drive`,
+      details: { driveId: drive._id, examTitle, examDate, candidatesCount: targetApplications.length },
+      req
+    });
+
     res.status(200).json({
       success: true,
       message: `Online exam successfully scheduled for ${targetApplications.length} candidate(s)! Notifications dispatched.`,
@@ -1405,6 +1510,13 @@ exports.bulkImportTestCleared = async (req, res, next) => {
     const drive = await PlacementDrive.findById(driveId);
     if (!drive) {
       return res.status(404).json({ success: false, error: 'Placement drive not found' });
+    }
+
+    if (!canRecruiterAccessDrive(req.user, drive)) {
+      return res.status(403).json({
+        success: false,
+        error: 'Not authorized to import test results for this placement drive.'
+      });
     }
 
     // Extract identifiers (roll numbers, emails, student IDs)
@@ -1543,6 +1655,15 @@ Check your Candidate Status:
       }).catch(() => {});
     });
 
+    await logActivity({
+      user: req.user,
+      action: 'RECRUITER_TEST_CLEARED_IMPORTED',
+      category: 'Placement Operations',
+      description: `${req.user.name} imported ${updatedCount} test-cleared candidate(s) for ${drive.companyName} drive`,
+      details: { driveId: drive._id, clearedCount: updatedCount },
+      req
+    });
+
     res.status(200).json({
       success: true,
       message: `Successfully imported & marked ${updatedCount} student(s) as 'Test Cleared'!`,
@@ -1575,6 +1696,13 @@ exports.bulkAdvanceCandidatesStage = async (req, res, next) => {
     const drive = await PlacementDrive.findById(driveId);
     if (!drive) {
       return res.status(404).json({ success: false, error: 'Placement drive not found' });
+    }
+
+    if (!canRecruiterAccessDrive(req.user, drive)) {
+      return res.status(403).json({
+        success: false,
+        error: 'Not authorized to advance candidates for this placement drive.'
+      });
     }
 
     const stageNames = {
@@ -1700,6 +1828,15 @@ Please log in to your student portal for instructions:
         metadata: { driveId: drive._id, stage: targetStage }
       }).catch(() => {});
     }
+
+    await logActivity({
+      user: req.user,
+      action: 'RECRUITER_CANDIDATES_BULK_ADVANCED',
+      category: 'Placement Operations',
+      description: `${req.user.name} advanced ${updatedCount} candidate(s) to '${stageDisplay}' in ${drive.companyName} drive`,
+      details: { driveId: drive._id, targetStage, updatedCount },
+      req
+    });
 
     res.status(200).json({
       success: true,

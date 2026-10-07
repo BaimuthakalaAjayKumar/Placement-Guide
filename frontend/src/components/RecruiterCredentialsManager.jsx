@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
+import { useAuth } from '../context/AuthContext';
 import { API_URL } from '../config/api';
 import { sfx } from '../utils/audioVfx';
 
 const RecruiterCredentialsManager = () => {
+  const { user } = useAuth();
   const [recruiters, setRecruiters] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -473,6 +475,11 @@ Role: Recruiter`;
             </div>
 
             <form onSubmit={handleCreateSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              {user?.campusName && (
+                <div style={{ padding: '8px 12px', background: 'rgba(56, 189, 248, 0.1)', border: '1px solid rgba(56, 189, 248, 0.25)', borderRadius: '6px', fontSize: '12px', color: '#38bdf8' }}>
+                  📍 Campus Scope: <strong>{user.campusName}</strong> (automatically assigned to this recruiter account)
+                </div>
+              )}
               <div className="recruiter-form-grid">
                 <div className="recruiter-form-group">
                   <label>Recruiter Name *</label>

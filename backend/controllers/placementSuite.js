@@ -5,11 +5,13 @@ const PlacementDrive = require('../models/PlacementDrive');
 const Job = require('../models/Job');
 const PracticeQuestion = require('../models/PracticeQuestion');
 const crypto = require('crypto');
+const { getCampusFilter } = require('../utils/scopeFilter');
 
 // 0. Scope Students for Faculty and Admin
 exports.getScopeStudents = async (req, res, next) => {
   try {
-    let query = { role: 'student' };
+    const campusFilter = getCampusFilter(req.user);
+    let query = { role: 'student', ...campusFilter };
     if (req.user.role === 'faculty') {
       const scopes = req.user.managedScopes || [];
       if (scopes.length > 0) {
@@ -23,6 +25,13 @@ exports.getScopeStudents = async (req, res, next) => {
         if (orConditions.length > 0) query.$or = orConditions;
       } else if (req.user.branch) {
         query.branch = req.user.branch;
+      } else {
+        // Faculty with no scope assigned fails-closed
+        return res.status(200).json({
+          success: true,
+          count: 0,
+          students: []
+        });
       }
     }
 
@@ -30,14 +39,6 @@ exports.getScopeStudents = async (req, res, next) => {
       .select('name email rollNumber branch section academicYear readinessScore')
       .sort({ rollNumber: 1, name: 1 })
       .lean();
-
-    // Fallback if scoped search returns none
-    if (students.length === 0) {
-      students = await User.find({ role: 'student' })
-        .select('name email rollNumber branch section academicYear readinessScore')
-        .sort({ rollNumber: 1, name: 1 })
-        .lean();
-    }
 
     res.status(200).json({
       success: true,

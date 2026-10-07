@@ -210,6 +210,20 @@
   font-weight: 800;
 }
 
+.profile-role-badge.badge-admin {
+  color: #fbbf24 !important;
+  background: rgba(245, 158, 11, 0.22) !important;
+  border: 1px solid rgba(245, 158, 11, 0.5) !important;
+  font-weight: 800;
+}
+
+.profile-role-badge.badge-auditor {
+  color: #cbd5e1 !important;
+  background: rgba(71, 85, 105, 0.25) !important;
+  border: 1px solid rgba(71, 85, 105, 0.5) !important;
+  font-weight: 800;
+}
+
 @media (max-width: 992px) {
   .main-header {
     width: 100%;

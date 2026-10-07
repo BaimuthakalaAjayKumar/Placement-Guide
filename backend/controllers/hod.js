@@ -11,7 +11,31 @@ const Notification = require('../models/Notification');
 const Resume = require('../models/Resume');
 const sendEmail = require('../utils/sendEmail');
 const { sendWhatsAppMessage } = require('../utils/sendWhatsApp');
+const Department = require('../models/Department');
 const { logActivity } = require('../utils/auditLogger');
+const {
+  getCampusFilter,
+  canAccessCampus,
+  isSuperAdmin,
+  canAccessDepartment,
+  getBranchPatterns: getScopeBranchPatterns
+} = require('../utils/scopeFilter');
+
+// Helper to resolve HOD branch preference from departmentId before falling back to branch
+const resolveHodBranch = async (user) => {
+  if (user && user.departmentId) {
+    if (typeof user.departmentId === 'object' && user.departmentId.code) {
+      return user.departmentId.code;
+    }
+    try {
+      const dept = await Department.findById(user.departmentId).select('code').lean();
+      if (dept && dept.code) return dept.code;
+    } catch (e) {
+      // safe fallback
+    }
+  }
+  return user ? (user.branch || 'IT') : 'IT';
+};
 
 // Helper to build branch matching regex
 const getBranchPatterns = (branch = 'IT') => {
@@ -51,13 +75,15 @@ const computeCgpa = (student) => {
 // =========================================================================
 exports.getDepartmentOverview = async (req, res, next) => {
   try {
+    const campusFilter = getCampusFilter(req.user);
     const branch = req.user.branch || 'IT';
     const branchPatterns = getBranchPatterns(branch);
 
     // 1. Students in this branch
     const students = await User.find({
       role: 'student',
-      branch: { $in: branchPatterns }
+      branch: { $in: branchPatterns },
+      ...campusFilter
     }).select('name email phone mobileNumber rollNumber branch section academicYear year sgpaSem1 sgpaSem2 sgpaSem3 sgpaSem4 sgpaSem5 sgpaSem6 sgpaSem7 sgpaSem8 readinessScore createdAt').lean();
 
     const totalStudents = students.length;
@@ -103,6 +129,7 @@ exports.getDepartmentOverview = async (req, res, next) => {
     // 2. Faculties in this branch
     const faculties = await User.find({
       role: 'faculty',
+      ...campusFilter,
       $or: [
         { branch: { $in: branchPatterns } },
         { 'managedScopes.branch': { $in: branchPatterns } },
@@ -197,11 +224,13 @@ exports.getDepartmentOverview = async (req, res, next) => {
 // =========================================================================
 exports.getDepartmentFaculties = async (req, res, next) => {
   try {
+    const campusFilter = getCampusFilter(req.user);
     const branch = req.user.branch || 'IT';
     const branchPatterns = getBranchPatterns(branch);
 
     const faculties = await User.find({
       role: 'faculty',
+      ...campusFilter,
       $or: [
         { branch: { $in: branchPatterns } },
         { 'managedScopes.branch': { $in: branchPatterns } },
@@ -252,6 +281,13 @@ exports.addFacultyToDepartment = async (req, res, next) => {
     const cleanEmail = email.trim().toLowerCase();
     let faculty = await User.findOne({ email: cleanEmail });
 
+    if (faculty && !canAccessCampus(req.user, faculty.campusId)) {
+      return res.status(403).json({
+        success: false,
+        error: 'Forbidden: Cannot assign faculty belonging to another campus.'
+      });
+    }
+
     const newScope = {
       academicYear: assignedYear,
       branch,
@@ -280,6 +316,7 @@ exports.addFacultyToDepartment = async (req, res, next) => {
         email: cleanEmail,
         password: password || 'Faculty@1234',
         role: 'faculty',
+        campusId: req.user.campusId || null,
         branch,
         targetRole: designation,
         mobileNumber: (mobileNumber || phone || '').trim(),
@@ -306,6 +343,26 @@ exports.updateFacultyScope = async (req, res, next) => {
     const faculty = await User.findOne({ _id: req.params.id, role: 'faculty' });
     if (!faculty) {
       return res.status(404).json({ success: false, error: 'Faculty member not found' });
+    }
+
+    if (!canAccessCampus(req.user, faculty.campusId)) {
+      return res.status(403).json({
+        success: false,
+        error: 'Forbidden: Cannot modify faculty scopes outside your campus.'
+      });
+    }
+
+    if (!isSuperAdmin(req.user)) {
+      const isSameDept = canAccessDepartment(req.user, faculty.departmentId, faculty.branch);
+      const hasOwnDeptScope = Array.isArray(faculty.managedScopes) && faculty.managedScopes.some(s =>
+        canAccessDepartment(req.user, null, s.branch)
+      );
+      if (!isSameDept && !hasOwnDeptScope) {
+        return res.status(403).json({
+          success: false,
+          error: 'Forbidden: Cannot modify faculty scopes belonging to another department.'
+        });
+      }
     }
 
     const { managedScopes, mobileNumber, phone, designation } = req.body;
@@ -339,11 +396,13 @@ exports.updateFacultyScope = async (req, res, next) => {
 // Get All Activities of Faculty in this Branch
 exports.getFacultyActivities = async (req, res, next) => {
   try {
+    const campusFilter = getCampusFilter(req.user);
     const branch = req.user.branch || 'IT';
     const branchPatterns = getBranchPatterns(branch);
 
     const faculties = await User.find({
       role: 'faculty',
+      ...campusFilter,
       $or: [
         { branch: { $in: branchPatterns } },
         { 'managedScopes.branch': { $in: branchPatterns } }
@@ -430,6 +489,7 @@ exports.getFacultyActivities = async (req, res, next) => {
 // =========================================================================
 exports.getDepartmentStudents = async (req, res, next) => {
   try {
+    const campusFilter = getCampusFilter(req.user);
     const branch = req.user.branch || 'IT';
     const branchPatterns = getBranchPatterns(branch);
 
@@ -444,7 +504,8 @@ exports.getDepartmentStudents = async (req, res, next) => {
 
     const query = {
       role: 'student',
-      branch: { $in: branchPatterns }
+      branch: { $in: branchPatterns },
+      ...campusFilter
     };
 
     if (academicYear && academicYear !== 'ALL') {
@@ -576,6 +637,20 @@ exports.updateStudentRecord = async (req, res, next) => {
     const student = await User.findOne({ _id: req.params.id, role: 'student' });
     if (!student) {
       return res.status(404).json({ success: false, error: 'Student record not found.' });
+    }
+
+    if (!canAccessCampus(req.user, student.campusId)) {
+      return res.status(403).json({
+        success: false,
+        error: 'Forbidden: Cannot update student record outside your campus.'
+      });
+    }
+
+    if (!isSuperAdmin(req.user) && !canAccessDepartment(req.user, student.departmentId, student.branch)) {
+      return res.status(403).json({
+        success: false,
+        error: 'Forbidden: Cannot update student record belonging to another department.'
+      });
     }
 
     const {
@@ -868,7 +943,10 @@ exports.getDepartmentSubjects = async (req, res, next) => {
 
 exports.createDepartmentSubject = async (req, res, next) => {
   try {
-    const branch = req.user.branch || 'IT';
+    const branch = await resolveHodBranch(req.user);
+    if (!isSuperAdmin(req.user) && !canAccessDepartment(req.user, req.user.departmentId, branch)) {
+      return res.status(403).json({ success: false, error: 'Forbidden: Cannot create subject for another department.' });
+    }
     const { name, code, description, academicYear, section = 'All', assignedTo } = req.body;
 
     if (!name || !code || !academicYear) {
@@ -1036,9 +1114,17 @@ exports.gradeStudentProject = async (req, res, next) => {
       teamMembers
     } = req.body;
 
-    const project = await Project.findById(id).populate('student', 'name email');
+    const project = await Project.findById(id).populate('student', 'name email campusId departmentId branch');
     if (!project) {
       return res.status(404).json({ success: false, error: 'Project not found.' });
+    }
+
+    if (project.student && !canAccessCampus(req.user, project.student.campusId)) {
+      return res.status(403).json({ success: false, error: 'Forbidden: Cannot grade project outside your campus.' });
+    }
+
+    if (!isSuperAdmin(req.user) && project.student && !canAccessDepartment(req.user, project.student.departmentId, project.student.branch)) {
+      return res.status(403).json({ success: false, error: 'Forbidden: Cannot grade project belonging to another department.' });
     }
 
     if (grade !== undefined && grade !== null && grade !== '') {
@@ -1229,10 +1315,24 @@ exports.getLabTaskSubmissions = async (req, res, next) => {
 
 exports.deleteDepartmentLabTask = async (req, res, next) => {
   try {
-    const task = await LabTask.findById(req.params.id);
+    const task = await LabTask.findById(req.params.id).populate('createdBy', 'campusId departmentId branch');
     if (!task) {
       return res.status(404).json({ success: false, error: 'Lab task not found.' });
     }
+
+    if (task.createdBy) {
+      if (!canAccessCampus(req.user, task.createdBy.campusId)) {
+        return res.status(403).json({ success: false, error: 'Forbidden: Cannot delete lab task outside your campus.' });
+      }
+      if (!isSuperAdmin(req.user) && !canAccessDepartment(req.user, task.createdBy.departmentId, task.createdBy.branch || task.branch)) {
+        return res.status(403).json({ success: false, error: 'Forbidden: Cannot delete lab task belonging to another department.' });
+      }
+    } else if (task.branch && !isSuperAdmin(req.user)) {
+      if (!canAccessDepartment(req.user, null, task.branch)) {
+        return res.status(403).json({ success: false, error: 'Forbidden: Cannot delete lab task belonging to another department.' });
+      }
+    }
+
     await LabTask.findByIdAndDelete(req.params.id);
     res.status(200).json({
       success: true,

@@ -1,16 +1,76 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { usePermission } from '../hooks/usePermission';
 import { API_URL } from '../config/api';
 import './Sidebar.css';
 
 const Sidebar = () => {
   const { user, token, logout } = useAuth();
+  const {
+    isSuperAdmin,
+    isCampusAdmin,
+    isAdministrator,
+    isHOD,
+    isFaculty,
+    isPlacementOfficer,
+    isRecruiter,
+    isStudent,
+    isAuditor
+  } = usePermission();
+  const isAdminGroup = isSuperAdmin || isCampusAdmin || isAdministrator || user?.role === 'admin';
   const navigate = useNavigate();
   const location = useLocation();
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [showContactModal, setShowContactModal] = useState(false);
   const menuRef = useRef(null);
+
+  const getRoleTitle = () => {
+    if (isSuperAdmin) return 'Super Administrator';
+    if (isCampusAdmin) return `Campus Admin (${user.campusName || user.campus?.name || 'Assigned Campus'})`;
+    if (isAdministrator) return `Administrator (${user.campusName || user.campus?.name || 'Institutional'})`;
+    if (isPlacementOfficer) return `Placement Officer (${user.campusName || user.campus?.name || 'T&P'})`;
+    if (isAuditor) return 'Security Auditor';
+    if (isHOD) return `HOD (${user.department || user.branch || 'IT'})`;
+    if (isFaculty) return (user.designation || 'Faculty Coordinator');
+    if (isRecruiter) return (user.companyName || 'Campus Recruiter');
+    return (user.targetRole || 'Student');
+  };
+
+  const getRoleAvatarStyle = () => {
+    if (isSuperAdmin || user?.role === 'admin') return { background: 'linear-gradient(135deg, #f59e0b, #ef4444)', color: '#fff', fontWeight: 'bold' };
+    if (isCampusAdmin) return { background: 'linear-gradient(135deg, #0284c7, #0369a1)', color: '#fff', fontWeight: 'bold' };
+    if (isAdministrator) return { background: 'linear-gradient(135deg, #0ea5e9, #2563eb)', color: '#fff', fontWeight: 'bold' };
+    if (isPlacementOfficer) return { background: 'linear-gradient(135deg, #0d9488, #059669)', color: '#fff', fontWeight: 'bold' };
+    if (isAuditor) return { background: 'linear-gradient(135deg, #475569, #334155)', color: '#fff', fontWeight: 'bold' };
+    if (isHOD) return { background: 'linear-gradient(135deg, #10b981, #0d9488)', color: '#fff', fontWeight: 'bold' };
+    if (isFaculty) return { background: 'linear-gradient(135deg, #8b5cf6, #6366f1)', color: '#fff', fontWeight: 'bold' };
+    if (isRecruiter) return { background: 'linear-gradient(135deg, #2563eb, #06b6d4)', color: '#fff', fontWeight: 'bold' };
+    return undefined;
+  };
+
+  const getRoleAvatarIcon = () => {
+    if (isSuperAdmin || user?.role === 'admin') return '🛡️';
+    if (isCampusAdmin) return '🏛️';
+    if (isAdministrator) return '⚡';
+    if (isPlacementOfficer) return '💼';
+    if (isAuditor) return '🔍';
+    if (isHOD) return '🎓';
+    if (isFaculty) return '👨‍🏫';
+    if (isRecruiter) return '🏢';
+    return (user?.name ? user.name.charAt(0).toUpperCase() : 'U');
+  };
+
+  const getRoleTextColor = () => {
+    if (isSuperAdmin || user?.role === 'admin') return '#fbbf24';
+    if (isCampusAdmin || isAdministrator) return '#38bdf8';
+    if (isPlacementOfficer) return '#2dd4bf';
+    if (isAuditor) return '#cbd5e1';
+    if (isHOD) return '#34d399';
+    if (isFaculty) return '#c084fc';
+    if (isRecruiter) return '#60a5fa';
+    return undefined;
+  };
 
   // Close popover when clicking outside
   useEffect(() => {
@@ -79,7 +139,7 @@ const Sidebar = () => {
       </div>
 
       <nav className="sidebar-nav">
-        {user.role === 'student' && (
+        {isStudent && (
           <>
             <NavLink to="/dashboard" className={({ isActive }) => `nav-link ${isActive && !location.search.includes('tab=achievements') ? 'active' : ''}`}>
               <svg viewBox="0 0 24 24" className="nav-icon"><rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" /><rect x="14" y="14" width="7" height="7" /><rect x="3" y="14" width="7" height="7" /></svg>
@@ -173,7 +233,7 @@ const Sidebar = () => {
           </>
         )}
 
-        {user.role === 'faculty' && (
+        {isFaculty && (
           <>
             <NavLink to="/faculty" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
               <svg viewBox="0 0 24 24" className="nav-icon"><rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" /><rect x="14" y="14" width="7" height="7" /><rect x="3" y="14" width="7" height="7" /></svg>
@@ -222,7 +282,7 @@ const Sidebar = () => {
           </>
         )}
 
-        {user.role === 'admin' && (
+        {isAdminGroup && (
           <>
             <NavLink to="/admin" end className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
               <svg viewBox="0 0 24 24" className="nav-icon"><rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" /><rect x="14" y="14" width="7" height="7" /><rect x="3" y="14" width="7" height="7" /></svg>
@@ -299,7 +359,6 @@ const Sidebar = () => {
               <span>Coding Playground</span>
             </NavLink>
 
-
             <NavLink to="/discussion-forum" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
               <svg viewBox="0 0 24 24" className="nav-icon" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" /></svg>
               <span>Discussion Forum</span>
@@ -317,7 +376,50 @@ const Sidebar = () => {
           </>
         )}
 
-        {user.role === 'recruiter' && (
+        {isPlacementOfficer && (
+          <>
+            <NavLink to="/job-opportunities" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+              <svg viewBox="0 0 24 24" className="nav-icon" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="2" y="7" width="20" height="14" rx="2" ry="2" />
+                <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" />
+              </svg>
+              <span>Placement Drives &amp; Jobs</span>
+            </NavLink>
+
+            <NavLink to="/applied-jobs-report" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+              <svg viewBox="0 0 24 24" className="nav-icon" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                <polyline points="14 2 14 8 20 8" />
+                <line x1="16" y1="13" x2="8" y2="13" />
+                <line x1="16" y1="17" x2="8" y2="17" />
+                <polyline points="10 9 9 9 8 9" />
+              </svg>
+              <span>Applied Jobs Report</span>
+            </NavLink>
+
+            <NavLink to="/placement-calendar" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+              <svg viewBox="0 0 24 24" className="nav-icon" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg>
+              <span>Placement Calendar</span>
+            </NavLink>
+
+            <NavLink to="/placement-suite" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+              <svg viewBox="0 0 24 24" className="nav-icon" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="8" r="7" /><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88" /></svg>
+              <span>Placement Suite</span>
+            </NavLink>
+
+            <NavLink to="/question-bank" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+              <svg viewBox="0 0 24 24" className="nav-icon" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" /></svg>
+              <span>Question Bank</span>
+            </NavLink>
+
+            <NavLink to="/discussion-forum" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+              <svg viewBox="0 0 24 24" className="nav-icon" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" /></svg>
+              <span>Discussion Forum</span>
+            </NavLink>
+          </>
+        )}
+
+        {isRecruiter && (
           <>
             <NavLink to="/recruiter" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
               <svg viewBox="0 0 24 24" className="nav-icon"><rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" /><rect x="14" y="14" width="7" height="7" /><rect x="3" y="14" width="7" height="7" /></svg>
@@ -331,7 +433,7 @@ const Sidebar = () => {
           </>
         )}
 
-        {user.role === 'hod' && (
+        {isHOD && (
           <>
             <NavLink to="/hod" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
               <svg viewBox="0 0 24 24" className="nav-icon" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg>
@@ -364,6 +466,33 @@ const Sidebar = () => {
             </NavLink>
           </>
         )}
+
+        {isAuditor && (
+          <>
+            <NavLink to="/audit-logs" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+              <svg viewBox="0 0 24 24" className="nav-icon" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10" />
+                <polyline points="12 6 12 12 16 14" />
+              </svg>
+              <span>Student Audit Logs</span>
+            </NavLink>
+
+            <NavLink to="/plagiarism-audit" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+              <svg viewBox="0 0 24 24" className="nav-icon" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" /></svg>
+              <span>Plagiarism Audit</span>
+            </NavLink>
+
+            <NavLink to="/placement-calendar" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+              <svg viewBox="0 0 24 24" className="nav-icon" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg>
+              <span>Placement Calendar</span>
+            </NavLink>
+
+            <NavLink to="/question-bank" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+              <svg viewBox="0 0 24 24" className="nav-icon" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" /></svg>
+              <span>Question Bank</span>
+            </NavLink>
+          </>
+        )}
       </nav>
 
       <div className="sidebar-footer">
@@ -375,53 +504,20 @@ const Sidebar = () => {
           >
             <div
               className="user-avatar"
-              style={
-                user.role === 'hod'
-                  ? { background: 'linear-gradient(135deg, #10b981, #0d9488)', color: '#fff', fontWeight: 'bold' }
-                  : user.role === 'recruiter'
-                  ? { background: 'linear-gradient(135deg, #2563eb, #06b6d4)', color: '#fff', fontWeight: 'bold' }
-                  : user.role === 'faculty'
-                  ? { background: 'linear-gradient(135deg, #8b5cf6, #6366f1)', color: '#fff', fontWeight: 'bold' }
-                  : user.role === 'admin'
-                  ? { background: 'linear-gradient(135deg, #f59e0b, #ef4444)', color: '#fff', fontWeight: 'bold' }
-                  : undefined
-              }
+              style={getRoleAvatarStyle()}
             >
-              {user.role === 'hod'
-                ? '🎓'
-                : user.role === 'recruiter'
-                ? '🏢'
-                : user.role === 'admin'
-                ? '🛡️'
-                : (user.name ? user.name.charAt(0).toUpperCase() : 'U')}
+              {getRoleAvatarIcon()}
             </div>
             <div className="user-info">
               <span className="user-name">{user.name}</span>
               <span
                 className="user-role"
                 style={{
-                  color:
-                    user.role === 'hod'
-                      ? '#34d399'
-                      : user.role === 'recruiter'
-                      ? '#60a5fa'
-                      : user.role === 'faculty'
-                      ? '#c084fc'
-                      : user.role === 'admin'
-                      ? '#fbbf24'
-                      : undefined,
+                  color: getRoleTextColor(),
                   fontWeight: 600
                 }}
               >
-                {user.role === 'hod'
-                  ? `HOD (${user.department || user.branch || 'IT'})`
-                  : user.role === 'recruiter'
-                  ? (user.companyName || 'Campus Recruiter')
-                  : user.role === 'faculty'
-                  ? (user.designation || 'Faculty Coordinator')
-                  : user.role === 'admin'
-                  ? 'Super Administrator'
-                  : (user.targetRole || 'Student')}
+                {getRoleTitle()}
               </span>
             </div>
             <span
@@ -439,33 +535,29 @@ const Sidebar = () => {
 
           {isUserMenuOpen && (
             <div className="user-popover-menu animate-fade">
-              {user.role !== 'admin' && (
-                <button
-                  type="button"
-                  onClick={() => { navigate('/profile'); setIsUserMenuOpen(false); }}
-                  className="popover-item"
-                >
-                  <svg className="popover-icon" viewBox="0 0 24 24">
-                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                    <circle cx="12" cy="7" r="4" />
-                  </svg>
-                  <span>Profile</span>
-                </button>
-              )}
+              <button
+                type="button"
+                onClick={() => { navigate('/profile'); setIsUserMenuOpen(false); }}
+                className="popover-item"
+              >
+                <svg className="popover-icon" viewBox="0 0 24 24">
+                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                  <circle cx="12" cy="7" r="4" />
+                </svg>
+                <span>Profile</span>
+              </button>
 
-              {user.role !== 'recruiter' && user.role !== 'admin' && (
-                <button
-                  type="button"
-                  onClick={() => { navigate('/change-password'); setIsUserMenuOpen(false); }}
-                  className="popover-item"
-                >
-                  <svg className="popover-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-                    <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-                  </svg>
-                  <span>Change Password</span>
-                </button>
-              )}
+              <button
+                type="button"
+                onClick={() => { navigate('/change-password'); setIsUserMenuOpen(false); }}
+                className="popover-item"
+              >
+                <svg className="popover-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                  <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                </svg>
+                <span>Change Password</span>
+              </button>
 
               <button
                 type="button"

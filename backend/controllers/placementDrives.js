@@ -3,6 +3,7 @@ const User = require('../models/User');
 const Notification = require('../models/Notification');
 const { logActivity } = require('../utils/auditLogger');
 const { notifyStudentsOnDrivePost, notifyStudentsOnDriveDeadlineExtension } = require('../utils/placementNotifier');
+const { canRecruiterAccessDrive } = require('../utils/scopeFilter');
 
 // Helper to compute student match score against a drive
 const calculateDriveMatch = (student, drive) => {
@@ -101,6 +102,8 @@ exports.getDrives = async (req, res, next) => {
         
         return {
           ...driveObj,
+          applications: existingApp ? [existingApp] : [],
+          candidates: [],
           hasApplied: !!existingApp,
           applicationStatus: existingApp ? existingApp.currentStage : null,
           userApplication: existingApp || null,
@@ -119,13 +122,19 @@ exports.getDrives = async (req, res, next) => {
     }
 
     // For faculty and admin, return drives with aggregate candidate counts & compatibility aliases
+    // For recruiters, redact candidate pipelines for drives not belonging to their company
+    const isRecruiter = req.user && req.user.role === 'recruiter';
+
     const formatted = drives.map(d => {
       const dObj = d.toObject();
       const apps = dObj.applications || [];
-      const candidatesList = apps.map(a => ({
+      const hasDriveAccess = !isRecruiter || canRecruiterAccessDrive(req.user, d);
+
+      const candidatesList = hasDriveAccess ? apps.map(a => ({
         ...a,
         stage: a.currentStage || 'applied'
-      }));
+      })) : [];
+
       return {
         ...dObj,
         driveTitle: dObj.title,
@@ -133,6 +142,7 @@ exports.getDrives = async (req, res, next) => {
         description: dObj.jobDescription,
         deadline: dObj.dates?.registrationDeadline,
         driveDate: dObj.dates?.driveDate,
+        applications: hasDriveAccess ? apps : [],
         candidates: candidatesList,
         totalApplicants: apps.length,
         shortlistedCount: apps.filter(a => ['shortlisted', 'online_test_cleared', 'interview_round_1', 'interview_round_2', 'hr_round', 'selected'].includes(a.currentStage)).length,
@@ -161,23 +171,60 @@ exports.getDriveById = async (req, res, next) => {
     }
 
     let matchAnalysis = null;
-    if (req.user.role === 'student') {
+    let existingApp = null;
+
+    if (req.user && req.user.role === 'student') {
       const student = await User.findById(req.user.id);
       matchAnalysis = calculateDriveMatch(student, drive);
+      existingApp = (drive.applications || []).find(a => String(a.student) === String(req.user.id));
     }
 
     const dObj = drive.toObject();
+
+    let candidates = [];
+    let applications = [];
+
+    if (req.user && req.user.role === 'student') {
+      // SECURITY FIX (PHASE 8D): Redact other applicants' PII from student callers
+      // Return candidates as empty array; applications contains only student's own application if present
+      candidates = [];
+      applications = existingApp ? [existingApp.toObject ? existingApp.toObject() : existingApp] : [];
+    } else if (req.user && req.user.role === 'recruiter') {
+      // SECURITY FIX (PHASE 8G): Redact competitor applicants from recruiter callers
+      const hasDriveAccess = canRecruiterAccessDrive(req.user, drive);
+      if (hasDriveAccess) {
+        candidates = (dObj.applications || []).map(a => ({
+          ...a,
+          stage: a.currentStage || 'applied'
+        }));
+        applications = dObj.applications || [];
+      } else {
+        candidates = [];
+        applications = [];
+      }
+    } else {
+      // Administrative / Faculty view: full pipeline
+      candidates = (dObj.applications || []).map(a => ({
+        ...a,
+        stage: a.currentStage || 'applied'
+      }));
+      applications = dObj.applications || [];
+    }
+
     const formattedDrive = {
       ...dObj,
+      applications,
+      candidates,
       driveTitle: dObj.title,
       packageLPA: dObj.packageDetails,
       description: dObj.jobDescription,
       deadline: dObj.dates?.registrationDeadline,
       driveDate: dObj.dates?.driveDate,
-      candidates: (dObj.applications || []).map(a => ({
-        ...a,
-        stage: a.currentStage || 'applied'
-      }))
+      ...(req.user && req.user.role === 'student' ? {
+        hasApplied: !!existingApp,
+        applicationStatus: existingApp ? existingApp.currentStage : null,
+        userApplication: existingApp || null
+      } : {})
     };
 
     res.status(200).json({
@@ -594,7 +641,21 @@ exports.updateDrive = async (req, res, next) => {
     const oldDeadline = drive.dates?.registrationDeadline;
 
     // Updatable fields
-    if (b.companyName) drive.companyName = b.companyName.trim();
+    if (b.companyName) {
+      if (req.user.role === 'recruiter') {
+        const userCompany = (req.user.companyName || '').trim().toLowerCase();
+        const targetCompany = b.companyName.trim().toLowerCase();
+        if (userCompany && targetCompany !== userCompany) {
+          return res.status(403).json({
+            success: false,
+            error: 'Recruiters are not authorized to change the drive company name to another company.'
+          });
+        }
+        drive.companyName = req.user.companyName.trim();
+      } else {
+        drive.companyName = b.companyName.trim();
+      }
+    }
     if (b.companyLogo !== undefined) drive.companyLogo = b.companyLogo;
     if (b.companyWebsite !== undefined) drive.companyWebsite = b.companyWebsite;
     if (b.tier) drive.tier = b.tier;

@@ -106,11 +106,12 @@ const connectDB = async () => {
       let existingUser = await User.findOne({ email: acc.email }).select('+password');
       if (existingUser) {
         let modified = false;
-        if (existingUser.role !== acc.role) {
+        // Preserve user's configured role - only set if missing
+        if (!existingUser.role && acc.role) {
           existingUser.role = acc.role;
           modified = true;
         }
-        if (acc.branch && existingUser.branch !== acc.branch) {
+        if (acc.branch && !existingUser.branch) {
           existingUser.branch = acc.branch;
           modified = true;
         }
@@ -119,24 +120,17 @@ const connectDB = async () => {
           existingUser.phone = acc.phone || acc.mobileNumber;
           modified = true;
         }
-        if (acc.targetRole && existingUser.targetRole !== acc.targetRole) {
+        if (acc.targetRole && !existingUser.targetRole) {
           existingUser.targetRole = acc.targetRole;
           modified = true;
         }
-        if (acc.managedScopes && acc.managedScopes.length > 0) {
+        if (acc.managedScopes && acc.managedScopes.length > 0 && (!existingUser.managedScopes || existingUser.managedScopes.length === 0)) {
           existingUser.managedScopes = acc.managedScopes;
           modified = true;
         }
-        if (acc.managedAcademicYears && acc.managedAcademicYears.length > 0) {
+        if (acc.managedAcademicYears && acc.managedAcademicYears.length > 0 && (!existingUser.managedAcademicYears || existingUser.managedAcademicYears.length === 0)) {
           existingUser.managedAcademicYears = acc.managedAcademicYears;
           modified = true;
-        }
-        if (acc.email === 'ajaykumarbymuthakala@gmail.com') {
-          const isCorrect = await existingUser.matchPassword(acc.password);
-          if (!isCorrect) {
-            existingUser.password = acc.password;
-            modified = true;
-          }
         }
         if (modified) {
           await existingUser.save();

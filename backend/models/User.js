@@ -28,7 +28,18 @@ const UserSchema = new mongoose.Schema({
   },
   role: {
     type: String,
-    enum: ['student', 'faculty', 'admin', 'recruiter', 'hod'],
+    enum: [
+      'student',
+      'faculty',
+      'admin',
+      'recruiter',
+      'hod',
+      'super_admin',
+      'campus_admin',
+      'administrator',
+      'placement_officer',
+      'auditor'
+    ],
     default: 'student'
   },
   companyName: {
@@ -109,6 +120,37 @@ const UserSchema = new mongoose.Schema({
     section: { type: String, default: '' },
     subject: { type: mongoose.Schema.Types.ObjectId, ref: 'Subject' }
   }],
+  campusId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Campus',
+    default: null,
+    index: true
+  },
+  departmentId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Department',
+    default: null,
+    index: true
+  },
+  branchId: {
+    type: mongoose.Schema.Types.ObjectId,
+    default: null,
+    index: true
+  },
+  batchId: {
+    type: mongoose.Schema.Types.ObjectId,
+    default: null,
+    index: true
+  },
+  sectionId: {
+    type: mongoose.Schema.Types.ObjectId,
+    default: null,
+    index: true
+  },
+  customPermissions: {
+    type: [String],
+    default: []
+  },
   readinessScore: {
     type: Number,
     default: 0

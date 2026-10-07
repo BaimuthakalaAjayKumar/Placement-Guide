@@ -2,10 +2,21 @@ const Subject = require('../models/Subject');
 const Project = require('../models/Project');
 const User = require('../models/User');
 const Notification = require('../models/Notification');
+const {
+  isSuperAdmin,
+  isCampusScopedAdmin,
+  canAccessCampus,
+  canAccessDepartment,
+  matchesManagedScope,
+  getCampusFilter,
+  getBranchPatterns
+} = require('../utils/scopeFilter');
+
 const getStudentAcademicYear = (user) => user.academicYear || user.year || '';
 
 const canManageYear = (user, academicYear) => {
-  if (user.role === 'admin' || user.role === 'hod') return true;
+  if (isSuperAdmin(user) || isCampusScopedAdmin(user)) return true;
+  if (user.role === 'hod') return true;
   if (user.role !== 'faculty') return false;
   if (!user.managedAcademicYears || user.managedAcademicYears.length === 0) return true;
   const targetYear = (academicYear || '').trim().toLowerCase();
@@ -13,7 +24,11 @@ const canManageYear = (user, academicYear) => {
 };
 
 const canManageScope = (user, academicYear, branch = '', section = '') => {
-  if (user.role === 'admin' || user.role === 'hod') return true;
+  if (isSuperAdmin(user) || isCampusScopedAdmin(user)) return true;
+  if (user.role === 'hod') {
+    if (!branch) return true;
+    return canAccessDepartment(user, null, branch);
+  }
   if (user.role !== 'faculty') return false;
   if (!user.managedScopes || user.managedScopes.length === 0) {
     if (user.managedAcademicYears && user.managedAcademicYears.length > 0) {
@@ -21,18 +36,10 @@ const canManageScope = (user, academicYear, branch = '', section = '') => {
     }
     return true;
   }
-  return user.managedScopes.some(scope => {
-    const sYear = (scope.academicYear || '').trim().toLowerCase();
-    const sBranch = (scope.branch || '').trim().toLowerCase();
-    const sSection = (scope.section || '').trim().toLowerCase();
-    const reqYear = (academicYear || '').trim().toLowerCase();
-    const reqBranch = (branch || '').trim().toLowerCase();
-    const reqSection = (section || '').trim().toLowerCase();
-
-    const yearMatch = !sYear || sYear === 'all' || !reqYear || sYear === reqYear || reqYear.includes(sYear) || sYear.includes(reqYear);
-    const branchMatch = !sBranch || sBranch === 'all' || !reqBranch || sBranch === reqBranch;
-    const sectionMatch = !reqSection || !sSection || sSection === 'all' || sSection === reqSection || reqSection === `section ${sSection}` || `section ${reqSection}` === sSection;
-    return yearMatch && branchMatch && sectionMatch;
+  return matchesManagedScope(user.managedScopes, {
+    branch,
+    academicYear,
+    section
   });
 };
 
@@ -253,6 +260,18 @@ exports.deleteSubject = async (req, res, next) => {
   try {
     const subject = await Subject.findById(req.params.id);
     if (!subject) return res.status(404).json({ success: false, error: 'Subject not found.' });
+
+    if (!isSuperAdmin(req.user) && !isCampusScopedAdmin(req.user)) {
+      if (req.user.role === 'hod') {
+        if (!canAccessDepartment(req.user, req.user.departmentId, subject.branch)) {
+          return res.status(403).json({ success: false, error: 'Forbidden: Cannot delete subject for another department.' });
+        }
+      } else if (req.user.role === 'faculty') {
+        if (!canManageScope(req.user, subject.academicYear, subject.branch, subject.section)) {
+          return res.status(403).json({ success: false, error: 'Forbidden: You are not authorized to delete this subject.' });
+        }
+      }
+    }
 
     await Subject.findByIdAndDelete(req.params.id);
     res.status(200).json({ success: true, message: `Subject "${subject.name}" (${subject.code}) removed successfully.` });
@@ -536,6 +555,28 @@ exports.getProjects = async (req, res, next) => {
       } else if (req.user.managedAcademicYears && req.user.managedAcademicYears.length > 0 && !req.user.managedAcademicYears.includes('All')) {
         query.academicYear = { $in: req.user.managedAcademicYears };
       }
+    } else if (req.user.role === 'hod') {
+      const hodBranch = req.user.branch || 'IT';
+      const branchPatterns = getBranchPatterns(hodBranch);
+      const campusFilter = getCampusFilter(req.user);
+      const deptStudents = await User.find({
+        role: 'student',
+        branch: { $in: branchPatterns },
+        ...campusFilter
+      }).select('_id');
+      const studentIds = deptStudents.map(s => s._id);
+
+      query.$or = [
+        { student: { $in: studentIds } },
+        { branch: { $in: branchPatterns } }
+      ];
+    } else if (isCampusScopedAdmin(req.user)) {
+      const campusFilter = getCampusFilter(req.user);
+      const campusStudents = await User.find({
+        role: 'student',
+        ...campusFilter
+      }).select('_id');
+      query.student = { $in: campusStudents.map(s => s._id) };
     }
 
     // Optional query parameter filters (for faculty dashboard filtering by year, branch, section)
@@ -637,10 +678,14 @@ exports.updateProject = async (req, res, next) => {
       (m.rollNumber && userRoll && m.rollNumber.trim().toLowerCase() === userRoll)
     );
     const canEditProject = isOwner || isTeamMember;
-    const canReview = ['admin', 'faculty'].includes(req.user.role) && (
-      req.user.role === 'admin' ||
-      canManageScope(req.user, project.academicYear, project.branch, project.section) ||
-      canManageYear(req.user, project.academicYear)
+    const canReview = ['admin', 'faculty', 'hod'].includes(req.user.role) && (
+      isSuperAdmin(req.user) ||
+      isCampusScopedAdmin(req.user) ||
+      (req.user.role === 'hod' && canAccessDepartment(req.user, req.user.departmentId, project.branch)) ||
+      (req.user.role === 'faculty' && (
+        canManageScope(req.user, project.academicYear, project.branch, project.section) ||
+        canManageYear(req.user, project.academicYear)
+      ))
     );
 
     if (!canEditProject && !canReview) {

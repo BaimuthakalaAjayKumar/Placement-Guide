@@ -42,16 +42,32 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
   const [searchParams] = useSearchParams();
   const tabParam = searchParams.get('tab');
 
+  const isFaculty = user?.role === 'faculty';
+  const initialTab = isFaculty ? 'applied-jobs' : (tabParam || defaultTab);
+
   // Navigation tabs
-  const [activeTab, setActiveTab] = useState(tabParam || defaultTab);
+  const [activeTab, setActiveTab] = useState(initialTab);
+
+  const safeSetActiveTab = (tab) => {
+    if (isFaculty && tab !== 'applied-jobs' && tab !== 'job-applications') {
+      return;
+    }
+    setActiveTab(tab);
+  };
 
   useEffect(() => {
+    if (isFaculty) {
+      if (activeTab !== 'applied-jobs' && activeTab !== 'job-applications') {
+        setActiveTab('applied-jobs');
+      }
+      return;
+    }
     if (tabParam) {
       setActiveTab(tabParam);
     } else if (defaultTab) {
       setActiveTab(defaultTab);
     }
-  }, [tabParam, defaultTab]);
+  }, [tabParam, defaultTab, isFaculty, activeTab]);
 
   // Lists
   const [students, setStudents] = useState([]);
@@ -3517,6 +3533,19 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
             }
           }}
         >
+          {isFaculty ? (
+            <button
+              className="admin-tab-btn active"
+              onClick={() => {
+                safeSetActiveTab('applied-jobs');
+                fetchJobs();
+                fetchApplicationsReport();
+              }}
+            >
+              📋 Candidate Applications Report
+            </button>
+          ) : (
+            <>
           <button
             className={`admin-tab-btn ${activeTab === 'analytics' ? 'active' : ''}`}
             onClick={() => setActiveTab('analytics')}
@@ -3657,6 +3686,8 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
           >
             ⚙️ Settings
           </button>
+            </>
+          )}
         </div>
 
         {

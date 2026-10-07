@@ -775,14 +775,70 @@ const RecruiterDashboard = () => {
     }
   };
 
-  // Export Suitable Students to CSV
-  const handleExportCSV = () => {
-    const params = new URLSearchParams({
-      minCgpa: minCgpaFilter
-    });
-    if (selectedDriveId) params.append('driveId', selectedDriveId);
+  // Export Suitable Students to CSV (Authenticated Blob Download)
+  const [exportingCsv, setExportingCsv] = useState(false);
 
-    window.open(`${API_URL}/recruiter/export-csv?${params.toString()}&token=${token}`, '_blank');
+  const handleExportCSV = async () => {
+    const driveId = selectedDriveId || (drives && drives.length > 0 ? drives[0]._id : '');
+    if (!driveId) {
+      setError('Please select or create an on-campus placement drive before exporting candidates.');
+      return;
+    }
+
+    try {
+      setExportingCsv(true);
+      setError('');
+      setSuccessMsg('');
+
+      const params = new URLSearchParams({
+        minCgpa: minCgpaFilter,
+        driveId
+      });
+      if (branchFilter && branchFilter !== 'ALL') params.append('branches', branchFilter);
+      if (batchFilter && batchFilter !== 'ALL') params.append('batches', batchFilter);
+
+      const res = await fetch(`${API_URL}/recruiter/export-csv?${params.toString()}`, {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+
+      if (!res.ok) {
+        let errMessage = 'Failed to export candidate CSV.';
+        try {
+          const errData = await res.json();
+          errMessage = errData.error || errMessage;
+        } catch (_) {}
+        if (res.status === 401) {
+          errMessage = 'Session expired. Please sign in again.';
+        } else if (res.status === 403) {
+          errMessage = 'Access Denied: You can only export candidates from placement drives owned by your company.';
+        } else if (res.status === 400) {
+          errMessage = 'A valid drive selection is required for CSV export.';
+        }
+        setError(errMessage);
+        return;
+      }
+
+      const blob = await res.blob();
+      const downloadUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      const sanitizedCompany = (user?.companyName || 'Recruiter').replace(/[^a-zA-Z0-9_-]/g, '_');
+      link.download = `${sanitizedCompany}_Candidate_Export_${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(downloadUrl);
+
+      sfx.playSuccess();
+      setSuccessMsg('📥 Candidate CSV exported successfully!');
+    } catch (err) {
+      setError('Connection error occurred while exporting candidate CSV.');
+    } finally {
+      setExportingCsv(false);
+    }
   };
 
   // Selected Drive Object
@@ -1045,9 +1101,10 @@ const RecruiterDashboard = () => {
                   type="button"
                   className="btn btn-secondary btn-sm"
                   onClick={handleExportCSV}
-                  title="Export suitable students to CSV"
+                  disabled={exportingCsv || (!selectedDriveId && (!drives || drives.length === 0))}
+                  title={!selectedDriveId && (!drives || drives.length === 0) ? "Select or create an on-campus placement drive before exporting candidates" : "Export suitable students to CSV"}
                 >
-                  📥 Export Talent Pool (CSV)
+                  {exportingCsv ? '⏳ Exporting...' : '📥 Export Talent Pool (CSV)'}
                 </button>
 
                 <button
@@ -1316,8 +1373,8 @@ const RecruiterDashboard = () => {
                       }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                           <span style={{ color: '#94a3b8' }}>📱 Mobile:</span>
-                          <strong style={{ color: student.mobileNumber || student.phone ? '#38bdf8' : '#64748b' }}>
-                            {student.mobileNumber || student.phone || 'Not Added'}
+                          <strong style={{ color: student.mobileNumber || student.phone ? '#38bdf8' : '#f59e0b', fontSize: student.mobileNumber || student.phone ? '12px' : '11px' }}>
+                            {student.mobileNumber || student.phone || '🔒 Protected — available after candidate applies'}
                           </strong>
                         </div>
 
@@ -2884,7 +2941,9 @@ const RecruiterDashboard = () => {
                 {/* Contact & Links Strip */}
                 <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', background: 'rgba(0,0,0,0.25)', padding: '10px 14px', borderRadius: '8px', fontSize: '12.5px' }}>
                   <span style={{ color: '#94a3b8' }}>✉️ {selectedStudentDetail.email}</span>
-                  {selectedStudentDetail.phone && <span style={{ color: '#94a3b8' }}>📞 {selectedStudentDetail.phone}</span>}
+                  <span style={{ color: selectedStudentDetail.phone ? '#94a3b8' : '#f59e0b' }}>
+                    📞 {selectedStudentDetail.phone || '🔒 Protected — available after candidate applies'}
+                  </span>
                   {selectedStudentDetail.githubProfileUrl && (
                     <a
                       href={selectedStudentDetail.githubProfileUrl.startsWith('http') ? selectedStudentDetail.githubProfileUrl : `https://${selectedStudentDetail.githubProfileUrl}`}
@@ -2931,8 +2990,8 @@ const RecruiterDashboard = () => {
                       </a>
                     </div>
                   ) : (
-                    <p style={{ color: '#94a3b8', fontSize: '12px', margin: 0, fontStyle: 'italic' }}>
-                      Candidate has not uploaded a resume to the Resume Analyzer yet.
+                    <p style={{ color: '#f59e0b', fontSize: '12px', margin: 0, fontStyle: 'italic' }}>
+                      🔒 Resume access available after candidate applies
                     </p>
                   )}
                 </div>

@@ -6,6 +6,7 @@ const Notification = require('../models/Notification');
 const { logActivity } = require('../utils/auditLogger');
 const sendEmail = require('../utils/sendEmail');
 const { sendWhatsAppMessage } = require('../utils/sendWhatsApp');
+const { getCampusFilter, canAccessCampus } = require('../utils/scopeFilter');
 
 // Helper to get portal base URL for email links
 const getPortalUrl = () => {
@@ -790,8 +791,9 @@ const evaluateStudentRisk = async (students) => {
 exports.getAtRiskStudents = async (req, res, next) => {
   try {
     const { branch, academicYear, section, minRiskLevel, filterStatus } = req.query;
+    const campusFilter = getCampusFilter(req.user);
 
-    const query = { role: 'student' };
+    const query = { role: 'student', ...campusFilter };
     if (branch && branch !== 'All' && branch !== 'all') query.branch = new RegExp(`^${branch.trim()}$`, 'i');
     if (academicYear && academicYear !== 'All' && academicYear !== 'all') {
       query.$or = [
@@ -879,6 +881,10 @@ exports.toggleStudentDashboardLock = async (req, res, next) => {
       return res.status(404).json({ success: false, error: 'Student account not found' });
     }
 
+    if (!canAccessCampus(req.user, student.campusId)) {
+      return res.status(403).json({ success: false, error: 'Not authorized to modify students outside your assigned campus' });
+    }
+
     const lockStatus = Boolean(isLocked);
 
     // ============================================================
@@ -961,10 +967,13 @@ exports.autoLockInactiveStudents = async (req, res, next) => {
     const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
     const sevenDaysAgo = new Date(now - SEVEN_DAYS_MS);
 
-    // Find all active students whose last login or activity was >= 7 days ago
+    const campusFilter = getCampusFilter(req.user);
+
+    // Find all active students whose last login or activity was >= 7 days ago within caller's campus
     const candidates = await User.find({
       role: 'student',
       isLocked: { $ne: true },
+      ...campusFilter,
       $or: [
         { lastActiveAt: { $lte: sevenDaysAgo } },
         { lastLoginAt: { $lte: sevenDaysAgo } },
@@ -1037,6 +1046,13 @@ exports.sendInterventionNotice = async (req, res, next) => {
     const student = await User.findById(studentId);
     if (!student) {
       return res.status(404).json({ success: false, error: 'Student not found' });
+    }
+
+    if (!canAccessCampus(req.user, student.campusId)) {
+      return res.status(403).json({
+        success: false,
+        error: 'Not authorized to send intervention notices to students outside your assigned campus'
+      });
     }
 
     const noticeSubject = subject || `Urgent: Placement Preparation & Academic Attendance Review`;
@@ -1114,7 +1130,8 @@ exports.sendInterventionNotice = async (req, res, next) => {
 exports.autoLockHighRiskStudents = async (req, res, next) => {
   try {
     const adminName = req.user?.name || 'Main Admin';
-    const students = await User.find({ role: 'student', isLocked: { $ne: true } })
+    const campusFilter = getCampusFilter(req.user);
+    const students = await User.find({ role: 'student', isLocked: { $ne: true }, ...campusFilter })
       .select('name email mobileNumber phone rollNumber branch section academicYear year totalActiveSeconds lastActiveAt lastLoginAt createdAt readinessScore leetcodeStats codechefStats hackerrankStats isLocked lockReason lockedAt lockedByName inactivityWarningSentAt riskWarningSentAt lastRiskWarningScore lockExemptionUntil sgpaSem1 sgpaSem2 sgpaSem3 sgpaSem4 sgpaSem5 sgpaSem6 sgpaSem7 sgpaSem8')
       .lean();
 

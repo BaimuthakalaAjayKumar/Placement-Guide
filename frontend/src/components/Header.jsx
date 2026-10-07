@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { usePermission } from '../hooks/usePermission';
 import { useTheme } from '../context/ThemeContext';
 import LeetCodeThemeToggle from './LeetCodeThemeToggle';
 import { API_URL } from '../config/api';
@@ -8,11 +9,42 @@ import './Header.css';
 
 const Header = ({ title }) => {
   const { user, token } = useAuth();
+  const {
+    isSuperAdmin,
+    isCampusAdmin,
+    isAdministrator,
+    isHOD,
+    isFaculty,
+    isPlacementOfficer,
+    isRecruiter,
+    isAuditor
+  } = usePermission();
   const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
   const [notifications, setNotifications] = useState([]);
   const [smartAlerts, setSmartAlerts] = useState([]);
   const [showNotifications, setShowNotifications] = useState(false);
+
+  const getRoleBadgeText = () => {
+    if (isSuperAdmin) return 'Super Admin';
+    if (isCampusAdmin) return `Campus Admin${user?.campusName ? ` • ${user.campusName}` : ''}`;
+    if (isAdministrator) return `Administrator${user?.campusName ? ` • ${user.campusName}` : ''}`;
+    if (isPlacementOfficer) return `Placement Officer${user?.campusName ? ` • ${user.campusName}` : ''}`;
+    if (isAuditor) return 'Security Auditor';
+    if (isHOD) return `HOD (${user?.department || user?.branch || 'IT'})`;
+    if (isFaculty) return `Faculty (${user?.department || user?.branch || 'Academic'})`;
+    if (isRecruiter) return `Recruiter (${user?.companyName || 'Visiting'})`;
+    return 'Student';
+  };
+
+  const getBadgeClass = () => {
+    if (isSuperAdmin || isCampusAdmin || isAdministrator || user?.role === 'admin') return 'badge-admin';
+    if (isRecruiter) return 'badge-recruiter';
+    if (isHOD) return 'badge-hod';
+    if (isFaculty || isPlacementOfficer) return 'badge-faculty';
+    if (isAuditor) return 'badge-auditor';
+    return 'badge-student';
+  };
   
   useEffect(() => {
     if (!token) return;
@@ -233,8 +265,23 @@ const Header = ({ title }) => {
         <div className="header-divider"></div>
 
         <div className="header-profile">
-          <span className={`profile-role-badge ${user.role === 'recruiter' ? 'badge-recruiter' : user.role === 'admin' ? 'badge-admin' : user.role === 'faculty' ? 'badge-faculty' : user.role === 'hod' ? 'badge-hod' : 'badge-student'}`}>
-            {user.role === 'admin' ? 'Admin' : user.role === 'faculty' ? 'Faculty' : user.role === 'recruiter' ? 'Recruiter' : user.role === 'hod' ? `HOD (${user.department || user.branch || 'IT'})` : 'Student'}
+          {user?.campusName && (
+            <span
+              style={{
+                fontSize: '11px',
+                color: '#38bdf8',
+                background: 'rgba(56, 189, 248, 0.12)',
+                border: '1px solid rgba(56, 189, 248, 0.25)',
+                padding: '3px 8px',
+                borderRadius: '12px',
+                fontWeight: 600
+              }}
+            >
+              📍 {user.campusName}
+            </span>
+          )}
+          <span className={`profile-role-badge ${getBadgeClass()}`}>
+            {getRoleBadgeText()}
           </span>
         </div>
       </div>

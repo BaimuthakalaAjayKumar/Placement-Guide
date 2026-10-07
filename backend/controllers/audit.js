@@ -1,6 +1,7 @@
 const AuditLog = require('../models/AuditLog');
 const User = require('../models/User');
 const { logActivity, extractClientIp, extractUserAgent } = require('../utils/auditLogger');
+const { getCampusFilter } = require('../utils/scopeFilter');
 
 // Helper to format seconds into readable string (e.g. "4h 23m 15s")
 const formatDuration = (seconds = 0) => {
@@ -121,7 +122,8 @@ exports.getAuditLogs = async (req, res, next) => {
       limit = 50
     } = req.query;
 
-    const query = {};
+    const campusFilter = getCampusFilter(req.user);
+    const query = { ...campusFilter };
 
     if (userId) {
       query.user = userId;
@@ -200,8 +202,9 @@ exports.getAuditLogs = async (req, res, next) => {
 exports.getStudentSessions = async (req, res, next) => {
   try {
     const { search, branch, academicYear, section, onlineOnly } = req.query;
+    const campusFilter = getCampusFilter(req.user);
 
-    const query = { role: 'student' };
+    const query = { role: 'student', ...campusFilter };
 
     if (branch && branch !== 'All') {
       query.branch = new RegExp(`^${branch.trim()}$`, 'i');
@@ -373,6 +376,10 @@ exports.getStudentTimeline = async (req, res, next) => {
 // @access  Private (Admin only)
 exports.getAuditStats = async (req, res, next) => {
   try {
+    const campusFilter = getCampusFilter(req.user);
+    const studentFilter = { role: 'student', ...campusFilter };
+    const logFilter = { ...campusFilter };
+
     const onlineThreshold = new Date(Date.now() - 3 * 60 * 1000);
     const startOfToday = new Date();
     startOfToday.setHours(0, 0, 0, 0);
@@ -386,19 +393,20 @@ exports.getAuditStats = async (req, res, next) => {
       categoryCounts,
       topStudents
     ] = await Promise.all([
-      User.countDocuments({ role: 'student' }),
-      User.countDocuments({ role: 'student', lastActiveAt: { $gte: onlineThreshold } }),
-      User.countDocuments({ role: 'student', lastActiveAt: { $gte: startOfToday } }),
+      User.countDocuments(studentFilter),
+      User.countDocuments({ ...studentFilter, lastActiveAt: { $gte: onlineThreshold } }),
+      User.countDocuments({ ...studentFilter, lastActiveAt: { $gte: startOfToday } }),
       User.aggregate([
-        { $match: { role: 'student' } },
+        { $match: studentFilter },
         { $group: { _id: null, totalSeconds: { $sum: '$totalActiveSeconds' } } }
       ]),
-      AuditLog.countDocuments({}),
+      AuditLog.countDocuments(logFilter),
       AuditLog.aggregate([
+        ...(Object.keys(logFilter).length > 0 ? [{ $match: logFilter }] : []),
         { $group: { _id: '$category', count: { $sum: 1 } } },
         { $sort: { count: -1 } }
       ]),
-      User.find({ role: 'student' })
+      User.find(studentFilter)
         .select('name email rollNumber branch section totalActiveSeconds lastActiveAt')
         .sort({ totalActiveSeconds: -1 })
         .limit(5)
@@ -441,10 +449,11 @@ exports.getAuditStats = async (req, res, next) => {
 exports.clearAuditLogs = async (req, res, next) => {
   try {
     const { days } = req.query;
-    let query = {};
+    const campusFilter = getCampusFilter(req.user);
+    let query = { ...campusFilter };
     if (days) {
       const cutoff = new Date(Date.now() - parseInt(days, 10) * 24 * 60 * 60 * 1000);
-      query = { createdAt: { $lt: cutoff } };
+      query.createdAt = { $lt: cutoff };
     }
 
     const result = await AuditLog.deleteMany(query);

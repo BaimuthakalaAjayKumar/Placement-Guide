@@ -10,6 +10,13 @@ const LabPracticeAttempt = require('../models/LabPracticeAttempt');
 const PracticeQuestion = require('../models/PracticeQuestion');
 const crypto = require('crypto');
 const sendEmail = require('../utils/sendEmail');
+const {
+  getCampusFilter,
+  buildStudentScopeFilter,
+  canAccessCampus,
+  isSuperAdmin,
+  isCampusScopedAdmin
+} = require('../utils/scopeFilter');
 
 const sendStaffPasswordResetLink = async (user, req) => {
   const resetToken = crypto.randomBytes(20).toString('hex');
@@ -551,11 +558,13 @@ exports.getDashboardStats = async (req, res, next) => {
 // @access  Private/Admin/Faculty
 exports.getAllStudents = async (req, res, next) => {
   try {
-    const isMainAdmin = req.user.role === 'admin' && (!req.user.managedScopes || req.user.managedScopes.length === 0);
+    const campusFilter = getCampusFilter(req.user);
+    const isMainAdmin = (req.user.role === 'admin' || req.user.role === 'super_admin') &&
+      (!req.user.managedScopes || req.user.managedScopes.length === 0);
     let students = [];
 
     if (isMainAdmin) {
-      students = await User.find({ role: 'student' }).sort({ readinessScore: -1 });
+      students = await User.find({ role: 'student', ...campusFilter }).sort({ readinessScore: -1 });
     } else if (req.user.role === 'hod') {
       const branchClean = (req.user.branch || 'IT').trim();
       const branchPatterns = [new RegExp(`^${branchClean}$`, 'i')];
@@ -565,7 +574,8 @@ exports.getAllStudents = async (req, res, next) => {
       }
       students = await User.find({
         role: 'student',
-        branch: { $in: branchPatterns }
+        branch: { $in: branchPatterns },
+        ...campusFilter
       }).sort({ readinessScore: -1 });
     } else {
       // Scoped Faculty or Secondary Administrator: only show students in their assigned scope
@@ -658,7 +668,8 @@ exports.getAllStudents = async (req, res, next) => {
       }
 
       const query = orConditions.length > 0 ? { $or: orConditions } : { role: 'student' };
-      students = await User.find(query).sort({ readinessScore: -1 });
+      const finalQuery = campusFilter.campusId ? { $and: [campusFilter, query] } : query;
+      students = await User.find(finalQuery).sort({ readinessScore: -1 });
     }
 
     const studentIds = students.map(s => s._id);
@@ -772,6 +783,10 @@ exports.getStudentProgress = async (req, res, next) => {
     const student = await User.findOne({ _id: req.params.id, role: 'student' }).select('-password');
     if (!student) return res.status(404).json({ success: false, error: 'Student not found.' });
 
+    if (!canAccessCampus(req.user, student.campusId)) {
+      return res.status(403).json({ success: false, error: 'This student is outside your assigned campus.' });
+    }
+
     if (req.user.role === 'faculty' && req.user.managedScopes && req.user.managedScopes.length > 0) {
       const studentYear = (student.academicYear || student.year || '').trim().toLowerCase();
       const studentBranch = (student.branch || '').trim().toLowerCase();
@@ -877,6 +892,13 @@ exports.deleteStudent = async (req, res, next) => {
       });
     }
 
+    if (!canAccessCampus(req.user, student.campusId)) {
+      return res.status(403).json({
+        success: false,
+        error: 'Not authorized to delete students outside your assigned campus.'
+      });
+    }
+
     if (student.role !== 'student') {
       return res.status(400).json({
         success: false,
@@ -927,12 +949,15 @@ exports.createAdmin = async (req, res, next) => {
       });
     }
 
+    const campusId = req.user.campusId || null;
+
     const admin = await User.create({
       name,
       email,
       password: internalPassword,
       role: 'admin',
       mustChangePassword: true,
+      campusId,
       managedScopes,
       managedAcademicYears: [...new Set(managedScopes.map(scope => scope.academicYear).filter(Boolean))]
     });
@@ -980,12 +1005,15 @@ exports.createFaculty = async (req, res, next) => {
       });
     }
 
+    const campusId = req.user.campusId || null;
+
     const faculty = await User.create({
       name,
       email,
       password: internalPassword,
       role: 'faculty',
       mustChangePassword: true,
+      campusId,
       managedScopes,
       managedAcademicYears: [...new Set(managedScopes.map(scope => scope.academicYear).filter(Boolean))]
     });
@@ -1012,8 +1040,10 @@ exports.createFaculty = async (req, res, next) => {
 
 exports.getStaff = async (req, res, next) => {
   try {
-    const staff = await User.find({ role: { $in: ['admin', 'faculty'] } })
-      .select('name email role managedAcademicYears managedScopes mustChangePassword createdAt')
+    const campusFilter = getCampusFilter(req.user);
+    const query = { role: { $in: ['admin', 'faculty'] }, ...campusFilter };
+    const staff = await User.find(query)
+      .select('name email role managedAcademicYears managedScopes mustChangePassword createdAt campusId')
       .sort({ role: 1, name: 1 });
     res.status(200).json({ success: true, count: staff.length, data: staff });
   } catch (err) {
@@ -1025,6 +1055,11 @@ exports.updateStaffScopes = async (req, res, next) => {
   try {
     const staff = await User.findOne({ _id: req.params.id, role: { $in: ['admin', 'faculty'] } });
     if (!staff) return res.status(404).json({ success: false, error: 'Administrator or faculty member not found.' });
+
+    if (!canAccessCampus(req.user, staff.campusId)) {
+      return res.status(403).json({ success: false, error: 'Not authorized to modify staff outside your assigned campus.' });
+    }
+
     if (!Array.isArray(req.body.managedScopes)) {
       return res.status(400).json({ success: false, error: 'managedScopes must be an array.' });
     }
@@ -1065,6 +1100,10 @@ exports.deleteStaffScope = async (req, res, next) => {
     const staff = await User.findOne({ _id: req.params.id, role: { $in: ['admin', 'faculty'] } });
     if (!staff) return res.status(404).json({ success: false, error: 'Administrator or faculty member not found.' });
 
+    if (!canAccessCampus(req.user, staff.campusId)) {
+      return res.status(403).json({ success: false, error: 'Not authorized to modify staff outside your assigned campus.' });
+    }
+
     const scopeIdentifier = req.params.scopeId;
     staff.managedScopes = staff.managedScopes.filter((scope, index) => {
       if (scope._id && String(scope._id) === String(scopeIdentifier)) return false;
@@ -1085,6 +1124,10 @@ exports.resetStaffPassword = async (req, res, next) => {
     const staff = await User.findOne({ _id: req.params.id, role: { $in: ['admin', 'faculty'] } });
     if (!staff) return res.status(404).json({ success: false, error: 'Administrator or faculty member not found.' });
 
+    if (!canAccessCampus(req.user, staff.campusId)) {
+      return res.status(403).json({ success: false, error: 'Not authorized to reset password for staff outside your assigned campus.' });
+    }
+
     staff.mustChangePassword = true;
     await sendStaffPasswordResetLink(staff, req);
 
@@ -1101,6 +1144,10 @@ exports.deleteStaff = async (req, res, next) => {
     }
     const staff = await User.findOne({ _id: req.params.id, role: { $in: ['admin', 'faculty'] } });
     if (!staff) return res.status(404).json({ success: false, error: 'Administrator or faculty member not found.' });
+
+    if (!canAccessCampus(req.user, staff.campusId)) {
+      return res.status(403).json({ success: false, error: 'Not authorized to delete staff outside your assigned campus.' });
+    }
 
     const superAdminEmail = (process.env.SUPER_ADMIN_EMAIL || 'vaddeajaykumar2004@gmail.com').toLowerCase().trim();
     if ((staff.email && staff.email.toLowerCase().trim() === superAdminEmail) || staff.isSuperAdmin) {
@@ -1868,8 +1915,9 @@ exports.bulkDeleteStudents = async (req, res, next) => {
       });
     }
 
-    // Find all students in that academic year
-    const students = await User.find({ role: 'student', year });
+    const campusFilter = getCampusFilter(req.user);
+    // Find all students in that academic year within caller's campus
+    const students = await User.find({ role: 'student', year, ...campusFilter });
 
     if (students.length === 0) {
       return res.status(404).json({
@@ -1905,7 +1953,8 @@ exports.bulkDeleteStudents = async (req, res, next) => {
 // @access  Private/Admin
 exports.exportStudentReport = async (req, res, next) => {
   try {
-    const students = await User.find({ role: 'student' }).sort({ name: 1 });
+    const campusFilter = getCampusFilter(req.user);
+    const students = await User.find({ role: 'student', ...campusFilter }).sort({ name: 1 });
 
     const formattedStudents = students.map(s => {
       const sems = [

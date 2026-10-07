@@ -632,8 +632,9 @@ exports.dismissPlagiarism = async (req, res, next) => {
 // @access  Private/Admin
 exports.getContestReport = async (req, res, next) => {
   try {
-    if (req.user.role !== 'admin') {
-      return res.status(403).json({ success: false, error: 'Only admins can view reports' });
+    const allowedReportRoles = ['admin', 'super_admin', 'campus_admin', 'administrator', 'faculty', 'hod'];
+    if (!allowedReportRoles.includes(req.user.role)) {
+      return res.status(403).json({ success: false, error: 'Not authorized to view contest reports' });
     }
 
     const contest = await Contest.findById(req.params.id).populate('questions', 'title difficulty');
