@@ -193,6 +193,7 @@ const interviewExperienceRoutes = require('./routes/interviewExperiences');
 const recruiterRoutes = require('./routes/recruiter');
 const hodRoutes = require('./routes/hod');
 const achievementRoutes = require('./routes/achievements');
+const attendanceRoutes = require('./routes/attendance');
 
 // ============================================================
 // MOUNT API ROUTES
@@ -225,6 +226,7 @@ app.use('/api/interview-experiences', interviewExperienceRoutes);
 app.use('/api/recruiter', recruiterRoutes);
 app.use('/api/hod', hodRoutes);
 app.use('/api/achievements', achievementRoutes);
+app.use('/api/attendance', attendanceRoutes);
 
 // ============================================================
 // HEALTH CHECK
@@ -319,6 +321,19 @@ io.on('connection', (socket) => {
     console.log(
       `User ${userId} joined their notification room`
     );
+  });
+
+  // Smart Attendance: Live session room handlers
+  socket.on('join_attendance_session', (sessionId) => {
+    if (sessionId) {
+      socket.join(`attendance_session_${sessionId}`);
+    }
+  });
+
+  socket.on('leave_attendance_session', (sessionId) => {
+    if (sessionId) {
+      socket.leave(`attendance_session_${sessionId}`);
+    }
   });
 
   socket.on('disconnect', () => {

@@ -342,6 +342,19 @@ const UserSchema = new mongoose.Schema({
   },
   resetPasswordToken: String,
   resetPasswordExpire: Date,
+  guardianContacts: [{
+    name: { type: String, default: '' },
+    relationship: { type: String, default: 'Parent' },
+    email: { type: String, default: '' },
+    phone: { type: String, default: '' },
+    enabled: { type: Boolean, default: false }
+  }],
+  attendanceNotificationPreferences: {
+    inApp: { type: Boolean, default: true },
+    email: { type: Boolean, default: true },
+    parentOptIn: { type: Boolean, default: false },
+    dailyDigest: { type: Boolean, default: false }
+  },
   createdAt: {
     type: Date,
     default: Date.now

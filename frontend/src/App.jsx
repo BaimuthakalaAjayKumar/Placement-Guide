@@ -44,6 +44,11 @@ import PlacementSuitePage from './pages/PlacementSuitePage';
 import AcademicsPage from './pages/AcademicsPage';
 import RecruiterDashboard from './pages/RecruiterDashboard';
 import HODDashboard from './pages/HODDashboard';
+import FacultyAttendanceSession from './pages/FacultyAttendanceSession';
+import StudentAttendanceScanner from './pages/StudentAttendanceScanner';
+import FacultyAttendanceHistory from './pages/FacultyAttendanceHistory';
+import StudentAttendance from './pages/StudentAttendance';
+import HODAttendanceDashboard from './pages/HODAttendanceDashboard';
 
 // Helper for home route by role
 const getRoleHome = (role) => {
@@ -414,6 +419,60 @@ const AppRoutes = () => {
         element={
           <PrivateRoute allowedRoles={['faculty', 'admin']}>
             <FacultyDashboard />
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/faculty/attendance"
+        element={
+          <PrivateRoute allowedRoles={['faculty', 'admin', 'campus_admin', 'super_admin']}>
+            <FacultyAttendanceSession />
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/faculty/attendance/history"
+        element={
+          <PrivateRoute allowedRoles={['faculty', 'admin', 'campus_admin', 'super_admin']}>
+            <FacultyAttendanceHistory />
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/attendance/scan"
+        element={
+          <PrivateRoute allowedRoles={['student']}>
+            <StudentAttendanceScanner />
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/attendance/my-attendance"
+        element={
+          <PrivateRoute allowedRoles={['student']}>
+            <StudentAttendance />
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/hod/attendance"
+        element={
+          <PrivateRoute allowedRoles={['hod', 'admin', 'campus_admin', 'super_admin']}>
+            <HODAttendanceDashboard />
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/attendance"
+        element={
+          <PrivateRoute allowedRoles={['student', 'faculty', 'admin', 'campus_admin', 'super_admin', 'hod']}>
+            {user?.role === 'student' ? (
+              <Navigate to="/attendance/scan" replace />
+            ) : user?.role === 'hod' ? (
+              <Navigate to="/hod/attendance" replace />
+            ) : (
+              <Navigate to="/faculty/attendance" replace />
+            )}
           </PrivateRoute>
         }
       />

@@ -8,7 +8,7 @@ const NotificationSchema = new mongoose.Schema({
   },
   type: {
     type: String,
-    enum: ['plagiarism_alert', 'job_update', 'general', 'test_assigned', 'lab_assigned', 'academic_update', 'achievement_unlocked'],
+    enum: ['plagiarism_alert', 'job_update', 'general', 'test_assigned', 'lab_assigned', 'academic_update', 'achievement_unlocked', 'attendance_alert'],
     default: 'general'
   },
   message: {
@@ -22,13 +22,25 @@ const NotificationSchema = new mongoose.Schema({
     testId: { type: mongoose.Schema.Types.ObjectId, ref: 'AptitudeTest' },
     taskId: { type: mongoose.Schema.Types.ObjectId, ref: 'LabTask' },
     subjectId: { type: mongoose.Schema.Types.ObjectId, ref: 'Subject' },
+    sessionId: { type: mongoose.Schema.Types.ObjectId, ref: 'AttendanceSession' },
     achievementId: { type: mongoose.Schema.Types.ObjectId, ref: 'AchievementDefinition' },
     badgeName: { type: String },
     badgeIcon: { type: String },
     subjectName: { type: String },
     expiresAt: { type: Date },
     plagiarismPercentage: { type: Number },
-    studentName: { type: String }
+    attendancePercentage: { type: Number },
+    studentName: { type: String },
+    presentCount: { type: Number },
+    totalCount: { type: Number },
+    threshold: { type: Number },
+    recommendedAction: { type: String },
+    guardianNotified: { type: Boolean, default: false }
+  },
+  dedupKey: {
+    type: String,
+    sparse: true,
+    index: true
   },
   isRead: {
     type: Boolean,
