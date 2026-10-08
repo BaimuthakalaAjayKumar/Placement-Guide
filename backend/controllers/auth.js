@@ -456,8 +456,8 @@ exports.changePassword = async (req, res, next) => {
       return res.status(404).json({ success: false, error: 'User account not found.' });
     }
 
-    if (user.role === 'recruiter' || user.role === 'admin' || user.email === 'vaddeajaykumar2004@gmail.com') {
-      return res.status(403).json({ success: false, error: 'Password change is disabled for Super Administrator and Campus Recruiter accounts.' });
+    if ((user.role === 'admin' || user.email === 'vaddeajaykumar2004@gmail.com') && !user.mustChangePassword) {
+      return res.status(403).json({ success: false, error: 'Password change is disabled for Super Administrator accounts.' });
     }
 
     if (!(await user.matchPassword(currentPassword))) {
@@ -466,7 +466,24 @@ exports.changePassword = async (req, res, next) => {
 
     user.password = newPassword;
     user.mustChangePassword = false;
+    user.lastPasswordChangeAt = new Date();
     await user.save();
+
+    if (user.role === 'recruiter') {
+      await logActivity({
+        user,
+        action: 'RECRUITER_PASSWORD_CHANGED',
+        category: 'Placement Operations',
+        description: `Recruiter ${user.name} (${user.companyName || 'Recruiter'}) successfully changed their temporary password.`,
+        details: {
+          recruiterId: user._id,
+          email: user.email,
+          companyName: user.companyName
+        },
+        req
+      });
+    }
+
     res.status(200).json({ success: true, message: 'Password changed successfully.' });
   } catch (err) {
     next(err);

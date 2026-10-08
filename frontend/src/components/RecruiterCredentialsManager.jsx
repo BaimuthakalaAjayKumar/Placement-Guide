@@ -13,20 +13,16 @@ const RecruiterCredentialsManager = () => {
 
   // Create Modal State
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [showCreatedCard, setShowCreatedCard] = useState(null); // holds newly created credentials
+  const [creationResult, setCreationResult] = useState(null);
   const [form, setForm] = useState({
     name: '',
     email: '',
     companyName: '',
     companyWebsite: '',
     companyLogo: '',
-    password: '',
     expiryDays: '30',
     recruiterNotes: ''
   });
-
-  // Password visibility map (id -> boolean)
-  const [visiblePasswords, setVisiblePasswords] = useState({});
 
   const token = localStorage.getItem('token');
 
@@ -53,16 +49,6 @@ const RecruiterCredentialsManager = () => {
     fetchRecruiters();
   }, []);
 
-  // Generate random secure password
-  const generateRandomPassword = () => {
-    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789@#$!';
-    let pass = 'Rec@';
-    for (let i = 0; i < 6; i++) {
-      pass += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    setForm((prev) => ({ ...prev, password: pass }));
-  };
-
   // Submit Create Recruiter Account
   const handleCreateSubmit = async (e) => {
     e.preventDefault();
@@ -83,8 +69,18 @@ const RecruiterCredentialsManager = () => {
       const data = await res.json();
       if (data.success) {
         sfx.playSuccess();
-        setSuccessMsg(`🎉 Temporary recruiter credentials generated for ${data.credentials?.companyName}!`);
-        setShowCreatedCard(data.credentials);
+        const emailNotice = data.emailStatus === 'sent'
+          ? `Credentials have been automatically emailed to ${form.email} via Brevo.`
+          : `Account created, but email delivery encountered an issue. You can resend credentials.`;
+
+        setSuccessMsg(`🎉 Recruiter account created for ${form.companyName}! ${emailNotice}`);
+        setCreationResult({
+          companyName: form.companyName,
+          name: form.name,
+          email: form.email,
+          emailStatus: data.emailStatus,
+          expiresAt: data.data?.recruiterExpiresAt
+        });
         setShowCreateModal(false);
         setForm({
           name: '',
@@ -92,7 +88,6 @@ const RecruiterCredentialsManager = () => {
           companyName: '',
           companyWebsite: '',
           companyLogo: '',
-          password: '',
           expiryDays: '30',
           recruiterNotes: ''
         });
@@ -107,9 +102,73 @@ const RecruiterCredentialsManager = () => {
     }
   };
 
+  // Reset Recruiter Password & Dispatch via Brevo
+  const handleResetPassword = async (id, name, email, company) => {
+    if (!window.confirm(`Generate a new temporary password and email credentials to ${name} (${email})? The recruiter will be required to change their password on next login.`)) {
+      return;
+    }
+
+    try {
+      setActionLoading(true);
+      setError('');
+      setSuccessMsg('');
+
+      const res = await fetch(`${API_URL}/recruiter/accounts/${id}/reset-password`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        }
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        sfx.playSuccess();
+        setSuccessMsg(`🔑 Temporary password reset! New credentials emailed to ${email}.`);
+        fetchRecruiters();
+      } else {
+        setError(data.error || 'Failed to reset password.');
+      }
+    } catch (err) {
+      setError('Could not reset recruiter password.');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // Resend Credentials via Brevo
+  const handleResendCredentials = async (id, name, email) => {
+    try {
+      setActionLoading(true);
+      setError('');
+      setSuccessMsg('');
+
+      const res = await fetch(`${API_URL}/recruiter/accounts/${id}/resend-credentials`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        }
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        sfx.playSuccess();
+        setSuccessMsg(`✉️ Login credentials resent to ${email}.`);
+        fetchRecruiters();
+      } else {
+        setError(data.error || 'Failed to resend credentials.');
+      }
+    } catch (err) {
+      setError('Could not resend credentials.');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   // Revoke Recruiter Account
   const handleRevoke = async (id, name, company) => {
-    if (!window.confirm(`Are you sure you want to revoke temporary credentials for ${name} (${company})?`)) {
+    if (!window.confirm(`Are you sure you want to revoke recruiter credentials for ${name} (${company})? This action cannot be undone.`)) {
       return;
     }
 
@@ -161,27 +220,6 @@ const RecruiterCredentialsManager = () => {
     }
   };
 
-  // Copy invitation text to clipboard
-  const handleCopyInvitation = (cred) => {
-    const loginUrl = `${window.location.origin}/login`;
-    const text = `Campus Placement Portal Temporary Credentials:
-Company: ${cred.companyName}
-Contact: ${cred.name}
-Login URL: ${loginUrl}
-Email: ${cred.email}
-Temporary Password: ${cred.temporaryPassword || cred.tempPasswordPlain}
-Expires At: ${cred.expiresAt ? new Date(cred.expiresAt).toLocaleDateString() : '30 Days'}
-Role: Recruiter`;
-
-    navigator.clipboard.writeText(text);
-    sfx.playClick();
-    setSuccessMsg('📋 Complete login credentials copied to clipboard!');
-  };
-
-  const togglePasswordVisibility = (id) => {
-    setVisiblePasswords((prev) => ({ ...prev, [id]: !prev[id] }));
-  };
-
   return (
     <div className="recruiter-credentials-manager animate-fade" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
       {/* Notifications */}
@@ -198,8 +236,8 @@ Role: Recruiter`;
         </div>
       )}
 
-      {/* Newly Created Credentials Success Modal / Card */}
-      {showCreatedCard && (
+      {/* Creation Confirmation Banner */}
+      {creationResult && (
         <div
           className="glass-card"
           style={{
@@ -213,46 +251,40 @@ Role: Recruiter`;
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '12px' }}>
             <div>
               <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '11px', fontWeight: 800, background: 'rgba(16, 185, 129, 0.3)', color: '#6ee7b7', padding: '3px 8px', borderRadius: '6px', marginBottom: '6px' }}>
-                ✓ TEMPORARY CREDENTIALS READY
+                ✓ RECRUITER ACCOUNT CONFIGURED
               </div>
               <h3 style={{ margin: '0 0 6px 0', color: '#FFFFFF' }}>
-                Recruiter Credentials for {showCreatedCard.companyName}
+                Account Provisioned for {creationResult.companyName}
               </h3>
               <p style={{ margin: 0, fontSize: '13px', color: '#cbd5e1' }}>
-                Share these temporary login details with the recruiter so they can access their dashboard and review eligible students.
+                A secure temporary password was generated and transmitted to <strong>{creationResult.email}</strong> via Brevo HTTPS API.
+                In accordance with institutional security policies, plaintext passwords are never stored in the database.
               </p>
             </div>
 
-            <div style={{ display: 'flex', gap: '8px' }}>
-              <button
-                type="button"
-                className="btn btn-primary btn-sm"
-                onClick={() => handleCopyInvitation(showCreatedCard)}
-              >
-                📋 Copy All Details
-              </button>
-              <button
-                type="button"
-                className="btn btn-secondary btn-sm"
-                onClick={() => setShowCreatedCard(null)}
-              >
-                ✕ Close
-              </button>
-            </div>
+            <button
+              type="button"
+              className="btn btn-secondary btn-sm"
+              onClick={() => setCreationResult(null)}
+            >
+              ✕ Dismiss
+            </button>
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '10px', marginTop: '14px', background: 'rgba(0,0,0,0.3)', padding: '12px', borderRadius: '10px', fontSize: '13px' }}>
             <div>
-              <span style={{ color: '#94a3b8', display: 'block', fontSize: '11px' }}>LOGIN EMAIL</span>
-              <strong style={{ color: '#FFFFFF' }}>{showCreatedCard.email}</strong>
+              <span style={{ color: '#94a3b8', display: 'block', fontSize: '11px' }}>LOGIN ID</span>
+              <strong style={{ color: '#FFFFFF' }}>{creationResult.email}</strong>
             </div>
             <div>
-              <span style={{ color: '#94a3b8', display: 'block', fontSize: '11px' }}>TEMPORARY PASSWORD</span>
-              <strong style={{ color: '#fbbf24', letterSpacing: '0.05em' }}>{showCreatedCard.temporaryPassword}</strong>
+              <span style={{ color: '#94a3b8', display: 'block', fontSize: '11px' }}>EMAIL DELIVERY STATUS</span>
+              <strong style={{ color: creationResult.emailStatus === 'sent' ? '#34d399' : '#f87171' }}>
+                {creationResult.emailStatus === 'sent' ? '✓ Delivered via Brevo' : '⚠️ Delivery Pending / Retry'}
+              </strong>
             </div>
             <div>
-              <span style={{ color: '#94a3b8', display: 'block', fontSize: '11px' }}>VALID UNTIL</span>
-              <strong style={{ color: '#38bdf8' }}>{new Date(showCreatedCard.expiresAt).toLocaleDateString()} ({showCreatedCard.daysValid} days)</strong>
+              <span style={{ color: '#94a3b8', display: 'block', fontSize: '11px' }}>PASSWORD REQUIREMENT</span>
+              <strong style={{ color: '#fbbf24' }}>Must Change on First Login</strong>
             </div>
           </div>
         </div>
@@ -263,10 +295,10 @@ Role: Recruiter`;
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
           <div>
             <h3 style={{ margin: '0 0 6px 0', display: 'flex', alignItems: 'center', gap: '8px', color: '#FFFFFF' }}>
-              <span>🔑</span> Recruiter Temporary Accounts &amp; Access Control
+              <span>🔑</span> Recruiter Account Management &amp; Credential Control
             </h3>
             <p className="card-desc" style={{ margin: 0 }}>
-              Issue temporary login credentials to visiting campus recruitment teams. Recruiters get a dedicated dashboard to post on-campus drives, view suitable student profiles, and advance candidates through interview rounds.
+              Issue and manage recruiter credentials for visiting campus placement teams. Credentials are automatically delivered to recruiters via Brevo HTTPS API with enforced temporary-password changes on first login.
             </p>
           </div>
 
@@ -276,6 +308,7 @@ Role: Recruiter`;
               className="btn btn-secondary btn-sm"
               onClick={fetchRecruiters}
               title="Refresh roster"
+              disabled={loading || actionLoading}
             >
               🔄 Refresh
             </button>
@@ -283,12 +316,9 @@ Role: Recruiter`;
               type="button"
               className="btn btn-primary btn-sm"
               style={{ background: 'linear-gradient(135deg, #a855f7, #6366f1)', border: 'none', fontWeight: 700 }}
-              onClick={() => {
-                generateRandomPassword();
-                setShowCreateModal(true);
-              }}
+              onClick={() => setShowCreateModal(true)}
             >
-              ➕ Generate Recruiter Credentials
+              ➕ Create Recruiter Account
             </button>
           </div>
         </div>
@@ -298,7 +328,7 @@ Role: Recruiter`;
       <div className="glass-card" style={{ padding: '1.25rem' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
           <h4 style={{ margin: 0, color: '#FFFFFF', fontSize: '1.1rem' }}>
-            Active Recruiter Credentials ({recruiters.length})
+            Configured Recruiter Accounts ({recruiters.length})
           </h4>
         </div>
 
@@ -314,16 +344,17 @@ Role: Recruiter`;
                 <tr>
                   <th>Company &amp; Recruiter</th>
                   <th>Login Email</th>
-                  <th>Temporary Password</th>
-                  <th>Validity &amp; Expiry</th>
-                  <th>Logins</th>
+                  <th>Password Status</th>
+                  <th>Email Status</th>
+                  <th>Account Validity</th>
+                  <th>Audit &amp; Activity</th>
                   <th style={{ textAlign: 'center' }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {recruiters.map((r) => {
-                  const isVisible = visiblePasswords[r._id];
-                  const plainPass = r.tempPasswordPlain || '••••••••';
+                  const isTempPassword = r.mustChangePassword;
+                  const emailStatus = r.credentialEmailStatus || 'sent';
 
                   return (
                     <tr key={r._id}>
@@ -343,34 +374,117 @@ Role: Recruiter`;
                         <span style={{ fontSize: '12.5px', color: '#cbd5e1' }}>{r.email}</span>
                       </td>
 
+                      {/* Password Status */}
                       <td>
-                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                          <span style={{ fontFamily: 'monospace', fontSize: '12px', background: 'rgba(0,0,0,0.3)', padding: '3px 8px', borderRadius: '4px', color: '#fbbf24' }}>
-                            {isVisible ? plainPass : '••••••••••'}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => togglePasswordVisibility(r._id)}
-                            style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: '12px' }}
-                            title={isVisible ? 'Hide password' : 'Show password'}
-                          >
-                            {isVisible ? '🙈' : '👁️'}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              navigator.clipboard.writeText(plainPass);
-                              sfx.playClick();
-                              setSuccessMsg(`Password for ${r.companyName} copied to clipboard!`);
+                        {isTempPassword ? (
+                          <span
+                            className="badge"
+                            style={{
+                              backgroundColor: 'rgba(245, 158, 11, 0.15)',
+                              color: '#fbbf24',
+                              border: '1px solid rgba(245, 158, 11, 0.3)',
+                              padding: '4px 9px',
+                              borderRadius: '6px',
+                              fontSize: '11.5px',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px'
                             }}
-                            style={{ background: 'transparent', border: 'none', color: '#38bdf8', cursor: 'pointer', fontSize: '12px' }}
-                            title="Copy password"
                           >
-                            📋
-                          </button>
-                        </div>
+                            🔑 Temporary Password
+                          </span>
+                        ) : (
+                          <span
+                            className="badge"
+                            style={{
+                              backgroundColor: 'rgba(16, 185, 129, 0.15)',
+                              color: '#34d399',
+                              border: '1px solid rgba(16, 185, 129, 0.3)',
+                              padding: '4px 9px',
+                              borderRadius: '6px',
+                              fontSize: '11.5px',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px'
+                            }}
+                          >
+                            ✓ Password Changed
+                          </span>
+                        )}
+                        {r.lastPasswordChangeAt && (
+                          <span style={{ display: 'block', fontSize: '10.5px', color: '#64748b', marginTop: '3px' }}>
+                            Updated: {new Date(r.lastPasswordChangeAt).toLocaleDateString()}
+                          </span>
+                        )}
                       </td>
 
+                      {/* Email Status */}
+                      <td>
+                        {emailStatus === 'sent' ? (
+                          <span
+                            className="badge"
+                            style={{
+                              backgroundColor: 'rgba(16, 185, 129, 0.12)',
+                              color: '#6ee7b7',
+                              border: '1px solid rgba(16, 185, 129, 0.25)',
+                              padding: '3px 8px',
+                              borderRadius: '6px',
+                              fontSize: '11px'
+                            }}
+                          >
+                            ✉️ Sent (Brevo)
+                          </span>
+                        ) : emailStatus === 'failed' ? (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                            <span
+                              className="badge"
+                              style={{
+                                backgroundColor: 'rgba(239, 68, 68, 0.15)',
+                                color: '#f87171',
+                                border: '1px solid rgba(239, 68, 68, 0.3)',
+                                padding: '3px 8px',
+                                borderRadius: '6px',
+                                fontSize: '11px'
+                              }}
+                              title={r.credentialEmailError || 'Delivery failure'}
+                            >
+                              ⚠️ Delivery Failed
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => handleResendCredentials(r._id, r.name, r.email)}
+                              disabled={actionLoading}
+                              style={{
+                                background: 'transparent',
+                                border: 'none',
+                                color: '#38bdf8',
+                                fontSize: '10.5px',
+                                cursor: 'pointer',
+                                textAlign: 'left',
+                                textDecoration: 'underline'
+                              }}
+                            >
+                              Resend now
+                            </button>
+                          </div>
+                        ) : (
+                          <span
+                            className="badge"
+                            style={{
+                              backgroundColor: 'rgba(148, 163, 184, 0.15)',
+                              color: '#94a3b8',
+                              border: '1px solid rgba(148, 163, 184, 0.25)',
+                              padding: '3px 8px',
+                              borderRadius: '6px',
+                              fontSize: '11px'
+                            }}
+                          >
+                            ⏳ Pending
+                          </span>
+                        )}
+                      </td>
+
+                      {/* Account Validity */}
                       <td>
                         {r.isExpired ? (
                           <span className="badge" style={{ backgroundColor: 'rgba(239, 68, 68, 0.15)', color: '#f87171', border: '1px solid rgba(239, 68, 68, 0.3)', padding: '3px 8px', borderRadius: '6px', fontSize: '11.5px' }}>
@@ -379,7 +493,7 @@ Role: Recruiter`;
                         ) : (
                           <div>
                             <span className="badge" style={{ backgroundColor: 'rgba(16, 185, 129, 0.15)', color: '#34d399', border: '1px solid rgba(16, 185, 129, 0.3)', padding: '3px 8px', borderRadius: '6px', fontSize: '11.5px' }}>
-                              ● {r.daysRemaining} days remaining
+                              ● {r.daysRemaining}d remaining
                             </span>
                             <span style={{ display: 'block', fontSize: '10.5px', color: '#64748b', marginTop: '2px' }}>
                               Expires: {r.recruiterExpiresAt ? new Date(r.recruiterExpiresAt).toLocaleDateString() : 'N/A'}
@@ -388,34 +502,57 @@ Role: Recruiter`;
                         )}
                       </td>
 
+                      {/* Audit & Activity */}
                       <td>
-                        <span style={{ fontSize: '12px', color: '#cbd5e1' }}>
-                          {r.loginCount || 0} times
-                        </span>
-                        {r.lastLoginAt && (
-                          <span style={{ display: 'block', fontSize: '10.5px', color: '#64748b' }}>
-                            {new Date(r.lastLoginAt).toLocaleDateString()}
-                          </span>
-                        )}
+                        <div style={{ fontSize: '11px', color: '#cbd5e1' }}>
+                          <div>Logins: <strong>{r.loginCount || 0}</strong></div>
+                          {r.lastLoginAt ? (
+                            <span style={{ color: '#94a3b8' }}>
+                              Last: {new Date(r.lastLoginAt).toLocaleDateString()}
+                            </span>
+                          ) : (
+                            <span style={{ color: '#64748b' }}>Never logged in</span>
+                          )}
+                          <div style={{ fontSize: '10px', color: '#64748b', marginTop: '2px' }}>
+                            Created: {new Date(r.createdAt).toLocaleDateString()}
+                            {r.createdBy?.name && ` by ${r.createdBy.name}`}
+                          </div>
+                        </div>
                       </td>
 
+                      {/* Actions */}
                       <td>
-                        <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
+                        <div style={{ display: 'flex', gap: '6px', justifyContent: 'center', flexWrap: 'wrap' }}>
                           <button
                             type="button"
                             className="btn btn-secondary btn-sm"
-                            style={{ fontSize: '11px', padding: '4px 8px' }}
-                            onClick={() => handleCopyInvitation(r)}
-                            title="Copy invitation message"
+                            style={{ fontSize: '11px', padding: '4px 8px', color: '#fbbf24', borderColor: 'rgba(245, 158, 11, 0.3)' }}
+                            onClick={() => handleResetPassword(r._id, r.name, r.email, r.companyName)}
+                            disabled={actionLoading}
+                            title="Reset password and email new temporary credentials via Brevo"
                           >
-                            📋 Copy Invite
+                            🔄 Reset
                           </button>
+
+                          {emailStatus !== 'sent' && (
+                            <button
+                              type="button"
+                              className="btn btn-secondary btn-sm"
+                              style={{ fontSize: '11px', padding: '4px 8px', color: '#38bdf8' }}
+                              onClick={() => handleResendCredentials(r._id, r.name, r.email)}
+                              disabled={actionLoading}
+                              title="Resend login credentials via Brevo"
+                            >
+                              ✉️ Resend
+                            </button>
+                          )}
 
                           <button
                             type="button"
                             className="btn btn-secondary btn-sm"
                             style={{ fontSize: '11px', padding: '4px 8px' }}
                             onClick={() => handleExtend(r._id, 15)}
+                            disabled={actionLoading}
                             title="Extend access by 15 days"
                           >
                             +15d
@@ -426,9 +563,10 @@ Role: Recruiter`;
                             className="btn btn-danger btn-sm"
                             style={{ fontSize: '11px', padding: '4px 8px' }}
                             onClick={() => handleRevoke(r._id, r.name, r.companyName)}
-                            title="Revoke access"
+                            disabled={actionLoading}
+                            title="Revoke recruiter access"
                           >
-                            🗑 Revoke
+                            🗑
                           </button>
                         </div>
                       </td>
@@ -441,17 +579,14 @@ Role: Recruiter`;
         ) : (
           <div className="empty-history-placeholder" style={{ padding: '2rem', textAlign: 'center' }}>
             <p style={{ margin: '0 0 10px 0', color: '#94a3b8' }}>
-              No temporary recruiter credentials issued yet.
+              No recruiter accounts configured yet.
             </p>
             <button
               type="button"
               className="btn btn-primary btn-sm"
-              onClick={() => {
-                generateRandomPassword();
-                setShowCreateModal(true);
-              }}
+              onClick={() => setShowCreateModal(true)}
             >
-              ➕ Issue Temporary Credentials
+              ➕ Create Recruiter Account
             </button>
           </div>
         )}
@@ -463,7 +598,7 @@ Role: Recruiter`;
           <div className="recruiter-modal-window" onClick={(e) => e.stopPropagation()}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '0.8rem' }}>
               <h3 style={{ margin: 0, color: '#FFFFFF', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span>🔑</span> Issue Temporary Recruiter Credentials
+                <span>🔑</span> Provision Recruiter Account
               </h3>
               <button
                 type="button"
@@ -474,10 +609,14 @@ Role: Recruiter`;
               </button>
             </div>
 
+            <div style={{ padding: '10px 14px', background: 'rgba(99, 102, 241, 0.1)', border: '1px solid rgba(99, 102, 241, 0.25)', borderRadius: '8px', fontSize: '12px', color: '#c7d2fe', marginBottom: '14px', lineHeight: 1.5 }}>
+              🛡️ <strong>Automated Credential Issuance:</strong> A cryptographically secure temporary password will be automatically generated and emailed to the recruiter via the centralized Brevo HTTPS service. Only the bcrypt hash is stored in MongoDB. The recruiter will be required to change their temporary password upon their first login.
+            </div>
+
             <form onSubmit={handleCreateSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
               {user?.campusName && (
                 <div style={{ padding: '8px 12px', background: 'rgba(56, 189, 248, 0.1)', border: '1px solid rgba(56, 189, 248, 0.25)', borderRadius: '6px', fontSize: '12px', color: '#38bdf8' }}>
-                  📍 Campus Scope: <strong>{user.campusName}</strong> (automatically assigned to this recruiter account)
+                  📍 Campus Scope: <strong>{user.campusName}</strong> (assigned to this recruiter account)
                 </div>
               )}
               <div className="recruiter-form-grid">
@@ -488,7 +627,7 @@ Role: Recruiter`;
                     required
                     value={form.name}
                     onChange={(e) => setForm({ ...form, name: e.target.value })}
-                    placeholder="e.g. Sarah Jenkins (HR Lead)"
+                    placeholder="e.g. Sarah Jenkins"
                   />
                 </div>
 
@@ -499,7 +638,7 @@ Role: Recruiter`;
                     required
                     value={form.companyName}
                     onChange={(e) => setForm({ ...form, companyName: e.target.value })}
-                    placeholder="e.g. Google / Microsoft / TCS"
+                    placeholder="e.g. Microsoft / Google / Infosys"
                   />
                 </div>
 
@@ -510,30 +649,18 @@ Role: Recruiter`;
                     required
                     value={form.email}
                     onChange={(e) => setForm({ ...form, email: e.target.value })}
-                    placeholder="e.g. sarah.jenkins@google.com"
+                    placeholder="e.g. recruiter@company.com"
                   />
                 </div>
 
                 <div className="recruiter-form-group">
-                  <label>Temporary Password *</label>
-                  <div style={{ display: 'flex', gap: '6px' }}>
-                    <input
-                      type="text"
-                      required
-                      value={form.password}
-                      onChange={(e) => setForm({ ...form, password: e.target.value })}
-                      placeholder="Enter or generate password"
-                      style={{ flex: 1 }}
-                    />
-                    <button
-                      type="button"
-                      className="btn btn-secondary btn-sm"
-                      onClick={generateRandomPassword}
-                      title="Generate random secure password"
-                    >
-                      🎲 Gen
-                    </button>
-                  </div>
+                  <label>Company Website (Optional)</label>
+                  <input
+                    type="url"
+                    value={form.companyWebsite}
+                    onChange={(e) => setForm({ ...form, companyWebsite: e.target.value })}
+                    placeholder="https://company.com"
+                  />
                 </div>
 
                 <div className="recruiter-form-group">
@@ -551,12 +678,12 @@ Role: Recruiter`;
                 </div>
 
                 <div className="recruiter-form-group full-width">
-                  <label>Internal TPO Notes (Optional)</label>
+                  <label>Internal Placement Cell Notes (Optional)</label>
                   <input
                     type="text"
                     value={form.recruiterNotes}
                     onChange={(e) => setForm({ ...form, recruiterNotes: e.target.value })}
-                    placeholder="e.g. Visiting college on Oct 18 for FTE campus recruitment"
+                    placeholder="e.g. On-campus recruitment for 2026 Batch FTE Software Engineers"
                   />
                 </div>
               </div>
@@ -566,6 +693,7 @@ Role: Recruiter`;
                   type="button"
                   className="btn btn-secondary"
                   onClick={() => setShowCreateModal(false)}
+                  disabled={actionLoading}
                 >
                   Cancel
                 </button>
@@ -575,7 +703,7 @@ Role: Recruiter`;
                   disabled={actionLoading}
                   style={{ background: 'linear-gradient(135deg, #a855f7, #6366f1)', border: 'none', fontWeight: 700 }}
                 >
-                  {actionLoading ? 'Generating...' : '✓ Generate & Issue Credentials'}
+                  {actionLoading ? 'Creating & Sending Email...' : '✓ Create & Send Credentials'}
                 </button>
               </div>
             </form>

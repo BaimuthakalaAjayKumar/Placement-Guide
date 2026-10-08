@@ -111,7 +111,13 @@ const ChangePassword = () => {
   };
 
   const userInitial = user?.name ? user.name.charAt(0).toUpperCase() : 'U';
-  const roleName = user?.role === 'admin' ? 'Administrator' : user?.role === 'faculty' ? 'Faculty Portal' : 'Student Portal';
+  const roleName = user?.role === 'admin'
+    ? 'Administrator'
+    : user?.role === 'faculty'
+    ? 'Faculty Portal'
+    : user?.role === 'recruiter'
+    ? 'Recruiter Portal'
+    : 'Student Portal';
 
   return (
     <>

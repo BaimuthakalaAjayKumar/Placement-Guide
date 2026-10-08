@@ -11,14 +11,140 @@ const { sendWhatsAppMessage } = require('../utils/sendWhatsApp');
 const { notifyStudentsOnDrivePost } = require('../utils/placementNotifier');
 const { canRecruiterAccessDrive } = require('../utils/scopeFilter');
 
-// Helper to generate secure random temporary password
-const generateTempPassword = (length = 10) => {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789!@#$%';
-  let password = 'Rec@';
+// Helper to generate cryptographically secure temporary password
+const generateSecureTempPassword = (length = 14) => {
+  const upper = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+  const lower = 'abcdefghijkmnpqrstuvwxyz';
+  const digits = '23456789';
+  const symbols = '!@#$%^&*';
+  const allChars = upper + lower + digits + symbols;
+
+  const getRandomChar = (charset) => {
+    const byte = crypto.randomBytes(1)[0];
+    return charset[byte % charset.length];
+  };
+
+  // Guarantee at least 1 character from each entropy pool
+  const passwordArr = [
+    getRandomChar(upper),
+    getRandomChar(lower),
+    getRandomChar(digits),
+    getRandomChar(symbols)
+  ];
+
+  // Fill remaining positions with random cryptographically secure bytes
+  const randomBytes = crypto.randomBytes(length - 4);
   for (let i = 0; i < length - 4; i++) {
-    password += chars.charAt(Math.floor(Math.random() * chars.length));
+    passwordArr.push(allChars[randomBytes[i] % allChars.length]);
   }
-  return password;
+
+  // Shuffle using Fisher-Yates with crypto
+  for (let i = passwordArr.length - 1; i > 0; i--) {
+    const j = crypto.randomBytes(1)[0] % (i + 1);
+    const temp = passwordArr[i];
+    passwordArr[i] = passwordArr[j];
+    passwordArr[j] = temp;
+  }
+
+  return passwordArr.join('');
+};
+
+/**
+ * Dispatches recruiter login credentials via centralized Brevo HTTPS email service
+ */
+const sendRecruiterCredentialEmail = async ({ recruiter, tempPassword, req, isReset = false }) => {
+  const clientOrigin = req?.headers?.origin || process.env.CLIENT_URL || process.env.FRONTEND_URL || 'https://placement-guide-nu.vercel.app';
+  const loginUrl = `${clientOrigin.replace(/\/+$/, '')}/login`;
+
+  const subject = isReset
+    ? 'Your CampusBridge Recruiter Account — Password Reset'
+    : 'Your CampusBridge Recruiter Account';
+
+  const actionHeadline = isReset
+    ? 'Password Reset Temporary Credentials'
+    : 'Your Recruiter Access Credentials';
+
+  const actionDescription = isReset
+    ? 'Your CampusBridge recruiter account password has been reset by an administrator. Please log in with the new temporary credentials below and choose a new private password.'
+    : 'An authorized administrator has provisioned a CampusBridge Recruiter account for your organization. Please use the temporary credentials below to log in.';
+
+  const html = `
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 12px; background-color: #ffffff; color: #1e293b;">
+      <div style="border-bottom: 2px solid #6366f1; padding-bottom: 16px; margin-bottom: 20px;">
+        <h2 style="color: #4f46e5; margin: 0; font-size: 22px; font-weight: 700;">CampusBridge Placement Portal</h2>
+        <p style="color: #64748b; margin: 4px 0 0 0; font-size: 14px;">Campus Recruitment & Industry Engagement System</p>
+      </div>
+
+      <p style="font-size: 15px; margin: 0 0 12px 0;">Hello <strong>${recruiter.name}</strong>,</p>
+      <p style="font-size: 14px; color: #475569; line-height: 1.5; margin: 0 0 20px 0;">
+        ${actionDescription}
+      </p>
+
+      <div style="background-color: #f8fafc; border: 1px solid #cbd5e1; border-radius: 8px; padding: 18px; margin: 20px 0;">
+        <h3 style="margin: 0 0 14px 0; font-size: 15px; color: #334155; font-weight: 600;">${actionHeadline}</h3>
+        <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+          <tr>
+            <td style="padding: 6px 0; color: #64748b; width: 140px;">Company:</td>
+            <td style="padding: 6px 0; font-weight: 600; color: #0f172a;">${recruiter.companyName || 'Campus Partner'}</td>
+          </tr>
+          <tr>
+            <td style="padding: 6px 0; color: #64748b;">Login Email:</td>
+            <td style="padding: 6px 0; font-weight: 600; color: #0f172a;">${recruiter.email}</td>
+          </tr>
+          <tr>
+            <td style="padding: 6px 0; color: #64748b;">Temporary Password:</td>
+            <td style="padding: 6px 0;">
+              <span style="font-family: Consolas, monospace; background: #e0e7ff; color: #3730a3; padding: 4px 10px; border-radius: 4px; font-weight: 700; font-size: 15px; letter-spacing: 0.05em;">${tempPassword}</span>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 6px 0; color: #64748b;">Login Portal:</td>
+            <td style="padding: 6px 0;">
+              <a href="${loginUrl}" style="color: #4f46e5; text-decoration: underline; font-weight: 500;">${loginUrl}</a>
+            </td>
+          </tr>
+        </table>
+      </div>
+
+      <div style="text-align: center; margin: 26px 0;">
+        <a href="${loginUrl}" style="background-color: #4f46e5; color: #ffffff; padding: 12px 28px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 14px; display: inline-block;">Log In to Recruiter Portal</a>
+      </div>
+
+      <div style="background-color: #fef2f2; border-left: 4px solid #ef4444; padding: 12px 16px; border-radius: 4px; margin: 24px 0;">
+        <strong style="color: #991b1b; font-size: 13px; display: block; margin-bottom: 4px;">Important Security Requirement:</strong>
+        <p style="margin: 0; font-size: 13px; color: #7f1d1d; line-height: 1.4;">
+          For your organization's data protection, you are <strong>required to change this temporary password immediately</strong> upon your first login. You will not be permitted to navigate the recruiter dashboard until a new private password is set.
+        </p>
+      </div>
+
+      <p style="font-size: 12px; color: #94a3b8; margin: 24px 0 0 0; line-height: 1.4;">
+        This is an automated system notification from CampusBridge. Please do not reply directly to this email. If you did not expect these credentials, please contact the institutional campus placement office.
+      </p>
+    </div>
+  `;
+
+  const text = `CampusBridge Recruiter Account
+Hello ${recruiter.name},
+
+${actionDescription}
+
+Account Details:
+- Company: ${recruiter.companyName || 'Campus Partner'}
+- Login Email: ${recruiter.email}
+- Temporary Password: ${tempPassword}
+- Login URL: ${loginUrl}
+
+SECURITY INSTRUCTION:
+You are required to change this temporary password immediately upon your first login.
+
+CampusBridge Placement Operations Team`;
+
+  return await sendEmail({
+    to: recruiter.email,
+    subject,
+    html,
+    text
+  });
 };
 
 // =========================================================================
@@ -36,7 +162,6 @@ exports.createTemporaryCredentials = async (req, res, next) => {
       companyName,
       companyWebsite,
       companyLogo,
-      password: customPassword,
       expiryDays = 30,
       customExpiryDate,
       recruiterNotes,
@@ -61,10 +186,8 @@ exports.createTemporaryCredentials = async (req, res, next) => {
       });
     }
 
-    // Determine temporary password
-    const tempPassword = (customPassword && customPassword.trim())
-      ? customPassword.trim()
-      : generateTempPassword(10);
+    // Generate cryptographically secure temporary password (never stored in plaintext)
+    const tempPassword = generateSecureTempPassword(14);
 
     // Determine expiry date
     let expiresAt;
@@ -85,10 +208,12 @@ exports.createTemporaryCredentials = async (req, res, next) => {
       companyLogo: (companyLogo || '').trim(),
       recruiterExpiresAt: expiresAt,
       isTemporaryAccount: true,
-      tempPasswordPlain: tempPassword,
       recruiterNotes: (recruiterNotes || '').trim(),
       campusId: req.user.campusId || req.body.campusId || undefined,
-      mustChangePassword: false
+      mustChangePassword: true,
+      createdBy: req.user._id,
+      credentialEmailStatus: 'pending',
+      credentialEmailError: ''
     });
 
     // If an existing drive was assigned, link it if relevant
@@ -98,36 +223,61 @@ exports.createTemporaryCredentials = async (req, res, next) => {
       }).catch(() => {});
     }
 
+    // Dispatch credentials via centralized Brevo HTTPS email service
+    try {
+      await sendRecruiterCredentialEmail({
+        recruiter: recruiterUser,
+        tempPassword,
+        req,
+        isReset: false
+      });
+      recruiterUser.credentialEmailStatus = 'sent';
+      recruiterUser.credentialEmailError = '';
+    } catch (emailErr) {
+      recruiterUser.credentialEmailStatus = 'failed';
+      recruiterUser.credentialEmailError = (emailErr.message || 'Email delivery failed').substring(0, 200);
+      console.error('Brevo recruiter credential email delivery error:', emailErr.message);
+    }
+
+    await recruiterUser.save({ validateBeforeSave: false });
+
     await logActivity({
       user: req.user,
-      action: 'RECRUITER_CREDENTIALS_CREATED',
+      action: 'RECRUITER_ACCOUNT_CREATED',
       category: 'Placement Operations',
-      description: `Admin created temporary recruiter credentials for ${name} (${companyName}) expiring on ${expiresAt.toLocaleDateString()}`,
+      description: `Admin created recruiter account for ${name} (${companyName}) expiring on ${expiresAt.toLocaleDateString()}`,
       details: {
         recruiterId: recruiterUser._id,
         email: cleanEmail,
         companyName,
-        expiresAt
+        expiresAt,
+        emailStatus: recruiterUser.credentialEmailStatus
       },
       req
     });
 
     const userObj = recruiterUser.toObject();
     delete userObj.password;
+    delete userObj.tempPasswordPlain;
 
     res.status(201).json({
       success: true,
-      message: `Temporary credentials created successfully for ${companyName} recruiter.`,
-      credentials: {
-        name: recruiterUser.name,
-        email: recruiterUser.email,
-        temporaryPassword: tempPassword,
-        companyName: recruiterUser.companyName,
-        expiresAt,
+      message: recruiterUser.credentialEmailStatus === 'sent'
+        ? `Recruiter account created successfully. Credentials have been emailed to ${cleanEmail}.`
+        : `Recruiter account created successfully, but credential email delivery failed. You can resend credentials from the portal.`,
+      emailStatus: recruiterUser.credentialEmailStatus,
+      data: {
+        _id: userObj._id,
+        name: userObj.name,
+        email: userObj.email,
+        companyName: userObj.companyName,
+        role: 'recruiter',
+        mustChangePassword: true,
+        credentialEmailStatus: recruiterUser.credentialEmailStatus,
+        recruiterExpiresAt: expiresAt,
         daysValid: Math.ceil((expiresAt.getTime() - Date.now()) / 86400000),
-        role: 'recruiter'
-      },
-      data: userObj
+        createdAt: userObj.createdAt
+      }
     });
   } catch (err) {
     next(err);
@@ -140,7 +290,7 @@ exports.createTemporaryCredentials = async (req, res, next) => {
 exports.getRecruiterAccounts = async (req, res, next) => {
   try {
     const recruiters = await User.find({ role: 'recruiter' })
-      .select('+tempPasswordPlain')
+      .populate('createdBy', 'name email role')
       .sort({ createdAt: -1 });
 
     const now = new Date();
@@ -169,12 +319,23 @@ exports.getRecruiterAccounts = async (req, res, next) => {
           companyName: rObj.companyName,
           companyWebsite: rObj.companyWebsite,
           companyLogo: rObj.companyLogo,
+          campusId: rObj.campusId,
           isTemporaryAccount: rObj.isTemporaryAccount,
           recruiterExpiresAt: rObj.recruiterExpiresAt,
-          tempPasswordPlain: rObj.tempPasswordPlain || '',
           recruiterNotes: rObj.recruiterNotes,
           isExpired,
           daysRemaining,
+          mustChangePassword: Boolean(rObj.mustChangePassword),
+          passwordStatus: rObj.mustChangePassword ? 'Temporary Password' : 'Password Changed',
+          credentialEmailStatus: rObj.credentialEmailStatus || 'sent',
+          credentialEmailError: rObj.credentialEmailError || '',
+          lastPasswordChangeAt: rObj.lastPasswordChangeAt || null,
+          createdBy: r.createdBy ? {
+            _id: r.createdBy._id,
+            name: r.createdBy.name,
+            email: r.createdBy.email,
+            role: r.createdBy.role
+          } : null,
           loginCount: rObj.loginCount || 0,
           lastLoginAt: rObj.lastLoginAt,
           lastIpAddress: rObj.lastIpAddress,
@@ -227,7 +388,7 @@ exports.revokeRecruiterAccount = async (req, res, next) => {
   }
 };
 
-// @desc    Admin extends recruiter expiry or resets temporary password
+// @desc    Admin extends recruiter expiry
 // @route   PUT /api/recruiter/accounts/:id/extend
 // @access  Private (Admin only)
 exports.extendRecruiterAccount = async (req, res, next) => {
@@ -249,7 +410,8 @@ exports.extendRecruiterAccount = async (req, res, next) => {
 
     if (newPassword && newPassword.trim()) {
       recruiter.password = newPassword.trim();
-      recruiter.tempPasswordPlain = newPassword.trim();
+      recruiter.mustChangePassword = true;
+      recruiter.tempPasswordPlain = undefined;
     }
 
     await recruiter.save();
@@ -272,7 +434,140 @@ exports.extendRecruiterAccount = async (req, res, next) => {
         email: recruiter.email,
         companyName: recruiter.companyName,
         recruiterExpiresAt: recruiter.recruiterExpiresAt,
-        tempPasswordPlain: recruiter.tempPasswordPlain
+        mustChangePassword: recruiter.mustChangePassword
+      }
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// @desc    Admin resets recruiter password and sends new temporary credentials via Brevo
+// @route   POST /api/recruiter/accounts/:id/reset-password
+// @access  Private (Admin only)
+exports.resetRecruiterPassword = async (req, res, next) => {
+  try {
+    const recruiter = await User.findOne({ _id: req.params.id, role: 'recruiter' });
+    if (!recruiter) {
+      return res.status(404).json({ success: false, error: 'Recruiter account not found' });
+    }
+
+    const newTempPassword = generateSecureTempPassword(14);
+    recruiter.password = newTempPassword;
+    recruiter.mustChangePassword = true;
+    recruiter.tempPasswordPlain = undefined;
+    recruiter.credentialEmailStatus = 'pending';
+    recruiter.credentialEmailError = '';
+
+    try {
+      await sendRecruiterCredentialEmail({
+        recruiter,
+        tempPassword: newTempPassword,
+        req,
+        isReset: true
+      });
+      recruiter.credentialEmailStatus = 'sent';
+      recruiter.credentialEmailError = '';
+    } catch (emailErr) {
+      recruiter.credentialEmailStatus = 'failed';
+      recruiter.credentialEmailError = (emailErr.message || 'Email delivery failed').substring(0, 200);
+      console.error('Brevo recruiter password reset email error:', emailErr.message);
+    }
+
+    await recruiter.save();
+
+    await logActivity({
+      user: req.user,
+      action: 'RECRUITER_PASSWORD_RESET',
+      category: 'Placement Operations',
+      description: `Admin reset password for recruiter ${recruiter.name} (${recruiter.companyName})`,
+      details: {
+        recruiterId: recruiter._id,
+        email: recruiter.email,
+        companyName: recruiter.companyName,
+        emailStatus: recruiter.credentialEmailStatus
+      },
+      req
+    });
+
+    res.status(200).json({
+      success: true,
+      message: recruiter.credentialEmailStatus === 'sent'
+        ? `Temporary password reset successfully and emailed to ${recruiter.email}.`
+        : `Temporary password reset, but email delivery failed. You may retry resending credentials.`,
+      emailStatus: recruiter.credentialEmailStatus,
+      data: {
+        _id: recruiter._id,
+        email: recruiter.email,
+        mustChangePassword: true,
+        passwordStatus: 'Temporary Password',
+        credentialEmailStatus: recruiter.credentialEmailStatus
+      }
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// @desc    Admin resends temporary credentials via Brevo
+// @route   POST /api/recruiter/accounts/:id/resend-credentials
+// @access  Private (Admin only)
+exports.resendRecruiterCredentials = async (req, res, next) => {
+  try {
+    const recruiter = await User.findOne({ _id: req.params.id, role: 'recruiter' });
+    if (!recruiter) {
+      return res.status(404).json({ success: false, error: 'Recruiter account not found' });
+    }
+
+    const newTempPassword = generateSecureTempPassword(14);
+    recruiter.password = newTempPassword;
+    recruiter.mustChangePassword = true;
+    recruiter.tempPasswordPlain = undefined;
+    recruiter.credentialEmailStatus = 'pending';
+    recruiter.credentialEmailError = '';
+
+    try {
+      await sendRecruiterCredentialEmail({
+        recruiter,
+        tempPassword: newTempPassword,
+        req,
+        isReset: false
+      });
+      recruiter.credentialEmailStatus = 'sent';
+      recruiter.credentialEmailError = '';
+    } catch (emailErr) {
+      recruiter.credentialEmailStatus = 'failed';
+      recruiter.credentialEmailError = (emailErr.message || 'Email delivery failed').substring(0, 200);
+      console.error('Brevo resend recruiter credentials error:', emailErr.message);
+    }
+
+    await recruiter.save();
+
+    await logActivity({
+      user: req.user,
+      action: 'RECRUITER_PASSWORD_RESET',
+      category: 'Placement Operations',
+      description: `Admin resent temporary credentials for recruiter ${recruiter.name} (${recruiter.companyName})`,
+      details: {
+        recruiterId: recruiter._id,
+        email: recruiter.email,
+        companyName: recruiter.companyName,
+        emailStatus: recruiter.credentialEmailStatus
+      },
+      req
+    });
+
+    res.status(200).json({
+      success: true,
+      message: recruiter.credentialEmailStatus === 'sent'
+        ? `Credentials resent successfully to ${recruiter.email}.`
+        : `Email delivery failed. Please check network/provider status.`,
+      emailStatus: recruiter.credentialEmailStatus,
+      data: {
+        _id: recruiter._id,
+        email: recruiter.email,
+        mustChangePassword: true,
+        credentialEmailStatus: recruiter.credentialEmailStatus
       }
     });
   } catch (err) {

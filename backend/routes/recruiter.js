@@ -6,6 +6,8 @@ const {
   getRecruiterAccounts,
   revokeRecruiterAccount,
   extendRecruiterAccount,
+  resetRecruiterPassword,
+  resendRecruiterCredentials,
   getSuitableStudents,
   inviteStudentToDrive,
   getMyDrives,
@@ -21,11 +23,13 @@ const {
 
 router.use(protect);
 
-// Admin-only recruiter management
-router.post('/create-temporary-credentials', authorize('admin'), createTemporaryCredentials);
-router.get('/accounts', authorize('admin'), getRecruiterAccounts);
-router.delete('/accounts/:id', authorize('admin'), revokeRecruiterAccount);
-router.put('/accounts/:id/extend', authorize('admin'), extendRecruiterAccount);
+// Admin & Super Admin recruiter credential management
+router.post('/create-temporary-credentials', authorize('admin', 'super_admin', 'campus_admin'), createTemporaryCredentials);
+router.get('/accounts', authorize('admin', 'super_admin', 'campus_admin'), getRecruiterAccounts);
+router.delete('/accounts/:id', authorize('admin', 'super_admin', 'campus_admin'), revokeRecruiterAccount);
+router.put('/accounts/:id/extend', authorize('admin', 'super_admin', 'campus_admin'), extendRecruiterAccount);
+router.post('/accounts/:id/reset-password', authorize('admin', 'super_admin', 'campus_admin'), resetRecruiterPassword);
+router.post('/accounts/:id/resend-credentials', authorize('admin', 'super_admin', 'campus_admin'), resendRecruiterCredentials);
 
 // Recruiter & Admin shared operations
 const { cancelDrive, deleteDrive } = require('../controllers/placementDrives');
