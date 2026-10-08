@@ -3,6 +3,7 @@ const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const sendEmail = require('../utils/sendEmail');
 const { logActivity, extractClientIp, extractUserAgent } = require('../utils/auditLogger');
+const { verifyTurnstileToken } = require('../utils/turnstileService');
 
 // Helper to generate and send token
 const sendTokenResponse = (user, statusCode, res) => {
@@ -125,7 +126,7 @@ exports.register = async (req, res, next) => {
 // @access  Public
 exports.login = async (req, res, next) => {
   try {
-    const { email, password } = req.body;
+    const { email, password, captchaToken } = req.body;
 
     // Validate email & password
     if (!email || !password) {
@@ -133,6 +134,30 @@ exports.login = async (req, res, next) => {
         success: false,
         error: 'Please provide an email and password'
       });
+    }
+
+    // Determine platform and CAPTCHA requirements
+    const clientPlatform = req.get('X-Client-Platform');
+    const isMobile = clientPlatform === 'CampusBridge-Mobile';
+    const requireCaptcha = isMobile || process.env.REQUIRE_CAPTCHA === 'true';
+
+    // Verify CAPTCHA if required or if captchaToken provided
+    if (requireCaptcha || captchaToken) {
+      if (!captchaToken) {
+        return res.status(400).json({
+          success: false,
+          error: 'CAPTCHA verification is required'
+        });
+      }
+
+      const clientIp = extractClientIp(req);
+      const captchaResult = await verifyTurnstileToken(captchaToken, clientIp);
+      if (!captchaResult.success) {
+        return res.status(400).json({
+          success: false,
+          error: captchaResult.error || 'CAPTCHA verification failed'
+        });
+      }
     }
 
     // Check for user
