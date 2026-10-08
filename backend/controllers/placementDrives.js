@@ -527,7 +527,7 @@ exports.cancelDrive = async (req, res, next) => {
     const creatorId = drive.createdBy?._id ? String(drive.createdBy._id) : String(drive.createdBy || '');
     const isOwner = creatorId === String(req.user.id) ||
       (req.user.role === 'recruiter' && req.user.companyName && drive.companyName && req.user.companyName.trim().toLowerCase() === drive.companyName.trim().toLowerCase());
-    if (req.user.role !== 'admin' && !isOwner) {
+    if (req.user.role !== 'admin' && req.user.role !== 'placement_officer' && !isOwner) {
       return res.status(403).json({ success: false, error: 'Not authorized to cancel this placement drive' });
     }
 
@@ -633,7 +633,7 @@ exports.updateDrive = async (req, res, next) => {
     const creatorId = drive.createdBy?._id ? String(drive.createdBy._id) : String(drive.createdBy || '');
     const isOwner = creatorId === String(req.user.id) ||
       (req.user.role === 'recruiter' && req.user.companyName && drive.companyName && req.user.companyName.trim().toLowerCase() === drive.companyName.trim().toLowerCase());
-    if (req.user.role !== 'admin' && !isOwner) {
+    if (req.user.role !== 'admin' && req.user.role !== 'placement_officer' && !isOwner) {
       return res.status(403).json({ success: false, error: 'Not authorized to update this placement drive' });
     }
 
@@ -805,7 +805,7 @@ exports.extendDriveDeadline = async (req, res, next) => {
     const creatorId = drive.createdBy?._id ? String(drive.createdBy._id) : String(drive.createdBy || '');
     const isOwner = creatorId === String(req.user.id) ||
       (req.user.role === 'recruiter' && req.user.companyName && drive.companyName && req.user.companyName.trim().toLowerCase() === drive.companyName.trim().toLowerCase());
-    if (req.user.role !== 'admin' && !isOwner) {
+    if (req.user.role !== 'admin' && req.user.role !== 'placement_officer' && !isOwner) {
       return res.status(403).json({ success: false, error: 'Not authorized to extend deadline for this placement drive' });
     }
 

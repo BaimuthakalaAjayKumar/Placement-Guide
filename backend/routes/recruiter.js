@@ -25,7 +25,7 @@ router.use(protect);
 
 // Admin & Super Admin recruiter credential management
 router.post('/create-temporary-credentials', authorize('admin', 'super_admin', 'campus_admin'), createTemporaryCredentials);
-router.get('/accounts', authorize('admin', 'super_admin', 'campus_admin'), getRecruiterAccounts);
+router.get('/accounts', authorize('admin', 'super_admin', 'campus_admin', 'director', 'principal'), getRecruiterAccounts);
 router.delete('/accounts/:id', authorize('admin', 'super_admin', 'campus_admin'), revokeRecruiterAccount);
 router.put('/accounts/:id/extend', authorize('admin', 'super_admin', 'campus_admin'), extendRecruiterAccount);
 router.post('/accounts/:id/reset-password', authorize('admin', 'super_admin', 'campus_admin'), resetRecruiterPassword);

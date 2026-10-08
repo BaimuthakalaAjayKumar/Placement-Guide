@@ -39,11 +39,11 @@ router.post('/:id/submit', submitTestAttempt);
 router.get('/practice-stats/me', getStudentPracticeStats);
 router.get('/practice-questions/:platform', getPracticeQuestions);
 
-// Subject Test Reports (Admin & Faculty & HOD)
-router.get('/subject/:subjectId/reports', authorize('admin', 'faculty', 'hod'), getSubjectTestReports);
+// Subject Test Reports (Admin, Faculty, HOD, Director & Principal)
+router.get('/subject/:subjectId/reports', authorize('admin', 'faculty', 'hod', 'director', 'principal'), getSubjectTestReports);
 
 // Admin, HOD and Faculty Test & Question Management
-router.get('/admin/attempts', authorize('admin', 'faculty', 'hod'), getAdminAttempts);
+router.get('/admin/attempts', authorize('admin', 'faculty', 'hod', 'director', 'principal'), getAdminAttempts);
 router.post('/', authorize('admin', 'faculty', 'hod'), createTest);
 router.delete('/:id', authorize('admin', 'faculty', 'hod'), deleteTest);
 router.get('/:id/questions', authorize('admin', 'faculty', 'hod'), getTestQuestionsAdmin);
@@ -59,7 +59,7 @@ router.post('/practice-questions/:platform', authorize('admin', 'hod'), addPract
 router.delete('/practice-questions/:platform/:id', authorize('admin', 'hod'), deletePracticeQuestion);
 router.put('/practice-questions/:platform/:id', authorize('admin', 'hod'), editPracticeQuestion);
 router.post('/practice-questions/:platform/bulk', authorize('admin', 'hod'), bulkCreatePracticeQuestions);
-router.get('/practice-reports/student/:studentId', authorize('admin', 'faculty', 'hod'), getIndividualPracticeReport);
-router.get('/practice-reports/:platform', authorize('admin', 'faculty', 'hod'), getPracticeReport);
+router.get('/practice-reports/student/:studentId', authorize('admin', 'faculty', 'hod', 'director', 'principal', 'auditor'), getIndividualPracticeReport);
+router.get('/practice-reports/:platform', authorize('admin', 'faculty', 'hod', 'director', 'principal', 'auditor'), getPracticeReport);
 
 module.exports = router;

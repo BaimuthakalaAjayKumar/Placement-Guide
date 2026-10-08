@@ -28,7 +28,7 @@ router.post('/bulk-import', authorize('faculty', 'admin', 'hod'), bulkImportMark
 // Branch & semester default curriculum
 router.get('/curriculum/:branch/:semester', getCurriculum);
 
-// Faculty list of scoped students with academic records
-router.get('/students', authorize('faculty', 'admin', 'hod'), getFacultyStudents);
+// Faculty, HOD, Admin, Director, and Principal list of scoped students with academic records
+router.get('/students', authorize('faculty', 'admin', 'hod', 'director', 'principal'), getFacultyStudents);
 
 module.exports = router;

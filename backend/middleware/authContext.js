@@ -41,11 +41,15 @@ const buildAuthContext = (user) => {
   const isRecruiter = normalized === ROLES.RECRUITER;
   const isAuditor = normalized === ROLES.AUDITOR;
   const isPlacementOfficer = normalized === ROLES.PLACEMENT_OFFICER;
+  const isDirector = normalized === ROLES.DIRECTOR;
+  const isPrincipal = normalized === ROLES.PRINCIPAL;
   const isAdministrator = [
     ROLES.ADMIN,
     ROLES.SUPER_ADMIN,
     ROLES.CAMPUS_ADMIN,
-    ROLES.ADMINISTRATOR
+    ROLES.ADMINISTRATOR,
+    ROLES.DIRECTOR,
+    ROLES.PRINCIPAL
   ].includes(normalized);
 
   return Object.freeze({

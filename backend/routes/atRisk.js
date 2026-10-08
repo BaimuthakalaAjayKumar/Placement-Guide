@@ -10,7 +10,7 @@ const {
 } = require('../controllers/atRisk');
 
 router.use(protect);
-router.use(authorize('faculty', 'admin'));
+router.use(authorize('faculty', 'admin', 'director', 'principal', 'placement_officer'));
 
 router.get('/students', getAtRiskStudents);
 router.get('/summary', getAtRiskStudents);

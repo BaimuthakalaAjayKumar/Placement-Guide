@@ -43,13 +43,57 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
   const tabParam = searchParams.get('tab');
 
   const isFaculty = user?.role === 'faculty';
-  const initialTab = isFaculty ? 'applied-jobs' : (tabParam || defaultTab);
+  const isPlacementOfficer = user?.role === 'placement_officer';
+  const isAuditor = user?.role === 'auditor';
+
+  const placementAllowedTabs = [
+    'job-opportunities',
+    'jobs',
+    'job-postings',
+    'company-drives',
+    'applied-jobs',
+    'job-applications',
+    'at-risk',
+    'placement-export',
+    'interviews',
+    'interview-settings',
+    'subject-discussions'
+  ];
+  const auditorAllowedTabs = [
+    'audit-logs',
+    'student-audit-logs',
+    'practice-reports',
+    'analytics'
+  ];
+
+  const getInitialTab = () => {
+    if (isFaculty) return 'applied-jobs';
+    if (isPlacementOfficer) {
+      if (tabParam && placementAllowedTabs.includes(tabParam)) return tabParam;
+      if (defaultTab && placementAllowedTabs.includes(defaultTab)) return defaultTab;
+      return 'job-opportunities';
+    }
+    if (isAuditor) {
+      if (tabParam && auditorAllowedTabs.includes(tabParam)) return tabParam;
+      if (defaultTab && auditorAllowedTabs.includes(defaultTab)) return defaultTab;
+      return 'audit-logs';
+    }
+    return tabParam || defaultTab;
+  };
+
+  const initialTab = getInitialTab();
 
   // Navigation tabs
   const [activeTab, setActiveTab] = useState(initialTab);
 
   const safeSetActiveTab = (tab) => {
     if (isFaculty && tab !== 'applied-jobs' && tab !== 'job-applications') {
+      return;
+    }
+    if (isPlacementOfficer && !placementAllowedTabs.includes(tab)) {
+      return;
+    }
+    if (isAuditor && !auditorAllowedTabs.includes(tab)) {
       return;
     }
     setActiveTab(tab);
@@ -62,12 +106,24 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
       }
       return;
     }
+    if (isPlacementOfficer) {
+      if (!placementAllowedTabs.includes(activeTab)) {
+        setActiveTab('job-opportunities');
+      }
+      return;
+    }
+    if (isAuditor) {
+      if (!auditorAllowedTabs.includes(activeTab)) {
+        setActiveTab('audit-logs');
+      }
+      return;
+    }
     if (tabParam) {
       setActiveTab(tabParam);
     } else if (defaultTab) {
       setActiveTab(defaultTab);
     }
-  }, [tabParam, defaultTab, isFaculty, activeTab]);
+  }, [tabParam, defaultTab, isFaculty, isPlacementOfficer, isAuditor, activeTab]);
 
   // Lists
   const [students, setStudents] = useState([]);
@@ -3544,18 +3600,106 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
             >
               📋 Candidate Applications Report
             </button>
+          ) : isPlacementOfficer ? (
+            <>
+              <button
+                className={`admin-tab-btn ${activeTab === 'job-opportunities' || activeTab === 'jobs' || activeTab === 'job-postings' || activeTab === 'company-drives' ? 'active' : ''}`}
+                onClick={() => {
+                  safeSetActiveTab('job-opportunities');
+                  fetchJobs();
+                }}
+              >
+                💼 Placement Drives &amp; Jobs
+              </button>
+              <button
+                className={`admin-tab-btn ${activeTab === 'applied-jobs' || activeTab === 'job-applications' ? 'active' : ''}`}
+                onClick={() => {
+                  safeSetActiveTab('applied-jobs');
+                  fetchJobs();
+                  fetchApplicationsReport();
+                }}
+              >
+                📋 Candidate Applications Report
+              </button>
+              <button
+                className={`admin-tab-btn ${activeTab === 'at-risk' ? 'active' : ''}`}
+                onClick={() => safeSetActiveTab('at-risk')}
+              >
+                ⚠️ At-Risk Detection
+              </button>
+              <button
+                className={`admin-tab-btn ${activeTab === 'placement-export' ? 'active' : ''}`}
+                onClick={() => safeSetActiveTab('placement-export')}
+              >
+                📑 Stats &amp; Report Export
+              </button>
+              <button
+                className={`admin-tab-btn ${activeTab === 'interviews' ? 'active' : ''}`}
+                onClick={() => safeSetActiveTab('interviews')}
+              >
+                🎤 Mock Interview Reports
+              </button>
+              <button
+                className={`admin-tab-btn ${activeTab === 'interview-settings' ? 'active' : ''}`}
+                onClick={() => {
+                  safeSetActiveTab('interview-settings');
+                  fetchInterviewMetadata();
+                }}
+              >
+                🎯 Interview Settings
+              </button>
+              <button
+                className={`admin-tab-btn ${activeTab === 'subject-discussions' ? 'active' : ''}`}
+                onClick={() => {
+                  safeSetActiveTab('subject-discussions');
+                  fetchAcademicContent();
+                  fetchAdminDiscussions();
+                }}
+              >
+                💬 Subject Discussions Forum
+              </button>
+            </>
+          ) : isAuditor ? (
+            <>
+              <button
+                className={`admin-tab-btn ${activeTab === 'audit-logs' || activeTab === 'student-audit-logs' ? 'active' : ''}`}
+                onClick={() => {
+                  safeSetActiveTab('audit-logs');
+                  fetchAuditStats();
+                  fetchAuditSessions();
+                  fetchAuditLogs();
+                }}
+              >
+                📜 Student Audit Logs & Active Time
+              </button>
+              <button
+                className={`admin-tab-btn ${activeTab === 'practice-reports' ? 'active' : ''}`}
+                onClick={() => {
+                  safeSetActiveTab('practice-reports');
+                  fetchPracticeReports(practiceReportPlatform);
+                }}
+              >
+                📈 Practice Reports
+              </button>
+              <button
+                className={`admin-tab-btn ${activeTab === 'analytics' ? 'active' : ''}`}
+                onClick={() => safeSetActiveTab('analytics')}
+              >
+                📊 Candidate Analytics
+              </button>
+            </>
           ) : (
             <>
           <button
             className={`admin-tab-btn ${activeTab === 'analytics' ? 'active' : ''}`}
-            onClick={() => setActiveTab('analytics')}
+            onClick={() => safeSetActiveTab('analytics')}
           >
             📊 Candidate Analytics
           </button>
           <button
             className={`admin-tab-btn ${activeTab === 'job-opportunities' || activeTab === 'jobs' || activeTab === 'job-postings' || activeTab === 'company-drives' ? 'active' : ''}`}
             onClick={() => {
-              setActiveTab('job-opportunities');
+              safeSetActiveTab('job-opportunities');
               fetchJobs();
             }}
           >
@@ -3564,7 +3708,7 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
           <button
             className={`admin-tab-btn ${activeTab === 'applied-jobs' || activeTab === 'job-applications' ? 'active' : ''}`}
             onClick={() => {
-              setActiveTab('applied-jobs');
+              safeSetActiveTab('applied-jobs');
               fetchJobs();
               fetchApplicationsReport();
             }}
@@ -3573,33 +3717,33 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
           </button>
           <button
             className={`admin-tab-btn ${activeTab === 'at-risk' ? 'active' : ''}`}
-            onClick={() => setActiveTab('at-risk')}
+            onClick={() => safeSetActiveTab('at-risk')}
           >
             ⚠️ At-Risk Detection
           </button>
 
           <button
             className={`admin-tab-btn ${activeTab === 'placement-export' ? 'active' : ''}`}
-            onClick={() => setActiveTab('placement-export')}
+            onClick={() => safeSetActiveTab('placement-export')}
           >
             📑 Stats &amp; Report Export
           </button>
           <button
             className={`admin-tab-btn ${activeTab === 'interviews' ? 'active' : ''}`}
-            onClick={() => setActiveTab('interviews')}
+            onClick={() => safeSetActiveTab('interviews')}
           >
             🎤 Mock Interview Reports
           </button>
           <button
             className={`admin-tab-btn ${activeTab === 'question-bank' ? 'active' : ''}`}
-            onClick={() => setActiveTab('question-bank')}
+            onClick={() => safeSetActiveTab('question-bank')}
           >
             🛡️ Question Bank Reports
           </button>
           <button
             className={`admin-tab-btn ${activeTab === 'lab-reports' ? 'active' : ''}`}
             onClick={() => {
-              setActiveTab('lab-reports');
+              safeSetActiveTab('lab-reports');
               fetchAdminLabReports();
             }}
           >
@@ -3608,7 +3752,7 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
           <button
             className={`admin-tab-btn ${activeTab === 'aptitude' ? 'active' : ''}`}
             onClick={() => {
-              setActiveTab('aptitude');
+              safeSetActiveTab('aptitude');
               fetchAptitudeTests();
             }}
           >
@@ -3617,7 +3761,7 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
           <button
             className={`admin-tab-btn ${activeTab === 'core-subjects' ? 'active' : ''}`}
             onClick={() => {
-              setActiveTab('core-subjects');
+              safeSetActiveTab('core-subjects');
               fetchAcademicContent();
               fetchAptitudeTests();
             }}
@@ -3626,14 +3770,14 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
           </button>
           <button
             className={`admin-tab-btn ${activeTab === 'academic-content' ? 'active' : ''}`}
-            onClick={() => setActiveTab('academic-content')}
+            onClick={() => safeSetActiveTab('academic-content')}
           >
             📚 Academic Subjects & Projects
           </button>
           <button
             className={`admin-tab-btn ${activeTab === 'practice' ? 'active' : ''}`}
             onClick={() => {
-              setActiveTab('practice');
+              safeSetActiveTab('practice');
               fetchPracticeQuestions(practicePlatform);
             }}
           >
@@ -3642,7 +3786,7 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
           <button
             className={`admin-tab-btn ${activeTab === 'practice-reports' ? 'active' : ''}`}
             onClick={() => {
-              setActiveTab('practice-reports');
+              safeSetActiveTab('practice-reports');
               fetchPracticeReports(practiceReportPlatform);
             }}
           >
@@ -3651,7 +3795,7 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
           <button
             className={`admin-tab-btn ${activeTab === 'interview-settings' ? 'active' : ''}`}
             onClick={() => {
-              setActiveTab('interview-settings');
+              safeSetActiveTab('interview-settings');
               fetchInterviewMetadata();
             }}
           >
@@ -3660,7 +3804,7 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
           <button
             className={`admin-tab-btn ${activeTab === 'audit-logs' || activeTab === 'student-audit-logs' ? 'active' : ''}`}
             onClick={() => {
-              setActiveTab('audit-logs');
+              safeSetActiveTab('audit-logs');
               fetchAuditStats();
               fetchAuditSessions();
               fetchAuditLogs();
@@ -3671,7 +3815,7 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
           <button
             className={`admin-tab-btn ${activeTab === 'subject-discussions' ? 'active' : ''}`}
             onClick={() => {
-              setActiveTab('subject-discussions');
+              safeSetActiveTab('subject-discussions');
               fetchAcademicContent();
               fetchAdminDiscussions();
             }}
@@ -3681,7 +3825,7 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
           <button
             className={`admin-tab-btn ${activeTab === 'settings' ? 'active' : ''}`}
             onClick={() => {
-              setActiveTab('settings');
+              safeSetActiveTab('settings');
             }}
           >
             ⚙️ Settings

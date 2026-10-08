@@ -349,8 +349,9 @@ exports.getDetailedReport = async (req, res, next) => {
 // @access  Private/Admin
 exports.getAdminSubmissionReport = async (req, res, next) => {
   try {
-    if (req.user.role !== 'admin') {
-      return res.status(403).json({ success: false, error: 'Only admins can perform this action' });
+    const allowedRoles = ['admin', 'faculty', 'hod', 'director', 'principal'];
+    if (!allowedRoles.includes(req.user.role)) {
+      return res.status(403).json({ success: false, error: 'Not authorized to view submissions report' });
     }
 
     const { sort, difficulty, plagiarismStatus } = req.query;

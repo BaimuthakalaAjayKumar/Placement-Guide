@@ -47,7 +47,7 @@ import HODDashboard from './pages/HODDashboard';
 
 // Helper for home route by role
 const getRoleHome = (role) => {
-  if (['admin', 'super_admin', 'campus_admin', 'administrator'].includes(role)) return '/admin';
+  if (['admin', 'super_admin', 'campus_admin', 'administrator', 'director', 'principal'].includes(role)) return '/admin';
   if (role === 'placement_officer') return '/job-opportunities';
   if (role === 'faculty') return '/faculty';
   if (role === 'recruiter') return '/recruiter';
@@ -81,7 +81,7 @@ const PrivateRoute = ({ children, allowedRoles }) => {
   if (allowedRoles) {
     const isRolePermitted =
       allowedRoles.includes(user.role) ||
-      (allowedRoles.includes('admin') && ['super_admin', 'campus_admin', 'administrator'].includes(user.role));
+      (allowedRoles.includes('admin') && ['super_admin', 'campus_admin', 'administrator', 'director', 'principal'].includes(user.role));
     if (!isRolePermitted) {
       return <Navigate to={getRoleHome(user.role)} replace />;
     }

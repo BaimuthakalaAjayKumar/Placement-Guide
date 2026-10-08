@@ -82,7 +82,7 @@ const isCampusScopedAdmin = (user) => {
   if (!user || !user.role) return false;
   const role = normalizeRole(user.role);
 
-  if (role === ROLES.CAMPUS_ADMIN || role === ROLES.ADMINISTRATOR) return true;
+  if ([ROLES.CAMPUS_ADMIN, ROLES.ADMINISTRATOR, ROLES.DIRECTOR, ROLES.PRINCIPAL].includes(role)) return true;
   if (role === ROLES.ADMIN && Boolean(user.campusId)) return true;
 
   return false;
@@ -357,6 +357,12 @@ const buildStudentScopeFilter = (user) => {
     const campusFilter = getCampusFilter(user);
 
     return combineScopeFilters(baseFilter, campusFilter, scopeFilter);
+  }
+
+  // 6. Placement Officer & Auditor: students across assigned campus
+  if (role === ROLES.PLACEMENT_OFFICER || role === ROLES.AUDITOR) {
+    const campusFilter = getCampusFilter(user);
+    return combineScopeFilters(baseFilter, campusFilter);
   }
 
   // Default fail-closed for any unrecognized role

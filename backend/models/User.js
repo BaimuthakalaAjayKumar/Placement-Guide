@@ -38,7 +38,9 @@ const UserSchema = new mongoose.Schema({
       'campus_admin',
       'administrator',
       'placement_officer',
-      'auditor'
+      'auditor',
+      'director',
+      'principal'
     ],
     default: 'student'
   },

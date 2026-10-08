@@ -16,7 +16,10 @@ import {
   isPlacementOfficer,
   isRecruiter,
   isStudent,
-  isAuditor
+  isAuditor,
+  isDirector,
+  isPrincipal,
+  isExecutiveLeadership
 } from '../utils/permissions';
 
 /**
@@ -75,6 +78,9 @@ export const usePermission = () => {
     isRecruiter: isRecruiter(user),
     isStudent: isStudent(user),
     isAuditor: isAuditor(user),
+    isDirector: isDirector(user),
+    isPrincipal: isPrincipal(user),
+    isExecutiveLeadership: isExecutiveLeadership(user),
 
     // Permission constants reference
     PERMISSIONS,

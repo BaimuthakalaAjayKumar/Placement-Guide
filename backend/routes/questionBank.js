@@ -24,7 +24,7 @@ router.route('/')
 router.post('/bulk', protect, authorize('admin', 'faculty', 'hod'), bulkCreateQuestions);
 
 router.route('/submissions/report')
-  .get(protect, authorize('admin', 'faculty', 'hod'), getAdminSubmissionReport);
+  .get(protect, authorize('admin', 'faculty', 'hod', 'director', 'principal'), getAdminSubmissionReport);
 
 router.route('/submissions/:submissionId/report')
   .get(protect, getDetailedReport);
