@@ -205,10 +205,10 @@ export const FacultyAttendanceScreen: React.FC = () => {
       >
         {/* Header */}
         <View style={styles.header}>
-          <div>
+          <View>
             <Text style={styles.title}>Faculty Attendance Hub</Text>
             <Text style={styles.subtitle}>Dynamic Lecture QR &amp; Live Present Roster</Text>
-          </div>
+          </View>
           {!activeSession && (
             <TouchableOpacity
               style={styles.newSessionBtn}
@@ -249,8 +249,8 @@ export const FacultyAttendanceScreen: React.FC = () => {
               {/* Dynamic QR Code Display */}
               <View style={styles.qrCardContainer}>
                 <Image source={{ uri: qrImageUrl }} style={styles.qrImage} />
-                <Text style={styles.qrTokenText}>
-                  Token: {activeSession.qrSessionIdentifier?.slice(0, 16)}...
+                <Text style={styles.qrTokenText} selectable={true}>
+                  Token: {activeSession.qrSessionIdentifier}
                 </Text>
                 <Text style={styles.qrSubPrompt}>
                   Rotate every 15s • Project on classroom screen
@@ -283,10 +283,10 @@ export const FacultyAttendanceScreen: React.FC = () => {
                 <View key={record._id || index} style={styles.rosterRowCard}>
                   <View style={styles.rosterLeft}>
                     <Text style={styles.rosterIndex}>{index + 1}.</Text>
-                    <div>
+                    <View>
                       <Text style={styles.rosterName}>{record.studentName || 'Student Candidate'}</Text>
                       <Text style={styles.rosterRoll}>{record.rollNumber || '21BCE1042'}</Text>
-                    </div>
+                    </View>
                   </View>
 
                   <View style={styles.rosterRight}>

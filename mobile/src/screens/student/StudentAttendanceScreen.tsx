@@ -12,23 +12,56 @@ import {
   RefreshControl,
   Platform,
 } from 'react-native';
-import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as Location from 'expo-location';
 import { ScreenContainer } from '../../components/ScreenContainer';
 import { Button } from '../../components/Button';
 import { THEME } from '../../utils/constants';
-import { attendanceApi, StudentAttendanceAnalytics, AttendanceHistoryRecord } from '../../api/attendanceApi';
+import { attendanceApi, StudentAttendanceAnalytics, AttendanceHistoryRecord, ActiveSession } from '../../api/attendanceApi';
+
+// Safe dynamic loader for native camera to prevent Expo Go crashes
+let CameraViewComponent: any = null;
+let expoCameraModule: any = null;
+let isNativeCameraAvailable = false;
+
+try {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  expoCameraModule = require('expo-camera');
+  if (expoCameraModule && (expoCameraModule.CameraView || expoCameraModule.Camera)) {
+    CameraViewComponent = expoCameraModule.CameraView || expoCameraModule.Camera;
+    isNativeCameraAvailable = true;
+  }
+} catch {
+  // Gracefully caught when running in Expo Go client without custom ExpoCamera binary
+  isNativeCameraAvailable = false;
+  CameraViewComponent = null;
+}
+
+const requestCameraPermissionAsync = async (): Promise<boolean> => {
+  try {
+    if (expoCameraModule?.requestCameraPermissionsAsync) {
+      const res = await expoCameraModule.requestCameraPermissionsAsync();
+      return !!res.granted;
+    }
+    if (expoCameraModule?.Camera?.requestCameraPermissionsAsync) {
+      const res = await expoCameraModule.Camera.requestCameraPermissionsAsync();
+      return !!res.granted;
+    }
+  } catch (err) {
+    console.warn('Camera permission request error:', err);
+  }
+  return false;
+};
 
 export const StudentAttendanceScreen: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'overview' | 'history'>('overview');
   const [analytics, setAnalytics] = useState<StudentAttendanceAnalytics | null>(null);
   const [history, setHistory] = useState<AttendanceHistoryRecord[]>([]);
+  const [activeSessions, setActiveSessions] = useState<ActiveSession[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
   // Scanner Modal & Verification States
   const [scannerVisible, setScannerVisible] = useState(false);
-  const [permission, requestPermission] = useCameraPermissions();
   const [manualModalVisible, setManualModalVisible] = useState(false);
   const [manualSessionId, setManualSessionId] = useState('');
   const [manualToken, setManualToken] = useState('');
@@ -43,9 +76,10 @@ export const StudentAttendanceScreen: React.FC = () => {
   const loadAttendanceData = useCallback(async () => {
     try {
       setLoading(true);
-      const [analyticsRes, historyRes] = await Promise.all([
+      const [analyticsRes, historyRes, activeRes] = await Promise.all([
         attendanceApi.getStudentAnalytics().catch(() => ({ success: false, data: null })),
         attendanceApi.getStudentHistory().catch(() => ({ success: false, data: [] })),
+        attendanceApi.getActiveSessions().catch(() => ({ success: false, data: [] })),
       ]);
 
       if (analyticsRes.success && analyticsRes.data) {
@@ -54,13 +88,19 @@ export const StudentAttendanceScreen: React.FC = () => {
       if (historyRes.success && historyRes.data) {
         setHistory(historyRes.data);
       }
+      if (activeRes.success && activeRes.data) {
+        setActiveSessions(activeRes.data);
+        if (activeRes.data.length > 0 && !manualSessionId) {
+          setManualSessionId(activeRes.data[0]._id);
+        }
+      }
     } catch (err) {
       console.error('Error fetching attendance data:', err);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [manualSessionId]);
 
   useEffect(() => {
     loadAttendanceData();
@@ -71,21 +111,31 @@ export const StudentAttendanceScreen: React.FC = () => {
     loadAttendanceData();
   };
 
-  // Open QR Scanner
+  // Open QR Scanner or Graceful Fallback
   const handleStartScan = async () => {
-    if (!permission?.granted) {
-      const { granted } = await requestPermission();
-      if (!granted) {
-        Alert.alert(
-          'Camera Permission Required',
-          'CampusBridge requires camera access to scan classroom attendance QR codes. Please enable it in Settings.',
-          [
-            { text: 'Cancel', style: 'cancel' },
-            { text: 'Manual Code Entry', onPress: () => setManualModalVisible(true) },
-          ]
-        );
-        return;
-      }
+    if (!isNativeCameraAvailable || !CameraViewComponent) {
+      Alert.alert(
+        '📷 Camera Scanner Notice',
+        'Optical camera scanner is available in custom development builds. You can check in instantly using the Active Session Token with hardware GPS verification!',
+        [
+          { text: 'Enter Token & GPS', onPress: () => setManualModalVisible(true) },
+          { text: 'Cancel', style: 'cancel' }
+        ]
+      );
+      return;
+    }
+
+    const granted = await requestCameraPermissionAsync();
+    if (!granted) {
+      Alert.alert(
+        'Camera Permission Required',
+        'CampusBridge requires camera access to scan classroom attendance QR codes.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Manual Code Entry', onPress: () => setManualModalVisible(true) },
+        ]
+      );
+      return;
     }
 
     // Check Location Permission
@@ -334,10 +384,10 @@ export const StudentAttendanceScreen: React.FC = () => {
               analytics.subjectStats.map((sub) => (
                 <View key={sub.subjectId} style={styles.subjectCard}>
                   <View style={styles.subjectHeader}>
-                    <div>
+                    <View>
                       <Text style={styles.subjectName}>{sub.subjectName}</Text>
                       <Text style={styles.subjectCode}>{sub.subjectCode}</Text>
-                    </div>
+                    </View>
                     <Text
                       style={[
                         styles.subjectPct,
@@ -476,12 +526,14 @@ export const StudentAttendanceScreen: React.FC = () => {
       {/* Optical Camera Scanner Modal */}
       <Modal visible={scannerVisible} animationType="slide">
         <View style={styles.cameraContainer}>
-          <CameraView
-            style={StyleSheet.absoluteFill}
-            facing="back"
-            barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
-            onBarcodeScanned={handleBarcodeScanned}
-          />
+          {CameraViewComponent ? (
+            <CameraViewComponent
+              style={StyleSheet.absoluteFill}
+              facing="back"
+              barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
+              onBarcodeScanned={handleBarcodeScanned}
+            />
+          ) : null}
 
           <View style={styles.scannerOverlay}>
             <View style={styles.scannerTargetBox}>
@@ -513,9 +565,38 @@ export const StudentAttendanceScreen: React.FC = () => {
               Enter the session ID and rolling token provided by your instructor:
             </Text>
 
+            {activeSessions.length > 0 && (
+              <View style={{ marginBottom: 14 }}>
+                <Text style={{ color: '#94a3b8', fontSize: 12, marginBottom: 8, fontWeight: '600' }}>
+                  Live Classroom Sessions Detected (Tap to Select):
+                </Text>
+                {activeSessions.map((s) => (
+                  <TouchableOpacity
+                    key={s._id}
+                    style={{
+                      backgroundColor: manualSessionId === s._id ? 'rgba(79, 70, 229, 0.25)' : 'rgba(255, 255, 255, 0.04)',
+                      borderColor: manualSessionId === s._id ? THEME.colors.primary : THEME.colors.border,
+                      borderWidth: 1.5,
+                      borderRadius: 8,
+                      padding: 10,
+                      marginBottom: 6,
+                    }}
+                    onPress={() => setManualSessionId(s._id)}
+                  >
+                    <Text style={{ color: '#fff', fontWeight: '700', fontSize: 13 }}>
+                      {s.subjectId?.name || 'Active Session'}
+                    </Text>
+                    <Text style={{ color: '#94a3b8', fontSize: 11, marginTop: 2 }}>
+                      Room: {s.roomId ? `${s.roomId.buildingName} ${s.roomId.roomNumber}` : 'Classroom'} • Sec {s.section} • Period {s.period}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+
             <TextInput
               style={styles.input}
-              placeholder="Session ID (e.g., 6705f...)"
+              placeholder="Session ID (auto-filled above)"
               placeholderTextColor="#64748b"
               value={manualSessionId}
               onChangeText={setManualSessionId}
