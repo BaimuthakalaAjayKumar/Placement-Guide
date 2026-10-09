@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import Header from '../components/Header';
 import StudentAcademicsModule from '../components/StudentAcademicsModule';
 import AchievementsSection from '../components/AchievementsSection';
+import PlacementKanbanPipeline from '../components/PlacementKanbanPipeline';
 import { API_URL } from '../config/api';
 import './Dashboard.css';
 
@@ -11,7 +12,7 @@ const Dashboard = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { token, user } = useAuth();
-  const [activeTab, setActiveTab] = useState('overview'); // 'overview' | 'academics' | 'achievements'
+  const [activeTab, setActiveTab] = useState('overview'); // 'overview' | 'academics' | 'achievements' | 'pipeline'
   const [stats, setStats] = useState(null);
   const [practiceStats, setPracticeStats] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -25,7 +26,13 @@ const Dashboard = () => {
       setActiveTab('academics');
     } else if (params.get('tab') === 'achievements') {
       setActiveTab('achievements');
+    } else if (params.get('tab') === 'pipeline') {
+      setActiveTab('pipeline');
     }
+
+    const handleOpenPipeline = () => setActiveTab('pipeline');
+    window.addEventListener('open_pipeline_tab', handleOpenPipeline);
+    return () => window.removeEventListener('open_pipeline_tab', handleOpenPipeline);
   }, [location.search]);
   const [loadingAppliedJobs, setLoadingAppliedJobs] = useState(false);
   const [appliedJobsFilter, setAppliedJobsFilter] = useState('all');
@@ -744,12 +751,45 @@ const Dashboard = () => {
               Gamified
             </span>
           </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('pipeline')}
+            style={{
+              background: activeTab === 'pipeline' ? '#2563eb' : 'transparent',
+              color: activeTab === 'pipeline' ? '#ffffff' : '#94a3b8',
+              border: 'none',
+              padding: '9px 18px',
+              borderRadius: '10px',
+              fontWeight: '700',
+              fontSize: '0.9rem',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              transition: 'all 0.2s ease'
+            }}
+          >
+            <span>📌</span> My Placement Pipeline
+            <span style={{
+              background: activeTab === 'pipeline' ? 'rgba(0,0,0,0.25)' : 'rgba(37, 99, 235, 0.2)',
+              color: activeTab === 'pipeline' ? '#ffffff' : '#60a5fa',
+              padding: '2px 8px',
+              borderRadius: '9999px',
+              fontSize: '0.75rem',
+              fontWeight: '800'
+            }}>
+              Kanban
+            </span>
+          </button>
         </div>
 
         {activeTab === 'academics' ? (
           <StudentAcademicsModule />
         ) : activeTab === 'achievements' ? (
           <AchievementsSection />
+        ) : activeTab === 'pipeline' ? (
+          <PlacementKanbanPipeline />
         ) : (
           <div className="dashboard-grid-container">
 

@@ -895,6 +895,24 @@ const HODDashboard = () => {
             <button
               type="button"
               className="btn btn-secondary btn-sm"
+              onClick={() => window.dispatchEvent(new CustomEvent('open_naac_modal'))}
+              title="Generate NAAC Criteria 5.2.1 Audit Dossier with Verified Offer Letters"
+              style={{ borderColor: 'rgba(59, 130, 246, 0.4)', color: '#93c5fd' }}
+            >
+              📜 NAAC 5.2 Dossier
+            </button>
+            <button
+              type="button"
+              className="btn btn-secondary btn-sm"
+              onClick={() => window.dispatchEvent(new CustomEvent('open_skillgap_modal'))}
+              title="View Department Skill-Gap Heatmap & Remedial Cohorts"
+              style={{ borderColor: 'rgba(16, 185, 129, 0.4)', color: '#6ee7b7' }}
+            >
+              📊 Skill-Gap Heatmap
+            </button>
+            <button
+              type="button"
+              className="btn btn-secondary btn-sm"
               onClick={() => navigate('/change-password')}
               title="Change Account Password"
               style={{ borderColor: 'rgba(234, 179, 8, 0.4)', color: '#fef08a' }}

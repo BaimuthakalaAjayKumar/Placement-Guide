@@ -26,7 +26,46 @@ const Sidebar = () => {
   const location = useLocation();
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [showContactModal, setShowContactModal] = useState(false);
+  const [isMobileOpen, setIsMobileOpen] = useState(false);
   const menuRef = useRef(null);
+
+  // Mobile drawer listener and route change auto-close
+  useEffect(() => {
+    const handleToggle = () => setIsMobileOpen((prev) => !prev);
+    const handleClose = () => setIsMobileOpen(false);
+    window.addEventListener('toggle_mobile_sidebar', handleToggle);
+    window.addEventListener('close_mobile_sidebar', handleClose);
+    return () => {
+      window.removeEventListener('toggle_mobile_sidebar', handleToggle);
+      window.removeEventListener('close_mobile_sidebar', handleClose);
+    };
+  }, []);
+
+  useEffect(() => {
+    setIsMobileOpen(false);
+  }, [location.pathname, location.search]);
+
+  // Close mobile drawer on Escape key press when open
+  useEffect(() => {
+    if (!isMobileOpen) return;
+
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape' || e.key === 'Esc') {
+        if (e.defaultPrevented) return;
+        if (showContactModal) return;
+        if (isUserMenuOpen) {
+          setIsUserMenuOpen(false);
+          return;
+        }
+        setIsMobileOpen(false);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isMobileOpen, showContactModal, isUserMenuOpen]);
 
   const getRoleTitle = () => {
     if (isDirector) return `Director (${user.campusName || user.campus?.name || 'GRIET'})`;
@@ -143,7 +182,15 @@ const Sidebar = () => {
   if (!user) return null;
 
   return (
-    <aside className="sidebar">
+    <>
+      {isMobileOpen && (
+        <div
+          className="sidebar-mobile-backdrop"
+          onClick={() => setIsMobileOpen(false)}
+          aria-label="Close navigation overlay"
+        />
+      )}
+      <aside className={`sidebar ${isMobileOpen ? 'mobile-open' : ''}`}>
       <div className="sidebar-logo">
         <img src="/campus-bridge-logo.png" alt="Campus Bridge" className="sidebar-logo-img" />
         <span>Campus Bridge</span>
@@ -821,7 +868,8 @@ const Sidebar = () => {
           </div>
         </div>
       )}
-    </aside>
+      </aside>
+    </>
   );
 };
 

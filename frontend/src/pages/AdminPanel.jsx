@@ -3719,6 +3719,24 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
             💼 Placement Drives &amp; Jobs
           </button>
           <button
+            type="button"
+            className="admin-tab-btn"
+            style={{ color: '#93c5fd', borderColor: 'rgba(59, 130, 246, 0.4)' }}
+            onClick={() => window.dispatchEvent(new CustomEvent('open_naac_modal'))}
+            title="Open NAAC Criteria 5.2.1 Audit Dossier Generator"
+          >
+            📜 NAAC 5.2 Dossier
+          </button>
+          <button
+            type="button"
+            className="admin-tab-btn"
+            style={{ color: '#6ee7b7', borderColor: 'rgba(16, 185, 129, 0.4)' }}
+            onClick={() => window.dispatchEvent(new CustomEvent('open_skillgap_modal'))}
+            title="Open Department Skill-Gap Heatmap"
+          >
+            📊 Skill-Gap Heatmap
+          </button>
+          <button
             className={`admin-tab-btn ${activeTab === 'applied-jobs' || activeTab === 'job-applications' ? 'active' : ''}`}
             onClick={() => {
               safeSetActiveTab('applied-jobs');
@@ -3786,6 +3804,16 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
             onClick={() => safeSetActiveTab('academic-content')}
           >
             📚 Academic Subjects & Projects
+          </button>
+          <button
+            className={`admin-tab-btn ${activeTab === 'faculty-staff' ? 'active' : ''}`}
+            onClick={() => {
+              safeSetActiveTab('faculty-staff');
+              fetchStaff();
+              fetchAcademicContent();
+            }}
+          >
+            👥 Faculty &amp; Staff
           </button>
           <button
             className={`admin-tab-btn ${activeTab === 'practice' ? 'active' : ''}`}

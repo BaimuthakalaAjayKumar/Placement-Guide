@@ -275,14 +275,21 @@
 [data-theme="light"] .admin-tab-btn {
   background: #f8fafc;
   border-color: #cbd5e1;
-  color: #000000 !important;
+  color: #334155;
 }
 
 [data-theme="light"] .admin-tab-btn:hover {
   background: #eef2ff;
   border-color: #818cf8;
-  box-shadow: 0 8px 18px rgba(79, 70, 229, 0.15);
-  color: #000000 !important;
+  box-shadow: 0 4px 14px rgba(79, 70, 229, 0.12);
+  color: #0f172a;
+}
+
+[data-theme="light"] .admin-tab-btn.active {
+  background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+  border-color: transparent;
+  color: #ffffff !important;
+  box-shadow: 0 4px 14px rgba(79, 70, 229, 0.28);
 }
 
 /* Modal Windows styling */

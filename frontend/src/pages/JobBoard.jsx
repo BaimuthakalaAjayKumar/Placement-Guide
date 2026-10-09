@@ -448,6 +448,16 @@ const JobBoard = () => {
             <span>Application Pipeline &amp; Status</span>
             <span className="nav-tab-counter">{totalAppliedCount}</span>
           </button>
+
+          <button
+            type="button"
+            className="academic-badge badge-tier-dream"
+            style={{ cursor: 'pointer', marginLeft: 'auto', padding: '8px 14px', fontSize: '0.82rem' }}
+            onClick={() => window.dispatchEvent(new CustomEvent('open_hall_ticket_modal'))}
+            title="Generate and Print Drive QR Admit Card / Hall Ticket"
+          >
+            🎫 Drive Admit Pass
+          </button>
         </div>
 
         {/* Search & Filter Bar */}

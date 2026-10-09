@@ -7,6 +7,10 @@ import { AIContextProvider } from './context/AIContext';
 // Components
 import Sidebar from './components/Sidebar';
 import Chatbot from './components/Chatbot';
+import CommandPalette from './components/CommandPalette';
+import NaacReportGenerator from './components/NaacReportGenerator';
+import SkillGapHeatmap from './components/SkillGapHeatmap';
+import DriveHallTicketModal from './components/DriveHallTicketModal';
 
 // Pages
 import HomePage from './pages/HomePage';
@@ -181,6 +185,10 @@ const PrivateRoute = ({ children, allowedRoles }) => {
       <Sidebar />
       {children}
       <Chatbot />
+      <CommandPalette />
+      <NaacReportGenerator />
+      <SkillGapHeatmap />
+      <DriveHallTicketModal />
     </div>
   );
 };

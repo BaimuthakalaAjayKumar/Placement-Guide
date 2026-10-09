@@ -68,6 +68,14 @@ const ProjectStudio = () => {
   const [facultyCodeSuggestions, setFacultyCodeSuggestions] = useState('');
   const [facultyTechSuggestions, setFacultyTechSuggestions] = useState('');
   const [facultyStatus, setFacultyStatus] = useState('submitted');
+  const [showVivaRubricModal, setShowVivaRubricModal] = useState(false);
+  const [vivaRubrics, setVivaRubrics] = useState({
+    architecture: 18,
+    codeQuality: 17,
+    liveDemo: 19,
+    originality: 20,
+    qaDefense: 18
+  });
 
   // Version History State
   const [commitMessage, setCommitMessage] = useState('');
@@ -1419,6 +1427,15 @@ const ProjectStudio = () => {
                 <option value="changes_requested">Changes Requested</option>
                 <option value="approved">Approved</option>
               </select>
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                style={{ borderColor: 'rgba(99, 102, 241, 0.4)', color: '#c7d2fe' }}
+                onClick={() => setShowVivaRubricModal(true)}
+                title="Open Digital Viva Defense Scoring Rubric"
+              >
+                ⚖️ Viva Rubric
+              </button>
               <button
                 type="button"
                 className="btn btn-primary btn-sm"
@@ -3706,6 +3723,144 @@ const ProjectStudio = () => {
                   disabled={saving}
                 >
                   {saving ? 'Setting up Project...' : '🚀 Create Project from Template'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {showVivaRubricModal && (
+          <div className="modal-overlay" onClick={() => setShowVivaRubricModal(false)}>
+            <div className="modal-content medium-modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '640px' }}>
+              <div className="modal-header">
+                <div>
+                  <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span>⚖️</span> Digital Viva &amp; Defense Scoring Rubric
+                  </h3>
+                  <p className="modal-subtitle">
+                    Standardized NBA/NAAC Evaluation Criteria for Capstone Project Reviews
+                  </p>
+                </div>
+                <button className="close-btn" onClick={() => setShowVivaRubricModal(false)}>×</button>
+              </div>
+
+              <div className="modal-body" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', background: 'rgba(255,255,255,0.03)', borderRadius: '8px' }}>
+                  <div>
+                    <strong style={{ display: 'block', fontSize: '0.88rem' }}>1. System Architecture &amp; Modularity</strong>
+                    <span style={{ fontSize: '0.74rem', color: '#94a3b8' }}>Component decomposition, database schema, design patterns</span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <input
+                      type="number"
+                      min="0"
+                      max="20"
+                      value={vivaRubrics.architecture}
+                      onChange={e => setVivaRubrics(r => ({ ...r, architecture: Math.min(20, Math.max(0, parseInt(e.target.value) || 0)) }))}
+                      style={{ width: '60px', padding: '6px', textAlign: 'center', borderRadius: '6px', border: '1px solid #475569', background: '#0f172a', color: '#fff', fontWeight: 700 }}
+                    />
+                    <span style={{ fontSize: '0.78rem', color: '#94a3b8' }}>/ 20</span>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', background: 'rgba(255,255,255,0.03)', borderRadius: '8px' }}>
+                  <div>
+                    <strong style={{ display: 'block', fontSize: '0.88rem' }}>2. Code Quality &amp; Cleanliness</strong>
+                    <span style={{ fontSize: '0.74rem', color: '#94a3b8' }}>Readability, naming conventions, version commits</span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <input
+                      type="number"
+                      min="0"
+                      max="20"
+                      value={vivaRubrics.codeQuality}
+                      onChange={e => setVivaRubrics(r => ({ ...r, codeQuality: Math.min(20, Math.max(0, parseInt(e.target.value) || 0)) }))}
+                      style={{ width: '60px', padding: '6px', textAlign: 'center', borderRadius: '6px', border: '1px solid #475569', background: '#0f172a', color: '#fff', fontWeight: 700 }}
+                    />
+                    <span style={{ fontSize: '0.78rem', color: '#94a3b8' }}>/ 20</span>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', background: 'rgba(255,255,255,0.03)', borderRadius: '8px' }}>
+                  <div>
+                    <strong style={{ display: 'block', fontSize: '0.88rem' }}>3. Live Application Demo &amp; Robustness</strong>
+                    <span style={{ fontSize: '0.74rem', color: '#94a3b8' }}>Functional completion, edge case resilience, user interface</span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <input
+                      type="number"
+                      min="0"
+                      max="20"
+                      value={vivaRubrics.liveDemo}
+                      onChange={e => setVivaRubrics(r => ({ ...r, liveDemo: Math.min(20, Math.max(0, parseInt(e.target.value) || 0)) }))}
+                      style={{ width: '60px', padding: '6px', textAlign: 'center', borderRadius: '6px', border: '1px solid #475569', background: '#0f172a', color: '#fff', fontWeight: 700 }}
+                    />
+                    <span style={{ fontSize: '0.78rem', color: '#94a3b8' }}>/ 20</span>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', background: 'rgba(255,255,255,0.03)', borderRadius: '8px' }}>
+                  <div>
+                    <strong style={{ display: 'block', fontSize: '0.88rem' }}>4. Originality &amp; Plagiarism Compliance</strong>
+                    <span style={{ fontSize: '0.74rem', color: '#94a3b8' }}>Verified audit index &lt; 15%, original contributions</span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <input
+                      type="number"
+                      min="0"
+                      max="20"
+                      value={vivaRubrics.originality}
+                      onChange={e => setVivaRubrics(r => ({ ...r, originality: Math.min(20, Math.max(0, parseInt(e.target.value) || 0)) }))}
+                      style={{ width: '60px', padding: '6px', textAlign: 'center', borderRadius: '6px', border: '1px solid #475569', background: '#0f172a', color: '#fff', fontWeight: 700 }}
+                    />
+                    <span style={{ fontSize: '0.78rem', color: '#94a3b8' }}>/ 20</span>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', background: 'rgba(255,255,255,0.03)', borderRadius: '8px' }}>
+                  <div>
+                    <strong style={{ display: 'block', fontSize: '0.88rem' }}>5. Individual Viva Defense &amp; Q&amp;A</strong>
+                    <span style={{ fontSize: '0.74rem', color: '#94a3b8' }}>Conceptual mastery, clarity during faculty questioning</span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <input
+                      type="number"
+                      min="0"
+                      max="20"
+                      value={vivaRubrics.qaDefense}
+                      onChange={e => setVivaRubrics(r => ({ ...r, qaDefense: Math.min(20, Math.max(0, parseInt(e.target.value) || 0)) }))}
+                      style={{ width: '60px', padding: '6px', textAlign: 'center', borderRadius: '6px', border: '1px solid #475569', background: '#0f172a', color: '#fff', fontWeight: 700 }}
+                    />
+                    <span style={{ fontSize: '0.78rem', color: '#94a3b8' }}>/ 20</span>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 18px', background: 'rgba(99, 102, 241, 0.1)', border: '1px solid rgba(99, 102, 241, 0.3)', borderRadius: '10px' }}>
+                  <div>
+                    <strong style={{ color: '#a5b4fc', fontSize: '0.95rem' }}>Calculated Aggregate Viva Score</strong>
+                    <span style={{ display: 'block', fontSize: '0.75rem', color: '#94a3b8' }}>Will automatically apply to internal examination records</span>
+                  </div>
+                  <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#6ee7b7', fontFamily: 'var(--font-mono)' }}>
+                    {vivaRubrics.architecture + vivaRubrics.codeQuality + vivaRubrics.liveDemo + vivaRubrics.originality + vivaRubrics.qaDefense} / 100
+                  </div>
+                </div>
+              </div>
+
+              <div className="modal-footer" style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', padding: '16px 20px', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+                <button type="button" className="btn btn-secondary btn-sm" onClick={() => setShowVivaRubricModal(false)}>
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-primary btn-sm"
+                  onClick={() => {
+                    const total = vivaRubrics.architecture + vivaRubrics.codeQuality + vivaRubrics.liveDemo + vivaRubrics.originality + vivaRubrics.qaDefense;
+                    setFacultyGrade(total.toString());
+                    setShowVivaRubricModal(false);
+                    setMessage(`✓ Applied Rubric Grade: ${total}/100 to student evaluation.`);
+                  }}
+                >
+                  ✓ Apply Rubric Grade ({vivaRubrics.architecture + vivaRubrics.codeQuality + vivaRubrics.liveDemo + vivaRubrics.originality + vivaRubrics.qaDefense}/100)
                 </button>
               </div>
             </div>
