@@ -37,6 +37,27 @@ const getImageUrl = (path) => {
   return `${baseUrl}${path.startsWith('/') ? '' : '/'}${path}`;
 };
 
+const PLACEMENT_ALLOWED_TABS = [
+  'job-opportunities',
+  'jobs',
+  'job-postings',
+  'company-drives',
+  'applied-jobs',
+  'job-applications',
+  'at-risk',
+  'placement-export',
+  'interviews',
+  'interview-settings',
+  'subject-discussions'
+];
+
+const AUDITOR_ALLOWED_TABS = [
+  'audit-logs',
+  'student-audit-logs',
+  'practice-reports',
+  'analytics'
+];
+
 const AdminPanel = ({ defaultTab = 'analytics' }) => {
   const { token, user } = useAuth();
   const [searchParams] = useSearchParams();
@@ -46,36 +67,16 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
   const isPlacementOfficer = user?.role === 'placement_officer';
   const isAuditor = user?.role === 'auditor';
 
-  const placementAllowedTabs = [
-    'job-opportunities',
-    'jobs',
-    'job-postings',
-    'company-drives',
-    'applied-jobs',
-    'job-applications',
-    'at-risk',
-    'placement-export',
-    'interviews',
-    'interview-settings',
-    'subject-discussions'
-  ];
-  const auditorAllowedTabs = [
-    'audit-logs',
-    'student-audit-logs',
-    'practice-reports',
-    'analytics'
-  ];
-
   const getInitialTab = () => {
     if (isFaculty) return 'applied-jobs';
     if (isPlacementOfficer) {
-      if (tabParam && placementAllowedTabs.includes(tabParam)) return tabParam;
-      if (defaultTab && placementAllowedTabs.includes(defaultTab)) return defaultTab;
+      if (tabParam && PLACEMENT_ALLOWED_TABS.includes(tabParam)) return tabParam;
+      if (defaultTab && PLACEMENT_ALLOWED_TABS.includes(defaultTab)) return defaultTab;
       return 'job-opportunities';
     }
     if (isAuditor) {
-      if (tabParam && auditorAllowedTabs.includes(tabParam)) return tabParam;
-      if (defaultTab && auditorAllowedTabs.includes(defaultTab)) return defaultTab;
+      if (tabParam && AUDITOR_ALLOWED_TABS.includes(tabParam)) return tabParam;
+      if (defaultTab && AUDITOR_ALLOWED_TABS.includes(defaultTab)) return defaultTab;
       return 'audit-logs';
     }
     return tabParam || defaultTab;
@@ -90,10 +91,10 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
     if (isFaculty && tab !== 'applied-jobs' && tab !== 'job-applications') {
       return;
     }
-    if (isPlacementOfficer && !placementAllowedTabs.includes(tab)) {
+    if (isPlacementOfficer && !PLACEMENT_ALLOWED_TABS.includes(tab)) {
       return;
     }
-    if (isAuditor && !auditorAllowedTabs.includes(tab)) {
+    if (isAuditor && !AUDITOR_ALLOWED_TABS.includes(tab)) {
       return;
     }
     setActiveTab(tab);
@@ -101,20 +102,32 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
 
   useEffect(() => {
     if (isFaculty) {
-      if (activeTab !== 'applied-jobs' && activeTab !== 'job-applications') {
-        setActiveTab('applied-jobs');
+      if (tabParam === 'applied-jobs' || tabParam === 'job-applications') {
+        setActiveTab(tabParam);
+      } else if (defaultTab === 'applied-jobs' || defaultTab === 'job-applications') {
+        setActiveTab(defaultTab);
+      } else {
+        setActiveTab((prev) => (prev === 'applied-jobs' || prev === 'job-applications' ? prev : 'applied-jobs'));
       }
       return;
     }
     if (isPlacementOfficer) {
-      if (!placementAllowedTabs.includes(activeTab)) {
-        setActiveTab('job-opportunities');
+      if (tabParam && PLACEMENT_ALLOWED_TABS.includes(tabParam)) {
+        setActiveTab(tabParam);
+      } else if (defaultTab && PLACEMENT_ALLOWED_TABS.includes(defaultTab)) {
+        setActiveTab(defaultTab);
+      } else {
+        setActiveTab((prev) => (PLACEMENT_ALLOWED_TABS.includes(prev) ? prev : 'job-opportunities'));
       }
       return;
     }
     if (isAuditor) {
-      if (!auditorAllowedTabs.includes(activeTab)) {
-        setActiveTab('audit-logs');
+      if (tabParam && AUDITOR_ALLOWED_TABS.includes(tabParam)) {
+        setActiveTab(tabParam);
+      } else if (defaultTab && AUDITOR_ALLOWED_TABS.includes(defaultTab)) {
+        setActiveTab(defaultTab);
+      } else {
+        setActiveTab((prev) => (AUDITOR_ALLOWED_TABS.includes(prev) ? prev : 'audit-logs'));
       }
       return;
     }
@@ -123,7 +136,7 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
     } else if (defaultTab) {
       setActiveTab(defaultTab);
     }
-  }, [tabParam, defaultTab, isFaculty, isPlacementOfficer, isAuditor, activeTab]);
+  }, [tabParam, defaultTab, isFaculty, isPlacementOfficer, isAuditor]);
 
   // Lists
   const [students, setStudents] = useState([]);
