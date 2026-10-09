@@ -3,10 +3,12 @@ import { StyleSheet, View, Text } from 'react-native';
 import { ScreenContainer } from '../../components/ScreenContainer';
 import { Button } from '../../components/Button';
 import { useAuth } from '../../context/AuthContext';
+import { useNavigation } from '@react-navigation/native';
 import { THEME } from '../../utils/constants';
 
 export const FacultyDashboardScreen: React.FC = () => {
   const { user, logout } = useAuth();
+  const navigation = useNavigation<any>();
 
   return (
     <ScreenContainer>
@@ -37,8 +39,13 @@ export const FacultyDashboardScreen: React.FC = () => {
       <View style={styles.infoCard}>
         <Text style={styles.sectionTitle}>Attendance Control Hub</Text>
         <Text style={styles.bodyText}>
-          Faculty instructors can manage live classroom attendance, dynamic 15-second rotating QR projector displays, and review student dispute corrections.
+          Faculty instructors can manage live classroom attendance sessions, generate dynamic 15-second rotating QR codes, track live checked-in rosters, and close sessions.
         </Text>
+        <Button
+          title="📋 Open Class Attendance Controller"
+          onPress={() => navigation.navigate('FacultyAttendance')}
+          style={{ marginTop: 12, backgroundColor: '#10B981' }}
+        />
       </View>
 
       <Button

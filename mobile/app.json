@@ -13,6 +13,11 @@
     },
     "android": {
       "package": "com.campusbridge.mobile",
+      "permissions": [
+        "CAMERA",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION"
+      ],
       "adaptiveIcon": {
         "backgroundColor": "#0F172A",
         "foregroundImage": "./assets/android-icon-foreground.png",
@@ -21,6 +26,20 @@
       },
       "predictiveBackGestureEnabled": false
     },
+    "plugins": [
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "CampusBridge requires camera access to scan dynamic classroom attendance QR codes."
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "CampusBridge requires location access to verify attendance inside the designated lecture room geofence."
+        }
+      ]
+    ],
     "web": {
       "favicon": "./assets/favicon.png"
     }

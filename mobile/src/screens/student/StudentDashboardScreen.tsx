@@ -3,10 +3,12 @@ import { StyleSheet, View, Text } from 'react-native';
 import { ScreenContainer } from '../../components/ScreenContainer';
 import { Button } from '../../components/Button';
 import { useAuth } from '../../context/AuthContext';
+import { useNavigation } from '@react-navigation/native';
 import { THEME } from '../../utils/constants';
 
 export const StudentDashboardScreen: React.FC = () => {
   const { user, logout } = useAuth();
+  const navigation = useNavigation<any>();
 
   return (
     <ScreenContainer>
@@ -37,8 +39,13 @@ export const StudentDashboardScreen: React.FC = () => {
       <View style={styles.infoCard}>
         <Text style={styles.sectionTitle}>Smart Attendance Module</Text>
         <Text style={styles.bodyText}>
-          Use the Attendance tab to scan high-contrast projector dynamic QR codes with device-verified classroom geofencing.
+          Scan dynamic classroom QR codes with GPS geofencing verification, track your 75% mandatory threshold, and review course attendance analytics.
         </Text>
+        <Button
+          title="📸 Open Smart Attendance Scanner"
+          onPress={() => navigation.navigate('StudentAttendance')}
+          style={{ marginTop: 12 }}
+        />
       </View>
 
       <Button
