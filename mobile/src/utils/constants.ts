@@ -6,9 +6,12 @@ export const STORAGE_KEYS = {
   AUTH_TOKEN: 'cb_secure_jwt_token',
   USER_DATA: 'cb_cached_user_profile',
   REMEMBER_EMAIL: 'cb_remember_email',
+  BIOMETRIC_ENABLED: 'cb_biometric_enabled',
+  COMPLAINT_DRAFTS: 'cb_offline_complaint_drafts',
 } as const;
 
-export const SUPPORTED_MOBILE_ROLES = ['student', 'faculty'] as const;
+export const SUPPORTED_MOBILE_ROLES = ['student', 'faculty', 'hod', 'principal', 'director'] as const;
+
 
 export const THEME = {
   colors: {

@@ -25,6 +25,7 @@ export interface User {
   role: UserRole;
   campusId?: string | null;
   departmentId?: string | null;
+  department?: string;
   branch?: string;
   section?: string;
   year?: string;
@@ -64,8 +65,13 @@ export interface AuthContextType {
   token: string | null;
   isLoading: boolean;
   isAuthenticated: boolean;
+  isCachedSession?: boolean;
+  isBiometricLocked?: boolean;
+  isBiometricSupported?: boolean;
+  biometricLabel?: string;
   role: UserRole | null;
   login: (credentials: LoginCredentials) => Promise<{ success: boolean; error?: string }>;
   logout: () => Promise<void>;
   refreshProfile: () => Promise<void>;
+  unlockWithBiometrics?: () => Promise<{ success: boolean; error?: string }>;
 }

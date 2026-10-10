@@ -77,6 +77,6 @@ router.post('/records/:recordId/correction', requirePermission(PERMISSIONS.ATTEN
 // ============================================================
 // AUDIT LOGS
 // ============================================================
-router.get('/audit', getAttendanceAudit);
+router.get('/audit', requirePermission(PERMISSIONS.AUDIT_LOG_VIEW), getAttendanceAudit);
 
 module.exports = router;

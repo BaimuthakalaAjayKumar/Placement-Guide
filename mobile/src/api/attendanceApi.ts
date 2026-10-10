@@ -34,18 +34,23 @@ export interface StudentAttendanceAnalytics {
 
 export interface AttendanceHistoryRecord {
   _id: string;
-  sessionId: {
-    _id: string;
-    branch: string;
-    section: string;
-    subjectId?: { name: string; code: string };
-    sessionDate: string;
-    period: string;
-  };
-  status: 'PRESENT' | 'ABSENT' | 'EXCUSED';
-  scannedAt: string;
+  recordId?: string;
+  sessionId?: any;
+  subject?: { name: string; code: string };
+  date?: string;
+  scheduledTime?: string;
+  faculty?: string;
+  room?: string;
+  status: 'PRESENT' | 'ABSENT' | 'EXCUSED' | string;
+  scannedAt?: string;
   calculatedDistanceMeters?: number;
-  locationVerificationStatus: string;
+  locationVerificationStatus?: string;
+  correctionStatus?: 'NONE' | 'REQUESTED' | 'APPROVED' | 'REJECTED' | string;
+  originalStatus?: string | null;
+  correctionRequestedStatus?: string | null;
+  correctionReason?: string;
+  correctionNotes?: string;
+  remarks?: string;
 }
 
 export interface CheckInResponse {
@@ -77,6 +82,15 @@ export interface ActiveSession {
   qrRefreshInterval: number;
 }
 
+export interface AttendanceSubjectOption {
+  _id: string;
+  name: string;
+  code: string;
+  academicYear?: string;
+  branch?: string;
+  section?: string;
+}
+
 export const attendanceApi = {
   // Student: Check-in with QR token and GPS coordinates
   checkIn: async (sessionId: string, payload: { token: string; latitude: number; longitude: number; accuracy: number }) => {
@@ -92,25 +106,48 @@ export const attendanceApi = {
 
   // Student: Fetch attendance history logs
   getStudentHistory: async () => {
-    const res = await apiClient.get<{ success: boolean; data: AttendanceHistoryRecord[] }>('/api/attendance/student/history');
-    return res.data;
+    const res = await apiClient.get<{ success: boolean; data?: AttendanceHistoryRecord[]; history?: AttendanceHistoryRecord[]; count?: number }>(
+      '/api/attendance/student/history'
+    );
+    return {
+      success: res.data.success,
+      data: res.data.history || res.data.data || [],
+      count: res.data.count || 0,
+    };
   },
 
   // Faculty: Fetch campus lecture rooms
   getRooms: async () => {
-    const res = await apiClient.get<{ success: boolean; data: AttendanceRoom[] }>('/api/attendance/rooms');
-    return res.data;
+    const res = await apiClient.get<{ success: boolean; data?: AttendanceRoom[]; rooms?: AttendanceRoom[] }>('/api/attendance/rooms');
+    return {
+      success: res.data.success,
+      data: res.data.data || res.data.rooms || [],
+    };
   },
 
   // Faculty: Fetch active sessions
   getActiveSessions: async () => {
-    const res = await apiClient.get<{ success: boolean; data: ActiveSession[] }>('/api/attendance/sessions/active');
-    return res.data;
+    const res = await apiClient.get<{ success: boolean; data?: ActiveSession[]; sessions?: ActiveSession[] }>('/api/attendance/sessions/active');
+    return {
+      success: res.data.success,
+      data: res.data.data || res.data.sessions || [],
+    };
+  },
+
+  // Faculty: Fetch assigned teaching subjects
+  getFacultySubjects: async () => {
+    const res = await apiClient.get<{ success: boolean; data?: AttendanceSubjectOption[]; count?: number }>('/api/academic/subjects');
+    return {
+      success: res.data.success,
+      data: res.data.data || [],
+    };
   },
 
   // Faculty: Create a new live attendance session
   createSession: async (payload: {
-    roomId: string;
+    roomId?: string;
+    roomNumber?: string;
+    buildingName?: string;
     subjectId: string;
     branch: string;
     section: string;
@@ -118,9 +155,16 @@ export const attendanceApi = {
     period: string;
     qrRefreshInterval?: number;
     geofenceEnforced?: boolean;
+    latitude?: number;
+    longitude?: number;
+    geofenceRadiusMeters?: number;
   }) => {
-    const res = await apiClient.post<{ success: boolean; data?: ActiveSession; error?: string }>('/api/attendance/sessions', payload);
-    return res.data;
+    const res = await apiClient.post<{ success: boolean; data?: ActiveSession; session?: ActiveSession; error?: string }>('/api/attendance/sessions', payload);
+    return {
+      success: res.data.success,
+      data: res.data.data || res.data.session,
+      error: res.data.error,
+    };
   },
 
   // Faculty: Rotate dynamic QR token
@@ -140,6 +184,95 @@ export const attendanceApi = {
   // Faculty: Close attendance session
   closeSession: async (sessionId: string) => {
     const res = await apiClient.post<{ success: boolean; message: string }>(`/api/attendance/sessions/${sessionId}/close`);
+    return res.data;
+  },
+
+  // Faculty: Submit attendance dispute / correction request
+  requestCorrection: async (
+    recordId: string,
+    payload: { requestedStatus: string; reason: string; notes?: string }
+  ) => {
+    const res = await apiClient.post<{
+      success: boolean;
+      message: string;
+      record?: any;
+      error?: string;
+    }>(`/api/attendance/records/${recordId}/correction`, payload);
+    return res.data;
+  },
+
+  // HOD / Admin: Review and approve/reject attendance correction request
+  reviewCorrection: async (
+    recordId: string,
+    payload: { action: 'APPROVE' | 'REJECT'; notes?: string }
+  ) => {
+    const res = await apiClient.post<{
+      success: boolean;
+      message: string;
+      record?: any;
+      error?: string;
+    }>(`/api/attendance/records/${recordId}/correction`, payload);
+    return res.data;
+  },
+
+  // Fetch session history for timetables and class audits
+  getSessionHistory: async (params?: Record<string, any>) => {
+    const res = await apiClient.get<{
+      success: boolean;
+      count: number;
+      sessions?: any[];
+      data?: any[];
+    }>('/api/attendance/sessions/history', { params });
+    return {
+      success: res.data.success,
+      count: res.data.count || 0,
+      sessions: res.data.sessions || res.data.data || [],
+    };
+  },
+
+  // Faculty: Fetch assigned students in teaching scope
+  getAssignedStudents: async (params?: Record<string, any>) => {
+    const res = await apiClient.get<{
+      success: boolean;
+      count: number;
+      data?: any[];
+      students?: any[];
+    }>('/api/users/students', { params });
+    return {
+      success: res.data.success,
+      count: res.data.count || 0,
+      data: res.data.data || res.data.students || [],
+    };
+  },
+
+  // Faculty / Leadership: Fetch attendance notification history
+  getAttendanceNotifications: async (params?: Record<string, any>) => {
+    const res = await apiClient.get<{
+      success: boolean;
+      count: number;
+      data?: any[];
+    }>('/api/attendance/notifications', { params });
+    return {
+      success: res.data.success,
+      count: res.data.count || 0,
+      data: res.data.data || [],
+    };
+  },
+
+  // Faculty: Trigger bulk shortage alert review for assigned class
+  dispatchAtRiskAlerts: async (payload?: { subjectId?: string; branch?: string; section?: string }) => {
+    const res = await apiClient.post<{
+      success: boolean;
+      message: string;
+      summary?: {
+        requested: number;
+        authorized: number;
+        notified: number;
+        skipped: number;
+        failed: number;
+      };
+      error?: string;
+    }>('/api/attendance/notifications/dispatch-at-risk', payload || {});
     return res.data;
   },
 };

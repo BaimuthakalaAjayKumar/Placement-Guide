@@ -14,7 +14,11 @@ export const UnsupportedRoleScreen: React.FC = () => {
     <ScreenContainer>
       <View style={styles.container}>
         <View style={styles.iconCircle}>
-          <Text style={styles.icon}>💻</Text>
+          <View style={styles.monitorFrame}>
+            <View style={styles.monitorScreen} />
+            <View style={styles.monitorStand} />
+            <View style={styles.monitorBase} />
+          </View>
         </View>
 
         <Text style={styles.title}>Web Portal Access Required</Text>
@@ -24,10 +28,10 @@ export const UnsupportedRoleScreen: React.FC = () => {
 
         <View style={styles.card}>
           <Text style={styles.bodyText}>
-            The CampusBridge Mobile App is designed for on-campus Student and Faculty attendance operations.
+            The CampusBridge Mobile App currently supports Student, Faculty, HOD, Principal, and Director workflows.
           </Text>
           <Text style={[styles.bodyText, { marginTop: 10 }]}>
-            Institutional governance, placement administration, company recruiter tools, and audit reporting are hosted on the desktop web application.
+            Platform Super Administration, Company Recruiter management, and Auditor logs are hosted on the desktop web portal.
           </Text>
           <View style={styles.urlBox}>
             <Text style={styles.urlLabel}>Official Web Portal:</Text>
@@ -62,8 +66,28 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: THEME.spacing.md,
   },
-  icon: {
-    fontSize: 36,
+  monitorFrame: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  monitorScreen: {
+    width: 36,
+    height: 24,
+    borderWidth: 2,
+    borderColor: '#818CF8',
+    borderRadius: 4,
+    backgroundColor: 'rgba(99, 102, 241, 0.12)',
+  },
+  monitorStand: {
+    width: 4,
+    height: 6,
+    backgroundColor: '#818CF8',
+  },
+  monitorBase: {
+    width: 18,
+    height: 2,
+    backgroundColor: '#818CF8',
+    borderRadius: 1,
   },
   title: {
     fontSize: 22,

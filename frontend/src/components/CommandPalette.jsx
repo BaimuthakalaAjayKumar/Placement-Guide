@@ -264,14 +264,18 @@ const CommandPalette = () => {
       : []),
 
     // General Utility
-    {
-      id: 'placement-calendar',
-      title: 'Institutional Placement Calendar',
-      desc: 'Company arrival schedules, PPT slots, and written exam dates',
-      category: '📅 University Schedule',
-      icon: '📅',
-      action: () => navigate('/placement-calendar')
-    },
+    ...(!isSuperAdmin
+      ? [
+          {
+            id: 'placement-calendar',
+            title: 'Institutional Placement Calendar',
+            desc: 'Company arrival schedules, PPT slots, and written exam dates',
+            category: '📅 University Schedule',
+            icon: '📅',
+            action: () => navigate('/placement-calendar')
+          }
+        ]
+      : []),
     {
       id: 'discussion-forum',
       title: 'Placement Discussion Forum & Senior Debriefs',

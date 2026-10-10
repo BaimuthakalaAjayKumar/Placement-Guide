@@ -15,7 +15,10 @@ import {
 import * as Location from 'expo-location';
 import { ScreenContainer } from '../../components/ScreenContainer';
 import { Button } from '../../components/Button';
+import { ErrorBanner } from '../../components/ErrorBanner';
+import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { THEME } from '../../utils/constants';
+import { formatApiErrorMessage } from '../../utils/errorUtils';
 import { attendanceApi, StudentAttendanceAnalytics, AttendanceHistoryRecord, ActiveSession } from '../../api/attendanceApi';
 
 // Safe dynamic loader for native camera to prevent Expo Go crashes
@@ -66,6 +69,7 @@ export const StudentAttendanceScreen: React.FC = () => {
   const [manualSessionId, setManualSessionId] = useState('');
   const [manualToken, setManualToken] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [checkInResult, setCheckInResult] = useState<{
     status: 'success' | 'error';
     message: string;
@@ -74,10 +78,14 @@ export const StudentAttendanceScreen: React.FC = () => {
 
   // Fetch Attendance Data
   const loadAttendanceData = useCallback(async () => {
+    setErrorMessage(null);
     try {
       setLoading(true);
       const [analyticsRes, historyRes, activeRes] = await Promise.all([
-        attendanceApi.getStudentAnalytics().catch(() => ({ success: false, data: null })),
+        attendanceApi.getStudentAnalytics().catch((e) => {
+          setErrorMessage(formatApiErrorMessage(e));
+          return { success: false, data: null };
+        }),
         attendanceApi.getStudentHistory().catch(() => ({ success: false, data: [] })),
         attendanceApi.getActiveSessions().catch(() => ({ success: false, data: [] })),
       ]);
@@ -94,8 +102,8 @@ export const StudentAttendanceScreen: React.FC = () => {
           setManualSessionId(activeRes.data[0]._id);
         }
       }
-    } catch (err) {
-      console.error('Error fetching attendance data:', err);
+    } catch (err: any) {
+      setErrorMessage(formatApiErrorMessage(err));
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -103,8 +111,49 @@ export const StudentAttendanceScreen: React.FC = () => {
   }, [manualSessionId]);
 
   useEffect(() => {
-    loadAttendanceData();
-  }, [loadAttendanceData]);
+    let isMounted = true;
+    (async () => {
+      try {
+        setLoading(true);
+        const [analyticsRes, historyRes, activeRes] = await Promise.all([
+          attendanceApi.getStudentAnalytics().catch((e) => {
+            if (isMounted) setErrorMessage(formatApiErrorMessage(e));
+            return { success: false, data: null };
+          }),
+          attendanceApi.getStudentHistory().catch(() => ({ success: false, data: [] })),
+          attendanceApi.getActiveSessions().catch(() => ({ success: false, data: [] })),
+        ]);
+
+        if (isMounted) {
+          if (analyticsRes.success && analyticsRes.data) {
+            setAnalytics(analyticsRes.data);
+          }
+          if (historyRes.success && historyRes.data) {
+            setHistory(historyRes.data);
+          }
+          if (activeRes.success && activeRes.data) {
+            setActiveSessions(activeRes.data);
+            if (activeRes.data.length > 0 && !manualSessionId) {
+              setManualSessionId(activeRes.data[0]._id);
+            }
+          }
+        }
+      } catch (err: any) {
+        if (isMounted) {
+          setErrorMessage(formatApiErrorMessage(err));
+        }
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+          setRefreshing(false);
+        }
+      }
+    })();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [manualSessionId]);
 
   const onRefresh = () => {
     setRefreshing(true);
@@ -115,7 +164,7 @@ export const StudentAttendanceScreen: React.FC = () => {
   const handleStartScan = async () => {
     if (!isNativeCameraAvailable || !CameraViewComponent) {
       Alert.alert(
-        '📷 Camera Scanner Notice',
+        'Camera Scanner Notice',
         'Optical camera scanner is available in custom development builds. You can check in instantly using the Active Session Token with hardware GPS verification!',
         [
           { text: 'Enter Token & GPS', onPress: () => setManualModalVisible(true) },
@@ -262,9 +311,9 @@ export const StudentAttendanceScreen: React.FC = () => {
               checkInResult.status === 'success' ? styles.resultSuccess : styles.resultError,
             ]}
           >
-            <Text style={styles.resultIcon}>
-              {checkInResult.status === 'success' ? '✅' : '❌'}
-            </Text>
+            <View style={[styles.resultIndicatorBadge, { backgroundColor: checkInResult.status === 'success' ? '#10B981' : '#EF4444' }]}>
+              <Text style={styles.resultIndicatorText}>{checkInResult.status === 'success' ? 'OK' : 'ERR'}</Text>
+            </View>
             <View style={{ flex: 1 }}>
               <Text
                 style={[
@@ -287,7 +336,7 @@ export const StudentAttendanceScreen: React.FC = () => {
         {/* Primary Action Card */}
         <View style={styles.scannerLauncherCard}>
           <View style={styles.scanBadgeWrap}>
-            <Text style={styles.scanBadge}>⚡ Anti-Proxy Protected</Text>
+            <Text style={styles.scanBadge}>Anti-Proxy Protection Active</Text>
             <Text style={styles.scanTimer}>15s Rolling Token</Text>
           </View>
 
@@ -297,7 +346,7 @@ export const StudentAttendanceScreen: React.FC = () => {
           </Text>
 
           <Button
-            title={submitting ? 'Verifying Coordinates...' : '📸 Scan Attendance QR Code'}
+            title={submitting ? 'Verifying Coordinates...' : 'Scan Attendance QR Code'}
             onPress={handleStartScan}
             disabled={submitting}
             style={styles.primaryScanBtn}
@@ -311,7 +360,7 @@ export const StudentAttendanceScreen: React.FC = () => {
             onPress={() => setActiveTab('overview')}
           >
             <Text style={[styles.tabText, activeTab === 'overview' && styles.tabTextActive]}>
-              📊 75% Policy Analytics
+              75% Policy Analytics
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
@@ -319,7 +368,7 @@ export const StudentAttendanceScreen: React.FC = () => {
             onPress={() => setActiveTab('history')}
           >
             <Text style={[styles.tabText, activeTab === 'history' && styles.tabTextActive]}>
-              📋 History Log ({history.length})
+              History Log ({history.length})
             </Text>
           </TouchableOpacity>
         </View>
@@ -354,7 +403,7 @@ export const StudentAttendanceScreen: React.FC = () => {
                       (analytics?.overallPercentage ?? 85) >= 75 ? styles.textSuccess : styles.textError,
                     ]}
                   >
-                    {(analytics?.overallPercentage ?? 85) >= 75 ? '✓ Statutory Clearance' : '⚠️ Shortage Warning'}
+                    {(analytics?.overallPercentage ?? 85) >= 75 ? 'Statutory Clearance' : 'Shortage Alert'}
                   </Text>
                 </View>
               </View>
@@ -414,10 +463,10 @@ export const StudentAttendanceScreen: React.FC = () => {
                     </Text>
                     {sub.isShortage ? (
                       <Text style={styles.subShortageAlert}>
-                        ⚠️ Attend next {sub.neededForThreshold} classes to reach 75%
+                        Attend next {sub.neededForThreshold} classes for 75% cutoff
                       </Text>
                     ) : (
-                      <Text style={styles.subClearedTag}>✓ Eligible</Text>
+                      <Text style={styles.subClearedTag}>Eligible</Text>
                     )}
                   </View>
                 </View>
@@ -461,10 +510,10 @@ export const StudentAttendanceScreen: React.FC = () => {
                     </Text>
                     {sub.shortage ? (
                       <Text style={styles.subShortageAlert}>
-                        ⚠️ Attend next {sub.need} classes to reach 75%
+                        Attend next {sub.need} classes for 75% cutoff
                       </Text>
                     ) : (
-                      <Text style={styles.subClearedTag}>✓ Eligible</Text>
+                      <Text style={styles.subClearedTag}>Eligible</Text>
                     )}
                   </View>
                 </View>
@@ -502,17 +551,16 @@ export const StudentAttendanceScreen: React.FC = () => {
 
                   <View style={styles.historyMetaRow}>
                     <Text style={styles.historyMetaText}>
-                      📅 {new Date(record.scannedAt).toLocaleDateString()} • Period {record.sessionId?.period || '1'}
+                      Date: {new Date(record.scannedAt || record.date || Date.now()).toLocaleDateString()} • Period {record.sessionId?.period || '1'}
                     </Text>
                     <Text style={styles.historyMetaText}>
-                      📍 {record.locationVerificationStatus === 'VERIFIED' ? 'Geofence Verified' : 'Manual'}
+                      {record.locationVerificationStatus === 'VERIFIED' ? 'Geofence Verified' : 'Manual Entry'}
                     </Text>
                   </View>
                 </View>
               ))
             ) : (
               <View style={styles.emptyCard}>
-                <Text style={{ fontSize: 28, marginBottom: 8 }}>📋</Text>
                 <Text style={styles.emptyTitle}>No past records found</Text>
                 <Text style={styles.emptyDesc}>
                   Your verified attendance check-ins will be logged here chronologically.
@@ -551,7 +599,7 @@ export const StudentAttendanceScreen: React.FC = () => {
             style={styles.closeCameraBtn}
             onPress={() => setScannerVisible(false)}
           >
-            <Text style={styles.closeCameraBtnText}>✕ Close Camera</Text>
+            <Text style={styles.closeCameraBtnText}>Close Camera</Text>
           </TouchableOpacity>
         </View>
       </Modal>
@@ -686,8 +734,15 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(239, 68, 68, 0.12)',
     borderColor: 'rgba(239, 68, 68, 0.3)',
   },
-  resultIcon: {
-    fontSize: 22,
+  resultIndicatorBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+  },
+  resultIndicatorText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: '800',
   },
   resultTitle: {
     fontSize: 14,

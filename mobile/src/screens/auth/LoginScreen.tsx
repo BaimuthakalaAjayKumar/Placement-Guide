@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { StyleSheet, View, Text } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { StyleSheet, View, Text, Image, TouchableOpacity } from 'react-native';
 import { ScreenContainer } from '../../components/ScreenContainer';
 import { Input } from '../../components/Input';
 import { Button } from '../../components/Button';
@@ -9,13 +9,42 @@ import { useAuth } from '../../context/AuthContext';
 import { THEME, APP_NAME } from '../../utils/constants';
 
 export const LoginScreen: React.FC = () => {
-  const { login, isLoading } = useAuth();
+  const {
+    login,
+    isLoading,
+    isBiometricLocked,
+    biometricLabel,
+    unlockWithBiometrics,
+    logout,
+    user,
+  } = useAuth();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [captchaResetTrigger, setCaptchaResetTrigger] = useState(0);
+  const [showPasswordFallback, setShowPasswordFallback] = useState<boolean>(false);
+
+  // Automatically offer biometric prompt once when screen mounts in biometric locked state
+  useEffect(() => {
+    if (isBiometricLocked && !showPasswordFallback && unlockWithBiometrics) {
+      unlockWithBiometrics().then((res) => {
+        if (!res.success && res.error && !res.error.includes('cancelled')) {
+          setErrorMessage(res.error);
+        }
+      });
+    }
+  }, [isBiometricLocked, showPasswordFallback, unlockWithBiometrics]);
+
+  const handleBiometricUnlock = async () => {
+    if (!unlockWithBiometrics) return;
+    setErrorMessage(null);
+    const result = await unlockWithBiometrics();
+    if (!result.success && result.error) {
+      setErrorMessage(result.error);
+    }
+  };
 
   const resetCaptcha = () => {
     setCaptchaToken(null);
@@ -36,7 +65,6 @@ export const LoginScreen: React.FC = () => {
     }
 
     // 2. MANDATORY CAPTCHA ENFORCEMENT
-    // Rule: The final production login MUST require CAPTCHA.
     if (!captchaToken) {
       setErrorMessage('Security verification is required. Please complete the CAPTCHA check below.');
       return;
@@ -51,14 +79,12 @@ export const LoginScreen: React.FC = () => {
 
       if (!result.success) {
         setErrorMessage(result.error || 'Authentication failed. Please check your credentials.');
-        // Clear/reset the CAPTCHA token after failed login / authentication failure
         resetCaptcha();
       } else {
-        // Clear/reset the CAPTCHA token after successful login
         resetCaptcha();
       }
     } catch {
-      setErrorMessage('A network error occurred. Please try again.');
+      setErrorMessage('A network error occurred. Please verify your connection and try again.');
       resetCaptcha();
     }
   };
@@ -66,71 +92,138 @@ export const LoginScreen: React.FC = () => {
   return (
     <ScreenContainer>
       <View style={styles.header}>
-        <View style={styles.logoBadge}>
-          <Text style={styles.logoText}>CB</Text>
-        </View>
+        <Image
+          source={require('../../../assets/logo.png')}
+          style={styles.logoImage}
+          resizeMode="contain"
+        />
         <Text style={styles.appTitle}>{APP_NAME}</Text>
-        <Text style={styles.subtitle}>Mobile Portal for Students & Faculty</Text>
+        <Text style={styles.motto}>One Platform. Every Campus. Every Career.</Text>
+        <Text style={styles.subtitle}>Unified Institutional Portal</Text>
       </View>
 
-      <View style={styles.formCard}>
-        <Text style={styles.formTitle}>Sign In</Text>
-        <Text style={styles.formHint}>Use your official institutional credentials</Text>
+      {/* BIOMETRIC APP UNLOCK GATE (When session is active but locked behind local biometrics) */}
+      {isBiometricLocked && !showPasswordFallback ? (
+        <View style={styles.formCard}>
+          <View style={styles.bioHeaderContainer}>
+            <View style={styles.bioIconBadge}>
+              <Text style={styles.bioIconText}>🔐</Text>
+            </View>
+            <Text style={styles.formTitle}>Biometric App Unlock</Text>
+            <Text style={styles.bioSubtitle}>
+              Active session secured by {biometricLabel || 'device biometrics'}.
+            </Text>
+            {user?.name && (
+              <Text style={styles.bioUserGreeting}>
+                Signed in as <Text style={{ fontWeight: '700', color: THEME.colors.text }}>{user.name}</Text>
+                {user.role ? ` (${user.role.toUpperCase()})` : ''}
+              </Text>
+            )}
+          </View>
 
-        <ErrorBanner message={errorMessage || ''} onDismiss={() => setErrorMessage(null)} />
+          <ErrorBanner message={errorMessage || ''} onDismiss={() => setErrorMessage(null)} />
 
-        <Input
-          label="Email Address"
-          value={email}
-          onChangeText={(val) => {
-            setEmail(val);
-            if (errorMessage) setErrorMessage(null);
-          }}
-          placeholder="e.g. rollnumber@grietcollege.com"
-          keyboardType="email-address"
-          autoCapitalize="none"
-        />
+          <Button
+            title={`Unlock with ${biometricLabel || 'Biometrics'}`}
+            onPress={handleBiometricUnlock}
+            loading={isLoading}
+            variant="primary"
+            style={{ marginTop: THEME.spacing.sm }}
+          />
 
-        <Input
-          label="Password"
-          value={password}
-          onChangeText={(val) => {
-            setPassword(val);
-            if (errorMessage) setErrorMessage(null);
-          }}
-          placeholder="••••••••••••"
-          secureTextEntry
-        />
-
-        {/* Mandatory Security CAPTCHA Interface */}
-        <CaptchaChallenge
-          onVerify={(token) => {
-            setCaptchaToken(token);
-            if (errorMessage && errorMessage.includes('CAPTCHA')) {
+          <Button
+            title="Use Institutional Password"
+            onPress={() => {
+              setShowPasswordFallback(true);
               setErrorMessage(null);
-            }
-          }}
-          onReset={() => setCaptchaToken(null)}
-          onError={() => {
-            setCaptchaToken(null);
-            setErrorMessage('Security verification check encountered an error. Please try again.');
-          }}
-          resetTrigger={captchaResetTrigger}
-          disabled={isLoading}
-        />
+            }}
+            variant="outline"
+            style={{ marginTop: 10 }}
+          />
 
-        <Button
-          title="Sign In to CampusBridge"
-          onPress={handleLogin}
-          loading={isLoading}
-          disabled={isLoading || !captchaToken}
-          style={styles.loginButton}
-        />
+          <TouchableOpacity
+            style={styles.switchAccountBtn}
+            onPress={() => {
+              logout();
+              setShowPasswordFallback(false);
+            }}
+          >
+            <Text style={styles.switchAccountText}>Sign in with a different account</Text>
+          </TouchableOpacity>
 
-        <Text style={styles.securityNotice}>
-          🔒 End-to-end encrypted with hardware-backed JWT storage.
-        </Text>
-      </View>
+          <Text style={styles.securityNotice}>
+            Biometric credentials never leave your device • Hardware Keystore secured
+          </Text>
+        </View>
+      ) : (
+        <View style={styles.formCard}>
+          <Text style={styles.formTitle}>Sign In</Text>
+          <Text style={styles.formHint}>Access your assigned campus, department, or student account</Text>
+
+          <ErrorBanner message={errorMessage || ''} onDismiss={() => setErrorMessage(null)} />
+
+          <Input
+            label="Institutional Email"
+            value={email}
+            onChangeText={(val) => {
+              setEmail(val);
+              if (errorMessage) setErrorMessage(null);
+            }}
+            placeholder="username@grietcollege.com"
+            keyboardType="email-address"
+            autoCapitalize="none"
+          />
+
+          <Input
+            label="Password"
+            value={password}
+            onChangeText={(val) => {
+              setPassword(val);
+              if (errorMessage) setErrorMessage(null);
+            }}
+            placeholder="••••••••••••"
+            secureTextEntry
+          />
+
+          {/* Mandatory Security CAPTCHA Interface */}
+          <CaptchaChallenge
+            onVerify={(token) => {
+              setCaptchaToken(token);
+              if (errorMessage && errorMessage.includes('CAPTCHA')) {
+                setErrorMessage(null);
+              }
+            }}
+            onReset={() => setCaptchaToken(null)}
+            onError={() => {
+              setCaptchaToken(null);
+              setErrorMessage('Security verification encountered an error. Please reload challenge.');
+            }}
+            resetTrigger={captchaResetTrigger}
+            disabled={isLoading}
+          />
+
+          <Button
+            title="Sign In to CampusBridge"
+            onPress={handleLogin}
+            loading={isLoading}
+            disabled={isLoading || !captchaToken}
+            style={styles.loginButton}
+          />
+
+          {isBiometricLocked && (
+            <Button
+              title={`Return to ${biometricLabel || 'Biometric'} Unlock`}
+              onPress={() => setShowPasswordFallback(false)}
+              variant="outline"
+              style={{ marginTop: 10 }}
+            />
+          )}
+
+          <Text style={styles.securityNotice}>
+            Hardware-backed SecureStore token cryptography • Multi-campus isolation enforced
+          </Text>
+        </View>
+      )}
     </ScreenContainer>
   );
 };
@@ -138,35 +231,29 @@ export const LoginScreen: React.FC = () => {
 const styles = StyleSheet.create({
   header: {
     alignItems: 'center',
-    marginVertical: THEME.spacing.lg,
+    marginVertical: THEME.spacing.md,
   },
-  logoBadge: {
-    width: 60,
-    height: 60,
-    borderRadius: 16,
-    backgroundColor: THEME.colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: THEME.spacing.sm,
-    shadowColor: THEME.colors.primary,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 6,
-  },
-  logoText: {
-    color: '#FFFFFF',
-    fontSize: 24,
-    fontWeight: '800',
-    letterSpacing: 1,
+  logoImage: {
+    width: 140,
+    height: 140,
+    borderRadius: 20,
+    marginBottom: 12,
   },
   appTitle: {
-    fontSize: 28,
+    fontSize: 26,
     fontWeight: '800',
     color: THEME.colors.text,
+    letterSpacing: -0.5,
+  },
+  motto: {
+    fontSize: 12,
+    color: THEME.colors.accent,
+    fontWeight: '600',
+    marginTop: 2,
+    letterSpacing: 0.3,
   },
   subtitle: {
-    fontSize: 14,
+    fontSize: 13,
     color: THEME.colors.textMuted,
     marginTop: 4,
   },
@@ -177,8 +264,48 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: THEME.colors.border,
   },
+  bioHeaderContainer: {
+    alignItems: 'center',
+    marginBottom: THEME.spacing.md,
+  },
+  bioIconBadge: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: 'rgba(79, 70, 229, 0.15)',
+    borderWidth: 1,
+    borderColor: THEME.colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
+  bioIconText: {
+    fontSize: 28,
+  },
+  bioSubtitle: {
+    fontSize: 13,
+    color: THEME.colors.textMuted,
+    textAlign: 'center',
+    marginTop: 4,
+  },
+  bioUserGreeting: {
+    fontSize: 13,
+    color: THEME.colors.textMuted,
+    textAlign: 'center',
+    marginTop: 6,
+  },
+  switchAccountBtn: {
+    marginTop: 14,
+    alignItems: 'center',
+    paddingVertical: 8,
+  },
+  switchAccountText: {
+    fontSize: 13,
+    color: THEME.colors.accent,
+    fontWeight: '600',
+  },
   formTitle: {
-    fontSize: 20,
+    fontSize: 19,
     fontWeight: '700',
     color: THEME.colors.text,
   },
@@ -187,6 +314,7 @@ const styles = StyleSheet.create({
     color: THEME.colors.textMuted,
     marginBottom: THEME.spacing.md,
     marginTop: 2,
+    lineHeight: 18,
   },
   loginButton: {
     marginTop: THEME.spacing.sm,
@@ -194,7 +322,8 @@ const styles = StyleSheet.create({
   securityNotice: {
     textAlign: 'center',
     fontSize: 11,
-    color: THEME.colors.textMuted,
+    color: '#64748B',
     marginTop: THEME.spacing.md,
+    lineHeight: 16,
   },
 });

@@ -1,12 +1,41 @@
-import React from 'react';
-import { StyleSheet, View, Text } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { StyleSheet, View, Text, Switch, Alert } from 'react-native';
 import { ScreenContainer } from '../../components/ScreenContainer';
 import { Button } from '../../components/Button';
 import { useAuth } from '../../context/AuthContext';
 import { THEME } from '../../utils/constants';
+import {
+  isBiometricUnlockEnabled,
+  setBiometricUnlockEnabled,
+  promptBiometricUnlock,
+} from '../../utils/biometric';
 
 export const StudentProfileScreen: React.FC = () => {
-  const { user, logout } = useAuth();
+  const { user, logout, isBiometricSupported, biometricLabel } = useAuth();
+  const [bioEnabled, setBioEnabled] = useState<boolean>(false);
+  const [checkingBio, setCheckingBio] = useState<boolean>(true);
+
+  useEffect(() => {
+    isBiometricUnlockEnabled().then((enabled) => {
+      setBioEnabled(enabled);
+      setCheckingBio(false);
+    });
+  }, []);
+
+  const handleToggleBio = async (val: boolean) => {
+    if (val) {
+      const res = await promptBiometricUnlock('Confirm Biometrics to Enable App Lock');
+      if (res.success) {
+        await setBiometricUnlockEnabled(true);
+        setBioEnabled(true);
+      } else {
+        Alert.alert('Verification Cancelled', res.error || 'Biometric authorization is required to enable lock.');
+      }
+    } else {
+      await setBiometricUnlockEnabled(false);
+      setBioEnabled(false);
+    }
+  };
 
   return (
     <ScreenContainer>
@@ -45,10 +74,28 @@ export const StudentProfileScreen: React.FC = () => {
       </View>
 
       <View style={styles.securityCard}>
-        <Text style={styles.securityTitle}>🔒 Security & Session</Text>
+        <Text style={styles.securityTitle}>Security & Session Protection</Text>
         <Text style={styles.securityText}>
           Your session token is encrypted using device hardware (Android Keystore / iOS Keychain).
         </Text>
+
+        <View style={styles.bioToggleRow}>
+          <View style={{ flex: 1, paddingRight: 12 }}>
+            <Text style={styles.bioToggleTitle}>Biometric App Unlock</Text>
+            <Text style={styles.bioToggleSubtitle}>
+              {isBiometricSupported
+                ? `Require ${biometricLabel || 'device biometrics'} to unlock on app resume.`
+                : 'Biometric hardware unavailable or not enrolled.'}
+            </Text>
+          </View>
+          <Switch
+            value={bioEnabled}
+            onValueChange={handleToggleBio}
+            disabled={!isBiometricSupported || checkingBio}
+            trackColor={{ false: '#334155', true: THEME.colors.primary }}
+            thumbColor="#FFFFFF"
+          />
+        </View>
       </View>
 
       <Button
@@ -138,6 +185,26 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: THEME.colors.textMuted,
     lineHeight: 18,
+  },
+  bioToggleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 14,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(6, 182, 212, 0.2)',
+  },
+  bioToggleTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: THEME.colors.text,
+  },
+  bioToggleSubtitle: {
+    fontSize: 11,
+    color: THEME.colors.textMuted,
+    marginTop: 2,
+    lineHeight: 15,
   },
   logoutBtn: {
     marginBottom: THEME.spacing.xl,

@@ -8,6 +8,7 @@ import AtRiskDetectionModule from '../components/AtRiskDetectionModule';
 
 import PlacementStatsExport from '../components/PlacementStatsExport';
 import { API_URL } from '../config/api';
+import { isSuperAdmin, isCampusAdmin } from '../utils/permissions';
 import './AdminPanel.css';
 
 const isCoreCseTest = (test) => {
@@ -58,6 +59,167 @@ const AUDITOR_ALLOWED_TABS = [
   'analytics'
 ];
 
+// Enterprise 5-Domain Navigation Matrix
+const TAB_GROUPS = [
+  {
+    id: 'overview',
+    label: 'Overview & Health',
+    icon: '📊',
+    shortDesc: 'Readiness & Diagnostics',
+    desc: 'Real-time candidate preparedness index, institutional readiness metrics, and student rosters.',
+    tabs: [
+      {
+        id: 'analytics',
+        label: 'Candidate Analytics & Roster',
+        icon: '📊',
+        desc: 'Student preparedness roster ranked by Placement Readiness Index (PRI).'
+      }
+    ]
+  },
+  {
+    id: 'placements',
+    label: 'Placements & Industry',
+    icon: '💼',
+    shortDesc: 'Drives, Jobs & Applications',
+    desc: 'Manage campus placement drives (PMS), corporate postings, candidate applications, and interviews.',
+    tabs: [
+      {
+        id: 'job-opportunities',
+        label: 'Placement Drives & Jobs',
+        icon: '💼',
+        desc: 'Unified hub for on-campus drives (PMS lifecycle) and off-campus job opportunities.',
+        aliases: ['jobs', 'job-postings', 'company-drives']
+      },
+      {
+        id: 'applied-jobs',
+        label: 'Applications Report',
+        icon: '📋',
+        desc: 'Candidate application tracking, hiring pipeline stages, and CSV export.',
+        aliases: ['job-applications']
+      },
+      {
+        id: 'placement-export',
+        label: 'Stats & Report Export',
+        icon: '📑',
+        desc: 'Custom cohort placement statistics and multi-department CSV export engine.'
+      },
+      {
+        id: 'interviews',
+        label: 'Mock Interview Reports',
+        icon: '🎤',
+        desc: 'AI mock interview evaluation transcripts, scores, and questions review.'
+      },
+      {
+        id: 'interview-settings',
+        label: 'Interview Settings',
+        icon: '🎯',
+        desc: 'Configure interview roles, core technology profiles, and mock generator configuration.'
+      }
+    ]
+  },
+  {
+    id: 'academics',
+    label: 'Academics & Tests',
+    icon: '📚',
+    shortDesc: 'Curriculum, Tests & Labs',
+    desc: 'Curriculum management, academic subject repositories, automated assessments, and lab code reviews.',
+    tabs: [
+      {
+        id: 'aptitude',
+        label: 'Aptitude Tests Manager',
+        icon: '🧠',
+        desc: 'Assessment creation, randomized question pool builder, and attempt analytics.'
+      },
+      {
+        id: 'core-subjects',
+        label: 'Core CSE Subjects',
+        icon: '💻',
+        desc: 'Subject-wise semester study materials, PDF notes, and subject exams.'
+      },
+      {
+        id: 'academic-content',
+        label: 'Academic Hub & Projects',
+        icon: '📚',
+        desc: 'Subject registry, capstone project tracking, review status, and grading.'
+      },
+      {
+        id: 'lab-reports',
+        label: 'Lab Practice Reports',
+        icon: '🔬',
+        desc: 'Coding lab submissions, logic match % evaluation, and peer plagiarism audit.'
+      },
+      {
+        id: 'question-bank',
+        label: 'Question Bank Reports',
+        icon: '🛡️',
+        desc: 'DSA problem submissions, peer code similarity, and plagiarism inspection.'
+      },
+      {
+        id: 'subject-discussions',
+        label: 'Subject Discussions',
+        icon: '💬',
+        desc: 'Moderated academic Q&A discussions grouped by subject and branch.',
+        aliases: ['discussions']
+      }
+    ]
+  },
+  {
+    id: 'students',
+    label: 'Students & At-Risk',
+    icon: '⚠️',
+    shortDesc: 'Performance & Practice',
+    desc: 'Predictive student performance monitoring, automated lockout governance, and competitive programming.',
+    tabs: [
+      {
+        id: 'at-risk',
+        label: 'At-Risk Detection Engine',
+        icon: '⚠️',
+        desc: 'Predictive dropout detection, inactivity alerts, and policy lockouts.'
+      },
+      {
+        id: 'practice-reports',
+        label: 'Platform Practice Reports',
+        icon: '📈',
+        desc: 'Student solving analytics across LeetCode, Codeforces, and code verification.'
+      },
+      {
+        id: 'practice',
+        label: 'Practice Platforms',
+        icon: '💻',
+        desc: 'Problem pool management for external coding platforms and batch URL imports.'
+      }
+    ]
+  },
+  {
+    id: 'governance',
+    label: 'Governance & Audit',
+    icon: '🛡️',
+    shortDesc: 'Staff, Audit & Registry',
+    desc: 'Institutional staff directories, multi-department academic scoping, security audit trails, and data governance.',
+    tabs: [
+      {
+        id: 'faculty-staff',
+        label: 'Faculty & Staff Management',
+        icon: '👥',
+        desc: 'Staff directory, managed academic scopes, and temporary recruiter credentialing.'
+      },
+      {
+        id: 'audit-logs',
+        label: 'Student Audit Logs',
+        icon: '📜',
+        desc: 'Real-time student heartbeat tracking, session activity logs, and candidate dossiers.',
+        aliases: ['student-audit-logs']
+      },
+      {
+        id: 'settings',
+        label: 'System Registry & Settings',
+        icon: '⚙️',
+        desc: 'Academic directory exports and irreversible batch decommissioning.'
+      }
+    ]
+  }
+];
+
 const AdminPanel = ({ defaultTab = 'analytics' }) => {
   const { token, user } = useAuth();
   const [searchParams] = useSearchParams();
@@ -84,21 +246,49 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
 
   const initialTab = getInitialTab();
 
+  const SUPER_ADMIN_EXCLUDED_TABS = [
+    'lab-reports',          // Plagiarism Audit: Lab Practice Reports
+    'question-bank',        // Plagiarism Audit: Question Bank Reports
+    'subject-discussions',  // Discussion Forums
+    'discussions',          // Discussion Forums alias
+    'practice'              // Coding Playground / Practice Platforms
+  ];
+
+  const isTabAllowedForRole = (tabId) => {
+    if (isFaculty) return tabId === 'applied-jobs' || tabId === 'job-applications';
+    if (isPlacementOfficer) return PLACEMENT_ALLOWED_TABS.includes(tabId);
+    if (isAuditor) return AUDITOR_ALLOWED_TABS.includes(tabId);
+    if (isSuperAdmin(user) && SUPER_ADMIN_EXCLUDED_TABS.includes(tabId)) return false;
+    return true;
+  };
+
+  const findGroupForTab = (tabId) => {
+    if (!tabId) return 'overview';
+    for (const group of TAB_GROUPS) {
+      if (group.tabs.some((t) => t.id === tabId || (t.aliases && t.aliases.includes(tabId)))) {
+        return group.id;
+      }
+    }
+    return 'overview';
+  };
+
   // Navigation tabs
   const [activeTab, setActiveTab] = useState(initialTab);
+  const [activeGroup, setActiveGroup] = useState(() => findGroupForTab(initialTab));
 
   const safeSetActiveTab = (tab) => {
-    if (isFaculty && tab !== 'applied-jobs' && tab !== 'job-applications') {
-      return;
-    }
-    if (isPlacementOfficer && !PLACEMENT_ALLOWED_TABS.includes(tab)) {
-      return;
-    }
-    if (isAuditor && !AUDITOR_ALLOWED_TABS.includes(tab)) {
+    if (!isTabAllowedForRole(tab)) {
       return;
     }
     setActiveTab(tab);
   };
+
+  useEffect(() => {
+    const matchingGroup = findGroupForTab(activeTab);
+    if (matchingGroup) {
+      setActiveGroup(matchingGroup);
+    }
+  }, [activeTab]);
 
   useEffect(() => {
     if (isFaculty) {
@@ -186,6 +376,36 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
   const [scopeStaffId, setScopeStaffId] = useState('');
   const [scopeForm, setScopeForm] = useState({ academicYear: '', branch: '', section: '', subject: '' });
   const [savingScope, setSavingScope] = useState(false);
+
+  // Phase 2 Enterprise Analytics States
+  const [placementDrives, setPlacementDrives] = useState([]);
+  const [placementDrivesLoading, setPlacementDrivesLoading] = useState(false);
+  const [placementDrivesError, setPlacementDrivesError] = useState(null);
+  const [atRiskSummary, setAtRiskSummary] = useState(null);
+  const [atRiskLoading, setAtRiskLoading] = useState(false);
+  const [atRiskError, setAtRiskError] = useState(null);
+  const [auditStatsLoading, setAuditStatsLoading] = useState(false);
+  const [auditStatsError, setAuditStatsError] = useState(null);
+  const [studentsError, setStudentsError] = useState(null);
+  const [staffError, setStaffError] = useState(null);
+  const [jobsError, setJobsError] = useState(null);
+  const [refreshingOverview, setRefreshingOverview] = useState(false);
+  const [lastRefreshedAt, setLastRefreshedAt] = useState(new Date());
+
+  // Phase 6 Operational System Health State
+  const [systemHealth, setSystemHealth] = useState({
+    status: 'checking', // 'checking' | 'healthy' | 'degraded' | 'offline'
+    latencyMs: null,
+    environment: null,
+    lastChecked: null,
+    message: ''
+  });
+  const [systemHealthLoading, setSystemHealthLoading] = useState(false);
+
+  // Phase 2.1 Interactive Roster Filter States
+  const [rosterSearch, setRosterSearch] = useState('');
+  const [rosterTierFilter, setRosterTierFilter] = useState('all');
+  const [rosterBranchFilter, setRosterBranchFilter] = useState('all');
 
   // Aptitude Tests Manager States
   const [aptitudeTests, setAptitudeTests] = useState([]);
@@ -417,15 +637,123 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
 
   const fetchAuditStats = async () => {
     try {
+      setAuditStatsLoading(true);
+      setAuditStatsError(null);
       const res = await fetch(`${API_URL}/audit/stats`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       const data = await res.json();
       if (data.success) {
         setAuditStats(data.data);
+      } else {
+        setAuditStatsError(data.error || 'Failed to load audit stats');
       }
     } catch (err) {
       console.error('Failed to load audit stats', err);
+      setAuditStatsError('Audit telemetry currently unreachable.');
+    } finally {
+      setAuditStatsLoading(false);
+    }
+  };
+
+  const fetchPlacementDrives = async () => {
+    try {
+      setPlacementDrivesLoading(true);
+      setPlacementDrivesError(null);
+      const res = await fetch(`${API_URL}/placement-drives`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (data.success && Array.isArray(data.data)) {
+        setPlacementDrives(data.data);
+      } else {
+        setPlacementDrivesError(data.error || 'Failed to load placement drives');
+        setPlacementDrives([]);
+      }
+    } catch (err) {
+      console.error('Failed to load placement drives', err);
+      setPlacementDrivesError('Placement drives telemetry temporarily unavailable.');
+      setPlacementDrives([]);
+    } finally {
+      setPlacementDrivesLoading(false);
+    }
+  };
+
+  const fetchAtRiskSummary = async () => {
+    try {
+      setAtRiskLoading(true);
+      setAtRiskError(null);
+      const res = await fetch(`${API_URL}/at-risk/summary`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (data.success && data.stats) {
+        setAtRiskSummary(data.stats);
+      } else {
+        setAtRiskError(data.error || 'Failed to load at-risk summary');
+        setAtRiskSummary(null);
+      }
+    } catch (err) {
+      console.error('Failed to load at-risk summary', err);
+      setAtRiskError('At-risk telemetry temporarily unavailable.');
+      setAtRiskSummary(null);
+    } finally {
+      setAtRiskLoading(false);
+    }
+  };
+
+  const fetchSystemHealth = async () => {
+    try {
+      setSystemHealthLoading(true);
+      const start = performance.now();
+      const res = await fetch(`${API_URL}/health`);
+      const latencyMs = Math.round(performance.now() - start);
+      if (res.ok) {
+        const data = await res.json();
+        setSystemHealth({
+          status: 'healthy',
+          latencyMs,
+          environment: data.environment || 'development',
+          lastChecked: new Date(),
+          message: data.message || 'API is running'
+        });
+      } else {
+        setSystemHealth({
+          status: 'offline',
+          latencyMs,
+          environment: null,
+          lastChecked: new Date(),
+          message: `HTTP ${res.status}`
+        });
+      }
+    } catch (err) {
+      setSystemHealth({
+        status: 'offline',
+        latencyMs: null,
+        environment: null,
+        lastChecked: new Date(),
+        message: 'API Unreachable'
+      });
+    } finally {
+      setSystemHealthLoading(false);
+    }
+  };
+
+  const refreshOverviewMetrics = async () => {
+    setRefreshingOverview(true);
+    try {
+      await Promise.allSettled([
+        fetchStudents(),
+        fetchStaff(),
+        fetchJobs(),
+        fetchAuditStats(),
+        fetchPlacementDrives(),
+        fetchAtRiskSummary(),
+        fetchSystemHealth()
+      ]);
+      setLastRefreshedAt(new Date());
+    } finally {
+      setRefreshingOverview(false);
     }
   };
 
@@ -674,19 +1002,21 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
   const fetchStudents = async () => {
     try {
       setLoading(true);
+      setStudentsError(null);
       const res = await fetch(`${API_URL}/users/students`, {
         headers: {
           Authorization: `Bearer ${token}`
         }
       });
       const data = await res.json();
-      if (data.success) {
+      if (data.success && Array.isArray(data.data)) {
         setStudents(data.data);
       } else {
-        setError(data.error || 'Failed to fetch student lists.');
+        setStudentsError(data.error || 'Failed to fetch student lists.');
       }
     } catch (err) {
-      setError('Could not connect to admin metrics services.');
+      console.error('Error fetching students:', err);
+      setStudentsError('Could not connect to student metrics service.');
     } finally {
       setLoading(false);
     }
@@ -695,12 +1025,17 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
   const fetchStaff = async () => {
     try {
       setLoadingStaff(true);
+      setStaffError(null);
       const res = await fetch(`${API_URL}/users/staff`, { headers: { Authorization: `Bearer ${token}` } });
       const data = await res.json();
-      if (data.success) setStaffMembers(data.data);
-      else setError(data.error || 'Failed to fetch staff records.');
+      if (data.success && Array.isArray(data.data)) {
+        setStaffMembers(data.data);
+      } else {
+        setStaffError(data.error || 'Failed to fetch staff records.');
+      }
     } catch (err) {
-      setError('Could not connect to staff management service.');
+      console.error('Error fetching staff:', err);
+      setStaffError('Could not connect to staff management service.');
     } finally {
       setLoadingStaff(false);
     }
@@ -961,20 +1296,21 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
   const fetchJobs = async () => {
     try {
       setFetchJobsLoading(true);
+      setJobsError(null);
       const res = await fetch(`${API_URL}/jobs`, {
         headers: {
           Authorization: `Bearer ${token}`
         }
       });
       const data = await res.json();
-      if (data.success) {
+      if (data.success && Array.isArray(data.data)) {
         setJobs(data.data);
       } else {
-        setError(data.error || 'Failed to fetch job listings.');
+        setJobsError(data.error || 'Failed to fetch job listings.');
       }
     } catch (err) {
-      console.error(err);
-      setError('Could not connect to job service.');
+      console.error('Error fetching jobs:', err);
+      setJobsError('Could not connect to job service.');
     } finally {
       setFetchJobsLoading(false);
     }
@@ -1506,11 +1842,13 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
 
   useEffect(() => {
     if (token) {
+      // Phase 6: Always verify operational backend health
+      fetchSystemHealth();
       // Always pre-load staff records so staff dropdowns & counts are always available
       fetchStaff();
 
       if (activeTab === 'analytics') {
-        fetchStudents();
+        refreshOverviewMetrics();
       } else if (activeTab === 'job-opportunities' || activeTab === 'jobs' || activeTab === 'job-postings') {
         fetchJobs();
       } else if (activeTab === 'applied-jobs' || activeTab === 'job-applications') {
@@ -1561,6 +1899,135 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
       fetchApplicationsReport();
     }
   }, [appReportStatusFilter, appReportJobFilter, appReportBranchFilter, appReportYearFilter]);
+
+  // ==========================================
+  // Unconditional Top-Level Hooks & Derived Analytics Metrics
+  // ==========================================
+  const totalStudentsCount = students.length;
+  // Unweighted arithmetic mean of Placement Readiness Index across authorized students in scope
+  const averageReadinessScore = totalStudentsCount > 0
+    ? Math.round(students.reduce((sum, s) => sum + (Number(s.readinessScore) || 0), 0) / totalStudentsCount)
+    : 0;
+
+  // Phase 2 & 2.1 Computed KPI & Telemetry Metrics
+  const jobReadyStudents = students.filter(s => (Number(s.readinessScore) || 0) >= 80);
+  const jobReadyPercentage = totalStudentsCount > 0
+    ? Math.round((jobReadyStudents.length / totalStudentsCount) * 100)
+    : 0;
+  const activeDrivesCount = placementDrives.filter(d => d.status === 'active' || d.status === 'upcoming' || d.status === 'ongoing').length;
+  const totalJobsCount = jobs.length;
+  const totalStaffCount = staffMembers.length;
+  const adminStaffCount = staffMembers.filter(m => m.role === 'admin' || m.role === 'super_admin').length;
+  const facultyStaffCount = staffMembers.filter(m => m.role === 'faculty').length;
+
+  // At-Risk metrics derived from verified backend summary with multi-dimensional distinction
+  const atRiskCount = atRiskSummary?.atRiskCount ?? (atRiskError ? null : 0);
+  const criticalRiskCount = atRiskSummary?.highRisk ?? (atRiskError ? null : 0);
+  const lockedAccountsCount = atRiskSummary?.lockedCount ?? (atRiskError ? null : 0);
+  const inactive7DaysCount = atRiskSummary?.inactive7Days ?? (atRiskError ? null : 0);
+  const safeStudentsCount = atRiskSummary
+    ? (atRiskSummary.lowRisk ?? Math.max(0, totalStudentsCount - (atRiskSummary.atRiskCount || 0)))
+    : (atRiskError ? null : totalStudentsCount);
+
+  // Readiness brackets for distribution insights (Mutually exclusive & collectively exhaustive tiers)
+  const readinessBrackets = [
+    { id: '90-100', label: '90–100%', category: 'Elite Mastery (PRI ≥ 90)', min: 90, max: 100, color: '#10b981', dotClass: 'bracket-dot-elite' },
+    { id: '80-89', label: '80–89%', category: 'Interview Ready (PRI 80–89)', min: 80, max: 89, color: '#6366f1', dotClass: 'bracket-dot-strong' },
+    { id: '70-79', label: '70–79%', category: 'Developing (PRI 70–79)', min: 70, max: 79, color: '#38bdf8', dotClass: 'bracket-dot-developing' },
+    { id: '60-69', label: '60–69%', category: 'Foundational (PRI 60–69)', min: 60, max: 69, color: '#f59e0b', dotClass: 'bracket-dot-foundational' },
+    { id: '<60', label: '<60%', category: 'Needs Practice (PRI < 60)', min: 0, max: 59, color: '#ef4444', dotClass: 'bracket-dot-risk' }
+  ].map(b => {
+    const matching = students.filter(s => {
+      const score = Number(s.readinessScore) || 0;
+      return score >= b.min && score <= b.max;
+    });
+    const share = totalStudentsCount > 0 ? Math.round((matching.length / totalStudentsCount) * 100) : 0;
+    return { ...b, count: matching.length, share };
+  });
+
+  // Dynamic Department cohort readiness across all branches present in cohort (unweighted branch mean)
+  const departmentBreakdown = React.useMemo(() => {
+    if (!students || students.length === 0) return [];
+    const branchMap = new Map();
+    students.forEach(s => {
+      const branchName = (s.branch || 'General').toUpperCase().trim();
+      if (!branchMap.has(branchName)) branchMap.set(branchName, []);
+      branchMap.get(branchName).push(s);
+    });
+
+    return Array.from(branchMap.entries()).map(([deptName, deptStudents]) => {
+      const count = deptStudents.length;
+      const totalScore = deptStudents.reduce((acc, s) => acc + (Number(s.readinessScore) || 0), 0);
+      const avgScore = count > 0 ? Math.round(totalScore / count) : 0;
+      const readyCount = deptStudents.filter(s => (Number(s.readinessScore) || 0) >= 80).length;
+      return {
+        name: deptName,
+        count,
+        avgScore,
+        readyCount,
+        percentage: totalStudentsCount > 0 ? Math.round((count / totalStudentsCount) * 100) : 0
+      };
+    }).sort((a, b) => b.avgScore - a.avgScore || b.readyCount - a.readyCount || b.count - a.count);
+  }, [students, totalStudentsCount]);
+
+  const telemetryErrors = [studentsError, placementDrivesError, jobsError, staffError, auditStatsError, atRiskError].filter(Boolean);
+  const hasTelemetryErrors = telemetryErrors.length > 0;
+  const effectiveHealthStatus = systemHealth.status === 'offline'
+    ? 'offline'
+    : (hasTelemetryErrors ? 'degraded' : systemHealth.status);
+
+  // Unique branches present in current cohort for dropdown filter
+  const cohortBranches = React.useMemo(() => {
+    const set = new Set();
+    students.forEach(s => {
+      if (s.branch) set.add(s.branch.toUpperCase().trim());
+    });
+    return Array.from(set).sort();
+  }, [students]);
+
+  const [rosterPage, setRosterPage] = useState(1);
+  const [rosterPageSize, setRosterPageSize] = useState(10);
+
+  useEffect(() => {
+    setRosterPage(1);
+  }, [rosterSearch, rosterTierFilter, rosterBranchFilter]);
+
+  // Filtered Student Preparedness Roster based on interactive filters
+  const filteredRosterStudents = React.useMemo(() => {
+    return students.filter(student => {
+      if (rosterSearch.trim()) {
+        const q = rosterSearch.trim().toLowerCase();
+        const matchName = (student.name || '').toLowerCase().includes(q);
+        const matchEmail = (student.email || '').toLowerCase().includes(q);
+        const matchRoll = (student.rollNumber || '').toLowerCase().includes(q);
+        if (!matchName && !matchEmail && !matchRoll) return false;
+      }
+
+      const score = Number(student.readinessScore) || 0;
+      if (rosterTierFilter === 'job-ready' && score < 80) return false;
+      if (rosterTierFilter === 'medium' && (score < 50 || score >= 80)) return false;
+      if (rosterTierFilter === 'low' && score >= 50) return false;
+      if (rosterTierFilter === '90-100' && score < 90) return false;
+      if (rosterTierFilter === '80-89' && (score < 80 || score > 89)) return false;
+      if (rosterTierFilter === '70-79' && (score < 70 || score > 79)) return false;
+      if (rosterTierFilter === '60-69' && (score < 60 || score > 69)) return false;
+      if (rosterTierFilter === '<60' && score >= 60) return false;
+
+      if (rosterBranchFilter !== 'all') {
+        const sBranch = (student.branch || '').toUpperCase().trim();
+        if (sBranch !== rosterBranchFilter.toUpperCase().trim()) return false;
+      }
+
+      return true;
+    });
+  }, [students, rosterSearch, rosterTierFilter, rosterBranchFilter]);
+
+  const totalRosterPages = Math.max(1, Math.ceil(filteredRosterStudents.length / rosterPageSize));
+  const paginatedRosterStudents = React.useMemo(() => {
+    const start = (rosterPage - 1) * rosterPageSize;
+    return filteredRosterStudents.slice(start, start + rosterPageSize);
+  }, [filteredRosterStudents, rosterPage, rosterPageSize]);
+
 
 
   // Core CSE Subjects Handlers
@@ -1900,6 +2367,10 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
   };
 
   const handleDeleteStudent = async (studentId, studentName) => {
+    if (isSuperAdmin(user)) {
+      setError('Super Administrators do not have permission to remove students. Deletions must be performed by the designated Campus Administrator.');
+      return;
+    }
     if (!window.confirm(`Are you sure you want to permanently delete student "${studentName}" and all of their test/interview history? This action cannot be undone.`)) {
       return;
     }
@@ -1977,7 +2448,7 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
   };
 
   const deleteStaff = async (staff) => {
-    if (staff.isSuperAdmin || staff.email?.toLowerCase() === 'vaddeajaykumar2004@gmail.com') {
+    if (isSuperAdmin(staff) || staff.isSuperAdmin) {
       setError('The Super Admin account is protected and cannot be deleted.');
       return;
     }
@@ -2034,6 +2505,10 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
 
   const saveStaffScope = async (event) => {
     event.preventDefault();
+    if (isSuperAdmin(user)) {
+      setError('Super Administrators do not have access to assign academic scopes. Scope assignments must be performed by the Campus Administrator.');
+      return;
+    }
     if (!scopeStaffId || !scopeForm.academicYear) return setError('Select a staff member and academic year.');
     try {
       setSavingScope(true);
@@ -2871,10 +3346,7 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
     );
   }
 
-  const totalStudentsCount = students.length;
-  const averageReadinessScore = totalStudentsCount > 0
-    ? Math.round(students.reduce((sum, s) => sum + s.readinessScore, 0) / totalStudentsCount)
-    : 0;
+
 
   const fetchInterviewMetadata = async () => {
     try {
@@ -3279,14 +3751,106 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
     document.body.removeChild(link);
   };
 
+  const triggerTabLoaders = (tabId) => {
+    switch (tabId) {
+      case 'analytics':
+        refreshOverviewMetrics();
+        break;
+      case 'applied-jobs':
+      case 'job-applications':
+        fetchJobs();
+        fetchApplicationsReport();
+        break;
+      case 'job-opportunities':
+      case 'jobs':
+      case 'job-postings':
+      case 'company-drives':
+        fetchJobs();
+        break;
+      case 'interview-settings':
+        fetchInterviewMetadata();
+        break;
+      case 'subject-discussions':
+      case 'discussions':
+        fetchAcademicContent();
+        fetchAdminDiscussions();
+        break;
+      case 'audit-logs':
+      case 'student-audit-logs':
+        fetchAuditStats();
+        fetchAuditSessions();
+        fetchAuditLogs();
+        break;
+      case 'practice-reports':
+        fetchPracticeReports(practiceReportPlatform);
+        break;
+      case 'lab-reports':
+        fetchAdminLabReports();
+        break;
+      case 'aptitude':
+        fetchAptitudeTests();
+        break;
+      case 'core-subjects':
+        fetchAcademicContent();
+        fetchAptitudeTests();
+        break;
+      case 'faculty-staff':
+        fetchStaff();
+        fetchAcademicContent();
+        break;
+      case 'practice':
+        fetchPracticeQuestions(practicePlatform);
+        break;
+      default:
+        break;
+    }
+  };
+
+  const handleSelectTab = (tabId) => {
+    safeSetActiveTab(tabId);
+    triggerTabLoaders(tabId);
+  };
+
+  const handleSelectGroup = (groupId) => {
+    setActiveGroup(groupId);
+    const group = TAB_GROUPS.find((g) => g.id === groupId);
+    if (!group) return;
+    const isCurrentInGroup = group.tabs.some((t) => t.id === activeTab || (t.aliases && t.aliases.includes(activeTab)));
+    if (!isCurrentInGroup) {
+      const firstAllowed = group.tabs.find((t) => isTabAllowedForRole(t.id));
+      if (firstAllowed) {
+        handleSelectTab(firstAllowed.id);
+      }
+    }
+  };
+
+  const handleRefreshCurrentTab = () => {
+    triggerTabLoaders(activeTab);
+    fetchSystemHealth();
+    setLastRefreshedAt(new Date());
+    if (activeTab === 'analytics') {
+      refreshOverviewMetrics();
+    }
+  };
+
+  const currentGroupObj = TAB_GROUPS.find((g) => g.id === activeGroup) || TAB_GROUPS[0];
+  const allFlattenedTabs = TAB_GROUPS.flatMap((g) => g.tabs);
+  const currentTabObj = allFlattenedTabs.find((t) => t.id === activeTab || (t.aliases && t.aliases.includes(activeTab))) || allFlattenedTabs[0];
+
+  const visibleGroups = TAB_GROUPS.filter((group) =>
+    group.tabs.some((tab) => isTabAllowedForRole(tab.id))
+  );
+
+  const visibleSubTabs = (currentGroupObj?.tabs || []).filter((tab) =>
+    isTabAllowedForRole(tab.id)
+  );
+
   return (
     <>
       <Header
         title={
-          activeTab === 'job-opportunities' || activeTab === 'jobs' || activeTab === 'job-postings'
-            ? 'Job Opportunities & Placement Drives'
-            : activeTab === 'faculty-staff'
-            ? 'Faculty & Administrator Management'
+          currentTabObj
+            ? `${currentTabObj.label} • CampusBridge Console`
             : 'Admin Command Console'
         }
       />
@@ -3332,7 +3896,7 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
                     Automated WhatsApp Alert Enabled
                   </strong>
                   <span style={{ color: '#cbd5e1', fontSize: '11.5px', lineHeight: '1.4', display: 'block' }}>
-                    Extending this deadline triggers optimized instant WhatsApp broadcasts to <strong>8074701052</strong> and all eligible batch candidates with registered numbers.
+                    Extending this deadline triggers automated instant WhatsApp broadcasts to all eligible batch candidates with registered numbers.
                   </span>
                 </div>
               </div>
@@ -3593,330 +4157,1046 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
           </div>
         )}
 
-        {/* Console Tab Toggles */}
-        <div
-          className="admin-tabs-nav"
-          onWheel={(e) => {
-            if (e.deltaY !== 0) {
-              e.currentTarget.scrollLeft += e.deltaY;
-            }
-          }}
-        >
-          {isFaculty ? (
-            <button
-              className="admin-tab-btn active"
-              onClick={() => {
-                safeSetActiveTab('applied-jobs');
-                fetchJobs();
-                fetchApplicationsReport();
-              }}
-            >
-              📋 Candidate Applications Report
-            </button>
-          ) : isPlacementOfficer ? (
-            <>
-              <button
-                className={`admin-tab-btn ${activeTab === 'job-opportunities' || activeTab === 'jobs' || activeTab === 'job-postings' || activeTab === 'company-drives' ? 'active' : ''}`}
-                onClick={() => {
-                  safeSetActiveTab('job-opportunities');
-                  fetchJobs();
-                }}
-              >
-                💼 Placement Drives &amp; Jobs
-              </button>
-              <button
-                className={`admin-tab-btn ${activeTab === 'applied-jobs' || activeTab === 'job-applications' ? 'active' : ''}`}
-                onClick={() => {
-                  safeSetActiveTab('applied-jobs');
-                  fetchJobs();
-                  fetchApplicationsReport();
-                }}
-              >
-                📋 Candidate Applications Report
-              </button>
-              <button
-                className={`admin-tab-btn ${activeTab === 'at-risk' ? 'active' : ''}`}
-                onClick={() => safeSetActiveTab('at-risk')}
-              >
-                ⚠️ At-Risk Detection
-              </button>
-              <button
-                className={`admin-tab-btn ${activeTab === 'placement-export' ? 'active' : ''}`}
-                onClick={() => safeSetActiveTab('placement-export')}
-              >
-                📑 Stats &amp; Report Export
-              </button>
-              <button
-                className={`admin-tab-btn ${activeTab === 'interviews' ? 'active' : ''}`}
-                onClick={() => safeSetActiveTab('interviews')}
-              >
-                🎤 Mock Interview Reports
-              </button>
-              <button
-                className={`admin-tab-btn ${activeTab === 'interview-settings' ? 'active' : ''}`}
-                onClick={() => {
-                  safeSetActiveTab('interview-settings');
-                  fetchInterviewMetadata();
-                }}
-              >
-                🎯 Interview Settings
-              </button>
-              <button
-                className={`admin-tab-btn ${activeTab === 'subject-discussions' ? 'active' : ''}`}
-                onClick={() => {
-                  safeSetActiveTab('subject-discussions');
-                  fetchAcademicContent();
-                  fetchAdminDiscussions();
-                }}
-              >
-                💬 Subject Discussions Forum
-              </button>
-            </>
-          ) : isAuditor ? (
-            <>
-              <button
-                className={`admin-tab-btn ${activeTab === 'audit-logs' || activeTab === 'student-audit-logs' ? 'active' : ''}`}
-                onClick={() => {
-                  safeSetActiveTab('audit-logs');
-                  fetchAuditStats();
-                  fetchAuditSessions();
-                  fetchAuditLogs();
-                }}
-              >
-                📜 Student Audit Logs & Active Time
-              </button>
-              <button
-                className={`admin-tab-btn ${activeTab === 'practice-reports' ? 'active' : ''}`}
-                onClick={() => {
-                  safeSetActiveTab('practice-reports');
-                  fetchPracticeReports(practiceReportPlatform);
-                }}
-              >
-                📈 Practice Reports
-              </button>
-              <button
-                className={`admin-tab-btn ${activeTab === 'analytics' ? 'active' : ''}`}
-                onClick={() => safeSetActiveTab('analytics')}
-              >
-                📊 Candidate Analytics
-              </button>
-            </>
-          ) : (
-            <>
-          <button
-            className={`admin-tab-btn ${activeTab === 'analytics' ? 'active' : ''}`}
-            onClick={() => safeSetActiveTab('analytics')}
-          >
-            📊 Candidate Analytics
-          </button>
-          <button
-            className={`admin-tab-btn ${activeTab === 'job-opportunities' || activeTab === 'jobs' || activeTab === 'job-postings' || activeTab === 'company-drives' ? 'active' : ''}`}
-            onClick={() => {
-              safeSetActiveTab('job-opportunities');
-              fetchJobs();
-            }}
-          >
-            💼 Placement Drives &amp; Jobs
-          </button>
-          <button
-            type="button"
-            className="admin-tab-btn"
-            style={{ color: '#93c5fd', borderColor: 'rgba(59, 130, 246, 0.4)' }}
-            onClick={() => window.dispatchEvent(new CustomEvent('open_naac_modal'))}
-            title="Open NAAC Criteria 5.2.1 Audit Dossier Generator"
-          >
-            📜 NAAC 5.2 Dossier
-          </button>
-          <button
-            type="button"
-            className="admin-tab-btn"
-            style={{ color: '#6ee7b7', borderColor: 'rgba(16, 185, 129, 0.4)' }}
-            onClick={() => window.dispatchEvent(new CustomEvent('open_skillgap_modal'))}
-            title="Open Department Skill-Gap Heatmap"
-          >
-            📊 Skill-Gap Heatmap
-          </button>
-          <button
-            className={`admin-tab-btn ${activeTab === 'applied-jobs' || activeTab === 'job-applications' ? 'active' : ''}`}
-            onClick={() => {
-              safeSetActiveTab('applied-jobs');
-              fetchJobs();
-              fetchApplicationsReport();
-            }}
-          >
-            📋 Candidate Applications Report
-          </button>
-          <button
-            className={`admin-tab-btn ${activeTab === 'at-risk' ? 'active' : ''}`}
-            onClick={() => safeSetActiveTab('at-risk')}
-          >
-            ⚠️ At-Risk Detection
-          </button>
+        {/* Enterprise Page Hero & Grouped Domain Navigation */}
+        <section className="admin-page-hero">
+          <div className="admin-hero-top-row">
+            <div className="admin-hero-breadcrumb-wrap">
+              <div className="admin-hero-breadcrumb-bar">
+                <span className="breadcrumb-root">⚡ Command Center</span>
+                <span className="breadcrumb-sep">›</span>
+                <span className="breadcrumb-domain">{currentGroupObj.icon} {currentGroupObj.label}</span>
+                <span className="breadcrumb-sep">›</span>
+                <span className="breadcrumb-active-view">{currentTabObj?.label}</span>
+              </div>
+              <span className="admin-hero-badge">
+                <span className="admin-hero-status-pulse" />
+                {isSuperAdmin(user) ? 'Enterprise Super Admin' : isCampusAdmin(user) ? 'Campus Admin' : 'Admin Console'}
+              </span>
+            </div>
 
-          <button
-            className={`admin-tab-btn ${activeTab === 'placement-export' ? 'active' : ''}`}
-            onClick={() => safeSetActiveTab('placement-export')}
-          >
-            📑 Stats &amp; Report Export
-          </button>
-          <button
-            className={`admin-tab-btn ${activeTab === 'interviews' ? 'active' : ''}`}
-            onClick={() => safeSetActiveTab('interviews')}
-          >
-            🎤 Mock Interview Reports
-          </button>
-          <button
-            className={`admin-tab-btn ${activeTab === 'question-bank' ? 'active' : ''}`}
-            onClick={() => safeSetActiveTab('question-bank')}
-          >
-            🛡️ Question Bank Reports
-          </button>
-          <button
-            className={`admin-tab-btn ${activeTab === 'lab-reports' ? 'active' : ''}`}
-            onClick={() => {
-              safeSetActiveTab('lab-reports');
-              fetchAdminLabReports();
-            }}
-          >
-            🔬 Lab Practice Reports
-          </button>
-          <button
-            className={`admin-tab-btn ${activeTab === 'aptitude' ? 'active' : ''}`}
-            onClick={() => {
-              safeSetActiveTab('aptitude');
-              fetchAptitudeTests();
-            }}
-          >
-            🧠 Aptitude Tests Manager
-          </button>
-          <button
-            className={`admin-tab-btn ${activeTab === 'core-subjects' ? 'active' : ''}`}
-            onClick={() => {
-              safeSetActiveTab('core-subjects');
-              fetchAcademicContent();
-              fetchAptitudeTests();
-            }}
-          >
-            💻 Core CSE Subjects
-          </button>
-          <button
-            className={`admin-tab-btn ${activeTab === 'academic-content' ? 'active' : ''}`}
-            onClick={() => safeSetActiveTab('academic-content')}
-          >
-            📚 Academic Subjects & Projects
-          </button>
-          <button
-            className={`admin-tab-btn ${activeTab === 'faculty-staff' ? 'active' : ''}`}
-            onClick={() => {
-              safeSetActiveTab('faculty-staff');
-              fetchStaff();
-              fetchAcademicContent();
-            }}
-          >
-            👥 Faculty &amp; Staff
-          </button>
-          <button
-            className={`admin-tab-btn ${activeTab === 'practice' ? 'active' : ''}`}
-            onClick={() => {
-              safeSetActiveTab('practice');
-              fetchPracticeQuestions(practicePlatform);
-            }}
-          >
-            💻 Practice Platforms
-          </button>
-          <button
-            className={`admin-tab-btn ${activeTab === 'practice-reports' ? 'active' : ''}`}
-            onClick={() => {
-              safeSetActiveTab('practice-reports');
-              fetchPracticeReports(practiceReportPlatform);
-            }}
-          >
-            📈 Practice Reports
-          </button>
-          <button
-            className={`admin-tab-btn ${activeTab === 'interview-settings' ? 'active' : ''}`}
-            onClick={() => {
-              safeSetActiveTab('interview-settings');
-              fetchInterviewMetadata();
-            }}
-          >
-            🎯 Interview Settings
-          </button>
-          <button
-            className={`admin-tab-btn ${activeTab === 'audit-logs' || activeTab === 'student-audit-logs' ? 'active' : ''}`}
-            onClick={() => {
-              safeSetActiveTab('audit-logs');
-              fetchAuditStats();
-              fetchAuditSessions();
-              fetchAuditLogs();
-            }}
-          >
-            📜 Student Audit Logs & Active Time
-          </button>
-          <button
-            className={`admin-tab-btn ${activeTab === 'subject-discussions' ? 'active' : ''}`}
-            onClick={() => {
-              safeSetActiveTab('subject-discussions');
-              fetchAcademicContent();
-              fetchAdminDiscussions();
-            }}
-          >
-            💬 Subject Discussions Forum
-          </button>
-          <button
-            className={`admin-tab-btn ${activeTab === 'settings' ? 'active' : ''}`}
-            onClick={() => {
-              safeSetActiveTab('settings');
-            }}
-          >
-            ⚙️ Settings
-          </button>
-            </>
-          )}
-        </div>
+            <div className="admin-hero-actions">
+              <button
+                type="button"
+                className="admin-hero-action-btn admin-hero-btn-naac"
+                onClick={() => window.dispatchEvent(new CustomEvent('open_naac_modal'))}
+                title="Generate NAAC Criteria 5.2.1 Audit Dossier"
+                id="hero-naac-btn"
+              >
+                <span className="btn-icon">📜</span>
+                <span>NAAC 5.2 Dossier</span>
+              </button>
+
+              <button
+                type="button"
+                className="admin-hero-action-btn admin-hero-btn-heatmap"
+                onClick={() => window.dispatchEvent(new CustomEvent('open_skillgap_modal'))}
+                title="Open Department Skill-Gap Heatmap"
+                id="hero-skillgap-btn"
+              >
+                <span className="btn-icon">📊</span>
+                <span>Skill-Gap Heatmap</span>
+              </button>
+
+              <button
+                type="button"
+                className="admin-hero-action-btn admin-hero-btn-refresh"
+                onClick={handleRefreshCurrentTab}
+                disabled={systemHealthLoading || refreshingOverview}
+                title="Refresh current dataset and verify system health"
+                id="hero-refresh-btn"
+              >
+                <span className={`btn-icon ${systemHealthLoading || refreshingOverview ? 'spin-icon' : ''}`}>🔄</span>
+                <span>{systemHealthLoading || refreshingOverview ? 'Syncing...' : 'Sync Data'}</span>
+              </button>
+            </div>
+          </div>
+
+          <div className="admin-hero-main-row">
+            <div className="admin-hero-titles">
+              <h1 className="admin-hero-title">
+                {currentTabObj ? `${currentTabObj.icon} ${currentTabObj.label}` : 'Administration Portal'}
+              </h1>
+              <p className="admin-hero-subtitle">
+                {currentTabObj?.desc || currentGroupObj?.desc}
+              </p>
+            </div>
+
+            <div className="admin-hero-telemetry">
+              <div className="admin-telemetry-pill">
+                <span className="telemetry-label">Scope</span>
+                <span className="telemetry-value">
+                  {user?.campusName || (isSuperAdmin(user) ? 'Platform-Wide (Global)' : 'Institutional')}
+                </span>
+              </div>
+              <div className="admin-telemetry-pill">
+                <span className="telemetry-label">Engine</span>
+                {effectiveHealthStatus === 'checking' ? (
+                  <span className="telemetry-value text-secondary">
+                    <span className="pulse-dot-amber" /> Verifying...
+                  </span>
+                ) : effectiveHealthStatus === 'offline' ? (
+                  <span className="telemetry-value text-rose" title={`API Service Unreachable: ${systemHealth.message}`}>
+                    <span className="status-dot-red" /> Offline
+                  </span>
+                ) : effectiveHealthStatus === 'degraded' ? (
+                  <span className="telemetry-value text-amber" title={`${telemetryErrors.length} telemetry streams degraded (${systemHealth.latencyMs || '<50'}ms latency)`}>
+                    <span className="status-dot-amber" /> Degraded ({systemHealth.latencyMs || '<50'}ms)
+                  </span>
+                ) : (
+                  <span className="telemetry-value telemetry-online" title={`Live Verified: ${systemHealth.latencyMs || '<50'}ms latency`}>
+                    <span className="status-dot-green" /> Live ({systemHealth.latencyMs || '<50'}ms)
+                  </span>
+                )}
+              </div>
+              <div className="admin-telemetry-pill">
+                <span className="telemetry-label">Synced</span>
+                <span className="telemetry-value" title={`Last synced: ${lastRefreshedAt ? lastRefreshedAt.toLocaleTimeString() : 'Pending'}`}>
+                  {lastRefreshedAt ? lastRefreshedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : 'Syncing...'}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Tier 1: Grouped Domain Navigation */}
+          <nav className="admin-domain-nav" aria-label="Administrative Domains">
+            {visibleGroups.map((group) => {
+              const isActiveGroup = group.id === activeGroup;
+              const allowedTabsCount = group.tabs.filter((t) => isTabAllowedForRole(t.id)).length;
+              return (
+                <button
+                  key={group.id}
+                  type="button"
+                  id={`domain-tab-${group.id}`}
+                  className={`admin-domain-tab ${isActiveGroup ? 'active' : ''}`}
+                  onClick={() => handleSelectGroup(group.id)}
+                  aria-selected={isActiveGroup}
+                  role="tab"
+                >
+                  <span className="admin-domain-tab-icon">{group.icon}</span>
+                  <div className="admin-domain-tab-meta">
+                    <span className="admin-domain-tab-title">{group.label}</span>
+                    <span className="admin-domain-tab-subtitle">{group.shortDesc}</span>
+                  </div>
+                  <span className="admin-domain-tab-count" title={`${allowedTabsCount} views available`}>
+                    {allowedTabsCount}
+                  </span>
+                </button>
+              );
+            })}
+          </nav>
+        </section>
+
+        {/* Tier 2: Domain Sub-Views Navigation */}
+        <section className="admin-subviews-container" aria-label="Domain Sub-Views">
+          <div className="admin-subviews-header">
+            <span className="admin-subviews-label">
+              Sub-Views in <strong>{currentGroupObj.label}</strong> ({visibleSubTabs.length}):
+            </span>
+          </div>
+          <div className="admin-subviews-scroll">
+            {visibleSubTabs.map((tab) => {
+              const isSelected = activeTab === tab.id || (tab.aliases && tab.aliases.includes(activeTab));
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  id={`subview-btn-${tab.id}`}
+                  className={`admin-subview-btn ${isSelected ? 'active' : ''}`}
+                  onClick={() => handleSelectTab(tab.id)}
+                  title={tab.desc}
+                  aria-pressed={isSelected}
+                >
+                  <span className="admin-subview-icon">{tab.icon}</span>
+                  <span className="admin-subview-label">{tab.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        </section>
+
+        {/* Phase 5: Streamlined Domain Command Telemetry Bar across all 5 Navigation Domains (Zero Redundancy) */}
+        {activeTab !== 'analytics' && (
+          <div className="admin-domain-context-banner glass-card animate-fade">
+            <div className="domain-context-left">
+              <div className="domain-context-icon-wrap">
+                <span className="domain-context-icon">{currentGroupObj.icon}</span>
+              </div>
+              <div className="domain-context-info">
+                <div className="domain-context-tags">
+                  <span className="domain-tag-domain">{currentGroupObj.label} Command Hub</span>
+                  <span className="domain-tag-scope">{isSuperAdmin(user) ? '🌐 Platform-Wide Governance' : '🏛️ Campus-Scoped'}</span>
+                  <span className="domain-tag-active">{visibleSubTabs.length} Views Monitored</span>
+                  <span className={`domain-tag-health ${effectiveHealthStatus === 'offline' ? 'health-offline' : effectiveHealthStatus === 'degraded' ? 'health-degraded' : 'health-online'}`}>
+                    <span className={effectiveHealthStatus === 'offline' ? 'status-dot-red' : effectiveHealthStatus === 'degraded' ? 'status-dot-amber' : 'status-dot-green'} />
+                    {effectiveHealthStatus === 'offline' ? 'API Offline' : effectiveHealthStatus === 'degraded' ? 'Service Degraded' : `Verified Live (${systemHealth.latencyMs || '<50'}ms)`}
+                  </span>
+                </div>
+                <p className="domain-context-desc">{currentGroupObj.desc}</p>
+              </div>
+            </div>
+            <div className="domain-context-right">
+              <div className="domain-telemetry-cluster">
+                {activeGroup === 'overview' && (
+                  <>
+                    <div className="domain-telemetry-chip">
+                      <span className="chip-label">Candidates:</span>
+                      <strong className={`chip-val ${studentsError ? 'text-rose' : ''}`}>{studentsError ? 'Offline' : loading ? '...' : totalStudentsCount}</strong>
+                    </div>
+                    <div className="domain-telemetry-chip">
+                      <span className="chip-label">Avg PRI:</span>
+                      <strong className={`chip-val ${studentsError ? 'text-rose' : ''}`}>{studentsError ? 'Offline' : loading ? '...' : totalStudentsCount === 0 ? 'N/A' : `${averageReadinessScore}%`}</strong>
+                    </div>
+                    <div className="domain-telemetry-chip">
+                      <span className="chip-label">Job-Ready:</span>
+                      <strong className={`chip-val ${studentsError ? 'text-rose' : 'text-emerald'}`}>{studentsError ? 'Offline' : loading ? '...' : jobReadyStudents.length}</strong>
+                    </div>
+                  </>
+                )}
+                {activeGroup === 'placements' && (
+                  <>
+                    <div className="domain-telemetry-chip">
+                      <span className="chip-label">Active Drives:</span>
+                      <strong className={`chip-val ${placementDrivesError ? 'text-rose' : ''}`}>{placementDrivesLoading ? '...' : placementDrivesError ? 'Offline' : activeDrivesCount}</strong>
+                    </div>
+                    <div className="domain-telemetry-chip">
+                      <span className="chip-label">Open Postings:</span>
+                      <strong className={`chip-val ${jobsError ? 'text-rose' : ''}`}>{fetchJobsLoading ? '...' : jobsError ? 'Offline' : totalJobsCount}</strong>
+                    </div>
+                    <div className="domain-telemetry-chip">
+                      <span className="chip-label">Applications:</span>
+                      <strong className="chip-val">{loadingApplicationsReport ? '...' : (applicationsStats?.totalApplications ?? applicationsReport?.length ?? 0)}</strong>
+                    </div>
+                  </>
+                )}
+                {activeGroup === 'academics' && (
+                  <>
+                    <div className="domain-telemetry-chip">
+                      <span className="chip-label">Assessments:</span>
+                      <strong className="chip-val">{loadingTests ? '...' : aptitudeTests.length}</strong>
+                    </div>
+                    <div className="domain-telemetry-chip">
+                      <span className="chip-label">Subjects:</span>
+                      <strong className="chip-val">{loadingAcademicContent ? '...' : academicSubjects.length}</strong>
+                    </div>
+                    <div className="domain-telemetry-chip">
+                      <span className="chip-label">Projects:</span>
+                      <strong className="chip-val">{loadingAcademicContent ? '...' : academicProjects.length}</strong>
+                    </div>
+                  </>
+                )}
+                {activeGroup === 'students' && (
+                  <>
+                    <div className="domain-telemetry-chip">
+                      <span className="chip-label">Candidates:</span>
+                      <strong className={`chip-val ${studentsError ? 'text-rose' : ''}`}>{studentsError ? 'Offline' : loading ? '...' : totalStudentsCount}</strong>
+                    </div>
+                    <div className="domain-telemetry-chip">
+                      <span className="chip-label">High Risk:</span>
+                      <strong className={`chip-val ${atRiskError ? 'text-rose' : 'text-rose'}`}>{atRiskError ? 'Offline' : atRiskLoading ? '...' : (criticalRiskCount ?? 0)}</strong>
+                    </div>
+                    <div className="domain-telemetry-chip">
+                      <span className="chip-label">Locked Accounts:</span>
+                      <strong className={`chip-val ${atRiskError ? 'text-rose' : 'text-amber'}`}>{atRiskError ? 'Offline' : atRiskLoading ? '...' : (lockedAccountsCount ?? 0)}</strong>
+                    </div>
+                  </>
+                )}
+                {activeGroup === 'governance' && (
+                  <>
+                    <div className="domain-telemetry-chip">
+                      <span className="chip-label">Indexed Staff:</span>
+                      <strong className={`chip-val ${staffError ? 'text-rose' : ''}`}>{staffError ? 'Offline' : loadingStaff ? '...' : totalStaffCount}</strong>
+                    </div>
+                    <div className="domain-telemetry-chip">
+                      <span className="chip-label">Online Now:</span>
+                      <strong className={`chip-val ${auditStatsError ? 'text-rose' : 'text-emerald'}`}>{auditStatsError ? 'Offline' : auditStatsLoading ? '...' : (auditStats?.onlineNowCount ?? 0)}</strong>
+                    </div>
+                    <div className="domain-telemetry-chip">
+                      <span className="chip-label">Audit Events:</span>
+                      <strong className={`chip-val ${auditStatsError ? 'text-rose' : ''}`}>{auditStatsError ? 'Offline' : auditStatsLoading ? '...' : (auditStats?.totalActivitiesLogged ?? 0)}</strong>
+                    </div>
+                  </>
+                )}
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm domain-sync-btn"
+                  onClick={() => {
+                    triggerTabLoaders(activeTab);
+                    fetchSystemHealth();
+                    setLastRefreshedAt(new Date());
+                  }}
+                  disabled={systemHealthLoading}
+                  title="Synchronize real-time dataset for current view"
+                >
+                  <span className={systemHealthLoading ? 'spin-icon' : ''}>🔄</span> {systemHealthLoading ? 'Syncing...' : 'Sync'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {
           activeTab === 'analytics' && (
             <>
-              {/* Aggregate Stats Cards */}
-              <div className="admin-stats-summary-grid">
-                <div className="glass-card admin-summary-card">
-                  <h4>Total Registered Candidates</h4>
-                  <span className="admin-stat-number">{totalStudentsCount}</span>
-                  <p className="admin-stat-sub">Active job seekers preparing</p>
-                </div>
-
-                <div className="glass-card admin-summary-card">
-                  <h4>Average Placement Readiness</h4>
-                  <span className="admin-stat-number">{averageReadinessScore}%</span>
-                  <div className="progress-bar-bg mt-10">
-                    <div className="progress-bar-fill aptitude" style={{ width: `${averageReadinessScore}%` }}></div>
+              {/* Phase 2.1 & 4 & 5: Enterprise Telemetry Header Bar & Command Strip */}
+              <div className={`admin-analytics-header-bar glass-card ${refreshingOverview ? 'is-syncing' : ''}`}>
+                <div className="admin-analytics-title-group">
+                  <div className="admin-analytics-badge-row">
+                    <span className="admin-analytics-scope-pill">
+                      {isSuperAdmin(user) ? '🌐 Platform-Wide Telemetry' : '🏛️ Campus-Scoped Telemetry'}
+                    </span>
+                    {effectiveHealthStatus === 'checking' ? (
+                      <span className="admin-analytics-degraded-indicator">
+                        <span className="pulse-dot-amber"></span> Verifying Health Stream...
+                      </span>
+                    ) : effectiveHealthStatus === 'offline' ? (
+                      <span className="admin-analytics-degraded-indicator text-rose" title={`Backend API unreachable: ${systemHealth.message}`}>
+                        <span className="status-dot-red"></span> API Offline ({systemHealth.message || 'Unreachable'})
+                      </span>
+                    ) : effectiveHealthStatus === 'degraded' ? (
+                      <span className="admin-analytics-degraded-indicator" title={`Backend healthy (${systemHealth.latencyMs || '<50'}ms), but ${telemetryErrors.length} streams degraded`}>
+                        <span className="pulse-dot-amber"></span> Telemetry Degraded ({telemetryErrors.length} Offline · {systemHealth.latencyMs || '<50'}ms)
+                      </span>
+                    ) : (
+                      <span className="admin-analytics-live-indicator" title={`Operational health verified: ${systemHealth.latencyMs || '<50'}ms latency`}>
+                        <span className="pulse-dot"></span> Live Verified Stream · {systemHealth.latencyMs || '<50'}ms
+                      </span>
+                    )}
                   </div>
-                </div>
+                  <h3 className="admin-analytics-main-title">Executive Command Center & Institutional Health</h3>
+                  <p className="admin-analytics-subtext">
+                    Comprehensive real-time overview of candidate preparedness, institutional recruitment pipelines, active job drives, and student compliance.
+                  </p>
 
-                <div className="glass-card admin-summary-card">
-                  <h4>Job-Ready Students (PRI ≥ 80)</h4>
-                  <span className="admin-stat-number">{students.filter(s => s.readinessScore >= 80).length}</span>
-                  <p className="admin-stat-sub">Qualified for interview pipelines</p>
+                  {/* Executive Operational Telemetry Strip */}
+                  <div className="admin-analytics-command-strip">
+                    <div className="command-strip-item">
+                      <span className={`strip-dot ${effectiveHealthStatus === 'offline' ? 'strip-danger' : effectiveHealthStatus === 'degraded' ? 'strip-warning' : 'strip-online'}`}></span>
+                      <span className="strip-label">Service Health:</span>
+                      {effectiveHealthStatus === 'offline' ? (
+                        <strong className="strip-val text-rose">API Offline</strong>
+                      ) : effectiveHealthStatus === 'degraded' ? (
+                        <strong className="strip-val text-amber">Degraded ({systemHealth.latencyMs || '<50'}ms)</strong>
+                      ) : (
+                        <strong className="strip-val text-emerald">Verified ({systemHealth.latencyMs || '<50'}ms)</strong>
+                      )}
+                    </div>
+                    <span className="command-strip-divider">•</span>
+                    <div className="command-strip-item">
+                      <span className={`strip-dot ${studentsError ? 'strip-warning' : 'strip-online'}`}></span>
+                      <span className="strip-label">Monitored Cohort:</span>
+                      <strong className="strip-val">
+                        {studentsError ? <span className="text-warning">Telemetry Offline</span> : loading ? '...' : `${totalStudentsCount} Candidates`}
+                      </strong>
+                    </div>
+                    <span className="command-strip-divider">•</span>
+                    <div className="command-strip-item">
+                      <span className="strip-label">Placement Pipeline:</span>
+                      <strong className="strip-val">
+                        {(placementDrivesError && jobsError) ? (
+                          <span className="text-warning">Telemetry Offline</span>
+                        ) : (
+                          `${placementDrivesError ? 'Offline' : activeDrivesCount} Drives · ${jobsError ? 'Offline' : totalJobsCount} Postings`
+                        )}
+                      </strong>
+                    </div>
+                    <span className="command-strip-divider">•</span>
+                    <div className="command-strip-item">
+                      <span className="strip-label">Indexed Staff:</span>
+                      <strong className="strip-val">
+                        {staffError ? <span className="text-warning">Telemetry Offline</span> : loadingStaff ? '...' : `${totalStaffCount} Personnel`}
+                      </strong>
+                    </div>
+                    <span className="command-strip-divider">•</span>
+                    <div className="command-strip-item">
+                      <span className="strip-label">Audit Events:</span>
+                      <strong className="strip-val">
+                        {auditStatsError ? <span className="text-warning">Telemetry Offline</span> : auditStatsLoading ? '...' : `${auditStats?.totalActivitiesLogged ?? 0} Events`}
+                      </strong>
+                    </div>
+                  </div>
+
+                  {/* Phase 7: Operational Incident Alert & Service Degradation Banner */}
+                  {(hasTelemetryErrors || effectiveHealthStatus === 'offline') && (
+                    <div className="admin-operational-incident-banner animate-fade" role="alert">
+                      <div className="incident-banner-left">
+                        <span className="incident-icon">⚠️</span>
+                        <div>
+                          <strong className="incident-title">
+                            {effectiveHealthStatus === 'offline' ? 'System API Unreachable' : `Platform Telemetry Degraded (${telemetryErrors.length} ${telemetryErrors.length === 1 ? 'Service' : 'Services'} Offline)`}
+                          </strong>
+                          <div className="incident-details">
+                            {effectiveHealthStatus === 'offline' ? (
+                              <span>Backend API endpoint at {API_URL} did not respond ({systemHealth.message || 'Connection Refused'}).</span>
+                            ) : (
+                              telemetryErrors.map((err, i) => (
+                                <span key={i} className="incident-pill">
+                                  {err}
+                                </span>
+                              ))
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="incident-banner-right">
+                        <button
+                          type="button"
+                          className="btn btn-warning btn-sm incident-retry-btn"
+                          onClick={refreshOverviewMetrics}
+                          disabled={refreshingOverview}
+                        >
+                          {refreshingOverview ? 'Retrying...' : '🔄 Retry Telemetry'}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+                <div className="admin-analytics-header-controls">
+                  <span className="admin-analytics-timestamp" title="Live clock timestamp of latest backend sync">
+                    Synced: {lastRefreshedAt ? lastRefreshedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : 'Syncing...'}
+                  </span>
+                  <button
+                    type="button"
+                    className="btn btn-outline btn-sm admin-refresh-btn"
+                    onClick={refreshOverviewMetrics}
+                    disabled={refreshingOverview}
+                    title="Refresh all metrics from live backend endpoints"
+                  >
+                    <span className={refreshingOverview ? 'spin-icon' : ''}>🔄</span>
+                    {refreshingOverview ? 'Syncing...' : 'Refresh Metrics'}
+                  </button>
                 </div>
               </div>
 
-              {/* List of Students */}
-              <div className="glass-card student-roster-card" style={{ marginTop: '24px' }}>
+              {/* Phase 2.1 & 4: 8 Enterprise KPI Cards Grid with Accent Stripes */}
+              <div className="admin-kpi-metrics-grid" role="region" aria-label="Executive Performance Indicators">
+                {/* 1. Total Candidates */}
+                <div className="glass-card admin-kpi-card">
+                  <div className="kpi-accent-stripe stripe-indigo"></div>
+                  <div className="admin-kpi-header">
+                    <span className="admin-kpi-icon-badge kpi-indigo">👥</span>
+                    <span className="admin-kpi-tag tag-neutral">Cohort Size</span>
+                  </div>
+                  <div className="admin-kpi-body">
+                    <span className="admin-kpi-number">
+                      {loading ? '...' : studentsError ? <span className="text-warning" style={{ fontSize: '1.2rem' }}>Unavailable</span> : totalStudentsCount}
+                    </span>
+                    <h4 className="admin-kpi-title">Registered Candidates</h4>
+                    <p className="admin-kpi-desc">
+                      {studentsError ? 'Failed to sync directory' : totalStudentsCount === 0 ? 'No candidates registered in scope' : 'Active job seekers indexed in system'}
+                    </p>
+                  </div>
+                  <div className="admin-kpi-footer">
+                    <button
+                      type="button"
+                      className="admin-kpi-link-btn"
+                      onClick={() => {
+                        const el = document.getElementById('student-preparedness-roster');
+                        if (el) el.scrollIntoView({ behavior: 'smooth' });
+                      }}
+                    >
+                      View Student Roster ({totalStudentsCount}) ➔
+                    </button>
+                  </div>
+                </div>
+
+                {/* 2. Average Readiness */}
+                <div className="glass-card admin-kpi-card">
+                  <div className="kpi-accent-stripe stripe-amber"></div>
+                  <div className="admin-kpi-header">
+                    <span className="admin-kpi-icon-badge kpi-amber">⚡</span>
+                    <span className="admin-kpi-tag tag-primary" title="Unweighted arithmetic mean of student PRI scores in scope">
+                      Unweighted Mean
+                    </span>
+                  </div>
+                  <div className="admin-kpi-body">
+                    <span className="admin-kpi-number">
+                      {loading ? '...' : studentsError ? <span className="text-warning" style={{ fontSize: '1.2rem' }}>Unavailable</span> : totalStudentsCount === 0 ? 'N/A' : `${averageReadinessScore}%`}
+                    </span>
+                    <h4 className="admin-kpi-title">Average Readiness Index</h4>
+                    <p className="admin-kpi-desc">Cohort mean Placement Readiness Index</p>
+                  </div>
+                  <div className="admin-kpi-footer">
+                    <div className="kpi-mini-progress" title={`Cohort Mean: ${averageReadinessScore}%`}>
+                      <div className="kpi-mini-progress-fill bg-amber" style={{ width: `${averageReadinessScore}%` }}></div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 3. Job-Ready Candidates */}
+                <div className="glass-card admin-kpi-card">
+                  <div className="kpi-accent-stripe stripe-emerald"></div>
+                  <div className="admin-kpi-header">
+                    <span className="admin-kpi-icon-badge kpi-emerald">🎯</span>
+                    <span className="admin-kpi-tag tag-success" title="Benchmark score threshold: PRI >= 80">Benchmark ≥ 80</span>
+                  </div>
+                  <div className="admin-kpi-body">
+                    <span className="admin-kpi-number">
+                      {loading ? '...' : studentsError ? <span className="text-warning" style={{ fontSize: '1.2rem' }}>Unavailable</span> : jobReadyStudents.length}
+                    </span>
+                    <h4 className="admin-kpi-title">Job-Ready (PRI ≥ 80)</h4>
+                    <p className="admin-kpi-desc">
+                      {studentsError ? 'Telemetry unavailable' : `${jobReadyPercentage}% of candidate pool meets bar`}
+                    </p>
+                  </div>
+                  <div className="admin-kpi-footer">
+                    <button
+                      type="button"
+                      className="admin-kpi-link-btn text-emerald"
+                      onClick={() => {
+                        setRosterTierFilter('job-ready');
+                        const el = document.getElementById('student-preparedness-roster');
+                        if (el) el.scrollIntoView({ behavior: 'smooth' });
+                      }}
+                      title="Filter candidate roster to show job-ready students"
+                    >
+                      Filter Job-Ready ({jobReadyStudents.length}) ➔
+                    </button>
+                  </div>
+                </div>
+
+                {/* 4. Active Placement Drives */}
+                <div className="glass-card admin-kpi-card">
+                  <div className="kpi-accent-stripe stripe-cyan"></div>
+                  <div className="admin-kpi-header">
+                    <span className="admin-kpi-icon-badge kpi-cyan">🏢</span>
+                    <span className="admin-kpi-tag tag-cyan">PMS Hub</span>
+                  </div>
+                  <div className="admin-kpi-body">
+                    <span className="admin-kpi-number">
+                      {placementDrivesLoading ? '...' : placementDrivesError ? <span className="text-warning" style={{ fontSize: '1.2rem' }}>Unavailable</span> : activeDrivesCount}
+                    </span>
+                    <h4 className="admin-kpi-title">Active Placement Drives</h4>
+                    <p className="admin-kpi-desc">
+                      {placementDrivesError ? 'Drive telemetry unavailable' : placementDrives.length === 0 ? '0 scheduled on-campus' : `${placementDrives.length} total scheduled on-campus`}
+                    </p>
+                  </div>
+                  <div className="admin-kpi-footer">
+                    <button
+                      type="button"
+                      className="admin-kpi-link-btn"
+                      onClick={() => {
+                        handleSelectGroup('placements');
+                        handleSelectTab('job-opportunities');
+                        setPlacementHubSubTab('drives');
+                      }}
+                      title="Manage placement recruitment drives"
+                    >
+                      {activeDrivesCount > 0 ? 'View Active Drives ➔' : 'Schedule Drive ➔'}
+                    </button>
+                  </div>
+                </div>
+
+                {/* 5. Corporate Job Opportunities */}
+                <div className="glass-card admin-kpi-card">
+                  <div className="kpi-accent-stripe stripe-blue"></div>
+                  <div className="admin-kpi-header">
+                    <span className="admin-kpi-icon-badge kpi-blue">💼</span>
+                    <span className="admin-kpi-tag tag-blue">Industry</span>
+                  </div>
+                  <div className="admin-kpi-body">
+                    <span className="admin-kpi-number">
+                      {fetchJobsLoading ? '...' : jobsError ? <span className="text-warning" style={{ fontSize: '1.2rem' }}>Unavailable</span> : totalJobsCount}
+                    </span>
+                    <h4 className="admin-kpi-title">Job Opportunities</h4>
+                    <p className="admin-kpi-desc">
+                      {jobsError ? 'Job service unavailable' : `${totalJobsCount} verified corporate postings open`}
+                    </p>
+                  </div>
+                  <div className="admin-kpi-footer">
+                    <button
+                      type="button"
+                      className="admin-kpi-link-btn"
+                      onClick={() => {
+                        handleSelectGroup('placements');
+                        handleSelectTab('job-opportunities');
+                        setPlacementHubSubTab('jobs');
+                      }}
+                      title="Manage corporate job listings"
+                    >
+                      Manage Job Postings ➔
+                    </button>
+                  </div>
+                </div>
+
+                {/* 6. Institutional Staff */}
+                <div className="glass-card admin-kpi-card">
+                  <div className="kpi-accent-stripe stripe-purple"></div>
+                  <div className="admin-kpi-header">
+                    <span className="admin-kpi-icon-badge kpi-purple">🛡️</span>
+                    <span className="admin-kpi-tag tag-purple">Governance</span>
+                  </div>
+                  <div className="admin-kpi-body">
+                    <span className="admin-kpi-number">
+                      {loadingStaff ? '...' : staffError ? <span className="text-warning" style={{ fontSize: '1.2rem' }}>Unavailable</span> : totalStaffCount}
+                    </span>
+                    <h4 className="admin-kpi-title">Faculty & Staff</h4>
+                    <p className="admin-kpi-desc">
+                      {staffError ? 'Staff service unavailable' : `${adminStaffCount} Administrators · ${facultyStaffCount} Faculty`}
+                    </p>
+                  </div>
+                  <div className="admin-kpi-footer">
+                    <button
+                      type="button"
+                      className="admin-kpi-link-btn"
+                      onClick={() => {
+                        handleSelectGroup('governance');
+                        handleSelectTab('faculty-staff');
+                      }}
+                      title="Open faculty and staff directory"
+                    >
+                      Staff Directory ➔
+                    </button>
+                  </div>
+                </div>
+
+                {/* 7. Student Platform Activity */}
+                <div className="glass-card admin-kpi-card">
+                  <div className="kpi-accent-stripe stripe-teal"></div>
+                  <div className="admin-kpi-header">
+                    <span className="admin-kpi-icon-badge kpi-teal">⏱️</span>
+                    <span className="admin-kpi-tag tag-teal">Audit Telemetry</span>
+                  </div>
+                  <div className="admin-kpi-body">
+                    <span className="admin-kpi-number">
+                      {auditStatsLoading ? '...' : auditStatsError ? <span className="text-warning" style={{ fontSize: '1.2rem' }}>Unavailable</span> : `${auditStats?.totalHours || '0.0'}h`}
+                    </span>
+                    <h4 className="admin-kpi-title">Study & Practice Hours</h4>
+                    <p className="admin-kpi-desc">
+                      {auditStatsError ? 'Audit service unavailable' : `${auditStats?.onlineNowCount || 0} online now · ${auditStats?.activeTodayCount || 0} active today`}
+                    </p>
+                  </div>
+                  <div className="admin-kpi-footer">
+                    <button
+                      type="button"
+                      className="admin-kpi-link-btn"
+                      onClick={() => {
+                        handleSelectGroup('governance');
+                        handleSelectTab('audit-logs');
+                      }}
+                      title="Inspect student activity and security audit trail"
+                    >
+                      Inspect Audit Trail ({auditStats?.totalActivitiesLogged || 0}) ➔
+                    </button>
+                  </div>
+                </div>
+
+                {/* 8. At-Risk Monitoring */}
+                <div className="glass-card admin-kpi-card">
+                  <div className="kpi-accent-stripe stripe-rose"></div>
+                  <div className="admin-kpi-header">
+                    <span className="admin-kpi-icon-badge kpi-rose">⚠️</span>
+                    <span className="admin-kpi-tag tag-rose">Policy Monitor</span>
+                  </div>
+                  <div className="admin-kpi-body">
+                    <span className="admin-kpi-number text-rose">
+                      {atRiskLoading ? '...' : atRiskError ? <span className="text-warning" style={{ fontSize: '1.2rem' }}>Unavailable</span> : (atRiskCount ?? 0)}
+                    </span>
+                    <h4 className="admin-kpi-title">At-Risk Students</h4>
+                    <p className="admin-kpi-desc">
+                      {atRiskError ? 'Risk engine unreachable' : `${criticalRiskCount ?? 0} High/Critical · ${lockedAccountsCount ?? 0} Locked`}
+                    </p>
+                  </div>
+                  <div className="admin-kpi-footer">
+                    <button
+                      type="button"
+                      className="admin-kpi-link-btn text-rose"
+                      onClick={() => {
+                        handleSelectGroup('students');
+                        handleSelectTab('at-risk');
+                      }}
+                      title="Open predictive at-risk detection module"
+                    >
+                      Open At-Risk Engine ➔
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Phase 2.1: Enterprise Visual Charts & Insights Grid */}
+              <div className="admin-analytics-insights-grid" role="region" aria-label="Visual Analytics and Trend Insights">
+                {/* Insight 1: Readiness Distribution Chart */}
+                <div className="glass-card admin-insight-card">
+                  <div className="admin-insight-header">
+                    <div>
+                      <h4 className="admin-insight-title">Placement Readiness Distribution</h4>
+                      <p className="admin-insight-subtitle">Mutually exclusive candidate segmentation across PRI tiers (Unweighted)</p>
+                    </div>
+                    <span className="admin-insight-pill">{studentsError ? 'Telemetry Offline' : loading ? '...' : `Cohort N = ${totalStudentsCount}`}</span>
+                  </div>
+
+                  {/* Segmented Visual Distribution Bar */}
+                  <div className="readiness-distribution-bar-wrapper">
+                    <div className="readiness-distribution-bar" role="progressbar" aria-label="Readiness Distribution Overview">
+                      {readinessBrackets.map((b) => (
+                        b.count > 0 && (
+                          <div
+                            key={b.label}
+                            className="readiness-distribution-segment"
+                            style={{ width: `${b.share}%`, background: b.color }}
+                            title={`${b.category} (${b.label}): ${b.count} candidates (${b.share}%)`}
+                          ></div>
+                        )
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Accessible Table for Screen Readers */}
+                  <table className="sr-only">
+                    <caption>Placement Readiness Distribution Summary</caption>
+                    <thead>
+                      <tr><th>Bracket</th><th>Tier Name</th><th>Candidates</th><th>Share</th></tr>
+                    </thead>
+                    <tbody>
+                      {readinessBrackets.map(b => (
+                        <tr key={b.label}><td>{b.label}</td><td>{b.category}</td><td>{b.count}</td><td>{b.share}%</td></tr>
+                      ))}
+                    </tbody>
+                  </table>
+
+                  {/* Interactive Bracket Chips */}
+                  <div className="readiness-brackets-grid">
+                    {readinessBrackets.map((b) => {
+                      const isFilterActive = rosterTierFilter === b.id;
+                      return (
+                        <div
+                          key={b.label}
+                          className={`readiness-bracket-item ${isFilterActive ? 'active-bracket-filter' : ''}`}
+                          onClick={() => {
+                            setRosterTierFilter(isFilterActive ? 'all' : b.id);
+                            const el = document.getElementById('student-preparedness-roster');
+                            if (el) el.scrollIntoView({ behavior: 'smooth' });
+                          }}
+                          title={`Click to ${isFilterActive ? 'clear' : 'filter roster by'} ${b.category}`}
+                          style={{ cursor: 'pointer' }}
+                        >
+                          <div className="bracket-item-header">
+                            <span className={`bracket-dot ${b.dotClass}`}></span>
+                            <span className="bracket-label">{b.label}</span>
+                            <span className="bracket-count">{b.count}</span>
+                          </div>
+                          <div className="bracket-item-body">
+                            <span className="bracket-category">{b.category}</span>
+                            <span className="bracket-share">{b.share}% of pool {isFilterActive ? '✓' : ''}</span>
+                          </div>
+                          <div className="bracket-mini-bar-outer" title={`${b.share}% cohort share`}>
+                            <div className="bracket-mini-bar-fill" style={{ width: `${b.share}%`, background: b.color }} />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  <div className="admin-insight-footer">
+                    <span>💡 <strong>Insight:</strong> {jobReadyPercentage}% of candidates meet the corporate benchmark (PRI ≥ 80%). Click any bracket to filter roster.</span>
+                  </div>
+                </div>
+
+                {/* Insight 2: Department Cohort Readiness */}
+                <div className="glass-card admin-insight-card">
+                  <div className="admin-insight-header">
+                    <div>
+                      <h4 className="admin-insight-title">Department Cohort Preparedness</h4>
+                      <p className="admin-insight-subtitle">Unweighted branch average PRI compared against cohort benchmark ({averageReadinessScore}%)</p>
+                    </div>
+                    <span className="admin-insight-pill">{studentsError ? 'Telemetry Offline' : loading ? '...' : `Benchmark: ${averageReadinessScore}%`}</span>
+                  </div>
+
+                  {/* Department Comparison Bars */}
+                  <div className="department-comparison-container">
+                    {studentsError ? (
+                      <div className="admin-empty-chart-state">
+                        <span style={{ fontSize: '1.8rem', display: 'block', marginBottom: '8px' }}>⚠️</span>
+                        <span className="text-warning">Department telemetry offline. Unable to calculate department cohorts.</span>
+                      </div>
+                    ) : departmentBreakdown.length > 0 ? (
+                      departmentBreakdown.map((dept, deptIdx) => {
+                        const isBranchActive = rosterBranchFilter.toUpperCase() === dept.name.toUpperCase();
+                        return (
+                          <div
+                            key={dept.name}
+                            className={`department-bar-row ${isBranchActive ? 'active-branch-filter' : ''}`}
+                            onClick={() => {
+                              setRosterBranchFilter(isBranchActive ? 'all' : dept.name);
+                              const el = document.getElementById('student-preparedness-roster');
+                              if (el) el.scrollIntoView({ behavior: 'smooth' });
+                            }}
+                            title={`Click to ${isBranchActive ? 'clear' : 'filter roster by'} ${dept.name} branch`}
+                            style={{ cursor: 'pointer' }}
+                          >
+                            <div className="department-bar-meta">
+                              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                                <span className="dept-rank-badge" title={`Cohort Rank #${deptIdx + 1}`}>#{deptIdx + 1}</span>
+                                <span className="department-name-badge">
+                                  {dept.name} {isBranchActive ? '✓' : ''}
+                                </span>
+                              </div>
+                              <span className="department-candidates-count">{dept.count} candidates ({dept.readyCount} ready)</span>
+                              <strong className="department-score-val">{dept.avgScore}%</strong>
+                            </div>
+                            <div className="department-bar-outer">
+                              <div
+                                className="department-bar-fill"
+                                style={{
+                                  width: `${dept.avgScore}%`,
+                                  background: dept.avgScore >= 80 ? 'linear-gradient(90deg, #10b981, #059669)' :
+                                              dept.avgScore >= 70 ? 'linear-gradient(90deg, #6366f1, #38bdf8)' :
+                                              'linear-gradient(90deg, #f59e0b, #ef4444)'
+                                }}
+                              ></div>
+                              <div
+                                className="department-benchmark-line"
+                                style={{ left: `${averageReadinessScore}%` }}
+                                title={`Cohort Benchmark Average: ${averageReadinessScore}%`}
+                              ></div>
+                            </div>
+                          </div>
+                        );
+                      })
+                    ) : (
+                      <div className="admin-empty-chart-state">
+                        <span style={{ fontSize: '1.8rem', display: 'block', marginBottom: '8px' }}>🏢</span>
+                        <span>No department cohort data available in current scope.</span>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="admin-insight-footer">
+                    <span className="benchmark-legend">
+                      <span className="benchmark-line-sample"></span> Cohort Average Benchmark: <strong>{averageReadinessScore}%</strong>. Click branch row to filter.
+                    </span>
+                  </div>
+                </div>
+
+                {/* Insight 3: Platform Engagement by Category */}
+                <div className="glass-card admin-insight-card">
+                  <div className="admin-insight-header">
+                    <div>
+                      <h4 className="admin-insight-title">Platform Activity Distribution</h4>
+                      <p className="admin-insight-subtitle">Operations logged across administrative & student learning subsystems</p>
+                    </div>
+                    <span className="admin-insight-pill">{auditStatsLoading ? '...' : auditStatsError ? 'Telemetry Offline' : `${auditStats?.totalActivitiesLogged ?? 0} Total Actions`}</span>
+                  </div>
+
+                  <div className="activity-categories-list">
+                    {auditStatsLoading ? (
+                      <div className="admin-empty-chart-state">
+                        <span>Loading audit telemetry operations...</span>
+                      </div>
+                    ) : auditStatsError ? (
+                      <div className="admin-empty-chart-state">
+                        <span className="text-warning">⚠️ {auditStatsError}</span>
+                      </div>
+                    ) : auditStats?.categoryCounts && auditStats.categoryCounts.length > 0 ? (
+                      auditStats.categoryCounts.map((cat) => {
+                        const total = auditStats.totalActivitiesLogged || 1;
+                        const pct = Math.round((cat.count / total) * 100);
+                        return (
+                          <div key={cat._id || 'general'} className="activity-category-row">
+                            <div className="activity-category-meta">
+                              <span className="activity-category-name">{cat._id || 'System Operations'}</span>
+                              <div className="activity-category-metrics">
+                                <span className="activity-count-badge">{cat.count} actions</span>
+                                <strong className="activity-pct-val">{pct}%</strong>
+                              </div>
+                            </div>
+                            <div className="activity-bar-outer">
+                              <div className="activity-bar-fill" style={{ width: `${pct}%` }}></div>
+                            </div>
+                          </div>
+                        );
+                      })
+                    ) : (
+                      <div className="admin-empty-chart-state">
+                        <span>0 audit logs recorded. Stream populates as user sessions occur.</span>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="admin-insight-footer">
+                    <button
+                      type="button"
+                      className="admin-kpi-link-btn"
+                      onClick={() => {
+                        handleSelectGroup('governance');
+                        handleSelectTab('audit-logs');
+                      }}
+                    >
+                      Inspect Audit Trail Logs ➔
+                    </button>
+                  </div>
+                </div>
+
+                {/* Insight 4: Institutional Risk & Policy Health */}
+                <div className="glass-card admin-insight-card">
+                  <div className="admin-insight-header">
+                    <div>
+                      <h4 className="admin-insight-title">Risk & Compliance Health</h4>
+                      <p className="admin-insight-subtitle">Multi-dimensional policy governance & automated dropout risk</p>
+                    </div>
+                    <span className={`admin-insight-pill ${atRiskError ? 'pill-warning' : (lockedAccountsCount || 0) > 0 ? 'pill-warning' : 'pill-success'}`}>
+                      {atRiskError ? 'Offline' : atRiskLoading ? '...' : `${lockedAccountsCount ?? 0} Locked`}
+                    </span>
+                  </div>
+
+                  <div className="risk-health-summary-grid">
+                    <div
+                      className="risk-health-metric-tile tile-danger"
+                      onClick={() => {
+                        handleSelectGroup('students');
+                        handleSelectTab('at-risk');
+                      }}
+                      style={{ cursor: 'pointer' }}
+                      title="View High & Critical Risk candidates in At-Risk Engine"
+                    >
+                      <span className="risk-tile-number">
+                        {atRiskLoading ? '...' : atRiskError ? 'Offline' : (criticalRiskCount ?? 0)}
+                      </span>
+                      <span className="risk-tile-label">High / Critical Risk</span>
+                      <span className="risk-tile-sub">Score ≥ 50% threshold</span>
+                    </div>
+
+                    <div
+                      className="risk-health-metric-tile tile-warning"
+                      onClick={() => {
+                        handleSelectGroup('students');
+                        handleSelectTab('at-risk');
+                      }}
+                      style={{ cursor: 'pointer' }}
+                      title="View locked accounts in At-Risk Engine"
+                    >
+                      <span className="risk-tile-number">
+                        {atRiskLoading ? '...' : atRiskError ? 'Offline' : (lockedAccountsCount ?? 0)}
+                      </span>
+                      <span className="risk-tile-label">Accounts Locked</span>
+                      <span className="risk-tile-sub">Policy enforcement active</span>
+                    </div>
+
+                    <div
+                      className="risk-health-metric-tile tile-info"
+                      onClick={() => {
+                        handleSelectGroup('students');
+                        handleSelectTab('at-risk');
+                      }}
+                      style={{ cursor: 'pointer' }}
+                      title="View inactive students in At-Risk Engine"
+                    >
+                      <span className="risk-tile-number">
+                        {atRiskLoading ? '...' : atRiskError ? 'Offline' : (inactive7DaysCount ?? 0)}
+                      </span>
+                      <span className="risk-tile-label">7-Day Inactive</span>
+                      <span className="risk-tile-sub">Eligible for lockout</span>
+                    </div>
+
+                    <div
+                      className="risk-health-metric-tile tile-success"
+                      onClick={() => {
+                        handleSelectGroup('students');
+                        handleSelectTab('at-risk');
+                      }}
+                      style={{ cursor: 'pointer' }}
+                      title="View safe students with regular velocity"
+                    >
+                      <span className="risk-tile-number">
+                        {atRiskLoading ? '...' : atRiskError ? 'Offline' : (safeStudentsCount ?? 0)}
+                      </span>
+                      <span className="risk-tile-label">Safe & Consistent</span>
+                      <span className="risk-tile-sub">Normal practice velocity</span>
+                    </div>
+                  </div>
+
+                  <div className="admin-insight-footer" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                    <span className="text-secondary" style={{ fontSize: '11.5px', lineHeight: '1.4' }}>
+                      * Multi-dimensional note: Categories represent distinct policy dimensions. A student may be High Risk and concurrently Locked or Inactive.
+                    </span>
+                    <button
+                      type="button"
+                      className="btn btn-primary btn-sm"
+                      onClick={() => {
+                        handleSelectGroup('students');
+                        handleSelectTab('at-risk');
+                      }}
+                      style={{ padding: '6px 14px', fontSize: '12px' }}
+                    >
+                      Open At-Risk Engine ➔
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Phase 2.1: Student Preparedness Roster with Interactive Filters */}
+              <div id="student-preparedness-roster" className="glass-card student-roster-card" style={{ marginTop: '24px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', marginBottom: '14px' }}>
                   <div>
                     <h3 style={{ margin: 0 }}>Student Preparedness Roster</h3>
-                    <p className="card-desc" style={{ margin: '4px 0 0' }}>Comprehensive log of students ranked by Placement Readiness Index (PRI).</p>
+                    <p className="card-desc" style={{ margin: '4px 0 0' }}>Comprehensive candidate roster ranked by Placement Readiness Index (PRI).</p>
                   </div>
-                  <button
-                    type="button"
-                    className="btn btn-primary btn-sm"
-                    onClick={downloadStudentsRosterCSV}
-                    disabled={!students.length}
-                    style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
-                  >
-                    📥 Download Students Report (CSV)
-                  </button>
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                    <button
+                      type="button"
+                      className="btn btn-primary btn-sm"
+                      onClick={downloadStudentsRosterCSV}
+                      disabled={!students.length}
+                      style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                    >
+                      📥 Download Roster (CSV)
+                    </button>
+                  </div>
+                </div>
+
+                {/* Interactive Roster Filter Toolbar */}
+                <div className="roster-filter-toolbar">
+                  <div className="roster-filter-item">
+                    <input
+                      type="text"
+                      className="form-control roster-filter-input"
+                      placeholder="🔍 Search candidate name, email, roll..."
+                      value={rosterSearch}
+                      onChange={(e) => setRosterSearch(e.target.value)}
+                    />
+                  </div>
+                  <div className="roster-filter-item">
+                    <select
+                      className="form-control roster-filter-select"
+                      value={rosterTierFilter}
+                      onChange={(e) => setRosterTierFilter(e.target.value)}
+                    >
+                      <option value="all">All Readiness Tiers</option>
+                      <option value="job-ready">Job-Ready (PRI ≥ 80%)</option>
+                      <option value="90-100">Elite Mastery (90–100%)</option>
+                      <option value="80-89">Interview Ready (80–89%)</option>
+                      <option value="70-79">Developing (70–79%)</option>
+                      <option value="60-69">Foundational (60–69%)</option>
+                      <option value="<60">Needs Practice (&lt;60%)</option>
+                      <option value="medium">Medium (50–79%)</option>
+                      <option value="low">Low (&lt;50%)</option>
+                    </select>
+                  </div>
+                  <div className="roster-filter-item">
+                    <select
+                      className="form-control roster-filter-select"
+                      value={rosterBranchFilter}
+                      onChange={(e) => setRosterBranchFilter(e.target.value)}
+                    >
+                      <option value="all">All Departments / Branches</option>
+                      {cohortBranches.map((b) => (
+                        <option key={b} value={b}>{b}</option>
+                      ))}
+                    </select>
+                  </div>
+                  {(rosterSearch || rosterTierFilter !== 'all' || rosterBranchFilter !== 'all') && (
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-sm roster-reset-btn"
+                      onClick={() => {
+                        setRosterSearch('');
+                        setRosterTierFilter('all');
+                        setRosterBranchFilter('all');
+                      }}
+                      title="Clear active roster filters"
+                    >
+                      ✕ Reset Filters (Showing {filteredRosterStudents.length} of {students.length})
+                    </button>
+                  )}
                 </div>
 
                 <div className="table-responsive-wrapper">
@@ -3925,6 +5205,7 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
                       <tr>
                         <th>Student Name</th>
                         <th>Email Address</th>
+                        <th>Branch</th>
                         <th>Target Role</th>
                         <th>PRI Score</th>
                         <th>Status</th>
@@ -3932,53 +5213,123 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
                       </tr>
                     </thead>
                     <tbody>
-                      {students.length > 0 ? (
-                        students.map((student) => (
+                      {paginatedRosterStudents.length > 0 ? (
+                        paginatedRosterStudents.map((student) => (
                           <tr key={student._id}>
                             <td>
                               <div className="table-student-name">
                                 <span className="table-avatar">{student.name.charAt(0).toUpperCase()}</span>
-                                <span>{student.name}</span>
+                                <div>
+                                  <strong>{student.name}</strong>
+                                  <span style={{ display: 'block', fontSize: '11px', color: '#94a3b8' }}>
+                                    {student.rollNumber || 'N/A'}
+                                  </span>
+                                </div>
                               </div>
                             </td>
                             <td>{student.email}</td>
+                            <td>
+                              <span className="department-name-badge" style={{ fontSize: '11px', padding: '2px 8px' }}>
+                                {student.branch || 'General'}
+                              </span>
+                            </td>
                             <td className="text-secondary">{student.targetRole || 'Software Engineer'}</td>
                             <td>
                               <strong className="text-glow">{student.readinessScore}%</strong>
                             </td>
                             <td>
-                              <span className={`pri-level-badge scale-down`} data-level={student.readinessScore >= 80 ? 'high' : student.readinessScore >= 50 ? 'medium' : 'low'}>
+                              <span className="pri-level-badge scale-down" data-level={student.readinessScore >= 80 ? 'high' : student.readinessScore >= 50 ? 'medium' : 'low'}>
                                 {student.readinessScore >= 80 ? 'Job Ready' : student.readinessScore >= 50 ? 'Medium' : 'Low'}
                               </span>
                             </td>
                             <td>
                               <div style={{ display: 'flex', justifyContent: 'center', gap: '8px' }}>
-                                <button
-                                  className="btn btn-secondary btn-sm"
-                                  onClick={() => openAcademicsModal(student)}
-                                  title="Edit Academics"
-                                >
-                                  🎓 Academics
-                                </button>
-                                <button
-                                  className="btn btn-danger btn-sm"
-                                  onClick={() => handleDeleteStudent(student._id, student.name)}
-                                  title="Remove Student"
-                                >
-                                  🗑 Remove
-                                </button>
+                                {isSuperAdmin(user) ? (
+                                  <span className="badge roster-readonly-badge">
+                                    🔒 Executive Oversight
+                                  </span>
+                                ) : (
+                                  <>
+                                    <button
+                                      className="btn btn-secondary btn-sm"
+                                      onClick={() => openAcademicsModal(student)}
+                                      title="Edit Academics"
+                                    >
+                                      🎓 Academics
+                                    </button>
+                                    <button
+                                      className="btn btn-danger btn-sm"
+                                      onClick={() => handleDeleteStudent(student._id, student.name)}
+                                      title="Remove Student"
+                                    >
+                                      🗑 Remove
+                                    </button>
+                                  </>
+                                )}
                               </div>
                             </td>
                           </tr>
                         ))
                       ) : (
                         <tr>
-                          <td colSpan="6" className="table-empty-msg">No students registered yet.</td>
+                          <td colSpan="7" className="table-empty-msg">
+                            {students.length === 0 ? 'No students registered in current scope.' : 'No students match current filter criteria.'}
+                          </td>
                         </tr>
                       )}
                     </tbody>
                   </table>
                 </div>
+
+                {/* Roster Pagination Toolbar */}
+                {filteredRosterStudents.length > 0 && (
+                  <div className="roster-pagination-bar">
+                    <div className="roster-pagination-info">
+                      Showing <strong>{(rosterPage - 1) * rosterPageSize + 1}</strong>–<strong>{Math.min(rosterPage * rosterPageSize, filteredRosterStudents.length)}</strong> of <strong>{filteredRosterStudents.length}</strong> candidates
+                    </div>
+                    <div className="roster-pagination-controls">
+                      <div className="roster-page-size-selector">
+                        <label htmlFor="rosterPageSizeSelect">Rows per page:</label>
+                        <select
+                          id="rosterPageSizeSelect"
+                          className="form-control roster-page-size-select"
+                          value={rosterPageSize}
+                          onChange={(e) => {
+                            setRosterPageSize(Number(e.target.value));
+                            setRosterPage(1);
+                          }}
+                        >
+                          <option value={10}>10</option>
+                          <option value={25}>25</option>
+                          <option value={50}>50</option>
+                        </select>
+                      </div>
+                      <div className="roster-pagination-buttons">
+                        <button
+                          type="button"
+                          className="btn btn-secondary btn-sm roster-page-nav-btn"
+                          onClick={() => setRosterPage(prev => Math.max(1, prev - 1))}
+                          disabled={rosterPage === 1}
+                          aria-label="Previous page"
+                        >
+                          ‹ Prev
+                        </button>
+                        <span className="roster-page-indicator">
+                          Page <strong>{rosterPage}</strong> of <strong>{totalRosterPages}</strong>
+                        </span>
+                        <button
+                          type="button"
+                          className="btn btn-secondary btn-sm roster-page-nav-btn"
+                          onClick={() => setRosterPage(prev => Math.min(totalRosterPages, prev + 1))}
+                          disabled={rosterPage === totalRosterPages}
+                          aria-label="Next page"
+                        >
+                          Next ›
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             </>
           )
@@ -7055,7 +8406,7 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
                               >
                                 ➕ Assign Scope
                               </button>
-                              {staff.isSuperAdmin || staff.email?.toLowerCase() === 'vaddeajaykumar2004@gmail.com' ? (
+                              {isSuperAdmin(staff) || staff.isSuperAdmin ? (
                                 <span className="protected-super-admin-badge" title="Super Admin account cannot be removed or deleted">
                                   🛡️ Protected Super Admin
                                 </span>
@@ -7085,13 +8436,28 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
             {/* Split Form: Assign Scope & Create Staff */}
             <div className="admin-split-layout" id="assignScopeFormCard">
               {/* Assign Academic Scope to Staff */}
-              <div className="glass-card">
-                <h4>🎯 Assign Academic Scope to Staff</h4>
-                <p className="card-desc">
-                  Assign different academic years, branches, sections, or subjects to any faculty member or administrator. Multiple distinct scopes can be assigned to the same staff member.
-                </p>
+              {isSuperAdmin(user) ? (
+                <div className="glass-card" style={{ borderLeft: '4px solid #818cf8', padding: '24px' }}>
+                  <h4 style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '0 0 10px 0' }}>
+                    <span>🏛️</span> Institutional Academic Scope Governance
+                  </h4>
+                  <p className="card-desc" style={{ marginTop: '8px', lineHeight: 1.6, fontSize: '13px' }}>
+                    Academic scope assignments (Year, Branch, Section, Subject) are configured at the institutional campus level by designated Campus Administrators. Platform Super Administrators maintain system-wide governance, global directories, and security audit oversight without operational scope mutations.
+                  </p>
+                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '6px 14px', background: 'rgba(99, 102, 241, 0.1)', border: '1px solid rgba(99, 102, 241, 0.25)', borderRadius: '6px', fontSize: '12px', color: '#c7d2fe', marginTop: '12px' }}>
+                    <span>✓ Campus Boundary Enforced</span>
+                    <span>•</span>
+                    <span>{staffMembers.length} Staff Indexed</span>
+                  </div>
+                </div>
+              ) : (
+                <div className="glass-card">
+                  <h4>🎯 Assign Academic Scope to Staff</h4>
+                  <p className="card-desc">
+                    Assign different academic years, branches, sections, or subjects to any faculty member or administrator. Multiple distinct scopes can be assigned to the same staff member.
+                  </p>
 
-                <form className="admin-job-form mt-20" onSubmit={saveStaffScope}>
+                  <form className="admin-job-form mt-20" onSubmit={saveStaffScope}>
                   <div className="form-group">
                     <label className="form-label">Select Staff Member *</label>
                     <select
@@ -7153,6 +8519,7 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
                   </button>
                 </form>
               </div>
+              )}
 
               {/* Create Staff Account Cards */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
@@ -7180,7 +8547,7 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
                   </form>
                 </div>
 
-                {user?.email?.toLowerCase() === 'vaddeajaykumar2004@gmail.com' && (
+                {isSuperAdmin(user) && (
                   <div className="glass-card">
                     <h4>➕ Create Administrator Account</h4>
                     <p className="card-desc">Add an administrator to monitor student progress and academic scopes.</p>
@@ -7228,25 +8595,41 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
                   </button>
                 </div>
 
-                <div className="settings-action-card">
-                  <h4>⚠️ Bulk Decommission by Academy Year</h4>
-                  <p className="text-secondary small mt-5" style={{ marginBottom: '15px' }}>
-                    Permanently delete all candidate profiles, solution records, resumes, tests and mock sessions matching the specified academic year. This action is irreversible.
-                  </p>
-                  <form onSubmit={handleBulkDeleteStudents} style={{ display: 'flex', gap: '12px' }}>
-                    <input
-                      type="text"
-                      className="form-control"
-                      placeholder="Enter Year (e.g. 2026)"
-                      value={deleteYear}
-                      onChange={(e) => setDeleteYear(e.target.value)}
-                      required
-                    />
-                    <button type="submit" className="btn btn-danger" disabled={deletingBulk}>
-                      {deletingBulk ? 'Decommissioning...' : 'Bulk Delete Candidates'}
-                    </button>
-                  </form>
-                </div>
+                {isSuperAdmin(user) ? (
+                  <div className="settings-action-card" style={{ borderLeft: '4px solid #818cf8', padding: '16px', background: 'rgba(99, 102, 241, 0.05)', borderRadius: '8px' }}>
+                    <h4 style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '0 0 10px 0' }}>
+                      <span>🏛️</span> Institutional Candidate Lifecycle Governance
+                    </h4>
+                    <p className="text-secondary small mt-5" style={{ marginBottom: '12px', lineHeight: 1.6 }}>
+                      Cohort decommissioning and bulk student removals are restricted to designated Campus Administrators to prevent accidental cross-campus data loss. Platform Super Administrators maintain immutable audit logs and global registry oversight without mass student purge authority.
+                    </p>
+                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '6px 14px', background: 'rgba(99, 102, 241, 0.1)', border: '1px solid rgba(99, 102, 241, 0.25)', borderRadius: '6px', fontSize: '12px', color: '#c7d2fe' }}>
+                      <span>🛡️ Protected Role Policy Enforced</span>
+                      <span>•</span>
+                      <span>Decommissioning Delegated to Campus Admin</span>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="settings-action-card">
+                    <h4>⚠️ Bulk Decommission by Academy Year</h4>
+                    <p className="text-secondary small mt-5" style={{ marginBottom: '15px' }}>
+                      Permanently delete all candidate profiles, solution records, resumes, tests and mock sessions matching the specified academic year. This action is irreversible.
+                    </p>
+                    <form onSubmit={handleBulkDeleteStudents} style={{ display: 'flex', gap: '12px' }}>
+                      <input
+                        type="text"
+                        className="form-control"
+                        placeholder="Enter Year (e.g. 2026)"
+                        value={deleteYear}
+                        onChange={(e) => setDeleteYear(e.target.value)}
+                        required
+                      />
+                      <button type="submit" className="btn btn-danger" disabled={deletingBulk}>
+                        {deletingBulk ? 'Decommissioning...' : 'Bulk Delete Candidates'}
+                      </button>
+                    </form>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -7262,37 +8645,114 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
               <div className="glass-card admin-summary-card">
                 <span className="summary-title" style={{ color: '#38bdf8' }}>⏱️ Total Student Active Time</span>
                 <span className="admin-stat-number" style={{ color: '#38bdf8' }}>
-                  {auditStats?.totalHours || '0.0'} hrs
+                  {auditStatsLoading ? '...' : auditStatsError ? <span className="text-warning" style={{ fontSize: '1.2rem' }}>Unavailable</span> : `${auditStats?.totalHours || '0.0'} hrs`}
                 </span>
                 <p className="admin-stat-sub">
-                  Cumulative student engagement ({auditStats?.totalActiveTimeFormatted || '0s'})
+                  {auditStatsError ? 'Audit telemetry unreachable' : `Cumulative student engagement (${auditStats?.totalActiveTimeFormatted || '0s'})`}
                 </p>
               </div>
 
               <div className="glass-card admin-summary-card">
                 <span className="summary-title" style={{ color: '#34d399' }}>🟢 Currently Online</span>
                 <span className="admin-stat-number" style={{ color: '#34d399' }}>
-                  {auditStats?.onlineNowCount ?? 0}
+                  {auditStatsLoading ? '...' : auditStatsError ? <span className="text-warning" style={{ fontSize: '1.2rem' }}>Unavailable</span> : (auditStats?.onlineNowCount ?? 0)}
                 </span>
-                <p className="admin-stat-sub">Students active in the last 3 minutes</p>
+                <p className="admin-stat-sub">
+                  {auditStatsError ? 'Live telemetry unreachable' : 'Students active in the last 3 minutes'}
+                </p>
               </div>
 
               <div className="glass-card admin-summary-card">
                 <span className="summary-title" style={{ color: '#fbbf24' }}>📅 Active Today</span>
                 <span className="admin-stat-number" style={{ color: '#fbbf24' }}>
-                  {auditStats?.activeTodayCount ?? 0}
+                  {auditStatsLoading ? '...' : auditStatsError ? <span className="text-warning" style={{ fontSize: '1.2rem' }}>Unavailable</span> : (auditStats?.activeTodayCount ?? 0)}
                 </span>
-                <p className="admin-stat-sub">Unique candidates logged in today</p>
+                <p className="admin-stat-sub">
+                  {auditStatsError ? 'Session telemetry unreachable' : 'Unique candidates logged in today'}
+                </p>
               </div>
 
               <div className="glass-card admin-summary-card">
                 <span className="summary-title" style={{ color: '#818cf8' }}>📊 Total Logged Activities</span>
                 <span className="admin-stat-number" style={{ color: '#818cf8' }}>
-                  {auditStats?.totalActivitiesLogged ?? 0}
+                  {auditStatsLoading ? '...' : auditStatsError ? <span className="text-warning" style={{ fontSize: '1.2rem' }}>Unavailable</span> : (auditStats?.totalActivitiesLogged ?? 0)}
                 </span>
-                <p className="admin-stat-sub">Tests, labs, discussions & sessions tracked</p>
+                <p className="admin-stat-sub">
+                  {auditStatsError ? 'Event store unreachable' : 'Tests, labs, discussions & sessions tracked'}
+                </p>
               </div>
             </div>
+
+            {/* Phase 7: Audit Metrics Interpretation & Methodology Guide */}
+            <div className="audit-methodology-guide glass-card" style={{ padding: '16px 20px', marginBottom: '20px', borderLeft: '4px solid #818cf8', background: 'rgba(99, 102, 241, 0.05)' }}>
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
+                <span style={{ fontSize: '20px', marginTop: '2px' }}>ℹ️</span>
+                <div style={{ flex: 1 }}>
+                  <h5 style={{ margin: '0 0 6px 0', color: '#e2e8f0', fontSize: '13.5px', fontWeight: 600 }}>
+                    Audited Engagement Methodology & Compliance Standards
+                  </h5>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '10px', fontSize: '12px', color: '#94a3b8', lineHeight: 1.5 }}>
+                    <div>
+                      <strong style={{ color: '#c7d2fe' }}>⏱️ Logged Active Hours:</strong> Cumulative time candidates spend actively engaging with learning modules, tests, labs, and discussions. Measured via authenticated client heartbeats at 1-minute intervals; idle sessions (&gt;3 minutes) are paused automatically.
+                    </div>
+                    <div>
+                      <strong style={{ color: '#c7d2fe' }}>🏆 Engagement Rankings (#1–#5):</strong> Relative standing among active candidates determined strictly by verified session duration. Sensitive authentication credentials, passwords, and tokens are strictly excluded from all governance summaries.
+                    </div>
+                    <div>
+                      <strong style={{ color: '#c7d2fe' }}>🛡️ Governance & Accreditation:</strong> Granular logs capture timestamps, role, action, and originating IP to support institutional accreditation (NAAC Criteria 5.2.1 / NBA) while enforcing campus privacy boundaries.
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Phase 6 & 7: Privacy-Safe Audited Engagement Leaders Summary */}
+            {auditStats?.topStudents && auditStats.topStudents.length > 0 && (
+              <div className="glass-card" style={{ padding: '20px', marginBottom: '22px', borderLeft: '4px solid #38bdf8' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px', marginBottom: '14px' }}>
+                  <div>
+                    <h4 style={{ margin: 0, color: '#f8fafc', fontSize: '15px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span>🏆</span>
+                      <span>Verified Active Engagement Leaders (Top Candidates)</span>
+                    </h4>
+                    <p style={{ margin: '4px 0 0', color: '#94a3b8', fontSize: '12.5px' }}>
+                      Highest cumulative platform participation verified through authenticated heartbeat monitoring. Sensitive authentication tokens, passwords, and private identifiers are strictly scrubbed.
+                    </p>
+                  </div>
+                  <span className="badge badge-info" style={{ fontSize: '11px', padding: '4px 10px' }}>
+                    🛡️ Privacy-Safe Governance
+                  </span>
+                </div>
+
+                <div className="audit-top-students-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
+                  {auditStats.topStudents.map((topStudent, index) => (
+                    <div key={topStudent._id || index} className="audit-top-student-card">
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                        <span
+                          style={{ fontSize: '11px', fontWeight: 700, color: index === 0 ? '#fbbf24' : index === 1 ? '#cbd5e1' : index === 2 ? '#cd7f32' : '#94a3b8' }}
+                          title="Verified cohort engagement rank by cumulative authenticated time"
+                        >
+                          #{index + 1} Cohort Leader
+                        </span>
+                        <span style={{ fontFamily: 'monospace', fontSize: '11px', color: '#38bdf8', background: 'rgba(56, 189, 248, 0.1)', padding: '1px 6px', borderRadius: '4px' }}>
+                          {topStudent.branch || 'CSE'}
+                        </span>
+                      </div>
+                      <div style={{ fontWeight: 600, color: '#f1f5f9', fontSize: '13px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {topStudent.name}
+                      </div>
+                      <div style={{ fontSize: '11.5px', color: '#64748b', marginTop: '2px' }}>
+                        {topStudent.rollNumber || 'ID Verified'}
+                      </div>
+                      <div style={{ marginTop: '8px', paddingTop: '8px', borderTop: '1px solid rgba(255, 255, 255, 0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ fontSize: '11px', color: '#94a3b8' }} title="Verified cumulative active duration on learning and testing modules">Verified Time:</span>
+                        <strong style={{ fontSize: '12px', color: '#34d399' }}>{topStudent.totalActiveFormatted || `${topStudent.totalActiveHours}h`}</strong>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Header & Sub-Nav Switcher */}
             <div className="glass-card" style={{ padding: '20px', marginBottom: '20px' }}>

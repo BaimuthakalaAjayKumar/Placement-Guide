@@ -340,8 +340,14 @@ const UserSchema = new mongoose.Schema({
     type: Date,
     default: null
   },
-  resetPasswordToken: String,
-  resetPasswordExpire: Date,
+  resetPasswordToken: {
+    type: String,
+    select: false
+  },
+  resetPasswordExpire: {
+    type: Date,
+    select: false
+  },
   guardianContacts: [{
     name: { type: String, default: '' },
     relationship: { type: String, default: 'Parent' },

@@ -377,12 +377,12 @@ const buildStudentScopeFilter = (user) => {
  * @returns {boolean}
  */
 const canAccessCampus = (user, targetCampusId) => {
-  if (!user || !targetCampusId) return false;
+  if (!user) return false;
 
-  // Super Admin can access any campus
+  // Super Admin can access any campus or unscoped resources
   if (isSuperAdmin(user)) return true;
 
-  if (!user.campusId) return false;
+  if (!targetCampusId || !user.campusId) return false;
 
   return user.campusId.toString() === targetCampusId.toString();
 };

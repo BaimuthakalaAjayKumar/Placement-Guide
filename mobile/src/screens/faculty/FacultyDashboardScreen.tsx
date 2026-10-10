@@ -7,25 +7,33 @@ import { useNavigation } from '@react-navigation/native';
 import { THEME } from '../../utils/constants';
 
 export const FacultyDashboardScreen: React.FC = () => {
-  const { user, logout } = useAuth();
+  const { user, logout, isCachedSession } = useAuth();
   const navigation = useNavigation<any>();
 
   return (
     <ScreenContainer>
+      {isCachedSession && (
+        <View style={styles.cachedBadge}>
+          <Text style={styles.cachedBadgeText}>CACHED PROFILE (OFFLINE MODE)</Text>
+        </View>
+      )}
+
       <View style={styles.card}>
-        <Text style={styles.roleTag}>FACULTY INSTRUCTOR PORTAL</Text>
-        <Text style={styles.welcomeText}>Welcome, {user?.name || 'Faculty Member'}!</Text>
+        <View style={styles.roleTag}>
+          <Text style={styles.roleTagText}>FACULTY INSTRUCTOR</Text>
+        </View>
+        <Text style={styles.welcomeText}>{user?.name || 'Faculty Member'}</Text>
         <Text style={styles.metaText}>{user?.email || 'N/A'}</Text>
       </View>
 
       <View style={styles.infoCard}>
-        <Text style={styles.sectionTitle}>Assigned Academic Scope</Text>
+        <Text style={styles.sectionTitle}>Assigned Academic Scopes</Text>
         {user?.managedScopes && user.managedScopes.length > 0 ? (
           user.managedScopes.map((scope, index) => (
             <View key={index} style={styles.scopeRow}>
-              <Text style={styles.scopeYear}>Year: {scope.academicYear}</Text>
+              <Text style={styles.scopeYear}>Year {scope.academicYear}</Text>
               <Text style={styles.scopeDetails}>
-                {scope.branch || 'All'} - Section {scope.section || 'All'}
+                {scope.branch || 'All Branches'} • Section {scope.section || 'All'}
               </Text>
             </View>
           ))
@@ -37,15 +45,64 @@ export const FacultyDashboardScreen: React.FC = () => {
       </View>
 
       <View style={styles.infoCard}>
-        <Text style={styles.sectionTitle}>Attendance Control Hub</Text>
+        <Text style={styles.sectionTitle}>Classroom Attendance Hub</Text>
         <Text style={styles.bodyText}>
-          Faculty instructors can manage live classroom attendance sessions, generate dynamic 15-second rotating QR codes, track live checked-in rosters, and close sessions.
+          Initiate geofenced classroom sessions with 15-second rotating cryptographic QR codes, monitor live student check-ins, and finalize records.
         </Text>
         <Button
-          title="📋 Open Class Attendance Controller"
+          title="Launch Attendance Controller"
           onPress={() => navigation.navigate('FacultyAttendance')}
-          style={{ marginTop: 12, backgroundColor: '#10B981' }}
+          style={{ marginTop: 14, backgroundColor: '#10B981' }}
         />
+      </View>
+
+      <View style={styles.infoCard}>
+        <Text style={styles.sectionTitle}>Academic Operations & Registry</Text>
+        <Text style={styles.bodyText}>
+          Review your weekly teaching schedule, submit attendance corrections for student discrepancies, and monitor institutional alerts.
+        </Text>
+        <View style={{ flexDirection: 'row', marginTop: 12 }}>
+          <Button
+            title="Weekly Timetable"
+            onPress={() => navigation.navigate('Timetable')}
+            variant="outline"
+            style={{ flex: 1, marginRight: 6 }}
+          />
+          <Button
+            title="File Correction"
+            onPress={() => navigation.navigate('AttendanceDisputes')}
+            variant="outline"
+            style={{ flex: 1, marginLeft: 6 }}
+          />
+        </View>
+        <View style={{ flexDirection: 'row', marginTop: 10 }}>
+          <Button
+            title="Parent Contacts & Alerts"
+            onPress={() => navigation.navigate('FacultyGuardianAlerts')}
+            variant="outline"
+            style={{ flex: 1, marginRight: 6 }}
+          />
+          <Button
+            title="Notifications"
+            onPress={() => navigation.navigate('Notifications')}
+            variant="outline"
+            style={{ flex: 1, marginLeft: 6 }}
+          />
+        </View>
+        <View style={{ flexDirection: 'row', marginTop: 10 }}>
+          <Button
+            title="Grievance Desk"
+            onPress={() => navigation.navigate('ComplaintsFeedback')}
+            variant="outline"
+            style={{ flex: 1, marginRight: 6 }}
+          />
+          <Button
+            title="Records & Exports"
+            onPress={() => navigation.navigate('ReportsRecords')}
+            variant="outline"
+            style={{ flex: 1, marginLeft: 6 }}
+          />
+        </View>
       </View>
 
       <Button
@@ -59,6 +116,20 @@ export const FacultyDashboardScreen: React.FC = () => {
 };
 
 const styles = StyleSheet.create({
+  cachedBadge: {
+    backgroundColor: '#854D0E',
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+    borderRadius: 4,
+    alignSelf: 'flex-start',
+    marginBottom: 12,
+  },
+  cachedBadgeText: {
+    color: '#FEF08A',
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
   card: {
     backgroundColor: THEME.colors.surface,
     padding: THEME.spacing.lg,
@@ -69,14 +140,17 @@ const styles = StyleSheet.create({
   },
   roleTag: {
     alignSelf: 'flex-start',
-    backgroundColor: 'rgba(16, 185, 129, 0.2)',
-    color: '#34D399',
+    backgroundColor: 'rgba(16, 185, 129, 0.15)',
     paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-    fontSize: 11,
-    fontWeight: '700',
+    paddingVertical: 3,
+    borderRadius: 4,
     marginBottom: 8,
+  },
+  roleTagText: {
+    color: '#10B981',
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 0.5,
   },
   welcomeText: {
     fontSize: 22,
@@ -97,7 +171,7 @@ const styles = StyleSheet.create({
     marginBottom: THEME.spacing.md,
   },
   sectionTitle: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
     color: THEME.colors.text,
     marginBottom: 10,
@@ -105,7 +179,7 @@ const styles = StyleSheet.create({
   scopeRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingVertical: 6,
+    paddingVertical: 8,
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(255, 255, 255, 0.05)',
   },
@@ -121,13 +195,14 @@ const styles = StyleSheet.create({
   noScopeText: {
     fontSize: 13,
     color: THEME.colors.textMuted,
+    lineHeight: 18,
   },
   bodyText: {
-    fontSize: 14,
+    fontSize: 13,
     color: THEME.colors.textMuted,
-    lineHeight: 20,
+    lineHeight: 19,
   },
   logoutBtn: {
-    marginTop: THEME.spacing.md,
+    marginTop: THEME.spacing.xs,
   },
 });

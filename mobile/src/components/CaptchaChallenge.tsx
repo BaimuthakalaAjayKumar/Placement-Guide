@@ -195,10 +195,10 @@ export const CaptchaChallenge: React.FC<CaptchaChallengeProps> = ({
     <View style={styles.container}>
       <View style={[styles.card, disabled && styles.disabled]}>
         <View style={styles.headerRow}>
-          <Text style={styles.badgeText}>🛡️ Cloudflare Turnstile</Text>
+          <Text style={styles.badgeText}>Cloudflare Turnstile</Text>
           {status === 'verified' && (
             <View style={styles.statusVerifiedBadge}>
-              <Text style={styles.statusVerifiedText}>✓ Verified</Text>
+              <Text style={styles.statusVerifiedText}>Verified</Text>
             </View>
           )}
           {status === 'loading' && isKeyConfigured && (
@@ -217,7 +217,7 @@ export const CaptchaChallenge: React.FC<CaptchaChallengeProps> = ({
         {/* Explicit Error When EXPO_PUBLIC_TURNSTILE_SITE_KEY Is Missing */}
         {!isKeyConfigured && (
           <View style={styles.configErrorBox}>
-            <Text style={styles.configErrorTitle}>⚠️ Security Check Not Configured</Text>
+            <Text style={styles.configErrorTitle}>Security Check Not Configured</Text>
             <Text style={styles.configErrorText}>
               Turnstile CAPTCHA cannot load: EXPO_PUBLIC_TURNSTILE_SITE_KEY is not configured in this environment.
               Sign In is disabled for security.

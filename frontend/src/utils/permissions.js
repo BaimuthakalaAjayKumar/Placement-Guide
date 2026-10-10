@@ -583,8 +583,20 @@ export const hasAllPermissions = (user, permissions = []) => {
 };
 
 // Convenient Role Helpers
-export const isSuperAdmin = (user) => user && [ROLES.SUPER_ADMIN, ROLES.ADMIN].includes(normalizeRole(user.role));
-export const isCampusAdmin = (user) => user && normalizeRole(user.role) === ROLES.CAMPUS_ADMIN;
+export const isSuperAdmin = (user) => {
+  if (!user || !user.role) return false;
+  const role = normalizeRole(user.role);
+  if (role === ROLES.SUPER_ADMIN) return true;
+  if (role === ROLES.ADMIN && (!user.campusId || user.campusId === '')) return true;
+  return false;
+};
+export const isCampusAdmin = (user) => {
+  if (!user || !user.role) return false;
+  const role = normalizeRole(user.role);
+  if (role === ROLES.CAMPUS_ADMIN) return true;
+  if (role === ROLES.ADMIN && Boolean(user.campusId)) return true;
+  return false;
+};
 export const isAdministrator = (user) => user && [ROLES.ADMINISTRATOR, ROLES.ADMIN].includes(normalizeRole(user.role));
 export const isHOD = (user) => user && normalizeRole(user.role) === ROLES.HOD;
 export const isFaculty = (user) => user && normalizeRole(user.role) === ROLES.FACULTY;

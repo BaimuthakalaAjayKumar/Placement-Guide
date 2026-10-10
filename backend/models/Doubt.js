@@ -17,6 +17,20 @@ const DoubtSchema = new mongoose.Schema({
         required: [true, 'Please describe the doubt'],
         maxlength: 5000
     },
+    category: {
+        type: String,
+        default: 'General'
+    },
+    priority: {
+        type: String,
+        enum: ['low', 'standard', 'urgent'],
+        default: 'standard'
+    },
+    itemType: {
+        type: String,
+        enum: ['complaint', 'feedback', 'inquiry'],
+        default: 'complaint'
+    },
     imageUrl: {
         type: String,
         default: null

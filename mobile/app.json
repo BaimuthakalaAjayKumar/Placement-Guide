@@ -9,14 +9,25 @@
     "userInterfaceStyle": "light",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.campusbridge.mobile"
+      "bundleIdentifier": "com.campusbridge.mobile",
+      "infoPlist": {
+        "NSFaceIDUsageDescription": "CampusBridge uses Face ID for secure local biometric app unlock."
+      }
     },
     "android": {
       "package": "com.campusbridge.mobile",
       "permissions": [
         "CAMERA",
         "ACCESS_FINE_LOCATION",
-        "ACCESS_COARSE_LOCATION"
+        "ACCESS_COARSE_LOCATION",
+        "USE_BIOMETRIC",
+        "USE_FINGERPRINT",
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.USE_BIOMETRIC",
+        "android.permission.USE_FINGERPRINT"
       ],
       "adaptiveIcon": {
         "backgroundColor": "#0F172A",
@@ -38,10 +49,21 @@
         {
           "locationAlwaysAndWhenInUsePermission": "CampusBridge requires location access to verify attendance inside the designated lecture room geofence."
         }
+      ],
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "CampusBridge uses Face ID for secure local biometric app unlock."
+        }
       ]
     ],
     "web": {
       "favicon": "./assets/favicon.png"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "5173b1ea-0ed1-45e2-84c3-f2c47296b122"
+      }
     }
   }
 }

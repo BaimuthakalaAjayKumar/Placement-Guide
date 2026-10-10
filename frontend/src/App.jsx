@@ -12,47 +12,49 @@ import NaacReportGenerator from './components/NaacReportGenerator';
 import SkillGapHeatmap from './components/SkillGapHeatmap';
 import DriveHallTicketModal from './components/DriveHallTicketModal';
 
-// Pages
+// Core Authentication & Entry Pages (Eagerly loaded for instant first paint)
 import HomePage from './pages/HomePage';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
-import Dashboard from './pages/Dashboard';
-import ResumeAnalyzer from './pages/ResumeAnalyzer';
-import AptitudeTests from './pages/AptitudeTests';
-import MockInterviews from './pages/MockInterviews';
-import JobBoard from './pages/JobBoard';
-import AdminPanel from './pages/AdminPanel';
-import QuestionBank from './pages/QuestionBank';
-import PlagiarismAudit from './pages/PlagiarismAudit';
-import Contests from './pages/Contests';
-import ContestWorkspace from './pages/ContestWorkspace';
-import ContestReport from './pages/ContestReport';
-import ContestLeaderboard from './pages/ContestLeaderboard';
-import Profile from './pages/Profile';
-import DoubtSolver from './pages/DoubtSolver';
-import AdminDoubtSolver from './pages/AdminDoubtSolver';
-import FacultyDashboard from './pages/FacultyDashboard';
-import CoreCSEPrep from './pages/CoreCSEPrep';
-import ResumeBuilder from './pages/ResumeBuilder';
-import CompanyPrep from './pages/CompanyPrep';
-import PersonalizedRoadmap from './pages/PersonalizedRoadmap';
-import DiscussionForum from './pages/DiscussionForum';
-import CodingPlayground from './pages/CodingPlayground';
-import ProjectStudio from './pages/ProjectStudio';
 import ChangePassword from './pages/ChangePassword';
-import LabPractice from './pages/LabPractice';
-import PlacementCalendar from './pages/PlacementCalendar';
-import PlacementSuitePage from './pages/PlacementSuitePage';
-import AcademicsPage from './pages/AcademicsPage';
-import RecruiterDashboard from './pages/RecruiterDashboard';
-import HODDashboard from './pages/HODDashboard';
-import FacultyAttendanceSession from './pages/FacultyAttendanceSession';
-import StudentAttendanceScanner from './pages/StudentAttendanceScanner';
-import FacultyAttendanceHistory from './pages/FacultyAttendanceHistory';
-import StudentAttendance from './pages/StudentAttendance';
-import HODAttendanceDashboard from './pages/HODAttendanceDashboard';
+
+// Specialized & Heavy Routes (Lazy-loaded on demand to optimize initial payload)
+const Dashboard = React.lazy(() => import('./pages/Dashboard'));
+const Profile = React.lazy(() => import('./pages/Profile'));
+const JobBoard = React.lazy(() => import('./pages/JobBoard'));
+const AdminPanel = React.lazy(() => import('./pages/AdminPanel'));
+const ResumeAnalyzer = React.lazy(() => import('./pages/ResumeAnalyzer'));
+const AptitudeTests = React.lazy(() => import('./pages/AptitudeTests'));
+const MockInterviews = React.lazy(() => import('./pages/MockInterviews'));
+const QuestionBank = React.lazy(() => import('./pages/QuestionBank'));
+const PlagiarismAudit = React.lazy(() => import('./pages/PlagiarismAudit'));
+const Contests = React.lazy(() => import('./pages/Contests'));
+const ContestWorkspace = React.lazy(() => import('./pages/ContestWorkspace'));
+const ContestReport = React.lazy(() => import('./pages/ContestReport'));
+const ContestLeaderboard = React.lazy(() => import('./pages/ContestLeaderboard'));
+const DoubtSolver = React.lazy(() => import('./pages/DoubtSolver'));
+const AdminDoubtSolver = React.lazy(() => import('./pages/AdminDoubtSolver'));
+const FacultyDashboard = React.lazy(() => import('./pages/FacultyDashboard'));
+const CoreCSEPrep = React.lazy(() => import('./pages/CoreCSEPrep'));
+const ResumeBuilder = React.lazy(() => import('./pages/ResumeBuilder'));
+const CompanyPrep = React.lazy(() => import('./pages/CompanyPrep'));
+const PersonalizedRoadmap = React.lazy(() => import('./pages/PersonalizedRoadmap'));
+const DiscussionForum = React.lazy(() => import('./pages/DiscussionForum'));
+const CodingPlayground = React.lazy(() => import('./pages/CodingPlayground'));
+const ProjectStudio = React.lazy(() => import('./pages/ProjectStudio'));
+const LabPractice = React.lazy(() => import('./pages/LabPractice'));
+const PlacementCalendar = React.lazy(() => import('./pages/PlacementCalendar'));
+const PlacementSuitePage = React.lazy(() => import('./pages/PlacementSuitePage'));
+const AcademicsPage = React.lazy(() => import('./pages/AcademicsPage'));
+const RecruiterDashboard = React.lazy(() => import('./pages/RecruiterDashboard'));
+const HODDashboard = React.lazy(() => import('./pages/HODDashboard'));
+const FacultyAttendanceSession = React.lazy(() => import('./pages/FacultyAttendanceSession'));
+const StudentAttendanceScanner = React.lazy(() => import('./pages/StudentAttendanceScanner'));
+const FacultyAttendanceHistory = React.lazy(() => import('./pages/FacultyAttendanceHistory'));
+const StudentAttendance = React.lazy(() => import('./pages/StudentAttendance'));
+const HODAttendanceDashboard = React.lazy(() => import('./pages/HODAttendanceDashboard'));
 
 // Helper for home route by role
 const getRoleHome = (role) => {
@@ -193,11 +195,100 @@ const PrivateRoute = ({ children, allowedRoles }) => {
   );
 };
 
+class RouteErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error, errorInfo) {
+    console.error('Route error caught by RouteErrorBoundary:', error, errorInfo);
+  }
+
+  handleReload = () => {
+    this.setState({ hasError: false, error: null });
+    window.location.reload();
+  };
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div
+          className="dashboard-loading-container"
+          style={{
+            minHeight: '60vh',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '2rem',
+            textAlign: 'center'
+          }}
+        >
+          <div style={{ fontSize: '2.5rem', marginBottom: '1rem' }}>⚠️</div>
+          <h3 style={{ color: 'var(--text-primary, #f1f5f9)', marginBottom: '0.5rem' }}>
+            Failed to load application module
+          </h3>
+          <p
+            style={{
+              color: 'var(--text-muted, #94a3b8)',
+              maxWidth: '420px',
+              marginBottom: '1.5rem',
+              fontSize: '0.9rem'
+            }}
+          >
+            A network interruption or updated deployment occurred while loading this page. Please refresh to load the latest module.
+          </p>
+          <button
+            onClick={this.handleReload}
+            style={{
+              padding: '10px 20px',
+              backgroundColor: '#4f46e5',
+              color: '#ffffff',
+              border: 'none',
+              borderRadius: '8px',
+              fontWeight: 600,
+              cursor: 'pointer'
+            }}
+          >
+            🔄 Reload Page
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+const RouteLoadingFallback = () => (
+  <div
+    className="dashboard-loading-container"
+    style={{
+      minHeight: '60vh',
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      justifyContent: 'center'
+    }}
+  >
+    <div className="spinner-loader"></div>
+    <p style={{ marginTop: '1rem', color: 'var(--text-muted, #94a3b8)', fontSize: '0.9rem' }}>
+      Loading workspace module...
+    </p>
+  </div>
+);
+
 const AppRoutes = () => {
   const { token, user } = useAuth();
 
   return (
-    <Routes>
+    <RouteErrorBoundary>
+      <React.Suspense fallback={<RouteLoadingFallback />}>
+        <Routes>
       {/* Public Routes */}
       <Route
         path="/"
@@ -597,7 +688,9 @@ const AppRoutes = () => {
         path="*"
         element={<Navigate to={token && user ? getRoleHome(user.role) : "/"} replace />}
       />
-    </Routes>
+        </Routes>
+      </React.Suspense>
+    </RouteErrorBoundary>
   );
 };
 

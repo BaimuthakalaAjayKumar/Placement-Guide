@@ -1,4 +1,5 @@
 const crypto = require('crypto');
+const mongoose = require('mongoose');
 const AttendanceSession = require('../models/AttendanceSession');
 const AttendanceRecord = require('../models/AttendanceRecord');
 const Room = require('../models/Room');
@@ -8,6 +9,8 @@ const AuditLog = require('../models/AuditLog');
 const Notification = require('../models/Notification');
 const { logActivity, extractClientIp, extractUserAgent } = require('../utils/auditLogger');
 const { ROLES, normalizeRole } = require('../config/permissions');
+
+const escapeRegex = (str) => String(str || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const {
   DEFAULT_ATTENDANCE_THRESHOLD,
   getShortageThreshold,
@@ -78,6 +81,8 @@ exports.createSession = async (req, res) => {
     const userRole = normalizeRole(user.role);
     const {
       roomId,
+      roomNumber,
+      buildingName,
       subjectId,
       branch,
       section,
@@ -87,14 +92,27 @@ exports.createSession = async (req, res) => {
       qrRefreshInterval = 15,
       geofenceEnforced = true,
       batchId = null,
-      timetableId = null
+      timetableId = null,
+      latitude,
+      longitude,
+      geofenceRadiusMeters = 30,
+      capacity = 60
     } = req.body;
 
     // 1. Basic required fields validation
-    if (!roomId || !subjectId || !branch || !section || !academicYear) {
+    const cleanRoomInput = (roomNumber || (!mongoose.Types.ObjectId.isValid(roomId) && roomId !== 'default_room' ? roomId : '') || '').trim();
+
+    if ((!roomId && !cleanRoomInput) || !subjectId || !branch || !section || !academicYear) {
       return res.status(400).json({
         success: false,
-        error: 'Missing required session fields: roomId, subjectId, branch, section, and academicYear are mandatory.'
+        error: 'Missing required session fields: designated room/lab, subject, branch, section, and academicYear are mandatory.'
+      });
+    }
+
+    if (roomId === 'default_room' && !cleanRoomInput) {
+      return res.status(400).json({
+        success: false,
+        error: 'Please enter a valid room number or select an existing classroom/lab.'
       });
     }
 
@@ -108,43 +126,125 @@ exports.createSession = async (req, res) => {
     }
 
     // 3. Room verification (MANDATORY ROOM-LEVEL SCOPE & GEOFENCE)
-    const room = await Room.findById(roomId);
+    let room = null;
+
+    // A. Check if a valid ObjectId was supplied for roomId
+    if (roomId && mongoose.Types.ObjectId.isValid(roomId)) {
+      room = await Room.findById(roomId);
+      if (room) {
+        if (room.campusId.toString() !== targetCampusId.toString()) {
+          await logActivity({
+            user,
+            action: 'ATTENDANCE_REJECTED',
+            category: 'Smart Attendance',
+            description: `Cross-campus room assignment blocked: Faculty attempted using room from campus ${room.campusId}`,
+            details: { roomId: room._id, roomCampus: room.campusId, userCampus: targetCampusId },
+            req
+          });
+          return res.status(403).json({
+            success: false,
+            error: 'Cross-Campus Violation: You cannot use a classroom belonging to another campus.'
+          });
+        }
+        if (!room.active) {
+          return res.status(400).json({
+            success: false,
+            error: `Room ${room.buildingName} ${room.roomNumber} is currently marked inactive.`
+          });
+        }
+      }
+    }
+
+    // B. If no room found by ObjectId or manual room number provided
+    if (!room && cleanRoomInput) {
+      const escaped = escapeRegex(cleanRoomInput);
+      const matchingRooms = await Room.find({
+        campusId: targetCampusId,
+        active: true,
+        $or: [
+          { roomNumber: { $regex: new RegExp(`^${escaped}$`, 'i') } },
+          { roomNumber: cleanRoomInput }
+        ]
+      });
+
+      if (matchingRooms.length === 1) {
+        room = matchingRooms[0];
+      } else if (matchingRooms.length > 1) {
+        if (buildingName) {
+          const buildingMatch = matchingRooms.find(r =>
+            r.buildingName.toLowerCase() === buildingName.trim().toLowerCase()
+          );
+          if (buildingMatch) {
+            room = buildingMatch;
+          }
+        }
+        if (!room) {
+          return res.status(400).json({
+            success: false,
+            error: `Multiple rooms match "${cleanRoomInput}". Please specify the building name or select a designated room.`
+          });
+        }
+      } else {
+        // No pre-existing Room document found for this campus.
+        // Support manual room entry by safely creating a verified Room record scoped to the target campus.
+        const bName = (buildingName || 'Main Academic Block').trim();
+        const parsedLat = parseFloat(latitude);
+        const parsedLng = parseFloat(longitude);
+        const parsedRadius = parseFloat(geofenceRadiusMeters) || 30;
+        const parsedCap = parseInt(capacity, 10) || 60;
+
+        let finalLat = !isNaN(parsedLat) ? parsedLat : null;
+        let finalLng = !isNaN(parsedLng) ? parsedLng : null;
+
+        if (finalLat === null || finalLng === null) {
+          const anyCampusRoom = await Room.findOne({ campusId: targetCampusId });
+          if (anyCampusRoom) {
+            finalLat = anyCampusRoom.latitude;
+            finalLng = anyCampusRoom.longitude;
+          } else {
+            // Default institutional campus reference coordinates (Hyderabad campus: 17.5204, 78.3678)
+            finalLat = 17.5204;
+            finalLng = 78.3678;
+          }
+        }
+
+        room = await Room.create({
+          campusId: targetCampusId,
+          buildingName: bName,
+          roomNumber: cleanRoomInput,
+          capacity: parsedCap,
+          latitude: finalLat,
+          longitude: finalLng,
+          geofenceRadiusMeters: parsedRadius,
+          active: true
+        });
+      }
+    }
+
     if (!room) {
       return res.status(404).json({
         success: false,
-        error: 'Designated classroom/lab room does not exist.'
-      });
-    }
-
-    if (!room.active) {
-      return res.status(400).json({
-        success: false,
-        error: `Room ${room.buildingName} ${room.roomNumber} is currently marked inactive.`
-      });
-    }
-
-    // Cross-campus room usage strictly forbidden
-    if (room.campusId.toString() !== targetCampusId.toString()) {
-      await logActivity({
-        user,
-        action: 'ATTENDANCE_REJECTED',
-        category: 'Smart Attendance',
-        description: `Cross-campus room assignment blocked: Faculty attempted using room from campus ${room.campusId}`,
-        details: { roomId: room._id, roomCampus: room.campusId, userCampus: targetCampusId },
-        req
-      });
-      return res.status(403).json({
-        success: false,
-        error: 'Cross-Campus Violation: You cannot use a classroom belonging to another campus.'
+        error: `Classroom/Lab "${cleanRoomInput || roomId || ''}" does not exist. Please provide a valid room number or select from campus rooms.`
       });
     }
 
     // 4. Verify Subject exists
-    const subject = await Subject.findById(subjectId);
+    let subject = null;
+    if (mongoose.Types.ObjectId.isValid(subjectId)) {
+      subject = await Subject.findById(subjectId);
+    } else {
+      subject = await Subject.findOne({
+        $or: [
+          { code: new RegExp(`^${escapeRegex(subjectId)}$`, 'i') },
+          { name: new RegExp(`^${escapeRegex(subjectId)}$`, 'i') }
+        ]
+      });
+    }
+
     if (!subject) {
       return res.status(404).json({
         success: false,
-        error: 'Subject does not exist.'
+        error: 'Selected subject does not exist. Please select an assigned course/subject.'
       });
     }
 
@@ -158,7 +258,7 @@ exports.createSession = async (req, res) => {
         const matchesYear = !scope.academicYear || scope.academicYear.trim().toLowerCase() === academicYear.trim().toLowerCase();
         const matchesBranch = !scope.branch || scope.branch.trim().toLowerCase() === branch.trim().toLowerCase();
         const matchesSection = !scope.section || scope.section.trim().toLowerCase() === section.trim().toLowerCase();
-        const matchesSubject = !scope.subject || scope.subject.toString() === subjectId.toString();
+        const matchesSubject = !scope.subject || scope.subject.toString() === subject._id.toString();
 
         return matchesYear && matchesBranch && matchesSection && matchesSubject;
       });
@@ -169,12 +269,12 @@ exports.createSession = async (req, res) => {
           action: 'ATTENDANCE_REJECTED',
           category: 'Smart Attendance',
           description: `Unauthorized class start attempt: Faculty not assigned to ${branch} Section ${section} (${academicYear})`,
-          details: { branch, section, academicYear, subjectId },
+          details: { branch, section, academicYear, subjectId: subject._id },
           req
         });
         return res.status(403).json({
           success: false,
-          error: `Unauthorized: You are not assigned to teach ${branch} Section ${section} for this subject.`
+          error: `Unauthorized: You are not assigned to teach ${branch} Section ${section} (${academicYear}) for ${subject.name}.`
         });
       }
     }
@@ -254,7 +354,7 @@ exports.createSession = async (req, res) => {
       branch,
       batchId,
       section,
-      subjectId,
+      subjectId: subject._id,
       facultyId: user._id,
       roomId: room._id,
       timetableId,
@@ -305,42 +405,58 @@ exports.createSession = async (req, res) => {
     });
 
     // Return session details and active dynamic QR payload to faculty client
+    const sessionPayload = {
+      _id: session._id,
+      campusId: session.campusId,
+      branch: session.branch,
+      section: session.section,
+      subject: {
+        _id: subject._id,
+        name: subject.name,
+        code: subject.code
+      },
+      room: {
+        _id: room._id,
+        buildingName: room.buildingName,
+        roomNumber: room.roomNumber,
+        floor: room.floor,
+        capacity: room.capacity,
+        geofenceRadiusMeters: room.geofenceRadiusMeters
+      },
+      status: session.status,
+      sessionDate: session.sessionDate,
+      actualStartTime: session.actualStartTime,
+      totalEnrolled: session.totalEnrolled,
+      totalPresent: session.totalPresent,
+      totalAbsent: session.totalAbsent,
+      qr: {
+        token: initialQr.token,
+        expiresAt: initialQr.expiresAt,
+        refreshInterval: initialQr.refreshInterval
+      }
+    };
+
     return res.status(201).json({
       success: true,
       message: 'Attendance session initiated successfully',
-      session: {
-        _id: session._id,
-        campusId: session.campusId,
-        branch: session.branch,
-        section: session.section,
-        subject: {
-          _id: subject._id,
-          name: subject.name,
-          code: subject.code
-        },
-        room: {
-          _id: room._id,
-          buildingName: room.buildingName,
-          roomNumber: room.roomNumber,
-          floor: room.floor,
-          capacity: room.capacity,
-          geofenceRadiusMeters: room.geofenceRadiusMeters
-        },
-        status: session.status,
-        sessionDate: session.sessionDate,
-        actualStartTime: session.actualStartTime,
-        totalEnrolled: session.totalEnrolled,
-        totalPresent: session.totalPresent,
-        totalAbsent: session.totalAbsent,
-        qr: {
-          token: initialQr.token,
-          expiresAt: initialQr.expiresAt,
-          refreshInterval: initialQr.refreshInterval
-        }
-      }
+      session: sessionPayload,
+      data: sessionPayload
     });
   } catch (err) {
     console.error('Error creating attendance session:', err);
+    if (err.name === 'CastError') {
+      return res.status(400).json({
+        success: false,
+        error: `Invalid identifier provided for ${err.path || 'field'}. Please verify your selection.`
+      });
+    }
+    if (err.name === 'ValidationError') {
+      const firstError = Object.values(err.errors || {})[0]?.message || 'Validation failed';
+      return res.status(400).json({
+        success: false,
+        error: firstError
+      });
+    }
     return res.status(500).json({
       success: false,
       error: 'Failed to create attendance session: ' + err.message
@@ -375,7 +491,8 @@ exports.getActiveSessions = async (req, res) => {
     return res.status(200).json({
       success: true,
       count: sessions.length,
-      sessions
+      sessions,
+      data: sessions
     });
   } catch (err) {
     console.error('Error fetching active sessions:', err);
@@ -440,9 +557,41 @@ exports.getSessionById = async (req, res) => {
       });
     }
 
-    // If Faculty / Admin / HOD, fetch roster records
+    // If Faculty / Admin / HOD, enforce role scoping before returning full roster
+    if (userRole === ROLES.FACULTY) {
+      const isHost = session.facultyId && (
+        (session.facultyId._id && session.facultyId._id.toString() === user._id.toString()) ||
+        session.facultyId.toString() === user._id.toString()
+      );
+      const managed = Array.isArray(user.managedScopes) ? user.managedScopes : [];
+      const hasTeachingScope = managed.some((m) => {
+        const branchMatch = !m.branch ? true : (m.branch || '').toLowerCase() === (session.branch || '').toLowerCase();
+        const secMatch = !m.section ? true : (m.section || '').toUpperCase() === (session.section || '').toUpperCase();
+        return branchMatch && secMatch;
+      });
+
+      if (!isHost && !hasTeachingScope) {
+        return res.status(403).json({
+          success: false,
+          error: 'Scope Restriction: Faculty can only view rosters for their assigned classes.'
+        });
+      }
+    }
+
+    if (userRole === ROLES.HOD) {
+      const hodDept = (user.department || user.branch || '').toLowerCase();
+      const sessBranch = (session.branch || '').toLowerCase();
+      if (hodDept && sessBranch && hodDept !== sessBranch) {
+        return res.status(403).json({
+          success: false,
+          error: `Department Isolation: HOD access is restricted to department '${user.branch || user.department}'.`
+        });
+      }
+    }
+
+    // Fetch roster records for authorized leadership / assigned instructor
     const records = await AttendanceRecord.find({ sessionId: session._id })
-      .select('studentId rollNumber studentName status verificationMethod scannedAt markedAt isFlaggedForReview flagReason calculatedDistanceMeters locationVerificationStatus')
+      .select('studentId rollNumber studentName status verificationMethod scannedAt markedAt isFlaggedForReview flagReason calculatedDistanceMeters locationVerificationStatus correctionStatus correctionRequestedStatus correctionReason correctionNotes originalStatus')
       .sort({ rollNumber: 1 });
 
     return res.status(200).json({
@@ -1057,7 +1206,8 @@ exports.getRooms = async (req, res) => {
     return res.status(200).json({
       success: true,
       count: rooms.length,
-      rooms
+      rooms,
+      data: rooms
     });
   } catch (err) {
     console.error('Error retrieving rooms:', err);
@@ -1249,6 +1399,9 @@ exports.getStudentAttendanceHistory = async (req, res) => {
         scannedAt: r.scannedAt || r.markedAt,
         correctionStatus: r.correctionStatus || 'NONE',
         originalStatus: r.originalStatus || null,
+        correctionRequestedStatus: r.correctionRequestedStatus || null,
+        correctionReason: r.correctionReason || '',
+        correctionNotes: r.correctionNotes || '',
         remarks: r.remarks || ''
       };
     });
@@ -1793,20 +1946,28 @@ exports.exportShortageCsv = async (req, res) => {
 
     const { threshold, shortageList } = await computeShortageData(req);
 
+    const sanitizeCsv = (val) => {
+      let str = String(val === null || val === undefined ? '' : val).trim();
+      if (/^[=+\-@\t\r%]/.test(str)) {
+        str = `'${str}`;
+      }
+      return `"${str.replace(/"/g, '""')}"`;
+    };
+
     const headers = ['Student Name', 'Roll Number', 'Branch', 'Section', 'Subject', 'Attendance Percentage', 'Present', 'Total', 'Shortage'];
     const rows = shortageList.map(s => [
-      `"${(s.studentName || '').replace(/"/g, '""')}"`,
-      `"${(s.rollNumber || '').replace(/"/g, '""')}"`,
-      `"${(s.branch || '').replace(/"/g, '""')}"`,
-      `"${(s.section || '').replace(/"/g, '""')}"`,
-      `"${(s.subjectName || '').replace(/"/g, '""')}"`,
-      `${s.attendancePercentage}%`,
-      s.present,
-      s.total,
-      'YES'
+      sanitizeCsv(s.studentName),
+      sanitizeCsv(s.rollNumber),
+      sanitizeCsv(s.branch),
+      sanitizeCsv(s.section),
+      sanitizeCsv(s.subjectName),
+      sanitizeCsv(`${s.attendancePercentage}%`),
+      sanitizeCsv(s.present),
+      sanitizeCsv(s.total),
+      sanitizeCsv('YES')
     ]);
 
-    const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\r\n');
+    const csvContent = [headers.map(sanitizeCsv).join(','), ...rows.map(r => r.join(','))].join('\r\n');
 
     await logActivity({
       user,
@@ -1875,11 +2036,22 @@ exports.requestOrReviewCorrection = async (req, res) => {
 
     // Review Workflow (Approve / Reject)
     if (action === 'APPROVE' || action === 'REJECT') {
-      if (userRole === ROLES.FACULTY && session.facultyId.toString() === user._id.toString()) {
+      if (userRole === ROLES.FACULTY) {
         return res.status(403).json({
           success: false,
-          error: 'Dual-Control Policy: Faculty cannot self-approve attendance dispute corrections. HOD or Administrator review required.'
+          error: 'Dual-Control Policy: Faculty instructors cannot review or approve attendance corrections. HOD or Administrator review required.'
         });
+      }
+
+      if (userRole === ROLES.HOD) {
+        const dept = (user.department || user.branch || '').toLowerCase();
+        const sessBranch = (session.branch || '').toLowerCase();
+        if (dept && sessBranch && dept !== sessBranch) {
+          return res.status(403).json({
+            success: false,
+            error: `Department Isolation: HOD can only review corrections within department '${user.branch || user.department}'.`
+          });
+        }
       }
 
       if (action === 'APPROVE') {
@@ -1954,6 +2126,20 @@ exports.requestOrReviewCorrection = async (req, res) => {
     }
 
     // Request Workflow (Faculty submits dispute/correction)
+    if (userRole === ROLES.FACULTY) {
+      const isSessionHost = session.facultyId.toString() === user._id.toString();
+      const hasManagedScope = user.managedScopes && user.managedScopes.some(s =>
+        (!s.branch || s.branch.toUpperCase() === (session.branch || '').toUpperCase()) &&
+        (!s.section || s.section.toUpperCase() === (session.section || '').toUpperCase())
+      );
+      if (!isSessionHost && !hasManagedScope) {
+        return res.status(403).json({
+          success: false,
+          error: 'Scope Restriction: Faculty can only request attendance corrections for their assigned classes.'
+        });
+      }
+    }
+
     if (!requestedStatus || !['PRESENT', 'ABSENT', 'LATE', 'EXCUSED'].includes(requestedStatus)) {
       return res.status(400).json({
         success: false,
@@ -2010,7 +2196,7 @@ exports.getAttendanceAudit = async (req, res) => {
     const user = req.user;
     const userRole = normalizeRole(user.role);
 
-    if ([ROLES.STUDENT, ROLES.RECRUITER].includes(userRole)) {
+    if ([ROLES.STUDENT, ROLES.RECRUITER, ROLES.FACULTY].includes(userRole)) {
       return res.status(403).json({
         success: false,
         error: 'Access Denied: You do not have permission to access attendance audit logs.'
@@ -2205,15 +2391,16 @@ exports.getAttendanceNotifications = async (req, res) => {
         });
       }
 
-      let studentQuery = { role: 'student' };
-      if (branchSectionConditions.length > 0) {
-        studentQuery.$or = branchSectionConditions;
-      }
-      if (user.campusId) studentQuery.campusId = user.campusId;
+      if (branchSectionConditions.length === 0) {
+        filter.user = { $in: [] };
+      } else {
+        let studentQuery = { role: 'student', $or: branchSectionConditions };
+        if (user.campusId) studentQuery.campusId = user.campusId;
 
-      const authorizedStudents = await User.find(studentQuery).select('_id');
-      const studentIds = authorizedStudents.map(s => s._id);
-      filter.user = { $in: studentIds };
+        const authorizedStudents = await User.find(studentQuery).select('_id');
+        const studentIds = authorizedStudents.map(s => s._id);
+        filter.user = { $in: studentIds };
+      }
     } else if (userRole === ROLES.HOD) {
       const dept = user.department || user.branch;
       const studentQuery = { role: 'student' };

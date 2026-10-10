@@ -559,7 +559,7 @@ exports.getDashboardStats = async (req, res, next) => {
 exports.getAllStudents = async (req, res, next) => {
   try {
     const campusFilter = getCampusFilter(req.user);
-    const isMainAdmin = (req.user.role === 'admin' || req.user.role === 'super_admin') &&
+    const isMainAdmin = (req.user.role === 'admin' || req.user.role === 'super_admin' || req.user.role === 'principal' || req.user.role === 'director' || req.user.role === 'campus_admin') &&
       (!req.user.managedScopes || req.user.managedScopes.length === 0);
     let students = [];
 
@@ -787,6 +787,14 @@ exports.getStudentProgress = async (req, res, next) => {
       return res.status(403).json({ success: false, error: 'This student is outside your assigned campus.' });
     }
 
+    if (req.user.role === 'hod') {
+      const dept = (req.user.department || req.user.branch || '').toLowerCase();
+      const stBranch = (student.branch || '').toLowerCase();
+      if (dept && stBranch && !new RegExp(`^${dept}$`, 'i').test(student.branch)) {
+        return res.status(403).json({ success: false, error: 'Department Isolation: This student is outside your department scope.' });
+      }
+    }
+
     if (req.user.role === 'faculty' && req.user.managedScopes && req.user.managedScopes.length > 0) {
       const studentYear = (student.academicYear || student.year || '').trim().toLowerCase();
       const studentBranch = (student.branch || '').trim().toLowerCase();
@@ -883,6 +891,13 @@ exports.getStudentProgress = async (req, res, next) => {
 // @access  Private/Admin
 exports.deleteStudent = async (req, res, next) => {
   try {
+    if (isSuperAdmin(req.user)) {
+      return res.status(403).json({
+        success: false,
+        error: 'Super Administrators do not have permission to remove students. Deletions must be performed by the designated Campus Administrator.'
+      });
+    }
+
     const student = await User.findById(req.params.id);
 
     if (!student) {
@@ -931,6 +946,13 @@ exports.deleteStudent = async (req, res, next) => {
 // @access  Private/Admin
 exports.createAdmin = async (req, res, next) => {
   try {
+    if (!isSuperAdmin(req.user)) {
+      return res.status(403).json({
+        success: false,
+        error: 'Access Denied: Only Super Administrators can provision new administrator accounts.'
+      });
+    }
+
     const { name, email, managedScopes = [] } = req.body;
     const internalPassword = crypto.randomBytes(32).toString('hex');
 
@@ -1041,7 +1063,7 @@ exports.createFaculty = async (req, res, next) => {
 exports.getStaff = async (req, res, next) => {
   try {
     const campusFilter = getCampusFilter(req.user);
-    const query = { role: { $in: ['admin', 'faculty'] }, ...campusFilter };
+    const query = { role: { $in: ['admin', 'faculty', 'hod', 'principal', 'director', 'campus_admin'] }, ...campusFilter };
     const staff = await User.find(query)
       .select('name email role managedAcademicYears managedScopes mustChangePassword createdAt campusId')
       .sort({ role: 1, name: 1 });
@@ -1053,6 +1075,13 @@ exports.getStaff = async (req, res, next) => {
 
 exports.updateStaffScopes = async (req, res, next) => {
   try {
+    if (isSuperAdmin(req.user)) {
+      return res.status(403).json({
+        success: false,
+        error: 'Super Administrators do not have access to assign academic scopes. Scope assignments must be performed by the Campus Administrator.'
+      });
+    }
+
     const staff = await User.findOne({ _id: req.params.id, role: { $in: ['admin', 'faculty'] } });
     if (!staff) return res.status(404).json({ success: false, error: 'Administrator or faculty member not found.' });
 
@@ -1097,6 +1126,13 @@ exports.updateStaffScopes = async (req, res, next) => {
 
 exports.deleteStaffScope = async (req, res, next) => {
   try {
+    if (isSuperAdmin(req.user)) {
+      return res.status(403).json({
+        success: false,
+        error: 'Super Administrators do not have access to manage academic scopes.'
+      });
+    }
+
     const staff = await User.findOne({ _id: req.params.id, role: { $in: ['admin', 'faculty'] } });
     if (!staff) return res.status(404).json({ success: false, error: 'Administrator or faculty member not found.' });
 
@@ -1145,13 +1181,18 @@ exports.deleteStaff = async (req, res, next) => {
     const staff = await User.findOne({ _id: req.params.id, role: { $in: ['admin', 'faculty'] } });
     if (!staff) return res.status(404).json({ success: false, error: 'Administrator or faculty member not found.' });
 
-    if (!canAccessCampus(req.user, staff.campusId)) {
-      return res.status(403).json({ success: false, error: 'Not authorized to delete staff outside your assigned campus.' });
+    const isProtectedSuperAdmin =
+      isSuperAdmin(staff) ||
+      staff.role === 'super_admin' ||
+      Boolean(staff.isSuperAdmin) ||
+      (process.env.SUPER_ADMIN_EMAIL && staff.email && staff.email.toLowerCase().trim() === process.env.SUPER_ADMIN_EMAIL.toLowerCase().trim());
+
+    if (isProtectedSuperAdmin) {
+      return res.status(403).json({ success: false, error: 'The Super Administrator account is permanently protected and cannot be removed by any administrator.' });
     }
 
-    const superAdminEmail = (process.env.SUPER_ADMIN_EMAIL || 'vaddeajaykumar2004@gmail.com').toLowerCase().trim();
-    if ((staff.email && staff.email.toLowerCase().trim() === superAdminEmail) || staff.isSuperAdmin) {
-      return res.status(403).json({ success: false, error: 'The Super Administrator account is permanently protected and cannot be removed by any administrator.' });
+    if (!canAccessCampus(req.user, staff.campusId)) {
+      return res.status(403).json({ success: false, error: 'Not authorized to delete staff outside your assigned campus.' });
     }
 
     await staff.deleteOne();
@@ -1906,6 +1947,13 @@ exports.updateStudentAcademics = async (req, res, next) => {
 // @access  Private/Admin
 exports.bulkDeleteStudents = async (req, res, next) => {
   try {
+    if (isSuperAdmin(req.user)) {
+      return res.status(403).json({
+        success: false,
+        error: 'Super Administrators do not have permission to delete students. Deletions must be performed by the designated Campus Administrator.'
+      });
+    }
+
     const { year } = req.body;
 
     if (!year) {

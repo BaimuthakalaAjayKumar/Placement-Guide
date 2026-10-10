@@ -6,11 +6,13 @@
 
 const {
   PERMISSIONS,
+  ALL_PERMISSIONS,
   ROLES,
   normalizeRole,
   getRolePermissions,
   hasRolePermission
 } = require('../config/permissions');
+const { isSuperAdmin } = require('../utils/scopeFilter');
 
 /**
  * Middleware: Enforce that the authenticated user possesses one or more required permissions.
@@ -32,16 +34,22 @@ const requirePermission = (...requiredPermissions) => {
       });
     }
 
+    // 2. Check if user possesses platform-wide Super Admin privileges
+    if (isSuperAdmin(req.user)) {
+      req.user.resolvedPermissions = Array.from(ALL_PERMISSIONS);
+      return next();
+    }
+
     const userRole = normalizeRole(req.user.role);
-    const userPermissions = getRolePermissions(userRole, req.user.customPermissions || []);
+    // Legacy 'admin' accounts bound to a campus are treated as Campus Administrators
+    const effectiveRole = (userRole === ROLES.ADMIN && Boolean(req.user.campusId))
+      ? ROLES.CAMPUS_ADMIN
+      : userRole;
+
+    const userPermissions = getRolePermissions(effectiveRole, req.user.customPermissions || []);
 
     // Attach resolved permissions to req.user for downstream controller efficiency
     req.user.resolvedPermissions = Array.from(userPermissions);
-
-    // 2. Check if user is Super Admin or legacy Admin (unrestricted platform privileges)
-    if (userRole === ROLES.SUPER_ADMIN || userRole === ROLES.ADMIN) {
-      return next();
-    }
 
     // 3. Verify all required permissions are possessed
     const missingPermissions = requiredPermissions.filter(perm => !userPermissions.has(perm));
@@ -73,12 +81,19 @@ const requireAnyPermission = (...permissions) => {
       });
     }
 
-    const userRole = normalizeRole(req.user.role);
-    if (userRole === ROLES.SUPER_ADMIN || userRole === ROLES.ADMIN) {
+    // Platform-wide Super Admin has unrestricted platform privileges
+    if (isSuperAdmin(req.user)) {
+      req.user.resolvedPermissions = Array.from(ALL_PERMISSIONS);
       return next();
     }
 
-    const userPermissions = getRolePermissions(userRole, req.user.customPermissions || []);
+    const userRole = normalizeRole(req.user.role);
+    // Legacy 'admin' accounts bound to a campus are treated as Campus Administrators
+    const effectiveRole = (userRole === ROLES.ADMIN && Boolean(req.user.campusId))
+      ? ROLES.CAMPUS_ADMIN
+      : userRole;
+
+    const userPermissions = getRolePermissions(effectiveRole, req.user.customPermissions || []);
     req.user.resolvedPermissions = Array.from(userPermissions);
 
     const hasAny = permissions.some(perm => userPermissions.has(perm));
@@ -113,10 +128,8 @@ const requireScope = (scopeType, options = {}) => {
       });
     }
 
-    const userRole = normalizeRole(req.user.role);
-
-    // Super Admin / legacy Admin bypasses scope restrictions
-    if (userRole === ROLES.SUPER_ADMIN || userRole === ROLES.ADMIN) {
+    // Platform-wide Super Admin bypasses scope restrictions
+    if (isSuperAdmin(req.user)) {
       return next();
     }
 
@@ -131,9 +144,11 @@ const requireScope = (scopeType, options = {}) => {
       return next();
     }
 
+    const userRole = normalizeRole(req.user.role);
+
     if (scopeType === 'CAMPUS') {
       const userCampus = req.user.campusId ? req.user.campusId.toString() : null;
-      if (userCampus && requestedScope.toString() !== userCampus) {
+      if (!userCampus || requestedScope.toString() !== userCampus) {
         return res.status(403).json({
           success: false,
           error: 'Multi-Campus Isolation: You cannot access or modify records belonging to another campus.'
@@ -208,7 +223,12 @@ const checkOwnership = (ownershipType, options = {}) => {
  */
 const userHasPermission = (user, permission) => {
   if (!user || !permission) return false;
-  return hasRolePermission(user.role, permission, user.customPermissions || []);
+  if (isSuperAdmin(user)) return true;
+  const userRole = normalizeRole(user.role);
+  const effectiveRole = (userRole === ROLES.ADMIN && Boolean(user.campusId))
+    ? ROLES.CAMPUS_ADMIN
+    : userRole;
+  return hasRolePermission(effectiveRole, permission, user.customPermissions || []);
 };
 
 module.exports = {

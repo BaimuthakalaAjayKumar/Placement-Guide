@@ -42,15 +42,33 @@ apiClient.interceptors.request.use(
   }
 );
 
-// Response Interceptor: Handles 401 Unauthorized globally
+let isHandling401 = false;
+
+// Response Interceptor: Handles 401 Unauthorized globally without retry loops
 apiClient.interceptors.response.use(
   (response) => response,
   async (error: AxiosError<{ error?: string; message?: string }>) => {
-    if (error.response && error.response.status === 401) {
-      console.warn('[API Client] 401 Unauthorized detected. Clearing secure session.');
-      await clearAuthStorage();
-      if (onUnauthorizedCallback) {
-        onUnauthorizedCallback();
+    // Redact sensitive Authorization Bearer header to prevent accidental token leakage in logs
+    if (error.config?.headers?.Authorization) {
+      error.config.headers.Authorization = 'Bearer [REDACTED]';
+    }
+
+    const requestUrl = error.config?.url || '';
+    const isLoginEndpoint = requestUrl.includes('/api/auth/login');
+
+    if (error.response && error.response.status === 401 && !isLoginEndpoint) {
+      if (!isHandling401) {
+        isHandling401 = true;
+        try {
+          await clearAuthStorage();
+          if (onUnauthorizedCallback) {
+            onUnauthorizedCallback();
+          }
+        } finally {
+          setTimeout(() => {
+            isHandling401 = false;
+          }, 1000);
+        }
       }
     }
     return Promise.reject(error);

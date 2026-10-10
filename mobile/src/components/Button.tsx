@@ -54,6 +54,9 @@ export const Button: React.FC<ButtonProps> = ({
       onPress={onPress}
       disabled={isActionDisabled}
       activeOpacity={0.8}
+      accessibilityRole="button"
+      accessibilityState={{ disabled: isActionDisabled, busy: loading }}
+      accessibilityLabel={title}
     >
       {loading ? (
         <ActivityIndicator color={variant === 'outline' ? THEME.colors.primary : '#FFFFFF'} size="small" />

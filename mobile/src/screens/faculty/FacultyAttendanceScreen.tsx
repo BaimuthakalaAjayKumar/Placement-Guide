@@ -16,11 +16,20 @@ import {
 import { ScreenContainer } from '../../components/ScreenContainer';
 import { Button } from '../../components/Button';
 import { THEME } from '../../utils/constants';
-import { attendanceApi, ActiveSession, AttendanceRoom } from '../../api/attendanceApi';
+import * as Location from 'expo-location';
+import { useNavigation } from '@react-navigation/native';
+import {
+  attendanceApi,
+  ActiveSession,
+  AttendanceRoom,
+  AttendanceSubjectOption,
+} from '../../api/attendanceApi';
 
 export const FacultyAttendanceScreen: React.FC = () => {
+  const navigation = useNavigation<any>();
   const [activeSession, setActiveSession] = useState<ActiveSession | null>(null);
   const [rooms, setRooms] = useState<AttendanceRoom[]>([]);
+  const [subjects, setSubjects] = useState<AttendanceSubjectOption[]>([]);
   const [roster, setRoster] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -29,6 +38,9 @@ export const FacultyAttendanceScreen: React.FC = () => {
   // New Session Creation Form Modal
   const [createModalVisible, setCreateModalVisible] = useState(false);
   const [selectedRoomId, setSelectedRoomId] = useState('');
+  const [roomNumber, setRoomNumber] = useState('');
+  const [buildingName, setBuildingName] = useState('Academic Block');
+  const [selectedSubjectId, setSelectedSubjectId] = useState('');
   const [subjectName, setSubjectName] = useState('Operating Systems (CS401)');
   const [subjectId, setSubjectId] = useState('');
   const [branch, setBranch] = useState('CSE');
@@ -40,19 +52,35 @@ export const FacultyAttendanceScreen: React.FC = () => {
   // Rotation Interval Ref
   const rotationTimerRef = useRef<any>(null);
 
-  // Load Rooms and Active Session
+  // Load Rooms, Subjects, and Active Session
   const loadFacultyData = useCallback(async () => {
     try {
       setLoading(true);
-      const [sessionsRes, roomsRes] = await Promise.all([
+      const [sessionsRes, roomsRes, subjectsRes] = await Promise.all([
         attendanceApi.getActiveSessions().catch(() => ({ success: false, data: [] })),
         attendanceApi.getRooms().catch(() => ({ success: false, data: [] })),
+        attendanceApi.getFacultySubjects().catch(() => ({ success: false, data: [] })),
       ]);
 
       if (roomsRes.success && roomsRes.data) {
         setRooms(roomsRes.data);
-        if (roomsRes.data.length > 0 && !selectedRoomId) {
+        if (roomsRes.data.length > 0 && !selectedRoomId && !roomNumber) {
           setSelectedRoomId(roomsRes.data[0]._id);
+          setRoomNumber(roomsRes.data[0].roomNumber);
+          setBuildingName(roomsRes.data[0].buildingName);
+        }
+      }
+
+      if (subjectsRes.success && subjectsRes.data && subjectsRes.data.length > 0) {
+        setSubjects(subjectsRes.data);
+        if (!selectedSubjectId && !subjectId) {
+          const firstSub = subjectsRes.data[0];
+          setSelectedSubjectId(firstSub._id);
+          setSubjectId(firstSub._id);
+          setSubjectName(`${firstSub.name} (${firstSub.code})`);
+          if (firstSub.branch) setBranch(firstSub.branch);
+          if (firstSub.academicYear) setAcademicYear(firstSub.academicYear);
+          if (firstSub.section) setSection(firstSub.section);
         }
       }
 
@@ -70,7 +98,7 @@ export const FacultyAttendanceScreen: React.FC = () => {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [selectedRoomId]);
+  }, [selectedRoomId, roomNumber, selectedSubjectId, subjectId]);
 
   const fetchRoster = async (sessionId: string) => {
     try {
@@ -122,20 +150,51 @@ export const FacultyAttendanceScreen: React.FC = () => {
 
   // Handle Launch Session Submit
   const handleLaunchSession = async () => {
-    if (!selectedRoomId) {
-      Alert.alert('Required Field', 'Please select a designated classroom / lab.');
+    const activeSubId = selectedSubjectId || subjectId;
+    if (!activeSubId && !subjectName.trim()) {
+      Alert.alert('Required Field', 'Please select an assigned course/subject.');
+      return;
+    }
+
+    const cleanRoom = roomNumber.trim();
+    if (!selectedRoomId && !cleanRoom) {
+      Alert.alert('Required Field', 'Please enter a classroom or lab room number.');
       return;
     }
 
     try {
       setCreating(true);
+
+      // Acquire current device GPS coordinates for live room geofencing
+      let lat: number | undefined;
+      let lng: number | undefined;
+      try {
+        const perm = await Location.getForegroundPermissionsAsync();
+        let granted = perm.status === 'granted';
+        if (!granted) {
+          const req = await Location.requestForegroundPermissionsAsync();
+          granted = req.status === 'granted';
+        }
+        if (granted) {
+          const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+          lat = loc.coords.latitude;
+          lng = loc.coords.longitude;
+        }
+      } catch (locErr) {
+        console.warn('GPS coordinates acquisition skipped for session launch:', locErr);
+      }
+
       const res = await attendanceApi.createSession({
-        roomId: selectedRoomId,
-        subjectId: subjectId || selectedRoomId, // fallback to room or mock ID
-        branch,
-        section,
-        academicYear,
-        period,
+        roomId: selectedRoomId ? selectedRoomId : undefined,
+        roomNumber: cleanRoom || undefined,
+        buildingName: buildingName.trim() || undefined,
+        subjectId: activeSubId || subjectName.trim(),
+        branch: branch.trim(),
+        section: section.trim(),
+        academicYear: academicYear.trim(),
+        period: period.trim(),
+        latitude: lat,
+        longitude: lng,
         qrRefreshInterval: 15,
         geofenceEnforced: true,
       });
@@ -175,7 +234,17 @@ export const FacultyAttendanceScreen: React.FC = () => {
               if (res.success) {
                 setActiveSession(null);
                 setRoster([]);
-                Alert.alert('Session Finalized', 'Attendance recorded and synchronized with examination records.');
+                Alert.alert(
+                  'Session Finalized & Absences Evaluated',
+                  'Attendance roster locked. Absent students evaluated against statutory 75% threshold and parent alerts queued for delivery.',
+                  [
+                    { text: 'Done', style: 'cancel' },
+                    {
+                      text: 'View Absence Alerts',
+                      onPress: () => navigation.navigate('FacultyGuardianAlerts'),
+                    },
+                  ]
+                );
               }
             } catch (err: any) {
               Alert.alert('Error', err.message || 'Failed to close session.');
@@ -236,13 +305,13 @@ export const FacultyAttendanceScreen: React.FC = () => {
 
               <View style={styles.sessionMetaPillsRow}>
                 <Text style={styles.sessionMetaPill}>
-                  🏛️ {activeSession.roomId?.buildingName} • Room {activeSession.roomId?.roomNumber}
+                  {activeSession.roomId?.buildingName} • Room {activeSession.roomId?.roomNumber}
                 </Text>
                 <Text style={styles.sessionMetaPill}>
-                  👥 {activeSession.branch} - Sec {activeSession.section}
+                  Cohort: {activeSession.branch} - Sec {activeSession.section}
                 </Text>
                 <Text style={styles.sessionMetaPill}>
-                  ⏱️ Period {activeSession.period}
+                  Period {activeSession.period}
                 </Text>
               </View>
 
@@ -272,33 +341,60 @@ export const FacultyAttendanceScreen: React.FC = () => {
 
               {/* Close Session Button */}
               <TouchableOpacity style={styles.closeSessionBtn} onPress={handleCloseSession}>
-                <Text style={styles.closeSessionBtnText}>⏹️ Close Session &amp; Mark Absentees</Text>
+                <Text style={styles.closeSessionBtnText}>Close Session &amp; Finalize Attendance</Text>
               </TouchableOpacity>
             </View>
 
             {/* Live Present Students Roster */}
             <Text style={styles.rosterSectionTitle}>Live Attendee Check-In Roster ({roster.length})</Text>
             {roster.length > 0 ? (
-              roster.map((record, index) => (
-                <View key={record._id || index} style={styles.rosterRowCard}>
-                  <View style={styles.rosterLeft}>
-                    <Text style={styles.rosterIndex}>{index + 1}.</Text>
-                    <View>
-                      <Text style={styles.rosterName}>{record.studentName || 'Student Candidate'}</Text>
-                      <Text style={styles.rosterRoll}>{record.rollNumber || '21BCE1042'}</Text>
-                    </View>
-                  </View>
+              roster.map((record, index) => {
+                const isLate = record.status === 'LATE';
+                const isExcused = record.status === 'EXCUSED';
+                const isAbsent = record.status === 'ABSENT';
 
-                  <View style={styles.rosterRight}>
-                    <View style={styles.verifiedTag}>
-                      <Text style={styles.verifiedTagText}>✓ Present</Text>
+                let tagBg = 'rgba(16, 185, 129, 0.15)';
+                let tagColor = '#10B981';
+                if (isLate) {
+                  tagBg = 'rgba(245, 158, 11, 0.15)';
+                  tagColor = '#F59E0B';
+                } else if (isExcused) {
+                  tagBg = 'rgba(59, 130, 246, 0.15)';
+                  tagColor = '#3B82F6';
+                } else if (isAbsent) {
+                  tagBg = 'rgba(239, 68, 68, 0.15)';
+                  tagColor = '#EF4444';
+                }
+
+                const timeStr = record.scannedAt || record.markedAt;
+                const formattedTime = timeStr
+                  ? new Date(timeStr).toLocaleTimeString([], {
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })
+                  : '—';
+
+                return (
+                  <View key={record._id || index} style={styles.rosterRowCard}>
+                    <View style={styles.rosterLeft}>
+                      <Text style={styles.rosterIndex}>{index + 1}.</Text>
+                      <View>
+                        <Text style={styles.rosterName}>{record.studentName || 'Student'}</Text>
+                        <Text style={styles.rosterRoll}>{record.rollNumber || 'N/A'}</Text>
+                      </View>
                     </View>
-                    <Text style={styles.rosterTime}>
-                      {new Date(record.scannedAt || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-                    </Text>
+
+                    <View style={styles.rosterRight}>
+                      <View style={[styles.verifiedTag, { backgroundColor: tagBg }]}>
+                        <Text style={[styles.verifiedTagText, { color: tagColor }]}>
+                          {record.status || 'PRESENT'}
+                        </Text>
+                      </View>
+                      <Text style={styles.rosterTime}>{formattedTime}</Text>
+                    </View>
                   </View>
-                </View>
-              ))
+                );
+              })
             ) : (
               <View style={styles.waitingRosterCard}>
                 <ActivityIndicator color="#10B981" style={{ marginBottom: 8 }} />
@@ -312,14 +408,16 @@ export const FacultyAttendanceScreen: React.FC = () => {
         ) : (
           /* 2. INACTIVE STATE: NO SESSION RUNNING */
           <View style={styles.inactiveStateCard}>
-            <Text style={{ fontSize: 40, marginBottom: 12 }}>📋</Text>
+            <View style={styles.inactiveIconPill}>
+              <View style={styles.inactiveDot} />
+            </View>
             <Text style={styles.inactiveTitle}>No Live Session in Progress</Text>
             <Text style={styles.inactiveDesc}>
               Launch a dynamic QR lecture session for your assigned branch and section. The system will enforce 15-second rotating cryptographic tokens and room geofencing.
             </Text>
 
             <Button
-              title="🚀 Launch Live Class Attendance Session"
+              title="Launch Attendance Session"
               onPress={() => setCreateModalVisible(true)}
               style={styles.launchBtn}
             />
@@ -336,42 +434,104 @@ export const FacultyAttendanceScreen: React.FC = () => {
               Select the lecture room and enrolled cohort to initiate geofenced check-in:
             </Text>
 
-            <Text style={styles.inputLabel}>Subject / Course</Text>
-            <TextInput
-              style={styles.modalInput}
-              value={subjectName}
-              onChangeText={setSubjectName}
-              placeholder="e.g. Operating Systems (CS401)"
-              placeholderTextColor="#64748b"
-            />
+            <Text style={styles.inputLabel}>Assigned Course / Subject</Text>
+            {subjects.length > 0 ? (
+              <View style={styles.roomSelectWrap}>
+                {subjects.map((s) => {
+                  const isSelected = selectedSubjectId === s._id || subjectId === s._id;
+                  return (
+                    <TouchableOpacity
+                      key={s._id}
+                      style={[styles.roomPill, isSelected && styles.roomPillActive]}
+                      onPress={() => {
+                        setSelectedSubjectId(s._id);
+                        setSubjectId(s._id);
+                        setSubjectName(`${s.name} (${s.code})`);
+                        if (s.branch) setBranch(s.branch);
+                        if (s.academicYear) setAcademicYear(s.academicYear);
+                        if (s.section) setSection(s.section);
+                      }}
+                    >
+                      <Text style={[styles.roomPillText, isSelected && styles.roomPillTextActive]}>
+                        {s.name} ({s.code})
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            ) : (
+              <TextInput
+                style={styles.modalInput}
+                value={subjectName}
+                onChangeText={setSubjectName}
+                placeholder="e.g. Database Management Systems (GR22A2069)"
+                placeholderTextColor="#64748b"
+              />
+            )}
 
             <Text style={styles.inputLabel}>Lecture Room / Lab</Text>
-            <View style={styles.roomSelectWrap}>
-              {rooms.length > 0 ? (
-                rooms.slice(0, 4).map((r) => (
-                  <TouchableOpacity
-                    key={r._id}
-                    style={[styles.roomPill, selectedRoomId === r._id && styles.roomPillActive]}
-                    onPress={() => setSelectedRoomId(r._id)}
-                  >
-                    <Text style={[styles.roomPillText, selectedRoomId === r._id && styles.roomPillTextActive]}>
-                      {r.buildingName} • {r.roomNumber} (±{r.geofenceRadiusMeters}m)
-                    </Text>
-                  </TouchableOpacity>
-                ))
-              ) : (
-                <TouchableOpacity
-                  style={[styles.roomPill, styles.roomPillActive]}
-                  onPress={() => setSelectedRoomId('default_room')}
-                >
-                  <Text style={[styles.roomPillText, styles.roomPillTextActive]}>
-                    Computing Block • Lab 03 (±30m Geofence)
-                  </Text>
-                </TouchableOpacity>
-              )}
+            {rooms.length > 0 && (
+              <View style={styles.roomSelectWrap}>
+                {rooms.slice(0, 6).map((r) => {
+                  const isSelected = selectedRoomId === r._id;
+                  return (
+                    <TouchableOpacity
+                      key={r._id}
+                      style={[styles.roomPill, isSelected && styles.roomPillActive]}
+                      onPress={() => {
+                        setSelectedRoomId(r._id);
+                        setRoomNumber(r.roomNumber);
+                        setBuildingName(r.buildingName);
+                      }}
+                    >
+                      <Text style={[styles.roomPillText, isSelected && styles.roomPillTextActive]}>
+                        {r.buildingName} • Room {r.roomNumber} (±{r.geofenceRadiusMeters}m)
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            )}
+
+            <View style={styles.rowInputs}>
+              <View style={{ flex: 1.2 }}>
+                <Text style={styles.inputLabel}>Room Number</Text>
+                <TextInput
+                  style={styles.modalInput}
+                  value={roomNumber}
+                  onChangeText={(val) => {
+                    setRoomNumber(val);
+                    setSelectedRoomId('');
+                  }}
+                  placeholder="e.g. Lab 03, 301"
+                  placeholderTextColor="#64748b"
+                />
+              </View>
+
+              <View style={{ flex: 1 }}>
+                <Text style={styles.inputLabel}>Building</Text>
+                <TextInput
+                  style={styles.modalInput}
+                  value={buildingName}
+                  onChangeText={setBuildingName}
+                  placeholder="CSE Block"
+                  placeholderTextColor="#64748b"
+                />
+              </View>
             </View>
 
             <View style={styles.rowInputs}>
+              <View style={{ flex: 1.2 }}>
+                <Text style={styles.inputLabel}>Academic Year</Text>
+                <TextInput
+                  style={styles.modalInput}
+                  value={academicYear}
+                  onChangeText={setAcademicYear}
+                  placeholder="4th Year"
+                  placeholderTextColor="#64748b"
+                />
+              </View>
+
               <View style={{ flex: 1 }}>
                 <Text style={styles.inputLabel}>Branch</Text>
                 <TextInput
@@ -383,8 +543,8 @@ export const FacultyAttendanceScreen: React.FC = () => {
                 />
               </View>
 
-              <View style={{ flex: 1 }}>
-                <Text style={styles.inputLabel}>Section</Text>
+              <View style={{ flex: 0.8 }}>
+                <Text style={styles.inputLabel}>Sec</Text>
                 <TextInput
                   style={styles.modalInput}
                   value={section}
@@ -394,7 +554,7 @@ export const FacultyAttendanceScreen: React.FC = () => {
                 />
               </View>
 
-              <View style={{ flex: 1 }}>
+              <View style={{ flex: 0.8 }}>
                 <Text style={styles.inputLabel}>Period</Text>
                 <TextInput
                   style={styles.modalInput}
@@ -419,7 +579,7 @@ export const FacultyAttendanceScreen: React.FC = () => {
                 disabled={creating}
               >
                 <Text style={styles.modalStartBtnText}>
-                  {creating ? 'Starting...' : '🚀 Start Live QR Session'}
+                  {creating ? 'Starting...' : 'Start Live QR Session'}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -774,5 +934,22 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 13,
     fontWeight: '700',
+  },
+  inactiveIconPill: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(51, 65, 85, 0.4)',
+    borderWidth: 1,
+    borderColor: '#334155',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
+  inactiveDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#64748B',
   },
 });

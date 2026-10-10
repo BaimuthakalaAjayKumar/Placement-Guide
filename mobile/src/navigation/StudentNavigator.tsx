@@ -1,13 +1,15 @@
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { Text } from 'react-native';
 import { StudentDashboardScreen } from '../screens/student/StudentDashboardScreen';
 import { StudentAttendanceScreen } from '../screens/student/StudentAttendanceScreen';
 import { StudentProfileScreen } from '../screens/student/StudentProfileScreen';
+import { TimetableScreen } from '../screens/common/TimetableScreen';
+import { TabBarIcon } from '../components/TabBarIcon';
 import { THEME } from '../utils/constants';
 
 export type StudentTabParamList = {
   StudentDashboard: undefined;
+  StudentTimetable: undefined;
   StudentAttendance: undefined;
   StudentProfile: undefined;
 };
@@ -40,27 +42,36 @@ export const StudentNavigator: React.FC = () => {
         name="StudentDashboard"
         component={StudentDashboardScreen}
         options={{
-          title: 'Dashboard',
+          title: 'Student Desk',
           tabBarLabel: 'Dashboard',
-          tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 18 }}>📊</Text>,
+          tabBarIcon: ({ color }) => <TabBarIcon type="dashboard" color={color} />,
+        }}
+      />
+      <Tab.Screen
+        name="StudentTimetable"
+        component={TimetableScreen}
+        options={{
+          title: 'Class Timetable',
+          tabBarLabel: 'Timetable',
+          tabBarIcon: ({ color }) => <TabBarIcon type="timetable" color={color} />,
         }}
       />
       <Tab.Screen
         name="StudentAttendance"
         component={StudentAttendanceScreen}
         options={{
-          title: 'Attendance',
+          title: 'Class Attendance',
           tabBarLabel: 'Attendance',
-          tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 18 }}>📸</Text>,
+          tabBarIcon: ({ color }) => <TabBarIcon type="scan" color={color} />,
         }}
       />
       <Tab.Screen
         name="StudentProfile"
         component={StudentProfileScreen}
         options={{
-          title: 'Profile',
+          title: 'Student Profile',
           tabBarLabel: 'Profile',
-          tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 18 }}>👤</Text>,
+          tabBarIcon: ({ color }) => <TabBarIcon type="profile" color={color} />,
         }}
       />
     </Tab.Navigator>

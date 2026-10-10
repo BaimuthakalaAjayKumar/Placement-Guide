@@ -1,13 +1,15 @@
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { Text } from 'react-native';
 import { FacultyDashboardScreen } from '../screens/faculty/FacultyDashboardScreen';
 import { FacultyAttendanceScreen } from '../screens/faculty/FacultyAttendanceScreen';
 import { FacultyProfileScreen } from '../screens/faculty/FacultyProfileScreen';
+import { TimetableScreen } from '../screens/common/TimetableScreen';
+import { TabBarIcon } from '../components/TabBarIcon';
 import { THEME } from '../utils/constants';
 
 export type FacultyTabParamList = {
   FacultyDashboard: undefined;
+  FacultyTimetable: undefined;
   FacultyAttendance: undefined;
   FacultyProfile: undefined;
 };
@@ -32,7 +34,7 @@ export const FacultyNavigator: React.FC = () => {
           paddingBottom: 8,
           paddingTop: 8,
         },
-        tabBarActiveTintColor: '#10B981', // Green accent for faculty instructor portal
+        tabBarActiveTintColor: '#10B981',
         tabBarInactiveTintColor: THEME.colors.textMuted,
       }}
     >
@@ -40,27 +42,36 @@ export const FacultyNavigator: React.FC = () => {
         name="FacultyDashboard"
         component={FacultyDashboardScreen}
         options={{
-          title: 'Instructor Hub',
+          title: 'Instructor Desk',
           tabBarLabel: 'Dashboard',
-          tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 18 }}>🎓</Text>,
+          tabBarIcon: ({ color }) => <TabBarIcon type="dashboard" color={color} />,
+        }}
+      />
+      <Tab.Screen
+        name="FacultyTimetable"
+        component={TimetableScreen}
+        options={{
+          title: 'Teaching Timetable',
+          tabBarLabel: 'Timetable',
+          tabBarIcon: ({ color }) => <TabBarIcon type="timetable" color={color} />,
         }}
       />
       <Tab.Screen
         name="FacultyAttendance"
         component={FacultyAttendanceScreen}
         options={{
-          title: 'Class Attendance',
+          title: 'Class Attendance Controller',
           tabBarLabel: 'Attendance',
-          tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 18 }}>📋</Text>,
+          tabBarIcon: ({ color }) => <TabBarIcon type="attendance" color={color} />,
         }}
       />
       <Tab.Screen
         name="FacultyProfile"
         component={FacultyProfileScreen}
         options={{
-          title: 'Faculty Profile',
+          title: 'Instructor Profile',
           tabBarLabel: 'Profile',
-          tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 18 }}>👤</Text>,
+          tabBarIcon: ({ color }) => <TabBarIcon type="profile" color={color} />,
         }}
       />
     </Tab.Navigator>

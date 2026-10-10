@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const User = require('../models/User');
 const AptitudeTest = require('../models/AptitudeTest');
 const TestAttempt = require('../models/TestAttempt');
@@ -5,7 +6,8 @@ const PlacementDrive = require('../models/PlacementDrive');
 const Job = require('../models/Job');
 const PracticeQuestion = require('../models/PracticeQuestion');
 const crypto = require('crypto');
-const { getCampusFilter } = require('../utils/scopeFilter');
+const { ROLES, normalizeRole } = require('../config/permissions');
+const { getCampusFilter, canAccessCampus, isSuperAdmin } = require('../utils/scopeFilter');
 
 // 0. Scope Students for Faculty and Admin
 exports.getScopeStudents = async (req, res, next) => {
@@ -380,11 +382,76 @@ exports.completeDailyChallenge = async (req, res, next) => {
 // 7. Personal Placement Wallet
 exports.getPlacementWallet = async (req, res, next) => {
   try {
-    let targetUserId = req.user.id;
-    if ((req.user.role === 'faculty' || req.user.role === 'admin') && req.query.studentId) {
-      targetUserId = req.query.studentId;
+    const callerRole = normalizeRole(req.user?.role);
+    const isStaff = [
+      ROLES.SUPER_ADMIN,
+      ROLES.ADMIN,
+      ROLES.CAMPUS_ADMIN,
+      ROLES.ADMINISTRATOR,
+      ROLES.DIRECTOR,
+      ROLES.PRINCIPAL,
+      ROLES.HOD,
+      ROLES.FACULTY,
+      ROLES.PLACEMENT_OFFICER,
+      ROLES.AUDITOR
+    ].includes(callerRole);
+
+    let targetUserId = req.user.id || req.user._id;
+
+    if (callerRole === ROLES.STUDENT) {
+      // Students can ONLY read their own placement wallet
+      if (req.query.studentId && String(req.query.studentId) !== String(targetUserId)) {
+        return res.status(403).json({
+          success: false,
+          error: 'Unauthorized: Students are only permitted to access their own placement wallet'
+        });
+      }
+    } else if (isStaff) {
+      if (req.query.studentId) {
+        if (!mongoose.Types.ObjectId.isValid(req.query.studentId)) {
+          return res.status(400).json({
+            success: false,
+            error: 'Invalid student ID format'
+          });
+        }
+
+        const student = await User.findById(req.query.studentId).select('_id name email role campusId departmentId branch').lean();
+        if (!student || student.role !== 'student') {
+          return res.status(404).json({
+            success: false,
+            error: 'Student candidate record not found'
+          });
+        }
+
+        // Campus boundary check
+        if (student.campusId && !canAccessCampus(req.user, student.campusId)) {
+          return res.status(403).json({
+            success: false,
+            error: 'Access denied: Student is outside your campus scope'
+          });
+        }
+
+        targetUserId = student._id;
+      } else {
+        // Staff viewing without explicit studentId: default to first scoped student if available
+        const campusFilter = getCampusFilter(req.user);
+        const firstScopedStudent = await User.findOne({ role: 'student', ...campusFilter }).sort({ rollNumber: 1 }).select('_id').lean();
+        if (firstScopedStudent) {
+          targetUserId = firstScopedStudent._id;
+        }
+      }
+    } else {
+      // Unrecognized or unauthorized role
+      return res.status(403).json({
+        success: false,
+        error: 'Unauthorized to access placement wallet'
+      });
     }
+
     const studentId = String(targetUserId);
+
+    // Query drives from database
+    const drives = await PlacementDrive.find({}).select('companyName role packageDetails packageLPA dates deadline status applications candidates createdAt').lean();
 
     const appliedEntries = [];
     const upcomingDeadlines = [];
@@ -393,34 +460,52 @@ exports.getPlacementWallet = async (req, res, next) => {
     let shortlistedCount = 0;
 
     drives.forEach(d => {
-      const app = d.candidates?.find(c => String(c.student) === studentId || String(c.student?._id) === studentId);
+      const applications = d.applications || d.candidates || [];
+      const app = applications.find(c => {
+        const cStudentId = c.student?._id ? String(c.student._id) : String(c.student || '');
+        return cStudentId === studentId;
+      });
+
       if (app) {
+        const stage = app.currentStage || app.stage || 'applied';
+        const packageOffered = app.offerDetails?.offeredPackage;
+        const drivePackage = d.packageDetails || d.packageLPA || 'N/A';
+
         appliedEntries.push({
           driveId: d._id,
           companyName: d.companyName,
           role: d.role,
-          packageLPA: d.packageLPA,
-          stage: app.stage || 'applied',
+          packageLPA: packageOffered || drivePackage,
+          stage: stage,
           appliedAt: app.appliedAt || d.createdAt,
-          interviewDate: app.interviewSchedule?.date,
-          offerDetails: app.offerDetails
+          interviewDate: app.interviewSchedule?.scheduledAt || app.interviewSchedule?.date || null,
+          offerDetails: app.offerDetails || null
         });
 
-        if (app.stage === 'selected' || app.stage === 'offered') offersCount++;
-        if (app.stage?.includes('interview')) interviewsCount++;
-        if (app.stage === 'shortlisted') shortlistedCount++;
+        if (stage === 'selected' || stage === 'offered' || Boolean(packageOffered && packageOffered.trim())) {
+          offersCount++;
+        }
+        if (stage.includes('interview') || stage === 'hr_round' || Boolean(app.interviewSchedule?.scheduledAt || app.interviewSchedule?.date)) {
+          interviewsCount++;
+        }
+        if (stage === 'shortlisted' || stage === 'online_test_cleared') {
+          shortlistedCount++;
+        }
       }
 
-      if (d.deadline && new Date(d.deadline) > new Date()) {
+      const deadline = d.dates?.registrationDeadline || d.deadline;
+      if (deadline && d.status !== 'cancelled' && d.status !== 'completed' && new Date(deadline) > new Date()) {
         upcomingDeadlines.push({
           driveId: d._id,
           companyName: d.companyName,
           role: d.role,
-          packageLPA: d.packageLPA,
-          deadline: d.deadline
+          packageLPA: d.packageDetails || d.packageLPA || 'N/A',
+          deadline: deadline
         });
       }
     });
+
+    upcomingDeadlines.sort((a, b) => new Date(a.deadline) - new Date(b.deadline));
 
     res.status(200).json({
       success: true,

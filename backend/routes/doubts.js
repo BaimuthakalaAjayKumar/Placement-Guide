@@ -4,7 +4,8 @@ const {
     getMyDoubts,
     getAllDoubts,
     answerDoubt,
-    submitContactUs
+    submitContactUs,
+    getDoubtAttachment
 } = require('../controllers/doubts');
 
 const router = express.Router();
@@ -16,8 +17,9 @@ router.route('/')
     .post(createDoubt);
 
 router.get('/my', getMyDoubts);
-router.get('/admin', authorize('admin'), getAllDoubts);
-router.put('/:id/answer', authorize('admin'), answerDoubt);
+router.get('/admin', authorize('admin', 'super_admin', 'campus_admin', 'director', 'principal', 'hod'), getAllDoubts);
+router.put('/:id/answer', authorize('admin', 'super_admin', 'campus_admin', 'director', 'principal', 'hod'), answerDoubt);
+router.get('/:id/attachment', getDoubtAttachment);
 router.post('/contact', submitContactUs);
 
 module.exports = router;
