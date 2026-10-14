@@ -100,7 +100,7 @@ const AttendanceSessionSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['SCHEDULED', 'ACTIVE', 'LOCKED', 'FINALIZED', 'CANCELLED'],
+    enum: ['SCHEDULED', 'ACTIVE', 'LOCKED', 'SUBMITTED', 'FINALIZED', 'CANCELLED'],
     default: 'SCHEDULED',
     index: true
   },
@@ -115,6 +115,16 @@ const AttendanceSessionSchema = new mongoose.Schema({
     trim: true
   },
   qrExpiresAt: {
+    type: Date,
+    default: null
+  },
+  // Previous token archive to support the configured 5-second grace window during token turnover
+  previousQrIdentifier: {
+    type: String,
+    default: null,
+    trim: true
+  },
+  previousQrExpiresAt: {
     type: Date,
     default: null
   },
@@ -139,6 +149,70 @@ const AttendanceSessionSchema = new mongoose.Schema({
   geofenceEnforced: {
     type: Boolean,
     default: true
+  },
+  facultyFaceVerified: {
+    type: Boolean,
+    default: false
+  },
+  facultyVerificationAudit: {
+    verifiedAt: { type: Date, default: null },
+    similarityScore: { type: Number, default: null },
+    fallbackReason: { type: String, default: null }
+  },
+
+  // ============================================================
+  // LIVE CLASS TRANSITION & ATTENDANCE WINDOW STATE
+  // ============================================================
+  attendanceClosed: {
+    type: Boolean,
+    default: false,
+    index: true
+  },
+  attendanceClosedAt: {
+    type: Date,
+    default: null
+  },
+  attendanceTimerMinutes: {
+    type: Number,
+    default: 10
+  },
+  lectureStatus: {
+    type: String,
+    enum: ['ATTENDANCE_SCANNING', 'LIVE_CLASS', 'COMPLETED'],
+    default: 'ATTENDANCE_SCANNING',
+    index: true
+  },
+
+  // ============================================================
+  // 10-MINUTE RECTIFICATION WINDOW & DURABLE TIMERS (Phase B)
+  // ============================================================
+  rectificationExpiresAt: {
+    type: Date,
+    default: null,
+    index: true
+  },
+  rectificationFinalized: {
+    type: Boolean,
+    default: false,
+    index: true
+  },
+  submittedAt: {
+    type: Date,
+    default: null
+  },
+  submittedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    default: null
+  },
+  absenceAlertsDispatched: {
+    type: Boolean,
+    default: false,
+    index: true
+  },
+  absenceAlertsDispatchedAt: {
+    type: Date,
+    default: null
   },
 
   // ============================================================

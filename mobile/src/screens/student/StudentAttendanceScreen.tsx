@@ -20,6 +20,7 @@ import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { THEME } from '../../utils/constants';
 import { formatApiErrorMessage } from '../../utils/errorUtils';
 import { attendanceApi, StudentAttendanceAnalytics, AttendanceHistoryRecord, ActiveSession } from '../../api/attendanceApi';
+import { FaceBiometricModal } from '../../components/FaceBiometricModal';
 
 // Safe dynamic loader for native camera to prevent Expo Go crashes
 let CameraViewComponent: any = null;
@@ -75,6 +76,22 @@ export const StudentAttendanceScreen: React.FC = () => {
     message: string;
     distance?: number;
   } | null>(null);
+
+  // Biometric Face Verification States
+  const [biometricModalVisible, setBiometricModalVisible] = useState(false);
+  const [isBiometricEnrolled, setIsBiometricEnrolled] = useState(false);
+  const [pendingCheckIn, setPendingCheckIn] = useState<{ sessionId: string; token: string } | null>(null);
+
+  useEffect(() => {
+    attendanceApi
+      .getBiometricStatus()
+      .then((res) => {
+        if (res && res.isEnrolled) {
+          setIsBiometricEnrolled(true);
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   // Fetch Attendance Data
   const loadAttendanceData = useCallback(async () => {
@@ -232,14 +249,19 @@ export const StudentAttendanceScreen: React.FC = () => {
         return;
       }
 
-      await executeCheckIn(sessionId, token);
+      if (isBiometricEnrolled) {
+        setPendingCheckIn({ sessionId, token });
+        setBiometricModalVisible(true);
+      } else {
+        await executeCheckIn(sessionId, token);
+      }
     } catch (e) {
       Alert.alert('Scan Format Error', 'Unable to parse QR payload. Try manual check-in.');
     }
   };
 
-  // Execute Check-in with GPS Coordinates
-  const executeCheckIn = async (sessionId: string, token: string) => {
+  // Execute Check-in with GPS Coordinates and Optional Face Verification Token
+  const executeCheckIn = async (sessionId: string, token: string, faceVerificationToken?: string) => {
     try {
       setSubmitting(true);
       setCheckInResult(null);
@@ -254,6 +276,7 @@ export const StudentAttendanceScreen: React.FC = () => {
         latitude: loc.coords.latitude,
         longitude: loc.coords.longitude,
         accuracy: loc.coords.accuracy || 10,
+        faceVerificationToken,
       };
 
       // 2. Call backend check-in endpoint
@@ -674,8 +697,15 @@ export const StudentAttendanceScreen: React.FC = () => {
                     Alert.alert('Required Fields', 'Please enter both Session ID and Token.');
                     return;
                   }
+                  const trimmedSession = manualSessionId.trim();
+                  const trimmedToken = manualToken.trim();
                   setManualModalVisible(false);
-                  executeCheckIn(manualSessionId.trim(), manualToken.trim());
+                  if (isBiometricEnrolled) {
+                    setPendingCheckIn({ sessionId: trimmedSession, token: trimmedToken });
+                    setBiometricModalVisible(true);
+                  } else {
+                    executeCheckIn(trimmedSession, trimmedToken);
+                  }
                 }}
               >
                 <Text style={styles.modalSubmitBtnText}>Verify Check-In</Text>
@@ -684,6 +714,33 @@ export const StudentAttendanceScreen: React.FC = () => {
           </View>
         </View>
       </Modal>
+
+      {/* Face Biometric Verification Modal */}
+      <FaceBiometricModal
+        visible={biometricModalVisible}
+        mode="VERIFY"
+        purpose="ATTENDANCE_CHECKIN"
+        title="Classroom Attendance Face Verification"
+        onSuccess={(faceToken) => {
+          setBiometricModalVisible(false);
+          if (pendingCheckIn) {
+            executeCheckIn(pendingCheckIn.sessionId, pendingCheckIn.token, faceToken);
+            setPendingCheckIn(null);
+          }
+        }}
+        onClose={() => {
+          setBiometricModalVisible(false);
+          setPendingCheckIn(null);
+        }}
+        onFallback={() => {
+          setBiometricModalVisible(false);
+          if (pendingCheckIn) {
+            executeCheckIn(pendingCheckIn.sessionId, pendingCheckIn.token);
+            setPendingCheckIn(null);
+          }
+        }}
+        fallbackLabel="Use Non-Biometric Alternative (QR + GPS)"
+      />
     </ScreenContainer>
   );
 };

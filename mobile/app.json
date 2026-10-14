@@ -41,7 +41,7 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "CampusBridge requires camera access to scan dynamic classroom attendance QR codes."
+          "cameraPermission": "CampusBridge requires camera access for biometric facial verification and scanning dynamic attendance QR codes."
         }
       ],
       [

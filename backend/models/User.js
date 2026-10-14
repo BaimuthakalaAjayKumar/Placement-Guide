@@ -40,9 +40,21 @@ const UserSchema = new mongoose.Schema({
       'placement_officer',
       'auditor',
       'director',
-      'principal'
+      'principal',
+      'front_office',
+      'support_desk',
+      'support_desk_supervisor',
+      'librarian'
     ],
     default: 'student'
+  },
+  authorizedRoles: {
+    type: [String],
+    default: function() { return [this.role]; }
+  },
+  activeRole: {
+    type: String,
+    default: function() { return this.role; }
   },
   companyName: {
     type: String,
@@ -130,6 +142,55 @@ const UserSchema = new mongoose.Schema({
     type: String,
     default: ''
   },
+  // Professional & Academic Profile Fields (Director, Principal, HOD, Faculty, Super Admin)
+  employeeId: {
+    type: String,
+    default: ''
+  },
+  designation: {
+    type: String,
+    default: ''
+  },
+  qualifications: {
+    type: String,
+    default: ''
+  },
+  specialization: {
+    type: String,
+    default: ''
+  },
+  experience: {
+    type: String,
+    default: ''
+  },
+  experienceYears: {
+    type: Number,
+    default: 0
+  },
+  officeLocation: {
+    type: String,
+    default: ''
+  },
+  reportingAuthority: {
+    type: String,
+    default: ''
+  },
+  institutionalResponsibilities: {
+    type: [String],
+    default: []
+  },
+  teachingResponsibilities: {
+    type: [String],
+    default: []
+  },
+  classAdvisor: {
+    type: String,
+    default: ''
+  },
+  profilePicture: {
+    type: String,
+    default: ''
+  },
   managedAcademicYears: {
     type: [String],
     default: []
@@ -184,7 +245,14 @@ const UserSchema = new mongoose.Schema({
     mediumSolved: { type: Number, default: 0 },
     hardSolved: { type: Number, default: 0 },
     totalSolved: { type: Number, default: 0 },
-    solvedSlugs: { type: [String], default: [] }
+    solvedSlugs: { type: [String], default: [] },
+    lastSyncAt: { type: Date, default: null },
+    lastSyncStatus: { type: String, default: 'idle' },
+    lastSyncMessage: { type: String, default: '' },
+    verifiedSolvedCount: { type: Number, default: 0 },
+    verifiedEasyCount: { type: Number, default: 0 },
+    verifiedMediumCount: { type: Number, default: 0 },
+    verifiedHardCount: { type: Number, default: 0 }
   },
   codeforcesUsername: {
     type: String,
@@ -195,7 +263,14 @@ const UserSchema = new mongoose.Schema({
     maxRating: { type: Number, default: 0 },
     rank: { type: String, default: 'Unrated' },
     solvedCount: { type: Number, default: 0 },
-    solvedSlugs: { type: [String], default: [] }
+    solvedSlugs: { type: [String], default: [] },
+    lastSyncAt: { type: Date, default: null },
+    lastSyncStatus: { type: String, default: 'idle' },
+    lastSyncMessage: { type: String, default: '' },
+    verifiedSolvedCount: { type: Number, default: 0 },
+    verifiedEasyCount: { type: Number, default: 0 },
+    verifiedMediumCount: { type: Number, default: 0 },
+    verifiedHardCount: { type: Number, default: 0 }
   },
   codechefUsername: {
     type: String,
@@ -207,7 +282,14 @@ const UserSchema = new mongoose.Schema({
     globalRank: { type: Number, default: 0 },
     countryRank: { type: Number, default: 0 },
     solvedCount: { type: Number, default: 0 },
-    solvedSlugs: { type: [String], default: [] }
+    solvedSlugs: { type: [String], default: [] },
+    lastSyncAt: { type: Date, default: null },
+    lastSyncStatus: { type: String, default: 'idle' },
+    lastSyncMessage: { type: String, default: '' },
+    verifiedSolvedCount: { type: Number, default: 0 },
+    verifiedEasyCount: { type: Number, default: 0 },
+    verifiedMediumCount: { type: Number, default: 0 },
+    verifiedHardCount: { type: Number, default: 0 }
   },
   hackerrankUsername: {
     type: String,
@@ -217,7 +299,14 @@ const UserSchema = new mongoose.Schema({
     solvedCount: { type: Number, default: 0 },
     score: { type: Number, default: 0 },
     badgesCount: { type: Number, default: 0 },
-    solvedSlugs: { type: [String], default: [] }
+    solvedSlugs: { type: [String], default: [] },
+    lastSyncAt: { type: Date, default: null },
+    lastSyncStatus: { type: String, default: 'idle' },
+    lastSyncMessage: { type: String, default: '' },
+    verifiedSolvedCount: { type: Number, default: 0 },
+    verifiedEasyCount: { type: Number, default: 0 },
+    verifiedMediumCount: { type: Number, default: 0 },
+    verifiedHardCount: { type: Number, default: 0 }
   },
   githubUsername: {
     type: String,
@@ -360,6 +449,59 @@ const UserSchema = new mongoose.Schema({
     email: { type: Boolean, default: true },
     parentOptIn: { type: Boolean, default: false },
     dailyDigest: { type: Boolean, default: false }
+  },
+  biometricProfile: {
+    isEnrolled: {
+      type: Boolean,
+      default: false
+    },
+    enrolledAt: {
+      type: Date,
+      default: null
+    },
+    consentGiven: {
+      type: Boolean,
+      default: false
+    },
+    consentDate: {
+      type: Date,
+      default: null
+    },
+    encryptedEmbedding: {
+      type: String,
+      default: null,
+      select: false
+    },
+    authTag: {
+      type: String,
+      default: null,
+      select: false
+    },
+    iv: {
+      type: String,
+      default: null,
+      select: false
+    },
+    modelVersion: {
+      type: String,
+      default: 'cb-facenet-128d-v1'
+    },
+    enrolledByIp: {
+      type: String,
+      default: ''
+    },
+    lastVerifiedAt: {
+      type: Date,
+      default: null
+    },
+    revokedAt: {
+      type: Date,
+      default: null
+    },
+    revokedReason: {
+      type: String,
+      default: ''
+    }
   },
   createdAt: {
     type: Date,

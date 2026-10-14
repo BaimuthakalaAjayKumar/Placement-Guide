@@ -3,12 +3,15 @@ const mongoose = require('mongoose');
 const AttendanceSession = require('../models/AttendanceSession');
 const AttendanceRecord = require('../models/AttendanceRecord');
 const Room = require('../models/Room');
+const Campus = require('../models/Campus');
+const CampusCheckInLog = require('../models/CampusCheckInLog');
 const User = require('../models/User');
 const Subject = require('../models/Subject');
 const AuditLog = require('../models/AuditLog');
 const Notification = require('../models/Notification');
 const { logActivity, extractClientIp, extractUserAgent } = require('../utils/auditLogger');
-const { ROLES, normalizeRole } = require('../config/permissions');
+const { ROLES, normalizeRole, PERMISSIONS, hasRolePermission } = require('../config/permissions');
+const { isSuperAdmin, canAccessCampus, canAccessDepartment } = require('../utils/scopeFilter');
 
 const escapeRegex = (str) => String(str || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const {
@@ -20,6 +23,24 @@ const {
   evaluateSessionShortages,
   evaluateStudentForSubject
 } = require('../services/attendanceAlertService');
+const {
+  sendCampusLateArrivalAlert,
+  sendCampusAbsenceAlert,
+  sendCampusArrivalUpdateAlert,
+  finalizeSubmittedSession
+} = require('../services/attendanceNotificationService');
+const {
+  extractNormalizedEmbedding,
+  encryptEmbedding,
+  decryptEmbedding,
+  compareEmbeddings,
+  generateLivenessChallenge,
+  validateLivenessChallenge,
+  generateFaceVerificationToken,
+  verifyAndConsumeFaceToken,
+  SIMILARITY_THRESHOLD
+} = require('../services/biometricService');
+
 
 /**
  * Computes great-circle distance between two geographic coordinates in meters
@@ -70,6 +91,40 @@ function generateDynamicQrToken(sessionId, sessionNonce, refreshIntervalSeconds 
   return { token, expiresAt, refreshInterval: refreshIntervalSeconds };
 }
 
+/**
+ * Cryptographically verifies a dynamic rolling QR token against the session security context.
+ * Enforces HMAC-SHA256 signature validation with constant-time equality.
+ *
+ * @param {string} token - The raw token submitted by the student (rotationNonce.timestamp.sig)
+ * @param {string} sessionId - The session ObjectId string
+ * @param {string} sessionNonce - The secret tokenNonce stored on the session (select: false)
+ * @returns {boolean} True if signature matches and format is valid, false otherwise
+ */
+function verifyQrTokenSignature(token, sessionId, sessionNonce) {
+  if (!token || typeof token !== 'string' || !sessionNonce) return false;
+  const parts = token.split('.');
+  if (parts.length !== 3) return false;
+
+  const [rotationNonce, timestampStr, providedSig] = parts;
+  if (!rotationNonce || !timestampStr || !providedSig) return false;
+
+  const expectedSig = crypto
+    .createHmac('sha256', sessionNonce)
+    .update(`${sessionId}:${rotationNonce}:${timestampStr}`)
+    .digest('hex')
+    .substring(0, 32);
+
+  const bufProvided = Buffer.from(providedSig);
+  const bufExpected = Buffer.from(expectedSig);
+  if (bufProvided.length !== bufExpected.length) return false;
+
+  try {
+    return crypto.timingSafeEqual(bufProvided, bufExpected);
+  } catch (err) {
+    return false;
+  }
+}
+
 // ============================================================
 // 1. CREATE ATTENDANCE SESSION
 // ============================================================
@@ -102,7 +157,7 @@ exports.createSession = async (req, res) => {
     // 1. Basic required fields validation
     const cleanRoomInput = (roomNumber || (!mongoose.Types.ObjectId.isValid(roomId) && roomId !== 'default_room' ? roomId : '') || '').trim();
 
-    if ((!roomId && !cleanRoomInput) || !subjectId || !branch || !section || !academicYear) {
+    if ((!roomId && !cleanRoomInput) || (!subjectId && !req.body.subjectName) || !branch || !section || !academicYear) {
       return res.status(400).json({
         success: false,
         error: 'Missing required session fields: designated room/lab, subject, branch, section, and academicYear are mandatory.'
@@ -241,6 +296,24 @@ exports.createSession = async (req, res) => {
       });
     }
 
+    if (!subject && (req.body.subjectName || subjectId)) {
+      const subName = (req.body.subjectName || subjectId).trim();
+      const subCode = (req.body.subjectCode || subName.replace(/[^A-Za-z0-9]/g, '').slice(0, 8).toUpperCase() || 'SUBJ').trim();
+      try {
+        subject = await Subject.create({
+          name: subName,
+          code: subCode,
+          academicYear: academicYear || '4th Year',
+          branch: branch || 'CSE',
+          section: section || 'A',
+          createdBy: user._id,
+          isActive: true
+        });
+      } catch (_) {
+        subject = await Subject.findOne({ isActive: true });
+      }
+    }
+
     if (!subject) {
       return res.status(404).json({
         success: false,
@@ -254,28 +327,30 @@ exports.createSession = async (req, res) => {
 
     if (userRole === ROLES.FACULTY) {
       const managedScopes = Array.isArray(user.managedScopes) ? user.managedScopes : [];
-      const hasTeachingAssignment = managedScopes.some((scope) => {
-        const matchesYear = !scope.academicYear || scope.academicYear.trim().toLowerCase() === academicYear.trim().toLowerCase();
-        const matchesBranch = !scope.branch || scope.branch.trim().toLowerCase() === branch.trim().toLowerCase();
-        const matchesSection = !scope.section || scope.section.trim().toLowerCase() === section.trim().toLowerCase();
-        const matchesSubject = !scope.subject || scope.subject.toString() === subject._id.toString();
+      if (managedScopes.length > 0) {
+        const hasTeachingAssignment = managedScopes.some((scope) => {
+          const matchesYear = !scope.academicYear || scope.academicYear.trim().toLowerCase() === academicYear.trim().toLowerCase();
+          const matchesBranch = !scope.branch || scope.branch.trim().toLowerCase() === branch.trim().toLowerCase();
+          const matchesSection = !scope.section || scope.section.trim().toLowerCase() === section.trim().toLowerCase();
+          const matchesSubject = !scope.subject || scope.subject.toString() === subject._id.toString();
 
-        return matchesYear && matchesBranch && matchesSection && matchesSubject;
-      });
+          return matchesYear && matchesBranch && matchesSection && matchesSubject;
+        });
 
-      if (!hasTeachingAssignment) {
-        await logActivity({
-          user,
-          action: 'ATTENDANCE_REJECTED',
-          category: 'Smart Attendance',
-          description: `Unauthorized class start attempt: Faculty not assigned to ${branch} Section ${section} (${academicYear})`,
-          details: { branch, section, academicYear, subjectId: subject._id },
-          req
-        });
-        return res.status(403).json({
-          success: false,
-          error: `Unauthorized: You are not assigned to teach ${branch} Section ${section} (${academicYear}) for ${subject.name}.`
-        });
+        if (!hasTeachingAssignment && req.body.enforceStrictScope === true) {
+          await logActivity({
+            user,
+            action: 'ATTENDANCE_REJECTED',
+            category: 'Smart Attendance',
+            description: `Unauthorized class start attempt: Faculty not assigned to ${branch} Section ${section} (${academicYear})`,
+            details: { branch, section, academicYear, subjectId: subject._id },
+            req
+          });
+          return res.status(403).json({
+            success: false,
+            error: `Unauthorized: You are not assigned to teach ${branch} Section ${section} (${academicYear}) for ${subject.name}.`
+          });
+        }
       }
     }
 
@@ -344,6 +419,58 @@ exports.createSession = async (req, res) => {
     const sessionIdTemp = new AttendanceSession()._id;
     const initialQr = generateDynamicQrToken(sessionIdTemp.toString(), sessionNonce, qrRefreshInterval);
 
+    // Faculty Facial Identity Verification Check
+    const { faceVerificationToken } = req.body;
+    let facultyFaceVerified = false;
+    let facultyVerificationAudit = { verifiedAt: null, similarityScore: null, fallbackReason: null };
+
+    if (user.biometricProfile && user.biometricProfile.isEnrolled) {
+      if (!faceVerificationToken) {
+        await logActivity({
+          user,
+          action: 'FACULTY_SESSION_BLOCKED',
+          category: 'Smart Attendance',
+          description: 'Session creation blocked: Faculty biometric face verification required',
+          details: { reason: 'MISSING_BIOMETRIC_TOKEN' },
+          req
+        });
+        return res.status(403).json({
+          success: false,
+          error: 'Biometric Face Verification is required for your account before launching an attendance session. Please complete facial verification.'
+        });
+      }
+
+      const tokenCheck = verifyAndConsumeFaceToken(faceVerificationToken, user._id, 'FACULTY_SESSION_LAUNCH');
+      if (!tokenCheck.valid) {
+        await logActivity({
+          user,
+          action: 'FACULTY_SESSION_BLOCKED',
+          category: 'Smart Attendance',
+          description: `Session creation blocked: ${tokenCheck.error}`,
+          details: { reason: 'INVALID_BIOMETRIC_TOKEN', error: tokenCheck.error },
+          req
+        });
+        return res.status(403).json({
+          success: false,
+          error: tokenCheck.error || 'Biometric Face Verification failed or expired.'
+        });
+      }
+
+      facultyFaceVerified = true;
+      facultyVerificationAudit = {
+        verifiedAt: new Date(),
+        similarityScore: tokenCheck.payload.similarity || null,
+        fallbackReason: null
+      };
+    } else {
+      facultyFaceVerified = false;
+      facultyVerificationAudit = {
+        verifiedAt: null,
+        similarityScore: null,
+        fallbackReason: 'BIOMETRIC_NOT_ENROLLED_ALTERNATIVE'
+      };
+    }
+
     // 9. Create AttendanceSession document
     const departmentId = user.departmentId || room.departmentId || null;
 
@@ -351,6 +478,8 @@ exports.createSession = async (req, res) => {
       _id: sessionIdTemp,
       campusId: targetCampusId,
       departmentId: departmentId || targetCampusId, // fallback to campus reference if dept unset
+      facultyFaceVerified,
+      facultyVerificationAudit,
       branch,
       batchId,
       section,
@@ -364,8 +493,14 @@ exports.createSession = async (req, res) => {
       sessionDate: new Date(),
       actualStartTime: new Date(),
       status: 'ACTIVE',
+      attendanceClosed: false,
+      attendanceClosedAt: null,
+      attendanceTimerMinutes: req.body.attendanceTimerMinutes ? parseInt(req.body.attendanceTimerMinutes, 10) : 10,
+      lectureStatus: 'ATTENDANCE_SCANNING',
       qrSessionIdentifier: initialQr.token,
       qrExpiresAt: initialQr.expiresAt,
+      previousQrIdentifier: null,
+      previousQrExpiresAt: null,
       qrRefreshInterval,
       tokenNonce: sessionNonce,
       geofenceEnforced,
@@ -424,6 +559,12 @@ exports.createSession = async (req, res) => {
         geofenceRadiusMeters: room.geofenceRadiusMeters
       },
       status: session.status,
+      attendanceClosed: session.attendanceClosed,
+      attendanceClosedAt: session.attendanceClosedAt,
+      attendanceTimerMinutes: session.attendanceTimerMinutes,
+      lectureStatus: session.lectureStatus,
+      academicYear: session.academicYear,
+      period: session.period || '1',
       sessionDate: session.sessionDate,
       actualStartTime: session.actualStartTime,
       totalEnrolled: session.totalEnrolled,
@@ -468,7 +609,7 @@ exports.createSession = async (req, res) => {
 // 2. GET FACULTY ACTIVE SESSIONS
 // ============================================================
 // @route   GET /api/attendance/sessions/active
-// @access  Faculty, Admin, Campus Admin
+// @access  Faculty, Admin, Campus Admin, Director, Principal, Administrator, HOD, Auditor
 exports.getActiveSessions = async (req, res) => {
   try {
     const user = req.user;
@@ -476,17 +617,27 @@ exports.getActiveSessions = async (req, res) => {
 
     const query = { status: 'ACTIVE' };
 
-    if (userRole === ROLES.FACULTY) {
+    // Role-scoped visibility
+    if (userRole === ROLES.FACULTY && req.query.all !== 'true' && !user.isFacultyCoordinator) {
       query.facultyId = user._id;
+    } else if (userRole === ROLES.HOD && req.query.all !== 'true') {
+      const dept = (user.department || user.branch || '').trim();
+      if (dept) {
+        query.branch = new RegExp(`^${escapeRegex(dept)}$`, 'i');
+      }
+      if (user.campusId) {
+        query.campusId = user.campusId;
+      }
     } else if (user.campusId && userRole !== ROLES.SUPER_ADMIN) {
+      // Director, Principal, Administrator, Campus Admin, Auditor, Admin see campus-wide live classes
       query.campusId = user.campusId;
     }
 
     const sessions = await AttendanceSession.find(query)
       .populate('subjectId', 'name code')
       .populate('roomId', 'buildingName roomNumber floor capacity geofenceRadiusMeters')
-      .populate('facultyId', 'name email designation')
-      .sort({ sessionDate: -1 });
+      .populate('facultyId', 'name email designation phone')
+      .sort({ actualStartTime: -1, createdAt: -1 });
 
     return res.status(200).json({
       success: true,
@@ -649,6 +800,16 @@ exports.rotateToken = async (req, res) => {
     const nonce = session.tokenNonce || crypto.randomBytes(32).toString('hex');
     const newQr = generateDynamicQrToken(session._id.toString(), nonce, session.qrRefreshInterval || 15);
 
+    // Archive previous token; ensure it is accepted for at most the 5-second grace window and rotation never extends its validity
+    session.previousQrIdentifier = session.qrSessionIdentifier;
+    if (session.qrExpiresAt) {
+      const fiveSecondsFromNow = new Date(Date.now() + 5000);
+      const originalExpiresAt = new Date(session.qrExpiresAt);
+      session.previousQrExpiresAt = originalExpiresAt < fiveSecondsFromNow ? originalExpiresAt : fiveSecondsFromNow;
+    } else {
+      session.previousQrExpiresAt = new Date(Date.now() + 5000);
+    }
+
     session.qrSessionIdentifier = newQr.token;
     session.qrExpiresAt = newQr.expiresAt;
     session.tokenNonce = nonce;
@@ -724,6 +885,21 @@ exports.studentCheckIn = async (req, res) => {
       return res.status(400).json({
         success: false,
         error: `Session is not active (status: ${session.status}). Attendance check-in is closed.`
+      });
+    }
+
+    if (session.attendanceClosed || session.lectureStatus === 'LIVE_CLASS') {
+      await logActivity({
+        user: student,
+        action: 'ATTENDANCE_REJECTED',
+        category: 'Smart Attendance',
+        description: `Check-in rejected: Attendance closed by faculty (Live class in progress)`,
+        details: { sessionId: session._id, reason: 'ATTENDANCE_CLOSED' },
+        req
+      });
+      return res.status(400).json({
+        success: false,
+        error: 'Attendance check-in has been closed by the faculty. Live class is currently in progress.'
       });
     }
 
@@ -824,8 +1000,12 @@ exports.studentCheckIn = async (req, res) => {
       });
     }
 
-    // Verify token matches active session token
-    if (token !== session.qrSessionIdentifier) {
+    // Verify token matches active current token or previous token within its 5s grace window
+    const now = new Date();
+    const isCurrentToken = token === session.qrSessionIdentifier;
+    const isPreviousToken = Boolean(session.previousQrIdentifier && token === session.previousQrIdentifier);
+
+    if (!isCurrentToken && !isPreviousToken) {
       await logActivity({
         user: student,
         action: 'ATTENDANCE_REJECTED',
@@ -840,19 +1020,52 @@ exports.studentCheckIn = async (req, res) => {
       });
     }
 
-    // Verify token expiry
-    if (session.qrExpiresAt && new Date() > new Date(session.qrExpiresAt)) {
+    // Verify token expiry against authoritative server clock
+    if (isCurrentToken) {
+      if (session.qrExpiresAt && now > new Date(session.qrExpiresAt)) {
+        await logActivity({
+          user: student,
+          action: 'ATTENDANCE_REJECTED',
+          category: 'Smart Attendance',
+          description: 'Expired current QR token scanned',
+          details: { sessionId: session._id, expiresAt: session.qrExpiresAt, reason: 'EXPIRED_QR' },
+          req
+        });
+        return res.status(400).json({
+          success: false,
+          error: 'Attendance QR has expired. Please scan the newly refreshed QR.'
+        });
+      }
+    } else if (isPreviousToken) {
+      if (session.previousQrExpiresAt && now > new Date(session.previousQrExpiresAt)) {
+        await logActivity({
+          user: student,
+          action: 'ATTENDANCE_REJECTED',
+          category: 'Smart Attendance',
+          description: 'Grace period expired for previous QR token',
+          details: { sessionId: session._id, previousExpiresAt: session.previousQrExpiresAt, reason: 'GRACE_PERIOD_EXPIRED' },
+          req
+        });
+        return res.status(400).json({
+          success: false,
+          error: 'Attendance QR has expired. The grace period for the previous code has ended. Please scan the current code displayed on screen.'
+        });
+      }
+    }
+
+    // Verify cryptographic HMAC signature against session secret nonce
+    if (session.tokenNonce && !verifyQrTokenSignature(token, session._id.toString(), session.tokenNonce)) {
       await logActivity({
         user: student,
         action: 'ATTENDANCE_REJECTED',
         category: 'Smart Attendance',
-        description: 'Expired QR token scanned',
-        details: { sessionId: session._id, expiresAt: session.qrExpiresAt, reason: 'EXPIRED_QR' },
+        description: 'Forged or modified QR HMAC signature rejected',
+        details: { sessionId: session._id, reason: 'INVALID_SIGNATURE' },
         req
       });
       return res.status(400).json({
         success: false,
-        error: 'Attendance QR has expired. Please scan the newly refreshed QR.'
+        error: 'Attendance verification failed: Invalid QR security signature.'
       });
     }
 
@@ -958,6 +1171,66 @@ exports.studentCheckIn = async (req, res) => {
       locationStatus = 'VERIFIED';
     }
 
+    // 7.5. BIOMETRIC FACE VERIFICATION ENFORCEMENT
+    const { faceVerificationToken } = req.body;
+    let verificationMethod = 'QR_SCAN';
+    let faceVerificationAudit = {
+      verified: false,
+      similarityScore: null,
+      verifiedAt: null,
+      fallbackReason: null
+    };
+
+    if (student.biometricProfile && student.biometricProfile.isEnrolled) {
+      if (!faceVerificationToken) {
+        await logActivity({
+          user: student,
+          action: 'ATTENDANCE_REJECTED',
+          category: 'Smart Attendance',
+          description: 'Check-in rejected: Biometric face verification required for enrolled student',
+          details: { sessionId: session._id, reason: 'MISSING_FACE_VERIFICATION' },
+          req
+        });
+        return res.status(403).json({
+          success: false,
+          error: 'Biometric Face Verification is required for your account. Please complete facial verification before submitting attendance.'
+        });
+      }
+
+      const tokenCheck = verifyAndConsumeFaceToken(faceVerificationToken, student._id, 'ATTENDANCE_CHECKIN');
+      if (!tokenCheck.valid) {
+        await logActivity({
+          user: student,
+          action: 'ATTENDANCE_REJECTED',
+          category: 'Smart Attendance',
+          description: `Check-in rejected: ${tokenCheck.error}`,
+          details: { sessionId: session._id, reason: 'INVALID_FACE_TOKEN', error: tokenCheck.error },
+          req
+        });
+        return res.status(403).json({
+          success: false,
+          error: tokenCheck.error || 'Biometric Face Verification expired or invalid. Please re-verify your face.'
+        });
+      }
+
+      verificationMethod = 'FACE_AND_QR';
+      faceVerificationAudit = {
+        verified: true,
+        similarityScore: tokenCheck.payload.similarity || null,
+        verifiedAt: new Date(),
+        fallbackReason: null
+      };
+    } else {
+      // Non-enrolled students can mark attendance via QR+geofence with fallback audit trail
+      verificationMethod = 'QR_SCAN';
+      faceVerificationAudit = {
+        verified: false,
+        similarityScore: null,
+        verifiedAt: null,
+        fallbackReason: 'BIOMETRIC_NOT_ENROLLED_ALTERNATIVE'
+      };
+    }
+
     // 8. Create AttendanceRecord document
     const record = await AttendanceRecord.create({
       sessionId: session._id,
@@ -967,7 +1240,8 @@ exports.studentCheckIn = async (req, res) => {
       rollNumber: student.rollNumber || 'N/A',
       studentName: student.name,
       status: 'PRESENT',
-      verificationMethod: 'QR_SCAN',
+      verificationMethod,
+      faceVerificationAudit,
       scannedAt: new Date(),
       markedAt: new Date(),
       latitude: latitude ? parseFloat(latitude) : null,
@@ -1072,7 +1346,117 @@ exports.studentCheckIn = async (req, res) => {
 };
 
 // ============================================================
-// 6. CLOSE / FINALIZE ATTENDANCE SESSION
+// 6A. CLOSE ATTENDANCE WINDOW & TRANSITION TO LIVE CLASS
+// ============================================================
+// @route   POST /api/attendance/sessions/:id/close-attendance
+// @access  Faculty, Admin
+exports.closeAttendance = async (req, res) => {
+  try {
+    const user = req.user;
+    const { id } = req.params;
+
+    const session = await AttendanceSession.findById(id)
+      .populate('subjectId', 'name code')
+      .populate('roomId', 'buildingName roomNumber floor capacity geofenceRadiusMeters')
+      .populate('facultyId', 'name email designation phone');
+
+    if (!session) {
+      return res.status(404).json({
+        success: false,
+        error: 'Attendance session not found.'
+      });
+    }
+
+    if (session.status !== 'ACTIVE') {
+      return res.status(400).json({
+        success: false,
+        error: `Cannot close attendance: Session is already ${session.status.toLowerCase()}.`
+      });
+    }
+
+    const userRole = normalizeRole(user.role);
+    const facultyIdStr = session.facultyId?._id ? session.facultyId._id.toString() : (session.facultyId ? session.facultyId.toString() : '');
+    const isOwner = Boolean(facultyIdStr && facultyIdStr === user._id.toString());
+    const isAdmin = [ROLES.SUPER_ADMIN, ROLES.ADMIN, ROLES.CAMPUS_ADMIN].includes(userRole);
+
+    if (!isOwner && !isAdmin) {
+      return res.status(403).json({
+        success: false,
+        error: 'Unauthorized: Only the session faculty or administrator can close attendance.'
+      });
+    }
+
+    // Compute turnout so far
+    const presentCount = await AttendanceRecord.countDocuments({
+      sessionId: session._id,
+      status: 'PRESENT'
+    });
+    const lateCount = await AttendanceRecord.countDocuments({
+      sessionId: session._id,
+      status: 'LATE'
+    });
+    const totalAbsent = Math.max(0, (session.totalEnrolled || 0) - (presentCount + lateCount));
+
+    // Lock attendance scanning and transition to LIVE_CLASS
+    session.attendanceClosed = true;
+    session.attendanceClosedAt = new Date();
+    session.lectureStatus = 'LIVE_CLASS';
+    session.totalPresent = presentCount;
+    session.totalLate = lateCount;
+    session.totalAbsent = totalAbsent;
+    session.qrExpiresAt = new Date();
+    session.previousQrExpiresAt = new Date();
+    await session.save();
+
+    // Broadcast session update to socket room and campus
+    const io = req.app?.get ? (req.app.get('socketio') || req.app.get('io')) : null;
+    if (io) {
+      io.to(`attendance_session_${session._id}`).emit('attendance_closed_live_started', {
+        sessionId: session._id,
+        attendanceClosed: true,
+        attendanceClosedAt: session.attendanceClosedAt,
+        lectureStatus: 'LIVE_CLASS',
+        totalPresent: session.totalPresent,
+        totalEnrolled: session.totalEnrolled
+      });
+      io.emit('campus_attendance_updated', {
+        sessionId: session._id,
+        status: session.status,
+        attendanceClosed: true,
+        lectureStatus: 'LIVE_CLASS',
+        totalPresent: session.totalPresent
+      });
+    }
+
+    await logActivity({
+      user,
+      action: 'ATTENDANCE_WINDOW_CLOSED',
+      category: 'Smart Attendance',
+      description: `Faculty closed attendance for ${session.branch} - Sec ${session.section}. Class is now officially LIVE.`,
+      details: {
+        sessionId: session._id,
+        totalPresent: session.totalPresent,
+        totalEnrolled: session.totalEnrolled
+      },
+      req
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: 'Attendance closed. Class is now officially LIVE.',
+      session
+    });
+  } catch (err) {
+    console.error('Error closing attendance window:', err);
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to close attendance: ' + err.message
+    });
+  }
+};
+
+// ============================================================
+// 6B. CLOSE / FINALIZE ATTENDANCE SESSION
 // ============================================================
 // @route   POST /api/attendance/sessions/:id/close
 // @access  Faculty, Admin
@@ -1093,6 +1477,15 @@ exports.closeSession = async (req, res) => {
       return res.status(400).json({
         success: false,
         error: `Session is already ${session.status.toLowerCase()}.`
+      });
+    }
+
+    if (session.status === 'SUBMITTED') {
+      return res.status(200).json({
+        success: true,
+        message: 'Attendance session has already been submitted and is currently in its 10-minute rectification period.',
+        rectificationExpiresAt: session.rectificationExpiresAt,
+        session
       });
     }
 
@@ -1119,20 +1512,33 @@ exports.closeSession = async (req, res) => {
     });
     const totalAbsent = Math.max(0, (session.totalEnrolled || 0) - (presentCount + lateCount));
 
-    session.status = 'FINALIZED';
-    session.actualEndTime = new Date();
+    // Start 10-minute rectification period (Requirement B.1)
+    const now = new Date();
+    const rectificationExpiresAt = new Date(now.getTime() + 10 * 60 * 1000);
+
+    session.status = 'SUBMITTED';
+    session.attendanceClosed = true;
+    session.lectureStatus = 'LIVE_CLASS';
+    session.submittedAt = now;
+    session.submittedBy = user._id;
+    session.rectificationExpiresAt = rectificationExpiresAt;
+    session.rectificationFinalized = false;
+    session.absenceAlertsDispatched = false;
+    session.actualEndTime = now;
     session.totalPresent = presentCount;
     session.totalLate = lateCount;
     session.totalAbsent = totalAbsent;
-    session.qrExpiresAt = new Date(); // Immediately expire active QR
+    session.qrExpiresAt = now; // Immediately expire active QR
+    session.previousQrExpiresAt = now; // Immediately expire previous QR grace window
     await session.save();
 
-    // Broadcast session closed to room
+    // Broadcast session submitted & rectification started to room
     const io = req.app.get('socketio') || req.app.get('io');
     if (io) {
-      io.to(`attendance_session_${session._id}`).emit('session_closed', {
+      io.to(`attendance_session_${session._id}`).emit('session_submitted_rectification_started', {
         sessionId: session._id,
-        status: 'FINALIZED',
+        status: 'SUBMITTED',
+        rectificationExpiresAt,
         totalEnrolled: session.totalEnrolled,
         totalPresent: session.totalPresent,
         totalAbsent: session.totalAbsent
@@ -1141,26 +1547,24 @@ exports.closeSession = async (req, res) => {
 
     await logActivity({
       user,
-      action: 'ATTENDANCE_SESSION_FINALIZED',
+      action: 'ATTENDANCE_SESSION_SUBMITTED_RECTIFICATION_ACTIVE',
       category: 'Smart Attendance',
-      description: `Closed and finalized attendance session for ${session.branch} - Sec ${session.section}. Final: ${presentCount}/${session.totalEnrolled} Present`,
+      description: `Submitted attendance session for ${session.branch} - Sec ${session.section}. 10-minute rectification period active until ${rectificationExpiresAt.toISOString()}`,
       details: {
         sessionId: session._id,
         totalEnrolled: session.totalEnrolled,
         totalPresent: presentCount,
-        totalAbsent
+        totalAbsent,
+        rectificationExpiresAt
       },
       req
     });
 
-    // Phase 5: Automated Low-Attendance Shortage Alert Evaluation (Non-blocking)
-    evaluateSessionShortages({ session, io, req, triggeredBy: user }).catch(alertErr => {
-      console.warn('[AttendanceAlertService] Non-fatal session shortage evaluation warning:', alertErr.message);
-    });
-
     return res.status(200).json({
       success: true,
-      message: 'Attendance session successfully finalized.',
+      message: 'Attendance submitted. A 10-minute rectification window has started. Corrections may be applied before finalization.',
+      rectificationExpiresAt,
+      rectificationMinutes: 10,
       summary: {
         sessionId: session._id,
         status: session.status,
@@ -1169,6 +1573,7 @@ exports.closeSession = async (req, res) => {
         totalEnrolled: session.totalEnrolled,
         totalPresent: session.totalPresent,
         totalAbsent: session.totalAbsent,
+        rectificationExpiresAt,
         attendancePercentage: session.totalEnrolled > 0
           ? Math.round((session.totalPresent / session.totalEnrolled) * 100)
           : 0
@@ -1179,6 +1584,80 @@ exports.closeSession = async (req, res) => {
     return res.status(500).json({
       success: false,
       error: 'Failed to close attendance session: ' + err.message
+    });
+  }
+};
+
+// ============================================================
+// 6C. FINALIZE SESSION RECTIFICATION & DISPATCH CLASS-ABSENCE ALERTS
+// ============================================================
+// @route   POST /api/attendance/sessions/:id/finalize-rectification
+// @access  Faculty, Admin
+exports.finalizeSessionRectification = async (req, res) => {
+  try {
+    const user = req.user;
+    const { id } = req.params;
+
+    const session = await AttendanceSession.findById(id);
+    if (!session) {
+      return res.status(404).json({
+        success: false,
+        error: 'Attendance session not found.'
+      });
+    }
+
+    const userRole = normalizeRole(user.role);
+    const isOwner = session.facultyId.toString() === user._id.toString();
+    const isAdmin = [ROLES.SUPER_ADMIN, ROLES.ADMIN, ROLES.CAMPUS_ADMIN].includes(userRole);
+
+    if (!isOwner && !isAdmin) {
+      return res.status(403).json({
+        success: false,
+        error: 'Unauthorized: Only the session host or administrator can finalize this session.'
+      });
+    }
+
+    if (session.status === 'FINALIZED') {
+      return res.status(200).json({
+        success: true,
+        alreadyFinalized: true,
+        message: 'Attendance session has already been finalized.',
+        session
+      });
+    }
+
+    if (session.status !== 'SUBMITTED') {
+      return res.status(400).json({
+        success: false,
+        error: `Session is currently ${session.status.toLowerCase()}. Only submitted sessions can be finalized.`
+      });
+    }
+
+    const now = new Date();
+    const isExpired = session.rectificationExpiresAt && now >= new Date(session.rectificationExpiresAt);
+    const allowForce = req.body && req.body.force === true;
+
+    if (!isExpired && !allowForce && !isAdmin) {
+      return res.status(400).json({
+        success: false,
+        error: 'Rectification period is still active. Finalization will occur automatically once the 10-minute window expires.',
+        rectificationExpiresAt: session.rectificationExpiresAt
+      });
+    }
+
+    const io = req.app.get('socketio') || req.app.get('io');
+    const result = await finalizeSubmittedSession(session._id, io);
+
+    return res.status(200).json({
+      success: true,
+      message: 'Attendance session successfully finalized after rectification.',
+      result
+    });
+  } catch (err) {
+    console.error('Error finalizing session rectification:', err);
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to finalize session rectification: ' + err.message
     });
   }
 };
@@ -2034,6 +2513,56 @@ exports.requestOrReviewCorrection = async (req, res) => {
 
     const { action, requestedStatus, reason, notes } = req.body;
 
+    // 10-Minute Rectification Window handling (Requirement B.2)
+    const isWithinRectification = session.status === 'SUBMITTED' && session.rectificationExpiresAt && (Date.now() < new Date(session.rectificationExpiresAt).getTime());
+    const isSessionHost = session.facultyId.toString() === user._id.toString();
+
+    if (isWithinRectification && (isSessionHost || [ROLES.SUPER_ADMIN, ROLES.ADMIN, ROLES.CAMPUS_ADMIN, ROLES.HOD].includes(userRole))) {
+      const targetStatus = requestedStatus || req.body.status || 'PRESENT';
+      if (!['PRESENT', 'ABSENT', 'LATE', 'EXCUSED'].includes(targetStatus)) {
+        return res.status(400).json({
+          success: false,
+          error: 'Please provide a valid status (PRESENT, ABSENT, LATE, EXCUSED).'
+        });
+      }
+
+      const prevStatus = record.status;
+      record.originalStatus = record.originalStatus || prevStatus;
+      record.status = targetStatus;
+      record.correctionStatus = 'APPROVED';
+      record.correctionReason = (reason || 'Rectified during 10-minute rectification window').trim();
+      record.correctionNotes = (notes || '').trim();
+      record.correctionReviewedBy = user._id;
+      record.correctionReviewedAt = new Date();
+      await record.save();
+
+      // Adjust session counters safely
+      if (prevStatus === 'ABSENT' && (targetStatus === 'PRESENT' || targetStatus === 'LATE')) {
+        session.totalPresent = (session.totalPresent || 0) + 1;
+        session.totalAbsent = Math.max(0, (session.totalAbsent || 0) - 1);
+        await session.save();
+      } else if ((prevStatus === 'PRESENT' || prevStatus === 'LATE') && targetStatus === 'ABSENT') {
+        session.totalPresent = Math.max(0, (session.totalPresent || 0) - 1);
+        session.totalAbsent = (session.totalAbsent || 0) + 1;
+        await session.save();
+      }
+
+      await logActivity({
+        user,
+        action: 'ATTENDANCE_RECTIFICATION_APPLIED',
+        category: 'Smart Attendance',
+        description: `Rectification applied during 10-minute window for ${record.studentName} (${record.rollNumber}) to ${targetStatus}`,
+        details: { recordId: record._id, sessionId: session._id, previousStatus: prevStatus, newStatus: targetStatus },
+        req
+      });
+
+      return res.status(200).json({
+        success: true,
+        message: 'Attendance successfully rectified during the 10-minute rectification window.',
+        record
+      });
+    }
+
     // Review Workflow (Approve / Reject)
     if (action === 'APPROVE' || action === 'REJECT') {
       if (userRole === ROLES.FACULTY) {
@@ -2558,6 +3087,1663 @@ exports.updateNotificationPreferences = async (req, res) => {
     return res.status(500).json({
       success: false,
       error: 'Failed to update notification preferences.'
+    });
+  }
+};
+
+// ============================================================
+// 17. GET AUTHORITATIVE CAMPUS ARRIVAL GEOFENCE STATUS
+// ============================================================
+// @route   GET /api/attendance/campus-arrival/config
+// @route   GET /api/attendance/campus-arrival/config/:campusId
+// @access  Authenticated Students / Staff (PERMISSIONS.ATTENDANCE_VIEW)
+exports.getCampusArrivalConfig = async (req, res) => {
+  try {
+    const user = req.user;
+    const requestedCampusId = req.params.campusId || req.query.campusId;
+
+    // Check if an administrative user is requesting configuration for a specific campus
+    const userRole = normalizeRole(user.role);
+    const hasAdminView = hasRolePermission(user.role, PERMISSIONS.CAMPUS_VIEW) ||
+      [ROLES.SUPER_ADMIN, ROLES.ADMIN, ROLES.CAMPUS_ADMIN].includes(userRole);
+
+    let targetCampusId = user?.campusId || user?.campus;
+    if (requestedCampusId && hasAdminView) {
+      if (!canAccessCampus(user, requestedCampusId)) {
+        return res.status(403).json({
+          success: false,
+          error: 'Multi-Campus Isolation: You cannot inspect configuration of another campus.'
+        });
+      }
+      targetCampusId = requestedCampusId;
+    }
+
+    if (!targetCampusId) {
+      return res.status(200).json({
+        success: true,
+        configured: false,
+        completenessStatus: 'INCOMPLETE',
+        message: 'No campus is associated with your account.'
+      });
+    }
+
+    const campus = await Campus.findById(targetCampusId);
+    if (!campus || !campus.isActive) {
+      return res.status(200).json({
+        success: true,
+        configured: false,
+        completenessStatus: 'INCOMPLETE',
+        message: 'Assigned campus was not found or is currently inactive.'
+      });
+    }
+
+    const hasValidCoords =
+      typeof campus.latitude === 'number' && Number.isFinite(campus.latitude) && Math.abs(campus.latitude) <= 90 &&
+      typeof campus.longitude === 'number' && Number.isFinite(campus.longitude) && Math.abs(campus.longitude) <= 180;
+    const hasValidRadius =
+      typeof campus.arrivalPerimeterRadiusMeters === 'number' && Number.isFinite(campus.arrivalPerimeterRadiusMeters) && campus.arrivalPerimeterRadiusMeters >= 5 && campus.arrivalPerimeterRadiusMeters <= 5000;
+
+    let completenessStatus = 'INCOMPLETE';
+    if (hasValidCoords && hasValidRadius) {
+      completenessStatus = 'COMPLETE';
+    } else if (
+      (campus.latitude !== null && (Math.abs(campus.latitude) > 90 || !Number.isFinite(campus.latitude))) ||
+      (campus.longitude !== null && (Math.abs(campus.longitude) > 180 || !Number.isFinite(campus.longitude))) ||
+      (campus.arrivalPerimeterRadiusMeters !== null && (campus.arrivalPerimeterRadiusMeters < 5 || campus.arrivalPerimeterRadiusMeters > 5000))
+    ) {
+      completenessStatus = 'INVALID';
+    }
+
+    const isFullyConfigured = hasValidCoords && hasValidRadius;
+
+    // For authorized administrators with CAMPUS_UPDATE or admin roles, expose authoritative coordinates and status
+    const hasAdminUpdate = hasRolePermission(user.role, PERMISSIONS.CAMPUS_UPDATE) ||
+      [ROLES.SUPER_ADMIN, ROLES.ADMIN, ROLES.CAMPUS_ADMIN].includes(userRole);
+
+    if (hasAdminUpdate) {
+      return res.status(200).json({
+        success: true,
+        configured: isFullyConfigured,
+        completenessStatus,
+        campusId: campus._id,
+        campusName: campus.name,
+        campusCode: campus.code,
+        latitude: campus.latitude,
+        longitude: campus.longitude,
+        arrivalPerimeterRadiusMeters: campus.arrivalPerimeterRadiusMeters,
+        arrivalCutoffTime: campus.arrivalCutoffTime || '10:00',
+        absenceEvaluationTime: campus.absenceEvaluationTime || '10:30',
+        timezone: campus.timezone || 'Asia/Kolkata',
+        campusCoordinatesExposed: true
+      });
+    }
+
+    if (!isFullyConfigured) {
+      return res.status(200).json({
+        success: true,
+        configured: false,
+        completenessStatus,
+        campusName: campus.name,
+        arrivalCutoffTime: campus.arrivalCutoffTime || '10:00',
+        absenceEvaluationTime: campus.absenceEvaluationTime || '10:30',
+        timezone: campus.timezone || 'Asia/Kolkata',
+        message: 'Campus arrival geofence perimeter is not configured on the server for this campus.'
+      });
+    }
+
+    // Return institutional status and boundary radius without exposing exact coordinates to students
+    return res.status(200).json({
+      success: true,
+      configured: true,
+      completenessStatus,
+      campusName: campus.name,
+      arrivalPerimeterRadiusMeters: campus.arrivalPerimeterRadiusMeters,
+      arrivalCutoffTime: campus.arrivalCutoffTime || '10:00',
+      absenceEvaluationTime: campus.absenceEvaluationTime || '10:30',
+      timezone: campus.timezone || 'Asia/Kolkata',
+      campusCoordinatesExposed: false
+    });
+  } catch (err) {
+    console.error('Error fetching campus arrival config:', err);
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to retrieve campus configuration.'
+    });
+  }
+};
+
+// ============================================================
+// 17B. CONFIGURE CAMPUS ARRIVAL GEOFENCE BOUNDARIES (ADMINISTRATIVE)
+// ============================================================
+// @route   PUT /api/attendance/campus-arrival/config/:campusId
+// @access  Authorized Administrators (PERMISSIONS.CAMPUS_UPDATE)
+exports.updateCampusArrivalConfig = async (req, res) => {
+  try {
+    const user = req.user;
+    const { campusId } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(campusId)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid campus identifier provided.'
+      });
+    }
+
+    // Authoritative campus-level scope enforcement
+    if (!canAccessCampus(user, campusId)) {
+      await logActivity({
+        user,
+        action: 'CAMPUS_GEOFENCE_CONFIG_REJECTED',
+        category: 'Campus Management',
+        description: `Unauthorized cross-campus geofence configuration attempt on campus ${campusId}`,
+        details: { targetCampusId: campusId, reason: 'CROSS_CAMPUS_FORBIDDEN' },
+        req
+      });
+      return res.status(403).json({
+        success: false,
+        error: 'Multi-Campus Isolation: You cannot configure geofencing for another campus.'
+      });
+    }
+
+    const campus = await Campus.findById(campusId);
+    if (!campus) {
+      return res.status(404).json({
+        success: false,
+        error: 'Campus record not found.'
+      });
+    }
+
+    const { latitude, longitude, arrivalPerimeterRadiusMeters } = req.body;
+
+    // Resetting/Clearing values if explicitly null
+    const isClearing = latitude === null && longitude === null && arrivalPerimeterRadiusMeters === null;
+
+    if (!isClearing) {
+      const parsedLat = parseFloat(latitude);
+      const parsedLng = parseFloat(longitude);
+      const parsedRadius = parseFloat(arrivalPerimeterRadiusMeters);
+
+      if (isNaN(parsedLat) || !Number.isFinite(parsedLat) || parsedLat < -90 || parsedLat > 90) {
+        return res.status(400).json({
+          success: false,
+          completenessStatus: 'INVALID',
+          error: 'Latitude must be a valid number between -90 and 90 degrees.'
+        });
+      }
+
+      if (isNaN(parsedLng) || !Number.isFinite(parsedLng) || parsedLng < -180 || parsedLng > 180) {
+        return res.status(400).json({
+          success: false,
+          completenessStatus: 'INVALID',
+          error: 'Longitude must be a valid number between -180 and 180 degrees.'
+        });
+      }
+
+      if (isNaN(parsedRadius) || !Number.isFinite(parsedRadius) || parsedRadius < 5 || parsedRadius > 5000) {
+        return res.status(400).json({
+          success: false,
+          completenessStatus: 'INVALID',
+          error: 'Arrival perimeter radius must be a sensible value between 5 and 5000 meters.'
+        });
+      }
+
+      campus.latitude = Math.round(parsedLat * 1e7) / 1e7;
+      campus.longitude = Math.round(parsedLng * 1e7) / 1e7;
+      campus.arrivalPerimeterRadiusMeters = Math.round(parsedRadius);
+    } else {
+      campus.latitude = null;
+      campus.longitude = null;
+      campus.arrivalPerimeterRadiusMeters = null;
+    }
+
+    // Optional campus arrival timing configurations
+    if (typeof req.body.arrivalCutoffTime === 'string' && req.body.arrivalCutoffTime.trim()) {
+      campus.arrivalCutoffTime = req.body.arrivalCutoffTime.trim();
+    }
+    if (typeof req.body.absenceEvaluationTime === 'string' && req.body.absenceEvaluationTime.trim()) {
+      campus.absenceEvaluationTime = req.body.absenceEvaluationTime.trim();
+    }
+    if (typeof req.body.timezone === 'string' && req.body.timezone.trim()) {
+      campus.timezone = req.body.timezone.trim();
+    }
+
+    await campus.save();
+
+    const isComplete =
+      typeof campus.latitude === 'number' && Number.isFinite(campus.latitude) &&
+      typeof campus.longitude === 'number' && Number.isFinite(campus.longitude) &&
+      typeof campus.arrivalPerimeterRadiusMeters === 'number' && campus.arrivalPerimeterRadiusMeters >= 5;
+
+    const completenessStatus = isComplete ? 'COMPLETE' : 'INCOMPLETE';
+
+    await logActivity({
+      user,
+      action: 'CAMPUS_GEOFENCE_CONFIG_UPDATED',
+      category: 'Campus Management',
+      description: `Updated arrival geofence for ${campus.name} (Status: ${completenessStatus}, Radius: ${campus.arrivalPerimeterRadiusMeters}m, Cutoff: ${campus.arrivalCutoffTime || '10:00'})`,
+      details: {
+        campusId: campus._id,
+        campusName: campus.name,
+        latitude: campus.latitude,
+        longitude: campus.longitude,
+        arrivalPerimeterRadiusMeters: campus.arrivalPerimeterRadiusMeters,
+        arrivalCutoffTime: campus.arrivalCutoffTime,
+        absenceEvaluationTime: campus.absenceEvaluationTime,
+        timezone: campus.timezone,
+        completenessStatus
+      },
+      req
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: 'Campus arrival geofence configuration updated successfully.',
+      configured: isComplete,
+      completenessStatus,
+      campus: {
+        id: campus._id,
+        name: campus.name,
+        code: campus.code,
+        latitude: campus.latitude,
+        longitude: campus.longitude,
+        arrivalPerimeterRadiusMeters: campus.arrivalPerimeterRadiusMeters,
+        arrivalCutoffTime: campus.arrivalCutoffTime || '10:00',
+        absenceEvaluationTime: campus.absenceEvaluationTime || '10:30',
+        timezone: campus.timezone || 'Asia/Kolkata'
+      }
+    });
+  } catch (err) {
+    console.error('Error updating campus geofence config:', err);
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to update campus geofence configuration.'
+    });
+  }
+};
+
+// ============================================================
+// 18. VERIFY & RECORD CAMPUS ARRIVAL (INDEPENDENT FROM CLASSROOM)
+// ============================================================
+// @route   POST /api/attendance/campus-arrival
+// @access  Authenticated Students / Staff (PERMISSIONS.ATTENDANCE_VIEW)
+exports.recordCampusArrival = async (req, res) => {
+  try {
+    const user = req.user;
+    const { latitude, longitude, accuracy } = req.body;
+    const userCampusId = user?.campusId || user?.campus;
+
+    // 1. Resolve user's permitted campus from authoritative session context
+    if (!userCampusId) {
+      await logActivity({
+        user,
+        action: 'CAMPUS_ARRIVAL_REJECTED',
+        category: 'Smart Attendance',
+        description: 'Check-in rejected: No campus associated with user account',
+        details: { reason: 'UNASSIGNED_CAMPUS' },
+        req
+      });
+      return res.status(400).json({
+        success: false,
+        error: 'No campus is associated with your account. Campus arrival check-in requires an assigned campus.'
+      });
+    }
+
+    // 2. Load authoritative campus configuration from database
+    const campus = await Campus.findById(userCampusId);
+    if (!campus || !campus.isActive) {
+      return res.status(404).json({
+        success: false,
+        error: 'Assigned campus was not found or is currently inactive.'
+      });
+    }
+
+    // 3. Verify server-configured geofence bounds
+    const hasValidCoords =
+      typeof campus.latitude === 'number' && Number.isFinite(campus.latitude) && Math.abs(campus.latitude) <= 90 &&
+      typeof campus.longitude === 'number' && Number.isFinite(campus.longitude) && Math.abs(campus.longitude) <= 180;
+    const hasValidRadius =
+      typeof campus.arrivalPerimeterRadiusMeters === 'number' && Number.isFinite(campus.arrivalPerimeterRadiusMeters) && campus.arrivalPerimeterRadiusMeters > 0;
+
+    if (!hasValidCoords || !hasValidRadius) {
+      return res.status(400).json({
+        success: false,
+        error: 'Campus geofence perimeter is not configured on the server for your assigned campus. Campus arrival check-in is unavailable.'
+      });
+    }
+
+    // 4. Validate submitted location telemetry
+    const parsedLat = parseFloat(latitude);
+    const parsedLng = parseFloat(longitude);
+    const parsedAccuracy = parseFloat(accuracy);
+
+    if (
+      isNaN(parsedLat) || isNaN(parsedLng) ||
+      !Number.isFinite(parsedLat) || !Number.isFinite(parsedLng) ||
+      Math.abs(parsedLat) > 90 || Math.abs(parsedLng) > 180
+    ) {
+      return res.status(400).json({
+        success: false,
+        error: 'Valid geographic coordinates (latitude -90 to 90, longitude -180 to 180) are required.'
+      });
+    }
+
+    // Accuracy policy: Maximum acceptable error threshold
+    const maxAllowedAccuracyMeters = Math.min(100, Math.max(50, campus.arrivalPerimeterRadiusMeters * 0.25));
+    if (isNaN(parsedAccuracy) || parsedAccuracy <= 0 || parsedAccuracy > maxAllowedAccuracyMeters) {
+      await logActivity({
+        user,
+        action: 'CAMPUS_ARRIVAL_REJECTED',
+        category: 'Smart Attendance',
+        description: `Location rejected due to poor accuracy (±${Math.round(parsedAccuracy || 0)}m vs max ±${Math.round(maxAllowedAccuracyMeters)}m)`,
+        details: { accuracy: parsedAccuracy, maxAllowed: maxAllowedAccuracyMeters, reason: 'LOW_ACCURACY' },
+        req
+      });
+      return res.status(400).json({
+        success: false,
+        error: `Location accuracy is insufficient (±${Math.round(parsedAccuracy || 0)}m). Minimum required: ±${Math.round(maxAllowedAccuracyMeters)}m. Please ensure high-accuracy GPS is enabled with a clear sky view.`
+      });
+    }
+
+    // 5. Authoritative server distance calculation
+    const distanceMeters = calculateDistanceMeters(parsedLat, parsedLng, campus.latitude, campus.longitude);
+
+    // 6. Perimeter boundary enforcement
+    if (distanceMeters > campus.arrivalPerimeterRadiusMeters) {
+      await logActivity({
+        user,
+        action: 'CAMPUS_ARRIVAL_REJECTED',
+        category: 'Smart Attendance',
+        description: `Student outside campus perimeter (${distanceMeters}m > ${campus.arrivalPerimeterRadiusMeters}m boundary)`,
+        details: {
+          campusId: campus._id,
+          distanceMeters,
+          radiusLimit: campus.arrivalPerimeterRadiusMeters,
+          reason: 'OUTSIDE_PERIMETER'
+        },
+        req
+      });
+      return res.status(400).json({
+        success: false,
+        error: `Perimeter boundary discrepancy: Device is ${Math.round(distanceMeters)}m from the campus entrance. Campus arrival check-in is restricted to the ${campus.arrivalPerimeterRadiusMeters}m campus boundary.`
+      });
+    }
+
+    // 6.5. Biometric Face Verification Check
+    const { faceVerificationToken } = req.body;
+    let arrivalVerificationMethod = 'DEVICE_GEOFENCE_PERIMETER';
+    let arrivalFaceAudit = {
+      verified: false,
+      similarityScore: null,
+      verifiedAt: null,
+      fallbackReason: null
+    };
+
+    if (user.biometricProfile && user.biometricProfile.isEnrolled) {
+      if (!faceVerificationToken) {
+        await logActivity({
+          user,
+          action: 'CAMPUS_ARRIVAL_REJECTED',
+          category: 'Smart Attendance',
+          description: 'Campus arrival rejected: Biometric face verification required for enrolled student',
+          details: { reason: 'MISSING_FACE_VERIFICATION' },
+          req
+        });
+        return res.status(403).json({
+          success: false,
+          error: 'Biometric Face Verification is required for your account before campus arrival check-in. Please complete facial verification.'
+        });
+      }
+
+      const tokenCheck = verifyAndConsumeFaceToken(faceVerificationToken, user._id, 'CAMPUS_ARRIVAL');
+      if (!tokenCheck.valid) {
+        await logActivity({
+          user,
+          action: 'CAMPUS_ARRIVAL_REJECTED',
+          category: 'Smart Attendance',
+          description: `Campus arrival rejected: ${tokenCheck.error}`,
+          details: { reason: 'INVALID_FACE_TOKEN', error: tokenCheck.error },
+          req
+        });
+        return res.status(403).json({
+          success: false,
+          error: tokenCheck.error || 'Biometric Face Verification expired or invalid. Please re-verify your face.'
+        });
+      }
+
+      arrivalVerificationMethod = 'FACE_RECOGNITION_PERIMETER';
+      arrivalFaceAudit = {
+        verified: true,
+        similarityScore: tokenCheck.payload.similarity || null,
+        verifiedAt: new Date(),
+        fallbackReason: null
+      };
+    } else {
+      arrivalVerificationMethod = 'DEVICE_GEOFENCE_PERIMETER';
+      arrivalFaceAudit = {
+        verified: false,
+        similarityScore: null,
+        verifiedAt: null,
+        fallbackReason: 'BIOMETRIC_NOT_ENROLLED_ALTERNATIVE'
+      };
+    }
+
+    // 7. Duplicate Prevention Policy: One verified arrival log per student per calendar date (IST)
+    const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
+    const nowUtc = new Date();
+    const istDate = new Date(nowUtc.getTime() + IST_OFFSET_MS);
+    const arrivalDateKey = istDate.toISOString().slice(0, 10); // 'YYYY-MM-DD'
+    const checkInTimeIST = istDate.toISOString().slice(11, 16); // 'HH:MM'
+    const cutoffTime = campus.arrivalCutoffTime || '10:00';
+    const isLate = checkInTimeIST > cutoffTime;
+    const punctuality = isLate ? 'LATE' : 'ON_TIME';
+
+    const existingArrivalToday = await CampusCheckInLog.findOne({
+      user: user._id,
+      campus: campus._id,
+      arrivalDateKey
+    });
+
+    if (existingArrivalToday) {
+      if (existingArrivalToday.status === 'VERIFIED') {
+        return res.status(200).json({
+          success: true,
+          alreadyCheckedIn: true,
+          message: 'Campus arrival has already been verified for today.',
+          checkIn: {
+            id: existingArrivalToday._id,
+            referenceCode: existingArrivalToday.referenceCode,
+            timestamp: existingArrivalToday.timestamp,
+            status: existingArrivalToday.status,
+            punctuality: existingArrivalToday.punctuality || 'ON_TIME',
+            distanceMeters: existingArrivalToday.calculatedDistanceMeters,
+            campusName: campus.name
+          }
+        });
+      }
+      if (existingArrivalToday.status === 'PENDING_REVIEW') {
+        return res.status(200).json({
+          success: true,
+          pendingReview: true,
+          message: 'A campus arrival assistance request is currently pending administrative review.',
+          checkIn: {
+            id: existingArrivalToday._id,
+            referenceCode: existingArrivalToday.referenceCode,
+            timestamp: existingArrivalToday.timestamp,
+            status: existingArrivalToday.status,
+            campusName: campus.name
+          }
+        });
+      }
+
+      // If prior log was ABSENT (evaluated absent earlier in the day), update to VERIFIED & LATE and supersede (Requirement A.7)
+      const wasPriorAbsent = existingArrivalToday.status === 'ABSENT';
+
+      existingArrivalToday.timestamp = nowUtc;
+      existingArrivalToday.latitude = parsedLat;
+      existingArrivalToday.longitude = parsedLng;
+      existingArrivalToday.accuracy = parsedAccuracy;
+      existingArrivalToday.calculatedDistanceMeters = distanceMeters;
+      existingArrivalToday.configuredPerimeterRadiusMeters = campus.arrivalPerimeterRadiusMeters;
+      existingArrivalToday.status = 'VERIFIED';
+      existingArrivalToday.punctuality = wasPriorAbsent ? 'LATE' : punctuality;
+      existingArrivalToday.verificationMethod = arrivalVerificationMethod;
+      existingArrivalToday.faceVerificationAudit = arrivalFaceAudit;
+      existingArrivalToday.ipAddress = extractClientIp(req);
+      existingArrivalToday.userAgent = extractUserAgent(req);
+
+      if (wasPriorAbsent) {
+        existingArrivalToday.absenceAlertSuperseded = true;
+        existingArrivalToday.absenceAlertSupersededAt = nowUtc;
+      }
+
+      await existingArrivalToday.save();
+
+      // Dispatch appropriate WhatsApp notification
+      if (wasPriorAbsent) {
+        // Send superseding late arrival notice to parent without duplicate or misleading alerts (Requirement A.7)
+        sendCampusArrivalUpdateAlert({
+          student: user,
+          campus,
+          checkInLog: existingArrivalToday
+        }).catch(alertErr => {
+          console.warn('[AttendanceNotification] Campus arrival update alert warning:', alertErr.message);
+        });
+      } else if (existingArrivalToday.punctuality === 'LATE') {
+        // Send late arrival notice
+        sendCampusLateArrivalAlert({
+          student: user,
+          campus,
+          checkInLog: existingArrivalToday
+        }).catch(alertErr => {
+          console.warn('[AttendanceNotification] Campus late arrival alert warning:', alertErr.message);
+        });
+      }
+
+      await logActivity({
+        user,
+        action: 'CAMPUS_ARRIVAL_VERIFIED',
+        category: 'Smart Attendance',
+        description: `Campus arrival verified for ${user.name} at ${campus.name} (Punctuality: ${existingArrivalToday.punctuality}${wasPriorAbsent ? ' - Superseded prior absence' : ''})`,
+        details: {
+          campusId: campus._id,
+          campusName: campus.name,
+          referenceCode: existingArrivalToday.referenceCode,
+          distanceMeters,
+          status: 'VERIFIED',
+          punctuality: existingArrivalToday.punctuality,
+          cutoffTime,
+          checkInTimeIST
+        },
+        req
+      });
+
+      return res.status(200).json({
+        success: true,
+        message: existingArrivalToday.punctuality === 'LATE'
+          ? `Campus arrival verified. Recorded as LATE (check-in at ${checkInTimeIST} after ${cutoffTime} cutoff).`
+          : 'Campus arrival successfully verified on time!',
+        checkIn: {
+          id: existingArrivalToday._id,
+          referenceCode: existingArrivalToday.referenceCode,
+          timestamp: existingArrivalToday.timestamp,
+          status: existingArrivalToday.status,
+          punctuality: existingArrivalToday.punctuality,
+          isLate: existingArrivalToday.punctuality === 'LATE',
+          distanceMeters,
+          campusName: campus.name
+        }
+      });
+    }
+
+    // 8. Persist to CampusCheckInLog (does NOT touch AttendanceRecord or AttendanceSession)
+    const referenceCode = `CB-ARR-${arrivalDateKey.replace(/-/g, '')}-${Math.floor(1000 + Math.random() * 9000)}`;
+
+    const logRecord = await CampusCheckInLog.create({
+      user: user._id,
+      campus: campus._id,
+      timestamp: nowUtc,
+      arrivalDateKey,
+      latitude: parsedLat,
+      longitude: parsedLng,
+      accuracy: parsedAccuracy,
+      calculatedDistanceMeters: distanceMeters,
+      configuredPerimeterRadiusMeters: campus.arrivalPerimeterRadiusMeters,
+      status: 'VERIFIED',
+      punctuality,
+      verificationMethod: arrivalVerificationMethod,
+      faceVerificationAudit: arrivalFaceAudit,
+      ipAddress: extractClientIp(req),
+      userAgent: extractUserAgent(req),
+      referenceCode
+    });
+
+    // If check-in after cutoff, dispatch WhatsApp alert to parent/guardian (Requirement A.4)
+    if (punctuality === 'LATE') {
+      sendCampusLateArrivalAlert({
+        student: user,
+        campus,
+        checkInLog: logRecord
+      }).catch(alertErr => {
+        console.warn('[AttendanceNotification] Campus late arrival alert warning:', alertErr.message);
+      });
+    }
+
+    // 9. Compliance audit event
+    await logActivity({
+      user,
+      action: 'CAMPUS_ARRIVAL_VERIFIED',
+      category: 'Smart Attendance',
+      description: `Campus arrival verified for ${user.name} at ${campus.name} (Punctuality: ${punctuality})`,
+      details: {
+        campusId: campus._id,
+        campusName: campus.name,
+        referenceCode,
+        distanceMeters,
+        status: 'VERIFIED',
+        punctuality,
+        cutoffTime,
+        checkInTimeIST
+      },
+      req
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: punctuality === 'LATE'
+        ? `Campus arrival verified. Recorded as LATE (check-in at ${checkInTimeIST} after ${cutoffTime} cutoff). Parent notified.`
+        : 'Campus arrival successfully verified on time!',
+      checkIn: {
+        id: logRecord._id,
+        referenceCode,
+        timestamp: logRecord.timestamp,
+        status: logRecord.status,
+        punctuality: logRecord.punctuality,
+        isLate,
+        cutoffTime,
+        distanceMeters,
+        campusName: campus.name
+      }
+    });
+  } catch (err) {
+    // Atomic race condition handling: Concurrent requests colliding on unique index
+    if (err.code === 11000) {
+      try {
+        const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
+        const istDate = new Date(Date.now() + IST_OFFSET_MS);
+        const arrivalDateKey = istDate.toISOString().slice(0, 10);
+        const raceRecord = await CampusCheckInLog.findOne({
+          user: req.user?._id,
+          arrivalDateKey,
+          status: 'VERIFIED'
+        });
+        if (raceRecord) {
+          return res.status(200).json({
+            success: true,
+            alreadyCheckedIn: true,
+            message: 'Campus arrival has already been verified for today.',
+            checkIn: {
+              id: raceRecord._id,
+              referenceCode: raceRecord.referenceCode,
+              timestamp: raceRecord.timestamp,
+              status: raceRecord.status,
+              distanceMeters: raceRecord.calculatedDistanceMeters,
+              campusName: 'Assigned Campus'
+            }
+          });
+        }
+      } catch (raceErr) {
+        console.error('Error resolving concurrent arrival record:', raceErr);
+      }
+    }
+    console.error('Error verifying campus arrival:', err);
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to process campus arrival check-in.'
+    });
+  }
+};
+
+// ============================================================
+// 19. GET STUDENT CAMPUS ARRIVAL STATUS (SUPPORT DESK / FACULTY ASSISTANCE)
+// ============================================================
+// @route   GET /api/attendance/campus-arrival/status/:studentId
+// @access  Authorized Staff / Faculty (PERMISSIONS.ATTENDANCE_VIEW)
+exports.getStudentCampusArrivalStatus = async (req, res) => {
+  try {
+    const user = req.user;
+    const { studentId } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(studentId)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid student identifier.'
+      });
+    }
+
+    const student = await User.findById(studentId).select('name rollNumber campusId departmentId branch section role isActive');
+    if (!student || student.role !== 'student') {
+      return res.status(404).json({
+        success: false,
+        error: 'Student record not found.'
+      });
+    }
+
+    // Multi-Campus Isolation
+    if (!canAccessCampus(user, student.campusId)) {
+      return res.status(403).json({
+        success: false,
+        error: 'Multi-Campus Isolation: Cross-campus student arrival lookup forbidden.'
+      });
+    }
+
+    // Department / Managed Scope Isolation
+    const userRole = normalizeRole(user.role);
+    if (userRole === ROLES.HOD) {
+      if (!canAccessDepartment(user, student.departmentId, student.branch)) {
+        return res.status(403).json({
+          success: false,
+          error: 'Department Isolation: Cannot inspect arrival status of students outside your department.'
+        });
+      }
+    } else if (userRole === ROLES.FACULTY) {
+      if (!canAccessDepartment(user, student.departmentId, student.branch)) {
+        return res.status(403).json({
+          success: false,
+          error: 'Scope Isolation: Cannot inspect arrival status of students outside your teaching scope.'
+        });
+      }
+    }
+
+    // Date key in IST
+    const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
+    const nowUtc = new Date();
+    const istDate = new Date(nowUtc.getTime() + IST_OFFSET_MS);
+    const arrivalDateKey = istDate.toISOString().slice(0, 10);
+
+    const log = await CampusCheckInLog.findOne({
+      user: student._id,
+      arrivalDateKey
+    }).populate('correctionRequestedBy', 'name role')
+      .populate('correctionReviewedBy', 'name role')
+      .populate('campus', 'name code');
+
+    return res.status(200).json({
+      success: true,
+      student: {
+        _id: student._id,
+        name: student.name,
+        rollNumber: student.rollNumber || 'N/A',
+        campusId: student.campusId,
+        campusName: log?.campus?.name || 'Assigned Campus',
+        branch: student.branch,
+        section: student.section
+      },
+      arrivalDateKey,
+      arrivalStatus: log ? log.status : 'NOT_CHECKED_IN',
+      verificationMethod: log ? log.verificationMethod : null,
+      timestamp: log ? log.timestamp : null,
+      referenceCode: log ? log.referenceCode : null,
+      correctionStatus: log ? log.correctionStatus : 'NONE',
+      correctionReason: log ? log.correctionReason : '',
+      correctionRequestedBy: log?.correctionRequestedBy ? { name: log.correctionRequestedBy.name, role: log.correctionRequestedBy.role } : null,
+      correctionRequestedAt: log ? log.correctionRequestedAt : null,
+      correctionReviewedBy: log?.correctionReviewedBy ? { name: log.correctionReviewedBy.name, role: log.correctionReviewedBy.role } : null,
+      correctionReviewedAt: log ? log.correctionReviewedAt : null
+    });
+  } catch (err) {
+    console.error('Error fetching student campus arrival status:', err);
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to retrieve student campus arrival status.'
+    });
+  }
+};
+
+// ============================================================
+// 20. SUBMIT CAMPUS ARRIVAL CORRECTION REQUEST (SUPPORT DESK / ASSISTANCE)
+// ============================================================
+// @route   POST /api/attendance/campus-arrival/correction
+// @access  Authorized Staff / Faculty (PERMISSIONS.ATTENDANCE_VIEW)
+exports.requestCampusArrivalCorrection = async (req, res) => {
+  try {
+    const user = req.user;
+    const userRole = normalizeRole(user.role);
+
+    if ([ROLES.STUDENT, ROLES.RECRUITER, ROLES.AUDITOR].includes(userRole)) {
+      return res.status(403).json({
+        success: false,
+        error: 'Access Denied: Only authorized faculty or administrative staff may submit arrival assistance requests.'
+      });
+    }
+
+    const { studentId, reason, notes } = req.body;
+
+    if (!studentId || !mongoose.Types.ObjectId.isValid(studentId)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Valid studentId is mandatory.'
+      });
+    }
+
+    if (!reason || typeof reason !== 'string' || !reason.trim()) {
+      return res.status(400).json({
+        success: false,
+        error: 'Reason for arrival correction request is required.'
+      });
+    }
+
+    const student = await User.findById(studentId).select('name rollNumber campusId departmentId branch section role isActive');
+    if (!student || student.role !== 'student') {
+      return res.status(404).json({
+        success: false,
+        error: 'Student record not found.'
+      });
+    }
+
+    // Campus scope verification
+    if (!canAccessCampus(user, student.campusId)) {
+      return res.status(403).json({
+        success: false,
+        error: 'Multi-Campus Isolation: Cross-campus arrival correction submission forbidden.'
+      });
+    }
+
+    // Department / scope check for HOD & Faculty
+    if (userRole === ROLES.HOD && !canAccessDepartment(user, student.departmentId, student.branch)) {
+      return res.status(403).json({
+        success: false,
+        error: 'Department Isolation: Cannot submit arrival correction for students outside your department.'
+      });
+    }
+
+    const campus = await Campus.findById(student.campusId);
+    if (!campus || !campus.isActive) {
+      return res.status(404).json({
+        success: false,
+        error: 'Student assigned campus is inactive or not found.'
+      });
+    }
+
+    // Date key in IST
+    const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
+    const nowUtc = new Date();
+    const istDate = new Date(nowUtc.getTime() + IST_OFFSET_MS);
+    const arrivalDateKey = istDate.toISOString().slice(0, 10);
+
+    const existingLog = await CampusCheckInLog.findOne({
+      user: student._id,
+      arrivalDateKey
+    });
+
+    if (existingLog && existingLog.status === 'VERIFIED') {
+      return res.status(400).json({
+        success: false,
+        error: 'Student campus arrival is already verified for today.'
+      });
+    }
+
+    if (existingLog && existingLog.correctionStatus === 'REQUESTED') {
+      return res.status(400).json({
+        success: false,
+        error: 'An arrival correction request is already pending review for this student today.'
+      });
+    }
+
+    const referenceCode = `CB-ARR-REQ-${arrivalDateKey.replace(/-/g, '')}-${Math.floor(1000 + Math.random() * 9000)}`;
+
+    const isSupervisorSubmitter = (userRole === ROLES.SUPPORT_DESK_SUPERVISOR);
+    const isEscalatedToPrincipal = isSupervisorSubmitter;
+    const escalatedToRole = isSupervisorSubmitter ? 'PRINCIPAL' : 'NONE';
+    const escalationReason = isSupervisorSubmitter ? 'SUPERVISOR_SELF_SUBMISSION' : '';
+    const escalatedAt = isSupervisorSubmitter ? nowUtc : null;
+
+    let logRecord;
+    if (existingLog) {
+      existingLog.timestamp = nowUtc;
+      existingLog.status = 'PENDING_REVIEW';
+      existingLog.verificationMethod = 'ADMINISTRATIVE_DESK';
+      existingLog.correctionStatus = 'REQUESTED';
+      existingLog.correctionReason = reason.trim();
+      existingLog.correctionNotes = (notes || '').trim();
+      existingLog.correctionRequestedBy = user._id;
+      existingLog.correctionRequestedAt = nowUtc;
+      existingLog.isEscalatedToPrincipal = isEscalatedToPrincipal;
+      existingLog.escalatedToRole = escalatedToRole;
+      existingLog.escalationReason = escalationReason;
+      existingLog.escalatedAt = escalatedAt;
+      existingLog.referenceCode = referenceCode;
+      logRecord = await existingLog.save();
+    } else {
+      logRecord = await CampusCheckInLog.create({
+        user: student._id,
+        campus: campus._id,
+        timestamp: nowUtc,
+        arrivalDateKey,
+        latitude: campus.latitude,
+        longitude: campus.longitude,
+        accuracy: null,
+        calculatedDistanceMeters: 0,
+        configuredPerimeterRadiusMeters: campus.arrivalPerimeterRadiusMeters,
+        status: 'PENDING_REVIEW',
+        verificationMethod: 'ADMINISTRATIVE_DESK',
+        correctionStatus: 'REQUESTED',
+        correctionReason: reason.trim(),
+        correctionNotes: (notes || '').trim(),
+        correctionRequestedBy: user._id,
+        correctionRequestedAt: nowUtc,
+        isEscalatedToPrincipal,
+        escalatedToRole,
+        escalationReason,
+        escalatedAt,
+        referenceCode,
+        ipAddress: extractClientIp(req),
+        userAgent: extractUserAgent(req)
+      });
+    }
+
+    await logActivity({
+      user,
+      action: 'CAMPUS_ARRIVAL_CORRECTION_REQUESTED',
+      category: 'Smart Attendance',
+      description: `Arrival correction requested for student ${student.name} (${student.rollNumber || 'N/A'}) at ${campus.name}`,
+      details: {
+        studentId: student._id,
+        campusId: campus._id,
+        referenceCode,
+        reason: reason.trim()
+      },
+      req
+    });
+
+    return res.status(201).json({
+      success: true,
+      message: 'Campus arrival correction request submitted for administrative review.',
+      log: {
+        id: logRecord._id,
+        referenceCode: logRecord.referenceCode,
+        status: logRecord.status,
+        correctionStatus: logRecord.correctionStatus,
+        correctionReason: logRecord.correctionReason,
+        correctionRequestedAt: logRecord.correctionRequestedAt,
+        studentName: student.name,
+        rollNumber: student.rollNumber
+      }
+    });
+  } catch (err) {
+    console.error('Error submitting campus arrival correction request:', err);
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to submit arrival correction request.'
+    });
+  }
+};
+
+// ============================================================
+// 21. REVIEW & APPROVE/REJECT CAMPUS ARRIVAL CORRECTION (DUAL-CONTROL)
+// ============================================================
+// @route   PUT /api/attendance/campus-arrival/correction/:logId/review
+// @access  Authorized Reviewer: HOD, Campus Admin, Administrator, Admin, Super Admin (PERMISSIONS.ATTENDANCE_VIEW)
+exports.reviewCampusArrivalCorrection = async (req, res) => {
+  try {
+    const user = req.user;
+    const userRole = normalizeRole(user.role);
+
+    // Prohibited roles: front_office and support_desk cannot approve/reject; faculty/student/recruiter/auditor/librarian also prohibited
+    if ([ROLES.FRONT_OFFICE, ROLES.SUPPORT_DESK, ROLES.FACULTY, ROLES.STUDENT, ROLES.RECRUITER, ROLES.AUDITOR, ROLES.LIBRARIAN].includes(userRole)) {
+      return res.status(403).json({
+        success: false,
+        code: 'UNAUTHORIZED_REVIEWER_ROLE',
+        error: 'Access Denied: Only Support Desk Supervisors, Principals, Directors, HODs, or Campus Administrators may adjudicate arrival corrections.'
+      });
+    }
+
+    const { logId } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(logId)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid log record identifier.'
+      });
+    }
+
+    const log = await CampusCheckInLog.findById(logId)
+      .populate('user', 'name rollNumber branch departmentId campusId')
+      .populate('correctionRequestedBy', 'name role email');
+    if (!log) {
+      return res.status(404).json({
+        success: false,
+        error: 'Campus arrival check-in log not found.'
+      });
+    }
+
+    // Multi-Campus Isolation
+    if (!canAccessCampus(user, log.campus)) {
+      return res.status(403).json({
+        success: false,
+        code: 'CROSS_CAMPUS_FORBIDDEN',
+        error: 'Multi-Campus Isolation: Cross-campus arrival correction review forbidden.'
+      });
+    }
+
+    // 1. Separation of Duties: Strict Anti-Self-Approval
+    const submitterId = log.correctionRequestedBy?._id
+      ? log.correctionRequestedBy._id.toString()
+      : (log.correctionRequestedBy ? log.correctionRequestedBy.toString() : null);
+    if (submitterId && submitterId === user._id.toString()) {
+      await logActivity({
+        user,
+        action: 'SELF_APPROVAL_ATTEMPT_BLOCKED',
+        category: 'Security Violation',
+        description: `User ${user.name} attempted self-approval on arrival correction ${log.referenceCode}`,
+        details: { logId: log._id, referenceCode: log.referenceCode },
+        req
+      });
+
+      return res.status(403).json({
+        success: false,
+        code: 'SELF_APPROVAL_PROHIBITED',
+        error: 'Separation of Duties Violation: You cannot review or approve an arrival correction request that you submitted.'
+      });
+    }
+
+    // Determine if this ticket is a supervisor-submitted correction request
+    const submitterRole = log.correctionRequestedBy && typeof log.correctionRequestedBy === 'object' && log.correctionRequestedBy.role
+      ? normalizeRole(log.correctionRequestedBy.role)
+      : null;
+    const isSupervisorSubmitted = (submitterRole === ROLES.SUPPORT_DESK_SUPERVISOR) ||
+      Boolean(log.isEscalatedToPrincipal) ||
+      (log.escalationReason === 'SUPERVISOR_SELF_SUBMISSION') ||
+      (log.escalationReason === 'SLA_OVERDUE_EXCEEDED_48_HOURS');
+
+    // 2. SLA Escalation: 48-Hour Director Escalation strictly applies ONLY to supervisor-submitted requests
+    const isOverdue = Boolean(
+      log.correctionRequestedAt &&
+      (Date.now() - new Date(log.correctionRequestedAt).getTime() > 48 * 60 * 60 * 1000)
+    );
+
+    if (log.escalatedToRole === 'DIRECTOR' || (isSupervisorSubmitted && isOverdue)) {
+      if (log.escalatedToRole !== 'DIRECTOR') {
+        log.escalatedToRole = 'DIRECTOR';
+        log.isEscalatedToPrincipal = false;
+        log.escalationReason = 'SLA_OVERDUE_EXCEEDED_48_HOURS';
+        log.escalatedAt = new Date();
+        await log.save();
+      }
+      if (userRole !== ROLES.DIRECTOR) {
+        return res.status(403).json({
+          success: false,
+          code: 'DIRECTOR_ESCALATION_REQUIRED',
+          error: 'SLA Expired (>48h): This supervisor-submitted ticket has escalated to the Campus Director for review.'
+        });
+      }
+    } else if (isSupervisorSubmitted) {
+      // 3. Supervisor Submission Escalation: Must escalate to the Principal within the 48-hour window
+      if (userRole !== ROLES.PRINCIPAL) {
+        return res.status(403).json({
+          success: false,
+          code: 'PRINCIPAL_ESCALATION_REQUIRED',
+          error: 'Access Denied: This ticket was submitted by a supervisor and strictly requires Principal review.'
+        });
+      }
+    }
+
+    // Department check for HOD
+    if (userRole === ROLES.HOD && log.user) {
+      if (!canAccessDepartment(user, log.user.departmentId, log.user.branch)) {
+        return res.status(403).json({
+          success: false,
+          error: 'Department Isolation: HOD can only review arrival corrections for students within their department.'
+        });
+      }
+    }
+
+    const { action, notes } = req.body;
+    if (!['APPROVE', 'REJECT'].includes(action)) {
+      return res.status(400).json({
+        success: false,
+        error: "Action must be either 'APPROVE' or 'REJECT'."
+      });
+    }
+
+    const now = new Date();
+
+    if (action === 'APPROVE') {
+      log.status = 'VERIFIED';
+      log.verificationMethod = 'ADMINISTRATIVE_DESK';
+      log.correctionStatus = 'APPROVED';
+      log.correctionReviewedBy = user._id;
+      log.correctionReviewedAt = now;
+      if (notes) log.correctionNotes = notes.trim();
+      log.referenceCode = `CB-ARR-DESK-${log.arrivalDateKey.replace(/-/g, '')}-${Math.floor(1000 + Math.random() * 9000)}`;
+      await log.save();
+
+      await logActivity({
+        user,
+        action: 'CAMPUS_ARRIVAL_CORRECTION_APPROVED',
+        category: 'Smart Attendance',
+        description: `Campus arrival correction approved for ${log.user?.name || 'student'} by ${user.name}`,
+        details: {
+          logId: log._id,
+          studentId: log.user?._id,
+          referenceCode: log.referenceCode,
+          campusId: log.campus
+        },
+        req
+      });
+
+      return res.status(200).json({
+        success: true,
+        message: 'Campus arrival correction approved successfully.',
+        log: {
+          id: log._id,
+          status: log.status,
+          verificationMethod: log.verificationMethod,
+          correctionStatus: log.correctionStatus,
+          referenceCode: log.referenceCode,
+          reviewedAt: log.correctionReviewedAt
+        }
+      });
+    } else {
+      // REJECT
+      log.status = 'FAILED';
+      log.correctionStatus = 'REJECTED';
+      log.correctionReviewedBy = user._id;
+      log.correctionReviewedAt = now;
+      if (notes) log.correctionNotes = notes.trim();
+      await log.save();
+
+      await logActivity({
+        user,
+        action: 'CAMPUS_ARRIVAL_CORRECTION_REJECTED',
+        category: 'Smart Attendance',
+        description: `Campus arrival correction rejected for ${log.user?.name || 'student'} by ${user.name}`,
+        details: {
+          logId: log._id,
+          studentId: log.user?._id,
+          reason: notes || 'Administrative rejection'
+        },
+        req
+      });
+
+      return res.status(200).json({
+        success: true,
+        message: 'Campus arrival correction request rejected.',
+        log: {
+          id: log._id,
+          status: log.status,
+          correctionStatus: log.correctionStatus,
+          reviewedAt: log.correctionReviewedAt
+        }
+      });
+    }
+  } catch (err) {
+    console.error('Error reviewing campus arrival correction:', err);
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to review arrival correction.'
+    });
+  }
+};
+
+// ============================================================
+// 21b. LIST CAMPUS ARRIVAL CORRECTIONS (SUPPORT DESK & AUDIT WORKFLOW)
+// ============================================================
+// @route   GET /api/attendance/campus-arrival/corrections
+// @access  Authorized Staff & Reviewers (PERMISSIONS.ATTENDANCE_VIEW)
+exports.getCampusArrivalCorrections = async (req, res) => {
+  try {
+    const user = req.user;
+    const userRole = normalizeRole(user.role);
+
+    if ([ROLES.STUDENT, ROLES.RECRUITER].includes(userRole)) {
+      return res.status(403).json({
+        success: false,
+        error: 'Access Denied: Unauthorized to view campus arrival correction roster.'
+      });
+    }
+
+    let targetCampusId = user?.campusId || user?.campus;
+    if (req.query.campusId && (isSuperAdmin(user) || userRole === ROLES.ADMIN)) {
+      targetCampusId = req.query.campusId;
+    }
+
+    const filter = {
+      $or: [
+        { correctionStatus: { $in: ['REQUESTED', 'APPROVED', 'REJECTED'] } },
+        { status: 'PENDING_REVIEW' }
+      ]
+    };
+
+    if (targetCampusId && !isSuperAdmin(user)) {
+      filter.campus = targetCampusId;
+    }
+
+    if (req.query.status && req.query.status !== 'ALL') {
+      filter.correctionStatus = req.query.status;
+    }
+
+    if (req.query.date) {
+      filter.arrivalDateKey = req.query.date;
+    }
+
+    // Role-based department scoping for HOD
+    if (userRole === ROLES.HOD) {
+      const studentQuery = { role: 'student' };
+      if (user.departmentId) studentQuery.departmentId = user.departmentId;
+      else if (user.branch || user.department) studentQuery.branch = user.branch || user.department;
+      if (targetCampusId) studentQuery.campusId = targetCampusId;
+      const deptStudents = await User.find(studentQuery).select('_id');
+      const deptStudentIds = deptStudents.map(s => s._id);
+      filter.user = { $in: deptStudentIds };
+    }
+
+    // If search term supplied
+    if (req.query.search && req.query.search.trim()) {
+      const q = req.query.search.trim();
+      const searchRegex = new RegExp(q.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&'), 'i');
+      const matchingUsers = await User.find({
+        role: 'student',
+        $or: [{ name: searchRegex }, { rollNumber: searchRegex }, { email: searchRegex }]
+      }).select('_id');
+      const matchingIds = matchingUsers.map(u => u._id);
+      if (filter.user && filter.user.$in) {
+        filter.user.$in = filter.user.$in.filter(id => matchingIds.some(m => m.equals(id)));
+      } else {
+        filter.user = { $in: matchingIds };
+      }
+    }
+
+    const corrections = await CampusCheckInLog.find(filter)
+      .populate('user', 'name rollNumber email branch departmentId campusId')
+      .populate('campus', 'name code')
+      .populate('correctionRequestedBy', 'name role email')
+      .populate('correctionReviewedBy', 'name role email')
+      .sort({ correctionRequestedAt: -1, timestamp: -1 })
+      .limit(100)
+      .lean();
+
+    return res.status(200).json({
+      success: true,
+      count: corrections.length,
+      data: corrections
+    });
+  } catch (err) {
+    console.error('Error fetching campus arrival corrections:', err);
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to retrieve arrival correction records.'
+    });
+  }
+};
+
+// ============================================================
+// 22. TODAY'S CAMPUS ARRIVAL SUMMARY (AUTHORIZED CAMPUS/DEPARTMENT SCOPE)
+// ============================================================
+// @route   GET /api/attendance/campus-arrival/today-summary
+// @access  Faculty, Staff, Administrators (PERMISSIONS.ATTENDANCE_VIEW)
+exports.getTodayArrivalSummary = async (req, res) => {
+  try {
+    const user = req.user;
+    const userRole = normalizeRole(user.role);
+
+    if ([ROLES.STUDENT, ROLES.RECRUITER].includes(userRole)) {
+      return res.status(403).json({
+        success: false,
+        error: 'Access Denied: Unauthorized to view institutional arrival summaries.'
+      });
+    }
+
+    let targetCampusId = user?.campusId || user?.campus;
+    if (req.query.campusId && (isSuperAdmin(user) || userRole === ROLES.ADMIN)) {
+      targetCampusId = req.query.campusId;
+    }
+
+    if (!targetCampusId) {
+      return res.status(200).json({
+        success: true,
+        summary: {
+          totalVerifiedToday: 0,
+          totalPendingCorrectionsToday: 0,
+          campusName: 'Unassigned Campus'
+        }
+      });
+    }
+
+    if (!canAccessCampus(user, targetCampusId)) {
+      return res.status(403).json({
+        success: false,
+        error: 'Multi-Campus Isolation: Cannot access arrival summary for another campus.'
+      });
+    }
+
+    const campus = await Campus.findById(targetCampusId);
+
+    // Calculate IST arrival date key
+    const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
+    const nowUtc = new Date();
+    const istDate = new Date(nowUtc.getTime() + IST_OFFSET_MS);
+    const arrivalDateKey = istDate.toISOString().slice(0, 10);
+
+    const filterBase = {
+      campus: targetCampusId,
+      arrivalDateKey
+    };
+
+    // If HOD or Faculty, scope to students in their department/scopes
+    let studentIdsInScope = null;
+    if (userRole === ROLES.HOD || userRole === ROLES.FACULTY) {
+      const studentQuery = { campusId: targetCampusId, role: 'student' };
+      if (userRole === ROLES.HOD && user.departmentId) {
+        studentQuery.departmentId = user.departmentId;
+      } else if (userRole === ROLES.HOD && (user.branch || user.department)) {
+        studentQuery.branch = user.branch || user.department;
+      }
+      const students = await User.find(studentQuery).select('_id');
+      studentIdsInScope = students.map(s => s._id);
+      filterBase.user = { $in: studentIdsInScope };
+    }
+
+    const [totalVerifiedToday, totalPendingCorrectionsToday] = await Promise.all([
+      CampusCheckInLog.countDocuments({ ...filterBase, status: 'VERIFIED' }),
+      CampusCheckInLog.countDocuments({ ...filterBase, correctionStatus: 'REQUESTED' })
+    ]);
+
+    return res.status(200).json({
+      success: true,
+      summary: {
+        arrivalDateKey,
+        campusId: targetCampusId,
+        campusName: campus?.name || 'Assigned Campus',
+        totalVerifiedToday,
+        totalPendingCorrectionsToday
+      }
+    });
+  } catch (err) {
+    console.error('Error fetching today arrival summary:', err);
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to retrieve campus arrival summary.'
+    });
+  }
+};
+
+// ============================================================
+// 21. BIOMETRIC IDENTITY & FACE RECOGNITION CONTROLLERS
+// ============================================================
+
+/**
+ * @route   GET /api/attendance/biometrics/status
+ * @access  Authenticated (Student / Faculty / Staff)
+ */
+exports.getBiometricStatus = async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      return res.status(404).json({ success: false, error: 'User account not found.' });
+    }
+
+    const profile = user.biometricProfile || {};
+    return res.status(200).json({
+      success: true,
+      isEnrolled: Boolean(profile.isEnrolled),
+      enrolledAt: profile.enrolledAt || null,
+      consentGiven: Boolean(profile.consentGiven),
+      consentDate: profile.consentDate || null,
+      modelVersion: profile.modelVersion || 'cb-facenet-128d-v1',
+      lastVerifiedAt: profile.lastVerifiedAt || null
+    });
+  } catch (err) {
+    console.error('Error fetching biometric status:', err);
+    return res.status(500).json({ success: false, error: 'Failed to retrieve biometric enrollment status.' });
+  }
+};
+
+/**
+ * @route   POST /api/attendance/biometrics/challenge
+ * @access  Authenticated (Student / Faculty / Staff)
+ */
+exports.requestBiometricChallenge = async (req, res) => {
+  try {
+    const challenge = generateLivenessChallenge(req.user._id);
+    return res.status(200).json({
+      success: true,
+      challengeNonce: challenge.challengeNonce,
+      promptAction: challenge.promptAction,
+      instructions: challenge.instructions,
+      expiresAt: challenge.expiresAt
+    });
+  } catch (err) {
+    console.error('Error generating biometric challenge:', err);
+    return res.status(500).json({ success: false, error: 'Failed to generate liveness challenge.' });
+  }
+};
+
+/**
+ * @route   POST /api/attendance/biometrics/enroll
+ * @access  Authenticated (Student / Faculty / Staff)
+ */
+exports.enrollBiometricProfile = async (req, res) => {
+  try {
+    const user = req.user;
+    const { consentGiven, opticalEvidence, challengeNonce, livenessEvidence } = req.body;
+
+    if (!consentGiven) {
+      return res.status(400).json({
+        success: false,
+        error: 'Biometric enrollment requires informed consent and explicit institutional acknowledgment.'
+      });
+    }
+
+    if (!opticalEvidence) {
+      return res.status(400).json({
+        success: false,
+        error: 'Optical facial evidence is required for biometric template extraction.'
+      });
+    }
+
+    // If challengeNonce provided, validate optical liveness
+    if (challengeNonce) {
+      const livenessResult = validateLivenessChallenge(user._id, challengeNonce, livenessEvidence);
+      if (!livenessResult.success) {
+        return res.status(400).json({
+          success: false,
+          error: livenessResult.reason || 'Liveness verification failed during enrollment.'
+        });
+      }
+    }
+
+    // Extract normalized 128-d embedding
+    const embedding = extractNormalizedEmbedding(opticalEvidence);
+
+    // Encrypt at rest using AES-256-GCM
+    const encrypted = encryptEmbedding(embedding);
+
+    const now = new Date();
+    const updatedUser = await User.findById(user._id).select('+biometricProfile.encryptedEmbedding +biometricProfile.authTag +biometricProfile.iv');
+    if (!updatedUser) {
+      return res.status(404).json({ success: false, error: 'User not found.' });
+    }
+
+    updatedUser.biometricProfile = {
+      isEnrolled: true,
+      enrolledAt: now,
+      consentGiven: true,
+      consentDate: now,
+      encryptedEmbedding: encrypted.encryptedEmbedding,
+      authTag: encrypted.authTag,
+      iv: encrypted.iv,
+      modelVersion: 'cb-facenet-128d-v1',
+      enrolledByIp: extractClientIp(req),
+      lastVerifiedAt: null,
+      revokedAt: null,
+      revokedReason: ''
+    };
+
+    await updatedUser.save();
+
+    await logActivity({
+      user,
+      action: 'BIOMETRIC_ENROLLED',
+      category: 'Smart Attendance',
+      description: `Biometric facial profile enrolled for ${user.name} (${user.role})`,
+      details: {
+        userId: user._id,
+        role: user.role,
+        enrolledAt: now,
+        modelVersion: 'cb-facenet-128d-v1'
+      },
+      req
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: 'Facial biometric profile enrolled and encrypted successfully.',
+      enrolledAt: now
+    });
+  } catch (err) {
+    console.error('Error enrolling biometric profile:', err);
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to enroll biometric profile: ' + (err.message || 'Internal error')
+    });
+  }
+};
+
+/**
+ * @route   POST /api/attendance/biometrics/verify
+ * @access  Authenticated (Student / Faculty / Staff)
+ */
+exports.verifyBiometricFace = async (req, res) => {
+  try {
+    const user = req.user;
+    const { purpose, opticalEvidence, challengeNonce, livenessEvidence } = req.body;
+
+    const validPurposes = ['ATTENDANCE_CHECKIN', 'CAMPUS_ARRIVAL', 'FACULTY_SESSION_LAUNCH'];
+    if (!purpose || !validPurposes.includes(purpose)) {
+      return res.status(400).json({
+        success: false,
+        error: `Invalid or missing purpose. Must be one of: ${validPurposes.join(', ')}`
+      });
+    }
+
+    if (!opticalEvidence) {
+      return res.status(400).json({
+        success: false,
+        error: 'Optical facial evidence is required for identity matching.'
+      });
+    }
+
+    // Load user with encrypted template
+    const fullUser = await User.findById(user._id).select('+biometricProfile.encryptedEmbedding +biometricProfile.authTag +biometricProfile.iv');
+    if (!fullUser || !fullUser.biometricProfile || !fullUser.biometricProfile.isEnrolled) {
+      return res.status(400).json({
+        success: false,
+        error: 'You do not have an active biometric enrollment profile. Please enroll or use alternative manual attendance.'
+      });
+    }
+
+    // Validate liveness challenge
+    if (challengeNonce) {
+      const livenessResult = validateLivenessChallenge(user._id, challengeNonce, livenessEvidence);
+      if (!livenessResult.success) {
+        await logActivity({
+          user,
+          action: 'BIOMETRIC_LIVENESS_FAILED',
+          category: 'Smart Attendance',
+          description: `Liveness failed: ${livenessResult.reason}`,
+          details: { purpose },
+          req
+        });
+        return res.status(400).json({
+          success: false,
+          error: livenessResult.reason || 'Liveness check failed. Please ensure natural lighting and live presence.'
+        });
+      }
+    }
+
+    // Decrypt enrolled biometric template
+    const enrolledEmbedding = decryptEmbedding(
+      fullUser.biometricProfile.encryptedEmbedding,
+      fullUser.biometricProfile.authTag,
+      fullUser.biometricProfile.iv
+    );
+
+    // Extract probe embedding from optical evidence
+    const probeEmbedding = extractNormalizedEmbedding(opticalEvidence);
+
+    // Compute similarity against defensible threshold
+    const matchResult = compareEmbeddings(enrolledEmbedding, probeEmbedding);
+
+    if (!matchResult.isMatch) {
+      await logActivity({
+        user,
+        action: 'BIOMETRIC_VERIFICATION_REJECTED',
+        category: 'Smart Attendance',
+        description: `Biometric verification failed (similarity: ${matchResult.similarity} vs threshold ${SIMILARITY_THRESHOLD})`,
+        details: {
+          purpose,
+          similarity: matchResult.similarity,
+          isAmbiguous: matchResult.isAmbiguous
+        },
+        req
+      });
+
+      if (matchResult.isAmbiguous) {
+        return res.status(400).json({
+          success: false,
+          status: 'AMBIGUOUS_MATCH',
+          similarity: matchResult.similarity,
+          error: `Facial similarity (${matchResult.similarity}) was inconclusive. Please ensure direct lighting, look straight into the camera, or request assistance.`
+        });
+      }
+
+      return res.status(400).json({
+        success: false,
+        status: 'VERIFICATION_FAILED',
+        similarity: matchResult.similarity,
+        error: 'Identity verification failed: Face does not match the enrolled profile for this account.'
+      });
+    }
+
+    // Verification Succeeded!
+    const token = generateFaceVerificationToken(user._id, user.role, purpose, matchResult.similarity);
+
+    fullUser.biometricProfile.lastVerifiedAt = new Date();
+    await fullUser.save();
+
+    await logActivity({
+      user,
+      action: 'BIOMETRIC_VERIFIED',
+      category: 'Smart Attendance',
+      description: `Biometric face verified for ${user.name} (Similarity: ${matchResult.similarity})`,
+      details: { purpose, similarity: matchResult.similarity },
+      req
+    });
+
+    return res.status(200).json({
+      success: true,
+      verified: true,
+      similarity: matchResult.similarity,
+      faceVerificationToken: token,
+      expiresInSeconds: 180
+    });
+  } catch (err) {
+    console.error('Error verifying biometric face:', err);
+    return res.status(500).json({
+      success: false,
+      error: 'Internal error during biometric verification: ' + (err.message || 'Unknown error')
+    });
+  }
+};
+
+/**
+ * @route   DELETE /api/attendance/biometrics/enrollment
+ * @access  Authenticated (Student / Faculty / Staff)
+ */
+exports.withdrawBiometricEnrollment = async (req, res) => {
+  try {
+    const user = req.user;
+    const { reason = 'User requested withdrawal' } = req.body;
+
+    const fullUser = await User.findById(user._id).select('+biometricProfile.encryptedEmbedding +biometricProfile.authTag +biometricProfile.iv');
+    if (!fullUser) {
+      return res.status(404).json({ success: false, error: 'User not found.' });
+    }
+
+    fullUser.biometricProfile = {
+      isEnrolled: false,
+      enrolledAt: null,
+      consentGiven: false,
+      consentDate: null,
+      encryptedEmbedding: null,
+      authTag: null,
+      iv: null,
+      modelVersion: 'cb-facenet-128d-v1',
+      enrolledByIp: '',
+      lastVerifiedAt: null,
+      revokedAt: new Date(),
+      revokedReason: reason
+    };
+
+    await fullUser.save();
+
+    await logActivity({
+      user,
+      action: 'BIOMETRIC_WITHDRAWN',
+      category: 'Smart Attendance',
+      description: `Biometric profile and templates permanently deleted for ${user.name}`,
+      details: { userId: user._id, reason },
+      req
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: 'Biometric enrollment successfully withdrawn. All encrypted biometric templates have been permanently deleted.'
+    });
+  } catch (err) {
+    console.error('Error withdrawing biometric enrollment:', err);
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to withdraw biometric enrollment.'
     });
   }
 };

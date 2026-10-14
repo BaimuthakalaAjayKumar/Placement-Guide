@@ -15,6 +15,8 @@ import { Button } from '../../components/Button';
 import { useAuth } from '../../context/AuthContext';
 import { useNavigation } from '@react-navigation/native';
 import { THEME } from '../../utils/constants';
+import { attendanceApi, CampusArrivalConfigResponse } from '../../api/attendanceApi';
+import { FaceBiometricModal } from '../../components/FaceBiometricModal';
 
 // Safe dynamic loader for native camera to prevent Expo Go crashes
 let CameraViewComponent: any = null;
@@ -49,31 +51,6 @@ const requestCameraPermissionAsync = async (): Promise<boolean> => {
   return false;
 };
 
-// Authoritative institutional campus anchor coordinates (GRIET Hyderabad)
-const CAMPUS_CONFIG = {
-  name: 'GRIET Hyderabad Main Campus',
-  latitude: 17.5186,
-  longitude: 78.3683,
-  arrivalPerimeterRadiusMeters: 400, // 400m perimeter around campus main gate & core
-  requiredGpsAccuracyThresholdMeters: 50, // Rejects readings with horizontal error > 50m
-};
-
-// Geodesic distance calculation (Haversine formula)
-function calculateDistanceMeters(lat1: number, lon1: number, lat2: number, lon2: number): number {
-  const R = 6371e3;
-  const phi1 = (lat1 * Math.PI) / 180;
-  const phi2 = (lat2 * Math.PI) / 180;
-  const deltaPhi = ((lat2 - lat1) * Math.PI) / 180;
-  const deltaLambda = ((lon2 - lon1) * Math.PI) / 180;
-
-  const a =
-    Math.sin(deltaPhi / 2) * Math.sin(deltaPhi / 2) +
-    Math.cos(phi1) * Math.cos(phi2) * Math.sin(deltaLambda / 2) * Math.sin(deltaLambda / 2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-
-  return Math.round(R * c);
-}
-
 type CheckInStep =
   | 'PERMISSIONS'
   | 'PRIVACY_CONSENT'
@@ -90,6 +67,7 @@ interface ArrivalEvent {
   accuracyMeters: number | null;
   verificationMethod: string;
   biometricConsentGiven: boolean;
+  campusName?: string;
 }
 
 export const CampusCheckInScreen: React.FC = () => {
@@ -101,8 +79,17 @@ export const CampusCheckInScreen: React.FC = () => {
   const [locationPermissionGranted, setLocationPermissionGranted] = useState<boolean>(false);
   const [permissionChecking, setPermissionChecking] = useState<boolean>(false);
 
+  // Authoritative Campus Geofence State
+  const [campusConfig, setCampusConfig] = useState<CampusArrivalConfigResponse | null>(null);
+  const [configLoading, setConfigLoading] = useState<boolean>(true);
+  const [submittingCheckIn, setSubmittingCheckIn] = useState<boolean>(false);
+
   // Biometric Privacy Consent
   const [biometricConsentGiven, setBiometricConsentGiven] = useState<boolean>(false);
+  const [biometricModalVisible, setBiometricModalVisible] = useState<boolean>(false);
+  const [biometricModalMode, setBiometricModalMode] = useState<'VERIFY' | 'ENROLL'>('VERIFY');
+  const [faceVerificationToken, setFaceVerificationToken] = useState<string | undefined>(undefined);
+  const [isBiometricEnrolled, setIsBiometricEnrolled] = useState<boolean>(false);
 
   // Optical Sensor State
   const [isCapturing, setIsCapturing] = useState<boolean>(false);
@@ -121,6 +108,40 @@ export const CampusCheckInScreen: React.FC = () => {
 
   // Arrival Result State
   const [arrivalResult, setArrivalResult] = useState<ArrivalEvent | null>(null);
+
+  // Load biometric enrollment status from backend
+  useEffect(() => {
+    attendanceApi
+      .getBiometricStatus()
+      .then((res) => {
+        if (res && res.isEnrolled) {
+          setIsBiometricEnrolled(true);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  // Fetch authoritative campus geofence configuration from server
+  const fetchCampusConfig = useCallback(async () => {
+    try {
+      setConfigLoading(true);
+      const res = await attendanceApi.getCampusArrivalConfig();
+      setCampusConfig(res);
+    } catch (err) {
+      console.warn('Failed to load campus arrival config:', err);
+      setCampusConfig({
+        success: false,
+        configured: false,
+        message: 'Campus arrival geofence is currently unavailable.'
+      });
+    } finally {
+      setConfigLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchCampusConfig();
+  }, [fetchCampusConfig]);
 
   // Check initial permissions
   const verifyExistingPermissions = useCallback(async () => {
@@ -186,6 +207,8 @@ export const CampusCheckInScreen: React.FC = () => {
   const handleAcceptBiometricConsent = () => {
     setBiometricConsentGiven(true);
     setStep('CAMERA_CAPTURE');
+    setBiometricModalMode(isBiometricEnrolled ? 'VERIFY' : 'ENROLL');
+    setBiometricModalVisible(true);
   };
 
   // Student declines biometric consent -> routes to alternative desk without penalty
@@ -194,21 +217,46 @@ export const CampusCheckInScreen: React.FC = () => {
     setStep('ALTERNATIVE_DESK');
   };
 
-  // Optical alignment confirmation (front camera alignment guide; not biometric matching or liveness test)
+  // Optical Face Verification Trigger
   const handleCaptureOpticalFrame = () => {
-    setIsCapturing(true);
-    setTimeout(() => {
-      setIsCapturing(false);
-      setOpticalEvidenceCaptured(true);
-      setStep('LOCATION_EVALUATION');
-      performLocationEvaluation();
-    }, 1200);
+    setBiometricModalMode(isBiometricEnrolled ? 'VERIFY' : 'ENROLL');
+    setBiometricModalVisible(true);
   };
 
-  // Acquire real hardware location and evaluate campus perimeter
-  const performLocationEvaluation = async () => {
+  // Called when face biometric verification or enrollment succeeds
+  const handleBiometricSuccess = (token?: string) => {
+    setBiometricModalVisible(false);
+    if (biometricModalMode === 'ENROLL') {
+      setIsBiometricEnrolled(true);
+      // Immediately trigger verification for arrival token
+      setBiometricModalMode('VERIFY');
+      setBiometricModalVisible(true);
+      return;
+    }
+    if (token) {
+      setFaceVerificationToken(token);
+    }
+    setOpticalEvidenceCaptured(true);
+    setStep('LOCATION_EVALUATION');
+    performLocationEvaluation(token);
+  };
+
+  // Acquire real hardware location and evaluate campus perimeter via authoritative backend
+  const performLocationEvaluation = async (tokenOverride?: string) => {
+    if (submittingCheckIn) return; // Prevent concurrent or repeated submissions
+
     setLocationLoading(true);
     setLocationError(null);
+
+    // If campus is not configured on server
+    if (campusConfig && !campusConfig.configured) {
+      setLocationError(
+        campusConfig.message ||
+          'Campus arrival check-in is unavailable because arrival geofencing has not been configured for your campus.'
+      );
+      setLocationLoading(false);
+      return;
+    }
 
     try {
       const position = await Location.getCurrentPositionAsync({
@@ -216,65 +264,60 @@ export const CampusCheckInScreen: React.FC = () => {
       });
 
       const { latitude, longitude, accuracy } = position.coords;
-      const horizontalAccuracy = accuracy || 15;
+      const horizontalAccuracy = typeof accuracy === 'number' && !isNaN(accuracy) ? accuracy : 15;
+      const activeToken = tokenOverride || faceVerificationToken;
 
-      // Calculate distance to campus anchor
-      const distance = calculateDistanceMeters(
-        latitude,
-        longitude,
-        CAMPUS_CONFIG.latitude,
-        CAMPUS_CONFIG.longitude
-      );
-
-      const isInside = distance <= CAMPUS_CONFIG.arrivalPerimeterRadiusMeters;
-
-      setLocationEvidence({
+      // Submit location and verified face token to authoritative backend
+      setSubmittingCheckIn(true);
+      const result = await attendanceApi.checkInCampusArrival({
         latitude,
         longitude,
         accuracy: horizontalAccuracy,
-        distanceMeters: distance,
-        isInsidePerimeter: isInside,
+        faceVerificationToken: activeToken,
       });
 
-      // Accuracy check
-      if (horizontalAccuracy > CAMPUS_CONFIG.requiredGpsAccuracyThresholdMeters) {
-        setLocationError(
-          `Location accuracy is too low (±${Math.round(horizontalAccuracy)}m). Minimum required: ±${CAMPUS_CONFIG.requiredGpsAccuracyThresholdMeters}m. Please ensure device has clear sky view.`
-        );
+      if (result && result.success && result.checkIn) {
+        const checkIn = result.checkIn;
+        setLocationEvidence({
+          latitude,
+          longitude,
+          accuracy: horizontalAccuracy,
+          distanceMeters: typeof checkIn.distanceMeters === 'number' ? checkIn.distanceMeters : 0,
+          isInsidePerimeter: true,
+        });
+
+        const arrivalDate = checkIn.timestamp ? new Date(checkIn.timestamp) : new Date();
+        setArrivalResult({
+          gateReferenceCode: checkIn.referenceCode,
+          timestamp: arrivalDate.toLocaleTimeString([], {
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+          }),
+          status: 'VERIFIED_CAMPUS_ARRIVAL',
+          distanceMeters: typeof checkIn.distanceMeters === 'number' ? checkIn.distanceMeters : null,
+          accuracyMeters: Math.round(horizontalAccuracy),
+          verificationMethod: 'SERVER_GEOFENCE_VERIFIED',
+          biometricConsentGiven: true,
+          campusName: checkIn.campusName,
+        });
+
         setLocationLoading(false);
-        return;
-      }
-
-      // Perimeter check
-      if (!isInside) {
-        setLocationError(
-          `Perimeter Boundary Discrepancy: Device is ${distance}m from the campus entrance. Campus arrival check-in is restricted to the ${CAMPUS_CONFIG.arrivalPerimeterRadiusMeters}m campus boundary.`
-        );
+        setSubmittingCheckIn(false);
+        setStep('RESULT_SUMMARY');
+      } else {
+        const errorMsg = result?.error || result?.message || 'Campus arrival verification failed.';
+        setLocationError(errorMsg);
         setLocationLoading(false);
-        return;
+        setSubmittingCheckIn(false);
       }
-
-      // Generate verified arrival event
-      const referenceCode = `CB-ARR-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.floor(
-        1000 + Math.random() * 9000
-      )}`;
-
-      setArrivalResult({
-        gateReferenceCode: referenceCode,
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
-        status: 'VERIFIED_CAMPUS_ARRIVAL',
-        distanceMeters: distance,
-        accuracyMeters: Math.round(horizontalAccuracy),
-        verificationMethod: 'GEOFENCE_GPS_VERIFIED',
-        biometricConsentGiven: true,
-      });
-
-      setLocationLoading(false);
-      setStep('RESULT_SUMMARY');
     } catch (err: any) {
-      console.error('Location evaluation error:', err);
-      setLocationError(err?.message || 'Failed to acquire hardware GPS signal. Please verify device location service is active.');
+      console.error('Campus arrival check-in error:', err);
+      const serverMsg =
+        err?.response?.data?.message || err?.message || 'Failed to communicate with campus check-in server.';
+      setLocationError(serverMsg);
       setLocationLoading(false);
+      setSubmittingCheckIn(false);
     }
   };
 
@@ -308,6 +351,25 @@ export const CampusCheckInScreen: React.FC = () => {
               location.
             </Text>
 
+            {/* Geofence Configuration Status Banner */}
+            {configLoading ? (
+              <View style={{ padding: 10, backgroundColor: '#0F172A', borderRadius: 6, marginBottom: 12 }}>
+                <ActivityIndicator size="small" color={THEME.colors.primary} />
+                <Text style={{ color: THEME.colors.textMuted, fontSize: 12, textAlign: 'center', marginTop: 4 }}>
+                  Loading campus geofence configuration...
+                </Text>
+              </View>
+            ) : campusConfig && !campusConfig.configured ? (
+              <View style={{ padding: 12, backgroundColor: 'rgba(239, 68, 68, 0.1)', borderColor: 'rgba(239, 68, 68, 0.3)', borderWidth: 1, borderRadius: 6, marginBottom: 12 }}>
+                <Text style={{ color: '#EF4444', fontWeight: '700', fontSize: 13, marginBottom: 4 }}>
+                  Geofence Check-In Unavailable
+                </Text>
+                <Text style={{ color: THEME.colors.textMuted, fontSize: 12, lineHeight: 16 }}>
+                  {campusConfig.message || 'Campus perimeter has not been configured on the server. Please visit the Security Gate Desk for arrival verification.'}
+                </Text>
+              </View>
+            ) : null}
+
             <View style={styles.permissionItem}>
               <View style={styles.permissionIconBlock}>
                 <View style={styles.permissionDot} />
@@ -330,7 +392,9 @@ export const CampusCheckInScreen: React.FC = () => {
               <View style={{ flex: 1 }}>
                 <Text style={styles.permissionTitle}>Precise Geolocation Access</Text>
                 <Text style={styles.permissionDesc}>
-                  Used to verify your presence within the institutional arrival boundary ({CAMPUS_CONFIG.arrivalPerimeterRadiusMeters}m perimeter).
+                  {campusConfig?.configured && campusConfig.arrivalPerimeterRadiusMeters
+                    ? `Used to verify your presence within the institutional arrival boundary (${campusConfig.arrivalPerimeterRadiusMeters}m perimeter).`
+                    : 'Used to verify your presence within the configured institutional campus boundary.'}
                 </Text>
                 <Text style={[styles.permStatus, locationPermissionGranted && styles.permStatusGranted]}>
                   {locationPermissionGranted ? 'Status: Granted' : 'Status: Pending Authorization'}
@@ -341,13 +405,15 @@ export const CampusCheckInScreen: React.FC = () => {
             <Button
               title={permissionChecking ? 'Checking Authorizations...' : 'Grant Permissions & Continue'}
               onPress={handleRequestPermissions}
-              disabled={permissionChecking}
+              disabled={permissionChecking || (campusConfig !== null && !campusConfig.configured)}
               style={{ marginTop: 14 }}
             />
 
             <TouchableOpacity style={styles.alternativeLink} onPress={() => setStep('ALTERNATIVE_DESK')}>
               <Text style={styles.alternativeLinkText}>
-                Declining camera access? Switch to Staff Gate Desk Check-In
+                {campusConfig && !campusConfig.configured
+                  ? 'Switch to Staff Gate Desk Check-In (Recommended)'
+                  : 'Declining camera access? Switch to Staff Gate Desk Check-In'}
               </Text>
             </TouchableOpacity>
           </View>
@@ -424,9 +490,10 @@ export const CampusCheckInScreen: React.FC = () => {
         {/* ======================================================== */}
         {step === 'CAMERA_CAPTURE' && (
           <View style={styles.card}>
-            <Text style={styles.cardHeader}>Align Face for Gate Check-In (Preview)</Text>
+            <Text style={styles.cardHeader}>Biometric Facial Identity Verification</Text>
             <Text style={styles.bodyText}>
-              Position your face inside the target frame. Maintain neutral expression in well-lit conditions.
+              Align your face inside the high-precision sensor frame. CampusBridge will verify your identity against
+              your encrypted institutional profile and issue a short-lived gate arrival token.
             </Text>
 
             {/* Viewfinder Canvas */}
@@ -442,18 +509,17 @@ export const CampusCheckInScreen: React.FC = () => {
               </Text>
             </View>
 
-            {/* Visual Alignment & Privacy Disclosure Box */}
+            {/* Audit & Privacy Disclosure Box */}
             <View style={styles.auditInfoBox}>
-              <Text style={styles.auditInfoTitle}>Optical Alignment & Privacy Disclosure (Prototype)</Text>
+              <Text style={styles.auditInfoTitle}>Institutional Biometric Security & Liveness</Text>
               <Text style={styles.auditInfoDesc}>
-                This camera interface is a visual alignment aid and prototype camera test. It does not perform algorithmic facial recognition, biometric identity matching, or cryptographic liveness verification. In strict compliance with privacy standards, no photos or biometric templates are stored or transmitted.
+                Biometric verification uses 128-dimensional mathematical template comparison with challenge-response optical liveness. Templates are encrypted with AES-256-GCM. Raw photographs are never stored or transmitted.
               </Text>
             </View>
 
             <Button
-              title={isCapturing ? 'Verifying Alignment Frame...' : 'Confirm Optical Alignment'}
+              title="Launch Facial Identity Verification"
               onPress={handleCaptureOpticalFrame}
-              disabled={isCapturing}
               style={{ marginTop: 14 }}
             />
 
@@ -487,8 +553,9 @@ export const CampusCheckInScreen: React.FC = () => {
                 <Text style={styles.errorDesc}>{locationError}</Text>
 
                 <Button
-                  title="Retry Location Fix"
+                  title={submittingCheckIn ? "Verifying with Campus Server..." : "Retry Location Fix"}
                   onPress={performLocationEvaluation}
+                  disabled={submittingCheckIn}
                   style={{ marginTop: 14 }}
                 />
                 <Button
@@ -513,7 +580,7 @@ export const CampusCheckInScreen: React.FC = () => {
               </View>
               <Text style={styles.successTitle}>Campus Arrival Recorded</Text>
               <Text style={styles.successSubtitle}>
-                Official daily institutional arrival logged for {CAMPUS_CONFIG.name}.
+                Official daily institutional arrival logged for {campusConfig?.campusName || arrivalResult.campusName || 'Assigned Campus'}.
               </Text>
             </View>
 
@@ -548,7 +615,9 @@ export const CampusCheckInScreen: React.FC = () => {
               <View style={[styles.receiptRow, { borderBottomWidth: 0 }]}>
                 <Text style={styles.receiptLabel}>Audit Classification</Text>
                 <Text style={styles.receiptValue}>
-                  Optical Alignment Confirmed • Local Perimeter Validated
+                  {arrivalResult.verificationMethod === 'SERVER_GEOFENCE_VERIFIED'
+                    ? 'Server Geofence Verified • Optical Alignment Confirmed'
+                    : 'Optical Alignment Confirmed • Local Perimeter Validated'}
                 </Text>
               </View>
             </View>
@@ -557,7 +626,7 @@ export const CampusCheckInScreen: React.FC = () => {
             <View style={styles.distinctionNotice}>
               <Text style={styles.distinctionTitle}>Attendance Policy & System Scope Notice</Text>
               <Text style={styles.distinctionText}>
-                Campus arrival check-in validates client-side GPS proximity to the institutional campus boundary (GRIET Hyderabad). This receipt confirms physical presence in the campus vicinity; it is not synchronized with authoritative physical gate turnstiles and does not satisfy classroom attendance for individual lectures, which must be scanned separately via rotating dynamic QR during each scheduled class period.
+                Campus arrival check-in validates secure server-verified GPS proximity to the institutional campus perimeter. This receipt confirms physical presence in the campus vicinity; it is not synchronized with physical gate turnstiles and does not satisfy classroom attendance for individual lectures, which must be scanned separately via rotating dynamic QR during each scheduled class period.
               </Text>
             </View>
 
@@ -653,6 +722,20 @@ export const CampusCheckInScreen: React.FC = () => {
           </View>
         )}
       </ScrollView>
+
+      <FaceBiometricModal
+        visible={biometricModalVisible}
+        mode={biometricModalMode}
+        purpose="CAMPUS_ARRIVAL"
+        title={biometricModalMode === 'ENROLL' ? 'Student Face Enrollment' : 'Campus Arrival Face Verification'}
+        onSuccess={handleBiometricSuccess}
+        onClose={() => setBiometricModalVisible(false)}
+        onFallback={() => {
+          setBiometricModalVisible(false);
+          setStep('ALTERNATIVE_DESK');
+        }}
+        fallbackLabel="Use Security Gate Alternative"
+      />
     </ScreenContainer>
   );
 };

@@ -50,8 +50,14 @@ const AttendanceRecordSchema = new mongoose.Schema({
   },
   verificationMethod: {
     type: String,
-    enum: ['QR_SCAN', 'OTP', 'MANUAL_FACULTY'],
+    enum: ['QR_SCAN', 'OTP', 'MANUAL_FACULTY', 'FACE_RECOGNITION', 'FACE_AND_QR'],
     default: 'QR_SCAN'
+  },
+  faceVerificationAudit: {
+    verified: { type: Boolean, default: false },
+    similarityScore: { type: Number, default: null },
+    verifiedAt: { type: Date, default: null },
+    fallbackReason: { type: String, default: null }
   },
   scannedAt: {
     type: Date,
