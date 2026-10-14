@@ -23,12 +23,22 @@ const {
   evaluateSessionShortages,
   evaluateStudentForSubject
 } = require('../services/attendanceAlertService');
-const {
-  sendCampusLateArrivalAlert,
-  sendCampusAbsenceAlert,
-  sendCampusArrivalUpdateAlert,
-  finalizeSubmittedSession
-} = require('../services/attendanceNotificationService');
+// Attendance notification service (WhatsApp alerts & 10-min session rectification)
+let attendanceNotificationService = null;
+try {
+  attendanceNotificationService = require('../services/attendanceNotificationService');
+} catch (err) {
+  if (err.code !== 'MODULE_NOT_FOUND') {
+    console.error('[AttendanceController] Failed to initialize attendanceNotificationService:', err.message);
+  } else {
+    console.warn('[AttendanceController] attendanceNotificationService not found; operating without automated notification triggers.');
+  }
+}
+
+const sendCampusLateArrivalAlert = attendanceNotificationService ? attendanceNotificationService.sendCampusLateArrivalAlert : null;
+const sendCampusAbsenceAlert = attendanceNotificationService ? attendanceNotificationService.sendCampusAbsenceAlert : null;
+const sendCampusArrivalUpdateAlert = attendanceNotificationService ? attendanceNotificationService.sendCampusArrivalUpdateAlert : null;
+const finalizeSubmittedSession = attendanceNotificationService ? attendanceNotificationService.finalizeSubmittedSession : null;
 const {
   extractNormalizedEmbedding,
   encryptEmbedding,
@@ -1642,6 +1652,13 @@ exports.finalizeSessionRectification = async (req, res) => {
         success: false,
         error: 'Rectification period is still active. Finalization will occur automatically once the 10-minute window expires.',
         rectificationExpiresAt: session.rectificationExpiresAt
+      });
+    }
+
+    if (typeof finalizeSubmittedSession !== 'function') {
+      return res.status(503).json({
+        success: false,
+        error: 'Attendance notification and finalization service is currently unavailable.'
       });
     }
 
@@ -3601,22 +3618,26 @@ exports.recordCampusArrival = async (req, res) => {
       // Dispatch appropriate WhatsApp notification
       if (wasPriorAbsent) {
         // Send superseding late arrival notice to parent without duplicate or misleading alerts (Requirement A.7)
-        sendCampusArrivalUpdateAlert({
-          student: user,
-          campus,
-          checkInLog: existingArrivalToday
-        }).catch(alertErr => {
-          console.warn('[AttendanceNotification] Campus arrival update alert warning:', alertErr.message);
-        });
+        if (typeof sendCampusArrivalUpdateAlert === 'function') {
+          sendCampusArrivalUpdateAlert({
+            student: user,
+            campus,
+            checkInLog: existingArrivalToday
+          }).catch(alertErr => {
+            console.warn('[AttendanceNotification] Campus arrival update alert warning:', alertErr.message);
+          });
+        }
       } else if (existingArrivalToday.punctuality === 'LATE') {
         // Send late arrival notice
-        sendCampusLateArrivalAlert({
-          student: user,
-          campus,
-          checkInLog: existingArrivalToday
-        }).catch(alertErr => {
-          console.warn('[AttendanceNotification] Campus late arrival alert warning:', alertErr.message);
-        });
+        if (typeof sendCampusLateArrivalAlert === 'function') {
+          sendCampusLateArrivalAlert({
+            student: user,
+            campus,
+            checkInLog: existingArrivalToday
+          }).catch(alertErr => {
+            console.warn('[AttendanceNotification] Campus late arrival alert warning:', alertErr.message);
+          });
+        }
       }
 
       await logActivity({
@@ -3678,7 +3699,7 @@ exports.recordCampusArrival = async (req, res) => {
     });
 
     // If check-in after cutoff, dispatch WhatsApp alert to parent/guardian (Requirement A.4)
-    if (punctuality === 'LATE') {
+    if (punctuality === 'LATE' && typeof sendCampusLateArrivalAlert === 'function') {
       sendCampusLateArrivalAlert({
         student: user,
         campus,

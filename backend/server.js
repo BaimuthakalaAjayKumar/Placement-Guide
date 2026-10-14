@@ -31,7 +31,11 @@ const app = express();
 // BODY PARSER
 // ============================================================
 
-app.use(express.json());
+app.use(express.json({
+  verify: (req, res, buf) => {
+    req.rawBody = buf;
+  }
+}));
 
 // ============================================================
 // CORS CONFIGURATION
@@ -194,6 +198,12 @@ const recruiterRoutes = require('./routes/recruiter');
 const hodRoutes = require('./routes/hod');
 const achievementRoutes = require('./routes/achievements');
 const attendanceRoutes = require('./routes/attendance');
+const academicScopeRequestRoutes = require('./routes/academicScopeRequests');
+const visitorRoutes = require('./routes/visitors');
+const guardianRoutes = require('./routes/guardians');
+const securityGateRoutes = require('./routes/securityGate');
+const libraryRoutes = require('./routes/library');
+const whatsappWebhookRoutes = require('./routes/whatsappWebhook');
 
 // ============================================================
 // MOUNT API ROUTES
@@ -215,6 +225,7 @@ app.use('/api/discussions', discussionRoutes);
 app.use('/api/ai', aiChatRoutes);
 app.use('/api/academic', academicRoutes);
 app.use('/api/academics', academicsRoutes);
+app.use('/api/academic-scope-requests', academicScopeRequestRoutes);
 app.use('/api/labs', labRoutes);
 app.use('/api/audit', auditRoutes);
 app.use('/api/placement-drives', placementDriveRoutes);
@@ -227,6 +238,11 @@ app.use('/api/recruiter', recruiterRoutes);
 app.use('/api/hod', hodRoutes);
 app.use('/api/achievements', achievementRoutes);
 app.use('/api/attendance', attendanceRoutes);
+app.use('/api/visitors', visitorRoutes);
+app.use('/api/guardians', guardianRoutes);
+app.use('/api/security-gate', securityGateRoutes);
+app.use('/api/library', libraryRoutes);
+app.use('/api/whatsapp', whatsappWebhookRoutes);
 
 // ============================================================
 // HEALTH CHECK
@@ -374,6 +390,14 @@ server.listen(PORT, '0.0.0.0', () => {
     console.log('[AT-RISK ENGINE] 24/7 Automated Risk Policy Engine initialized.');
   } catch (err) {
     console.warn('Failed to initialize At-Risk Engine on server:', err.message);
+  }
+
+  // Initialize unified automatic WhatsApp attendance notification runners (Campus Arrival + Classroom 10-min Rectification)
+  try {
+    const { initAttendanceNotificationJobs } = require('./services/attendanceNotificationService');
+    initAttendanceNotificationJobs(io);
+  } catch (err) {
+    console.warn('Failed to initialize Attendance Notification Engine on server:', err.message);
   }
 });
 
