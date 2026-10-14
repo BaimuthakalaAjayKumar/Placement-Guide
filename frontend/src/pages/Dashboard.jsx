@@ -615,170 +615,63 @@ const Dashboard = () => {
           </div>
         )}
 
-        <div className="placement-suite-banner-launcher" style={{
-          background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.15) 0%, rgba(168, 85, 247, 0.15) 100%)',
-          border: '1px solid rgba(168, 85, 247, 0.3)',
-          borderRadius: '16px',
-          padding: '1.25rem 1.75rem',
-          marginBottom: '1.5rem',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          flexWrap: 'wrap',
-          gap: '1rem',
-          boxShadow: '0 10px 30px -10px rgba(0, 0, 0, 0.4)'
-        }}>
-          <div>
-            <h3 style={{ margin: '0 0 0.3rem 0', color: '#fff', fontSize: '1.2rem', display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-              <span>🏆</span> Placement Preparation & Readiness Suite
+        <div className="placement-suite-banner-launcher">
+          <div className="placement-suite-banner-content">
+            <h3 className="placement-suite-banner-title">
+              <span>🏆</span> Placement Preparation &amp; Readiness Suite
             </h3>
-            <p style={{ margin: 0, color: '#cbd5e1', fontSize: '0.9rem' }}>
+            <p className="placement-suite-banner-desc">
               Access your Knowledge Heatmap, 15-Question Smart Revision Set, Daily Challenge streaks, and earn your official Completion Certificate.
             </p>
           </div>
           <button
             type="button"
+            className="placement-suite-banner-btn"
             onClick={() => navigate('/placement-suite')}
-            style={{
-              background: 'linear-gradient(135deg, #6366f1 0%, #a855f7 100%)',
-              color: '#fff',
-              border: 'none',
-              padding: '0.7rem 1.4rem',
-              borderRadius: '10px',
-              fontWeight: '700',
-              fontSize: '0.9rem',
-              cursor: 'pointer',
-              boxShadow: '0 4px 15px rgba(168, 85, 247, 0.4)',
-              transition: 'all 0.2s ease',
-              whiteSpace: 'nowrap'
-            }}
           >
             Open Placement Suite →
           </button>
         </div>
 
         {/* Student View Switcher: Overview vs Academics & CGPA */}
-        <div style={{
-          display: 'flex',
-          gap: '10px',
-          marginBottom: '1.5rem',
-          background: 'rgba(15, 23, 42, 0.65)',
-          padding: '8px',
-          borderRadius: '14px',
-          border: '1px solid rgba(255, 255, 255, 0.08)',
-          width: 'fit-content'
-        }}>
+        <div className="dashboard-tab-switcher">
           <button
             type="button"
+            className={`dashboard-tab-btn ${activeTab === 'overview' ? 'active' : ''}`}
             onClick={() => setActiveTab('overview')}
-            style={{
-              background: activeTab === 'overview' ? '#6366f1' : 'transparent',
-              color: activeTab === 'overview' ? '#ffffff' : '#94a3b8',
-              border: 'none',
-              padding: '9px 18px',
-              borderRadius: '10px',
-              fontWeight: '700',
-              fontSize: '0.9rem',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              transition: 'all 0.2s ease'
-            }}
           >
             <span>📊</span> Placement &amp; Practice Overview
           </button>
 
           <button
             type="button"
+            className={`dashboard-tab-btn ${activeTab === 'academics' ? 'active' : ''}`}
             onClick={() => setActiveTab('academics')}
-            style={{
-              background: activeTab === 'academics' ? '#10B981' : 'transparent',
-              color: activeTab === 'academics' ? '#ffffff' : '#94a3b8',
-              border: 'none',
-              padding: '9px 18px',
-              borderRadius: '10px',
-              fontWeight: '700',
-              fontSize: '0.9rem',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              transition: 'all 0.2s ease'
-            }}
           >
             <span>🎓</span> Academics &amp; CGPA Hub
-            <span style={{
-              background: activeTab === 'academics' ? 'rgba(0,0,0,0.25)' : 'rgba(16, 185, 129, 0.2)',
-              color: activeTab === 'academics' ? '#ffffff' : '#34d399',
-              padding: '2px 8px',
-              borderRadius: '9999px',
-              fontSize: '0.75rem',
-              fontWeight: '800'
-            }}>
+            <span className="dashboard-tab-badge academics">
               Auto-Calc
             </span>
           </button>
 
           <button
             type="button"
+            className={`dashboard-tab-btn ${activeTab === 'achievements' ? 'active' : ''}`}
             onClick={() => setActiveTab('achievements')}
-            style={{
-              background: activeTab === 'achievements' ? 'linear-gradient(135deg, #a855f7 0%, #ec4899 100%)' : 'transparent',
-              color: activeTab === 'achievements' ? '#ffffff' : '#94a3b8',
-              border: 'none',
-              padding: '9px 18px',
-              borderRadius: '10px',
-              fontWeight: '700',
-              fontSize: '0.9rem',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              transition: 'all 0.2s ease',
-              boxShadow: activeTab === 'achievements' ? '0 4px 15px rgba(168, 85, 247, 0.4)' : 'none'
-            }}
           >
             <span>🏆</span> Badges &amp; Achievements
-            <span style={{
-              background: activeTab === 'achievements' ? 'rgba(0,0,0,0.25)' : 'rgba(168, 85, 247, 0.2)',
-              color: activeTab === 'achievements' ? '#ffffff' : '#c084fc',
-              padding: '2px 8px',
-              borderRadius: '9999px',
-              fontSize: '0.75rem',
-              fontWeight: '800'
-            }}>
+            <span className="dashboard-tab-badge achievements">
               Gamified
             </span>
           </button>
 
           <button
             type="button"
+            className={`dashboard-tab-btn ${activeTab === 'pipeline' ? 'active' : ''}`}
             onClick={() => setActiveTab('pipeline')}
-            style={{
-              background: activeTab === 'pipeline' ? '#2563eb' : 'transparent',
-              color: activeTab === 'pipeline' ? '#ffffff' : '#94a3b8',
-              border: 'none',
-              padding: '9px 18px',
-              borderRadius: '10px',
-              fontWeight: '700',
-              fontSize: '0.9rem',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              transition: 'all 0.2s ease'
-            }}
           >
             <span>📌</span> My Placement Pipeline
-            <span style={{
-              background: activeTab === 'pipeline' ? 'rgba(0,0,0,0.25)' : 'rgba(37, 99, 235, 0.2)',
-              color: activeTab === 'pipeline' ? '#ffffff' : '#60a5fa',
-              padding: '2px 8px',
-              borderRadius: '9999px',
-              fontSize: '0.75rem',
-              fontWeight: '800'
-            }}>
+            <span className="dashboard-tab-badge pipeline">
               Kanban
             </span>
           </button>
@@ -1029,30 +922,84 @@ const Dashboard = () => {
                   </div>
                 </div>
 
+                {/* Overall Curated Practice Progress Summary */}
+                <div className="curated-overall-summary-card" style={{
+                  background: 'linear-gradient(135deg, rgba(30, 41, 59, 0.7), rgba(15, 23, 42, 0.8))',
+                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                  borderRadius: '12px',
+                  padding: '16px 20px',
+                  marginTop: '25px'
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px', marginBottom: '8px' }}>
+                    <div>
+                      <span style={{ fontSize: '0.95rem', fontWeight: '700', color: 'var(--text-primary)' }}>
+                        🎯 Centralized Curated Practice Progress
+                      </span>
+                      <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginLeft: '10px' }}>
+                        150 Active Problems Per Platform (50 Easy, 50 Medium, 50 Hard)
+                      </span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{ fontSize: '1.2rem', fontWeight: '800', color: '#38bdf8' }}>
+                        {((practiceStats?.leetcode?.solvedCount || 0) + (practiceStats?.codeforces?.solvedCount || 0) + (practiceStats?.codechef?.solvedCount || 0) + (practiceStats?.hackerrank?.solvedCount || 0))}/600
+                      </span>
+                      <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                        ({Math.round((((practiceStats?.leetcode?.solvedCount || 0) + (practiceStats?.codeforces?.solvedCount || 0) + (practiceStats?.codechef?.solvedCount || 0) + (practiceStats?.hackerrank?.solvedCount || 0)) / 600) * 100)}%)
+                      </span>
+                      <button
+                        className="btn btn-secondary btn-sm"
+                        style={{ fontSize: '12px', padding: '4px 10px', marginLeft: '6px' }}
+                        onClick={() => navigate('/practice')}
+                      >
+                        Go to Practice ↗
+                      </button>
+                    </div>
+                  </div>
+                  <div style={{ width: '100%', height: '8px', background: 'rgba(255,255,255,0.08)', borderRadius: '4px', overflow: 'hidden' }}>
+                    <div
+                      style={{
+                        width: `${Math.min(100, Math.round((((practiceStats?.leetcode?.solvedCount || 0) + (practiceStats?.codeforces?.solvedCount || 0) + (practiceStats?.codechef?.solvedCount || 0) + (practiceStats?.hackerrank?.solvedCount || 0)) / 600) * 100))}%`,
+                        height: '100%',
+                        background: 'linear-gradient(90deg, #38bdf8, #818cf8, #a855f7)',
+                        borderRadius: '4px',
+                        transition: 'width 0.4s ease'
+                      }}
+                    />
+                  </div>
+                </div>
+
                 {/* Platform Wise Aggregated metrics report */}
                 <div className="cp-platforms-report-grid" style={{
                   display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
                   gap: '15px',
-                  marginTop: '25px',
-                  paddingTop: '20px',
-                  borderTop: '1px solid rgba(255, 255, 255, 0.08)'
+                  marginTop: '15px',
+                  paddingTop: '10px'
                 }}>
                   {/* LeetCode card */}
                   <div className="platform-report-card">
                     <div>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                         <span style={{ fontSize: '0.85rem', fontWeight: '600', color: '#FFA116', display: 'flex', alignItems: 'center', gap: '5px' }}>
-                          <svg viewBox="0 0 24 24" style={{ fill: '#FFA116', width: '14px', height: '14px' }}><path d="M13.483 0a1.374 1.374 0 0 0-.961.414l-9.177 9.178a1.35 1.35 0 0 0-.415.962c0 .356.141.696.393.948l8.344 8.344a1.35 1.35 0 0 0 .963.414c.356 0 .696-.142.948-.394l9.178-9.177a1.35 1.35 0 0 0 .415-.963 1.35 1.35 0 0 0-.393-.948l-8.344-8.344a1.374 1.374 0 0 0-.96-.414z" /></svg>
+                          <svg viewBox="0 0 24 24" style={{ fill: '#FFA116', width: '14px', height: '14px' }}><path d="M13.483 0a1.374 1.374 0 0 0-.961.414l-9.177 9.178a1.35 1.35 0 0 0-.415.962c0 .356.141.696.393.948l8.344 8.344a1.35 1.35 0 0 0 .963.414c.356 0 .696-.142.948-.394l9.178-9.177a1.35 1.35 0 0 0 .415-.963 1.35 1.35 0 0 0-.393-.948l-8.344-8.344A1.374 1.374 0 0 0-.96-.414z" /></svg>
                           LeetCode
                         </span>
-                        <span className={`status-badge-inline ${user?.leetcodeUsername ? 'linked' : 'unlinked'}`} style={{ fontSize: '10px', padding: '2px 6px' }}>
-                          {user?.leetcodeUsername ? 'Linked' : 'Not Linked'}
-                        </span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <span className={`status-badge-inline ${user?.leetcodeUsername ? 'linked' : 'unlinked'}`} style={{ fontSize: '10px', padding: '2px 6px' }}>
+                            {user?.leetcodeUsername ? 'Linked' : 'Not Linked'}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => navigate('/practice?tab=leetcode')}
+                            style={{ background: 'none', border: 'none', color: '#FFA116', cursor: 'pointer', fontSize: '11px', textDecoration: 'underline', padding: 0 }}
+                          >
+                            Practice ↗
+                          </button>
+                        </div>
                       </div>
                       <div className="report-value" style={{ fontSize: '1.4rem', fontWeight: '700', color: 'var(--text-primary)' }}>
-                        {practiceStats?.leetcode ? `${practiceStats.leetcode.solvedCount}/${practiceStats.leetcode.totalCount}` : (stats?.leetcodeStats?.totalSolved || 0)}{' '}
-                        <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: '400' }}>Admin Solved</span>
+                        {practiceStats?.leetcode?.solvedCount ?? 0}/150{' '}
+                        <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: '400' }}>Solved</span>
                       </div>
                       <div style={{ marginTop: '4px', marginBottom: '8px' }}>
                         <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: 'rgba(255, 161, 22, 0.15)', color: '#FFA116', padding: '2px 8px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: '700' }}>
@@ -1061,21 +1008,28 @@ const Dashboard = () => {
                       </div>
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '5px', marginTop: '6px', fontSize: '0.75rem', textAlign: 'center' }}>
                         <div style={{ background: 'rgba(72, 187, 120, 0.1)', color: '#15803d', padding: '4px', borderRadius: '4px', fontWeight: '600' }}>
-                          E: {practiceStats?.leetcode ? `${practiceStats.leetcode.easySolved}/${practiceStats.leetcode.easyTotal}` : (stats?.leetcodeStats?.easySolved || Math.round((stats?.leetcodeStats?.totalSolved || 0) * 0.35))}
+                          E: {practiceStats?.leetcode?.easySolved ?? 0}/50
                         </div>
                         <div style={{ background: 'rgba(237, 137, 54, 0.1)', color: '#c2410c', padding: '4px', borderRadius: '4px', fontWeight: '600' }}>
-                          M: {practiceStats?.leetcode ? `${practiceStats.leetcode.mediumSolved}/${practiceStats.leetcode.mediumTotal}` : (stats?.leetcodeStats?.mediumSolved || Math.round((stats?.leetcodeStats?.totalSolved || 0) * 0.50))}
+                          M: {practiceStats?.leetcode?.mediumSolved ?? 0}/50
                         </div>
                         <div style={{ background: 'rgba(229, 62, 62, 0.1)', color: '#b91c1c', padding: '4px', borderRadius: '4px', fontWeight: '600' }}>
-                          H: {practiceStats?.leetcode ? `${practiceStats.leetcode.hardSolved}/${practiceStats.leetcode.hardTotal}` : (stats?.leetcodeStats?.hardSolved || Math.round((stats?.leetcodeStats?.totalSolved || 0) * 0.15))}
+                          H: {practiceStats?.leetcode?.hardSolved ?? 0}/50
                         </div>
                       </div>
                     </div>
-                    {user?.leetcodeUsername && (
-                      <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginTop: '10px', wordBreak: 'break-all' }}>
-                        Handle: <strong>{user.leetcodeUsername}</strong>
-                      </div>
-                    )}
+                    <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginTop: '10px' }}>
+                      {user?.leetcodeUsername ? (
+                        <>Handle: <strong>{user.leetcodeUsername}</strong></>
+                      ) : (
+                        <span style={{ fontStyle: 'italic', color: '#94a3b8' }}>Link handle to synchronize</span>
+                      )}
+                      {practiceStats?.leetcode?.lastSyncAt && (
+                        <div style={{ marginTop: '3px', color: '#64748b' }}>
+                          Synced: {new Date(practiceStats.leetcode.lastSyncAt).toLocaleDateString()}
+                        </div>
+                      )}
+                    </div>
                   </div>
 
                   {/* Codeforces card */}
@@ -1086,33 +1040,52 @@ const Dashboard = () => {
                           <svg viewBox="0 0 24 24" style={{ fill: '#FF4B4B', width: '14px', height: '14px' }}><path d="M4.5 7.5h1.5v15H4.5zM0 12h1.5v10.5H0zM9 3h1.5v19.5H9z" /></svg>
                           Codeforces
                         </span>
-                        <span className={`status-badge-inline ${user?.codeforcesUsername ? 'linked' : 'unlinked'}`} style={{ fontSize: '10px', padding: '2px 6px' }}>
-                          {user?.codeforcesUsername ? 'Linked' : 'Not Linked'}
-                        </span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <span className={`status-badge-inline ${user?.codeforcesUsername ? 'linked' : 'unlinked'}`} style={{ fontSize: '10px', padding: '2px 6px' }}>
+                            {user?.codeforcesUsername ? 'Linked' : 'Not Linked'}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => navigate('/practice?tab=codeforces')}
+                            style={{ background: 'none', border: 'none', color: '#FF4B4B', cursor: 'pointer', fontSize: '11px', textDecoration: 'underline', padding: 0 }}
+                          >
+                            Practice ↗
+                          </button>
+                        </div>
                       </div>
                       <div className="report-value" style={{ fontSize: '1.4rem', fontWeight: '700', color: 'var(--text-primary)' }}>
-                        {practiceStats?.codeforces ? `${practiceStats.codeforces.solvedCount}/${practiceStats.codeforces.totalCount}` : (stats?.codeforcesStats?.solvedCount || 0)}{' '}
-                        <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: '400' }}>Admin Solved</span>
+                        {practiceStats?.codeforces?.solvedCount ?? 0}/150{' '}
+                        <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: '400' }}>Solved</span>
                       </div>
                       <div style={{ marginTop: '4px', marginBottom: '8px' }}>
                         <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: 'rgba(255, 75, 75, 0.15)', color: '#FF4B4B', padding: '2px 8px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: '700' }}>
                           🏆 College Rank: #{practiceStats?.codeforces?.rank || 1}
                         </span>
                       </div>
-                      <div style={{ display: 'flex', gap: '8px', marginTop: '6px', fontSize: '0.75rem' }}>
-                        <div className="platform-stat-badge">
-                          Rating: <strong style={{ color: '#a855f7' }}>{stats?.codeforcesStats?.rating || 'N/A'}</strong>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '5px', marginTop: '6px', fontSize: '0.75rem', textAlign: 'center' }}>
+                        <div style={{ background: 'rgba(72, 187, 120, 0.1)', color: '#15803d', padding: '4px', borderRadius: '4px', fontWeight: '600' }}>
+                          E: {practiceStats?.codeforces?.easySolved ?? 0}/50
                         </div>
-                        <div className="platform-stat-badge">
-                          CF Rank: <strong style={{ color: 'var(--text-primary)' }}>{stats?.codeforcesStats?.rank || 'N/A'}</strong>
+                        <div style={{ background: 'rgba(237, 137, 54, 0.1)', color: '#c2410c', padding: '4px', borderRadius: '4px', fontWeight: '600' }}>
+                          M: {practiceStats?.codeforces?.mediumSolved ?? 0}/50
+                        </div>
+                        <div style={{ background: 'rgba(229, 62, 62, 0.1)', color: '#b91c1c', padding: '4px', borderRadius: '4px', fontWeight: '600' }}>
+                          H: {practiceStats?.codeforces?.hardSolved ?? 0}/50
                         </div>
                       </div>
                     </div>
-                    {user?.codeforcesUsername && (
-                      <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginTop: '10px', wordBreak: 'break-all' }}>
-                        Handle: <strong>{user.codeforcesUsername}</strong>
-                      </div>
-                    )}
+                    <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginTop: '10px' }}>
+                      {user?.codeforcesUsername ? (
+                        <>Handle: <strong>{user.codeforcesUsername}</strong></>
+                      ) : (
+                        <span style={{ fontStyle: 'italic', color: '#94a3b8' }}>Link handle to synchronize</span>
+                      )}
+                      {practiceStats?.codeforces?.lastSyncAt && (
+                        <div style={{ marginTop: '3px', color: '#64748b' }}>
+                          Synced: {new Date(practiceStats.codeforces.lastSyncAt).toLocaleDateString()}
+                        </div>
+                      )}
+                    </div>
                   </div>
 
                   {/* CodeChef card */}
@@ -1123,33 +1096,52 @@ const Dashboard = () => {
                           <span style={{ color: '#D4AF37', fontSize: '14px', lineHeight: 1 }}>★</span>
                           CodeChef
                         </span>
-                        <span className={`status-badge-inline ${user?.codechefUsername ? 'linked' : 'unlinked'}`} style={{ fontSize: '10px', padding: '2px 6px' }}>
-                          {user?.codechefUsername ? 'Linked' : 'Not Linked'}
-                        </span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <span className={`status-badge-inline ${user?.codechefUsername ? 'linked' : 'unlinked'}`} style={{ fontSize: '10px', padding: '2px 6px' }}>
+                            {user?.codechefUsername ? 'Linked' : 'Not Linked'}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => navigate('/practice?tab=codechef')}
+                            style={{ background: 'none', border: 'none', color: '#D4AF37', cursor: 'pointer', fontSize: '11px', textDecoration: 'underline', padding: 0 }}
+                          >
+                            Practice ↗
+                          </button>
+                        </div>
                       </div>
                       <div className="report-value" style={{ fontSize: '1.4rem', fontWeight: '700', color: 'var(--text-primary)' }}>
-                        {practiceStats?.codechef ? `${practiceStats.codechef.solvedCount}/${practiceStats.codechef.totalCount}` : (stats?.codechefStats?.rating ? Math.max(15, Math.floor(stats.codechefStats.rating / 12)) : 0)}{' '}
-                        <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: '400' }}>Admin Solved</span>
+                        {practiceStats?.codechef?.solvedCount ?? 0}/150{' '}
+                        <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: '400' }}>Solved</span>
                       </div>
                       <div style={{ marginTop: '4px', marginBottom: '8px' }}>
                         <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: 'rgba(212, 175, 55, 0.15)', color: '#D4AF37', padding: '2px 8px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: '700' }}>
                           🏆 College Rank: #{practiceStats?.codechef?.rank || 1}
                         </span>
                       </div>
-                      <div style={{ display: 'flex', gap: '8px', marginTop: '6px', fontSize: '0.75rem' }}>
-                        <div className="platform-stat-badge">
-                          Stars: <strong style={{ color: '#D4AF37' }}>{stats?.codechefStats?.stars || 'N/A'}</strong>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '5px', marginTop: '6px', fontSize: '0.75rem', textAlign: 'center' }}>
+                        <div style={{ background: 'rgba(72, 187, 120, 0.1)', color: '#15803d', padding: '4px', borderRadius: '4px', fontWeight: '600' }}>
+                          E: {practiceStats?.codechef?.easySolved ?? 0}/50
                         </div>
-                        <div className="platform-stat-badge">
-                          Rating: <strong style={{ color: 'var(--text-primary)' }}>{stats?.codechefStats?.rating || 'N/A'}</strong>
+                        <div style={{ background: 'rgba(237, 137, 54, 0.1)', color: '#c2410c', padding: '4px', borderRadius: '4px', fontWeight: '600' }}>
+                          M: {practiceStats?.codechef?.mediumSolved ?? 0}/50
+                        </div>
+                        <div style={{ background: 'rgba(229, 62, 62, 0.1)', color: '#b91c1c', padding: '4px', borderRadius: '4px', fontWeight: '600' }}>
+                          H: {practiceStats?.codechef?.hardSolved ?? 0}/50
                         </div>
                       </div>
                     </div>
-                    {user?.codechefUsername && (
-                      <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginTop: '10px', wordBreak: 'break-all' }}>
-                        Handle: <strong>{user.codechefUsername}</strong>
-                      </div>
-                    )}
+                    <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginTop: '10px' }}>
+                      {user?.codechefUsername ? (
+                        <>Handle: <strong>{user.codechefUsername}</strong></>
+                      ) : (
+                        <span style={{ fontStyle: 'italic', color: '#94a3b8' }}>Link handle to synchronize</span>
+                      )}
+                      {practiceStats?.codechef?.lastSyncAt && (
+                        <div style={{ marginTop: '3px', color: '#64748b' }}>
+                          Synced: {new Date(practiceStats.codechef.lastSyncAt).toLocaleDateString()}
+                        </div>
+                      )}
+                    </div>
                   </div>
 
                   {/* HackerRank card */}
@@ -1160,30 +1152,52 @@ const Dashboard = () => {
                           <svg viewBox="0 0 24 24" style={{ fill: '#2EC866', width: '12px', height: '12px' }}><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z" /></svg>
                           HackerRank
                         </span>
-                        <span className={`status-badge-inline ${user?.hackerrankUsername ? 'linked' : 'unlinked'}`} style={{ fontSize: '10px', padding: '2px 6px' }}>
-                          {user?.hackerrankUsername ? 'Linked' : 'Not Linked'}
-                        </span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <span className={`status-badge-inline ${user?.hackerrankUsername ? 'linked' : 'unlinked'}`} style={{ fontSize: '10px', padding: '2px 6px' }}>
+                            {user?.hackerrankUsername ? 'Linked' : 'Not Linked'}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => navigate('/practice?tab=hackerrank')}
+                            style={{ background: 'none', border: 'none', color: '#2EC866', cursor: 'pointer', fontSize: '11px', textDecoration: 'underline', padding: 0 }}
+                          >
+                            Practice ↗
+                          </button>
+                        </div>
                       </div>
                       <div className="report-value" style={{ fontSize: '1.4rem', fontWeight: '700', color: 'var(--text-primary)' }}>
-                        {practiceStats?.hackerrank ? `${practiceStats.hackerrank.solvedCount}/${practiceStats.hackerrank.totalCount}` : (stats?.hackerrankStats?.solvedCount || 0)}{' '}
-                        <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: '400' }}>Admin Solved</span>
+                        {practiceStats?.hackerrank?.solvedCount ?? 0}/150{' '}
+                        <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: '400' }}>Solved</span>
                       </div>
                       <div style={{ marginTop: '4px', marginBottom: '8px' }}>
                         <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: 'rgba(46, 200, 102, 0.15)', color: '#2EC866', padding: '2px 8px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: '700' }}>
                           🏆 College Rank: #{practiceStats?.hackerrank?.rank || 1}
                         </span>
                       </div>
-                      <div style={{ display: 'flex', gap: '8px', marginTop: '6px', fontSize: '0.75rem' }}>
-                        <div className="platform-stat-badge">
-                          Score: <strong style={{ color: '#2ec866' }}>{stats?.hackerrankStats?.solvedCount ? stats.hackerrankStats.solvedCount * 10 : 0}</strong>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '5px', marginTop: '6px', fontSize: '0.75rem', textAlign: 'center' }}>
+                        <div style={{ background: 'rgba(72, 187, 120, 0.1)', color: '#15803d', padding: '4px', borderRadius: '4px', fontWeight: '600' }}>
+                          E: {practiceStats?.hackerrank?.easySolved ?? 0}/50
+                        </div>
+                        <div style={{ background: 'rgba(237, 137, 54, 0.1)', color: '#c2410c', padding: '4px', borderRadius: '4px', fontWeight: '600' }}>
+                          M: {practiceStats?.hackerrank?.mediumSolved ?? 0}/50
+                        </div>
+                        <div style={{ background: 'rgba(229, 62, 62, 0.1)', color: '#b91c1c', padding: '4px', borderRadius: '4px', fontWeight: '600' }}>
+                          H: {practiceStats?.hackerrank?.hardSolved ?? 0}/50
                         </div>
                       </div>
                     </div>
-                    {user?.hackerrankUsername && (
-                      <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginTop: '10px', wordBreak: 'break-all' }}>
-                        Handle: <strong>{user.hackerrankUsername}</strong>
-                      </div>
-                    )}
+                    <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginTop: '10px' }}>
+                      {user?.hackerrankUsername ? (
+                        <>Handle: <strong>{user.hackerrankUsername}</strong></>
+                      ) : (
+                        <span style={{ fontStyle: 'italic', color: '#94a3b8' }}>Link handle to synchronize</span>
+                      )}
+                      {practiceStats?.hackerrank?.lastSyncAt && (
+                        <div style={{ marginTop: '3px', color: '#64748b' }}>
+                          Synced: {new Date(practiceStats.hackerrank.lastSyncAt).toLocaleDateString()}
+                        </div>
+                      )}
+                    </div>
                   </div>
 
                   {/* Question Bank card */}

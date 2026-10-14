@@ -22,6 +22,10 @@ const Sidebar = () => {
     isExecutiveLeadership
   } = usePermission();
   const isAdminGroup = isSuperAdmin || isCampusAdmin || isAdministrator || user?.role === 'admin';
+  const isFrontOffice = user?.role === 'front_office';
+  const isSupportDesk = user?.role === 'support_desk';
+  const isSupportDeskSupervisor = user?.role === 'support_desk_supervisor';
+  const isLibrarian = user?.role === 'librarian';
   const navigate = useNavigate();
   const location = useLocation();
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
@@ -75,6 +79,10 @@ const Sidebar = () => {
     if (isAdministrator) return `Administrator (${user.campusName || user.campus?.name || 'Institutional'})`;
     if (isPlacementOfficer) return `Placement Officer (${user.campusName || user.campus?.name || 'T&P'})`;
     if (isAuditor) return 'Security Auditor';
+    if (isFrontOffice) return `Front Office & Security (${user.campusName || user.campus?.name || 'Gate Desk'})`;
+    if (isLibrarian) return `Campus Librarian (${user.campusName || user.campus?.name || 'Central Library'})`;
+    if (isSupportDeskSupervisor) return `Support Desk Supervisor (${user.campusName || user.campus?.name || 'Helpdesk'})`;
+    if (isSupportDesk) return `Support Desk Officer (${user.campusName || user.campus?.name || 'Helpdesk'})`;
     if (isHOD) return `HOD (${user.department || user.branch || 'IT'})`;
     if (isFaculty) return (user.designation || 'Faculty Coordinator');
     if (isRecruiter) return (user.companyName || 'Campus Recruiter');
@@ -89,6 +97,9 @@ const Sidebar = () => {
     if (isAdministrator) return { background: 'linear-gradient(135deg, #0ea5e9, #2563eb)', color: '#fff', fontWeight: 'bold' };
     if (isPlacementOfficer) return { background: 'linear-gradient(135deg, #0d9488, #059669)', color: '#fff', fontWeight: 'bold' };
     if (isAuditor) return { background: 'linear-gradient(135deg, #475569, #334155)', color: '#fff', fontWeight: 'bold' };
+    if (isFrontOffice) return { background: 'linear-gradient(135deg, #059669, #0d9488)', color: '#fff', fontWeight: 'bold' };
+    if (isLibrarian) return { background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', color: '#fff', fontWeight: 'bold' };
+    if (isSupportDesk || isSupportDeskSupervisor) return { background: 'linear-gradient(135deg, #0284c7, #2563eb)', color: '#fff', fontWeight: 'bold' };
     if (isHOD) return { background: 'linear-gradient(135deg, #10b981, #0d9488)', color: '#fff', fontWeight: 'bold' };
     if (isFaculty) return { background: 'linear-gradient(135deg, #8b5cf6, #6366f1)', color: '#fff', fontWeight: 'bold' };
     if (isRecruiter) return { background: 'linear-gradient(135deg, #2563eb, #06b6d4)', color: '#fff', fontWeight: 'bold' };
@@ -103,6 +114,9 @@ const Sidebar = () => {
     if (isAdministrator) return '⚡';
     if (isPlacementOfficer) return '💼';
     if (isAuditor) return '🔍';
+    if (isFrontOffice) return '🛡️';
+    if (isLibrarian) return '📚';
+    if (isSupportDesk || isSupportDeskSupervisor) return '🎧';
     if (isHOD) return '🎓';
     if (isFaculty) return '👨‍🏫';
     if (isRecruiter) return '🏢';
@@ -116,6 +130,9 @@ const Sidebar = () => {
     if (isCampusAdmin || isAdministrator) return '#38bdf8';
     if (isPlacementOfficer) return '#2dd4bf';
     if (isAuditor) return '#cbd5e1';
+    if (isFrontOffice) return '#34d399';
+    if (isLibrarian) return '#a78bfa';
+    if (isSupportDesk || isSupportDeskSupervisor) return '#38bdf8';
     if (isHOD) return '#34d399';
     if (isFaculty) return '#c084fc';
     if (isRecruiter) return '#60a5fa';
@@ -199,6 +216,7 @@ const Sidebar = () => {
       <nav className="sidebar-nav">
         {isStudent && (
           <>
+            <div className="sidebar-section-label">Overview &amp; Academics</div>
             <NavLink to="/dashboard" className={({ isActive }) => `nav-link ${isActive && !location.search.includes('tab=achievements') ? 'active' : ''}`}>
               <svg viewBox="0 0 24 24" className="nav-icon"><rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" /><rect x="14" y="14" width="7" height="7" /><rect x="3" y="14" width="7" height="7" /></svg>
               <span>Dashboard</span>
@@ -214,15 +232,14 @@ const Sidebar = () => {
               <span>Academics &amp; CGPA</span>
             </NavLink>
 
-            <NavLink to="/attendance/scan" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+            <NavLink to="/library" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
               <svg viewBox="0 0 24 24" className="nav-icon" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M3 7V5a2 2 0 0 1 2-2h2"/>
-                <path d="M17 3h2a2 2 0 0 1 2 2v2"/>
-                <path d="M21 17v2a2 2 0 0 1-2 2h-2"/>
-                <path d="M7 21H5a2 2 0 0 1-2-2v-2"/>
-                <rect x="7" y="7" width="10" height="10" rx="1"/>
+                <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+                <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+                <line x1="9" y1="7" x2="16" y2="7" />
+                <line x1="9" y1="11" x2="14" y2="11" />
               </svg>
-              <span>Scan Attendance</span>
+              <span>Physical Library</span>
             </NavLink>
 
             <NavLink to="/attendance/my-attendance" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
@@ -236,6 +253,7 @@ const Sidebar = () => {
               <span>My Attendance</span>
             </NavLink>
 
+            <div className="sidebar-section-label">Career &amp; Learning</div>
             <NavLink to="/resume-builder" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
               <svg viewBox="0 0 24 24" className="nav-icon"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /></svg>
               <span>Resume Builder</span>
@@ -266,6 +284,7 @@ const Sidebar = () => {
               <span>Question Bank</span>
             </NavLink>
 
+            <div className="sidebar-section-label">Coding &amp; Labs</div>
             <NavLink to="/contests" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
               <svg viewBox="0 0 24 24" className="nav-icon" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg>
               <span>Coding Contests</span>
@@ -291,6 +310,7 @@ const Sidebar = () => {
               <span>Mock Interviews</span>
             </NavLink>
 
+            <div className="sidebar-section-label">Placements &amp; Forum</div>
             <NavLink to="/discussion-forum" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
               <svg viewBox="0 0 24 24" className="nav-icon" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" /></svg>
               <span>Discussion Forum</span>
@@ -323,6 +343,16 @@ const Sidebar = () => {
             <NavLink to="/academics" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
               <svg viewBox="0 0 24 24" className="nav-icon" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg>
               <span>Marks &amp; CGPA Evaluator</span>
+            </NavLink>
+
+            <NavLink to="/library" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+              <svg viewBox="0 0 24 24" className="nav-icon" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+                <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+                <line x1="9" y1="7" x2="16" y2="7" />
+                <line x1="9" y1="11" x2="14" y2="11" />
+              </svg>
+              <span>Physical Library</span>
             </NavLink>
 
             <NavLink to="/faculty/attendance" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
@@ -389,41 +419,49 @@ const Sidebar = () => {
               <span>Admin Console</span>
             </NavLink>
 
-            <NavLink to="/academics" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
-              <svg viewBox="0 0 24 24" className="nav-icon" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg>
-              <span>Academics &amp; Marks Hub</span>
-            </NavLink>
+            {!isSuperAdmin && (
+              <NavLink to="/academics" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+                <svg viewBox="0 0 24 24" className="nav-icon" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg>
+                <span>Academics &amp; Marks Hub</span>
+              </NavLink>
+            )}
 
-            <NavLink to="/faculty/attendance" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
-              <svg viewBox="0 0 24 24" className="nav-icon" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="3" y="3" width="7" height="7"/>
-                <rect x="14" y="3" width="7" height="7"/>
-                <rect x="3" y="14" width="7" height="7"/>
-                <path d="M14 14h3v3h-3z"/>
-                <path d="M20 14v3"/>
-                <path d="M14 20h6"/>
-              </svg>
-              <span>Smart Attendance</span>
-            </NavLink>
+            {!isSuperAdmin && (
+              <NavLink to="/faculty/attendance" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+                <svg viewBox="0 0 24 24" className="nav-icon" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3" y="3" width="7" height="7"/>
+                  <rect x="14" y="3" width="7" height="7"/>
+                  <rect x="3" y="14" width="7" height="7"/>
+                  <path d="M14 14h3v3h-3z"/>
+                  <path d="M20 14v3"/>
+                  <path d="M14 20h6"/>
+                </svg>
+                <span>Smart Attendance &amp; Live Classes</span>
+              </NavLink>
+            )}
 
-            <NavLink to="/job-opportunities" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
-              <svg viewBox="0 0 24 24" className="nav-icon" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="2" y="7" width="20" height="14" rx="2" ry="2" />
-                <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" />
-              </svg>
-              <span>Placement Drives &amp; Jobs</span>
-            </NavLink>
+            {!isSuperAdmin && (
+              <NavLink to="/job-opportunities" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+                <svg viewBox="0 0 24 24" className="nav-icon" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="2" y="7" width="20" height="14" rx="2" ry="2" />
+                  <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" />
+                </svg>
+                <span>Placement Drives &amp; Jobs</span>
+              </NavLink>
+            )}
 
-            <NavLink to="/applied-jobs-report" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
-              <svg viewBox="0 0 24 24" className="nav-icon" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                <polyline points="14 2 14 8 20 8" />
-                <line x1="16" y1="13" x2="8" y2="13" />
-                <line x1="16" y1="17" x2="8" y2="17" />
-                <polyline points="10 9 9 9 8 9" />
-              </svg>
-              <span>Applied Jobs Report</span>
-            </NavLink>
+            {!isSuperAdmin && (
+              <NavLink to="/applied-jobs-report" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+                <svg viewBox="0 0 24 24" className="nav-icon" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                  <polyline points="14 2 14 8 20 8" />
+                  <line x1="16" y1="13" x2="8" y2="13" />
+                  <line x1="16" y1="17" x2="8" y2="17" />
+                  <polyline points="10 9 9 9 8 9" />
+                </svg>
+                <span>Applied Jobs Report</span>
+              </NavLink>
+            )}
 
             <NavLink to="/faculty-staff" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
               <svg viewBox="0 0 24 24" className="nav-icon" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -443,18 +481,50 @@ const Sidebar = () => {
               <span>Student Audit Logs</span>
             </NavLink>
 
-            <NavLink to="/admin/discussions" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+            <NavLink to="/front-office" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+              <svg viewBox="0 0 24 24" className="nav-icon" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+                <line x1="16" y1="2" x2="16" y2="6" />
+                <line x1="8" y1="2" x2="8" y2="6" />
+                <line x1="3" y1="10" x2="21" y2="10" />
+                <path d="M9 16l2 2 4-4" />
+              </svg>
+              <span>Front Office &amp; Security</span>
+            </NavLink>
+
+            <NavLink to="/support-desk" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+              <svg viewBox="0 0 24 24" className="nav-icon" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M18 18.72a9.094 9.094 0 0 0 3.741-.479 3 3 0 0 0-4.682-2.72m.94 3.198l.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0 1 12 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 0 1 6 18.719m12 0a5.971 5.971 0 0 0-.941-3.197m0 0A5.995 5.995 0 0 0 12 12.75a5.995 5.995 0 0 0-5.058 2.772m0 0a3 3 0 0 0-4.681 2.72 8.986 8.986 0 0 0 3.74.477m.999-3.199a5.971 5.971 0 0 0-.941 3.197M15 6.75a3 3 0 1 1-6 0 3 3 0 0 1 6 0zm6 3a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0zm-13.5 0a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0z" />
+              </svg>
+              <span>Support Desk &amp; Arrival</span>
+            </NavLink>
+
+            <NavLink to="/library" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
               <svg viewBox="0 0 24 24" className="nav-icon" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
                 <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+                <line x1="9" y1="7" x2="16" y2="7" />
+                <line x1="9" y1="11" x2="14" y2="11" />
               </svg>
-              <span>Subject Discussions</span>
+              <span>Physical Library</span>
             </NavLink>
 
-            <NavLink to="/question-bank" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
-              <svg viewBox="0 0 24 24" className="nav-icon" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" /></svg>
-              <span>Question Bank</span>
-            </NavLink>
+            {!isSuperAdmin && (
+              <NavLink to="/admin/discussions" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+                <svg viewBox="0 0 24 24" className="nav-icon" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+                  <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+                </svg>
+                <span>Subject Discussions</span>
+              </NavLink>
+            )}
+
+            {!isSuperAdmin && (
+              <NavLink to="/question-bank" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+                <svg viewBox="0 0 24 24" className="nav-icon" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" /></svg>
+                <span>Question Bank</span>
+              </NavLink>
+            )}
 
             <NavLink to="/plagiarism-audit" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
               <svg viewBox="0 0 24 24" className="nav-icon" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" /></svg>
@@ -471,10 +541,12 @@ const Sidebar = () => {
               <span>Coding Playground</span>
             </NavLink>
 
-            <NavLink to="/discussion-forum" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
-              <svg viewBox="0 0 24 24" className="nav-icon" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" /></svg>
-              <span>Discussion Forum</span>
-            </NavLink>
+            {!isSuperAdmin && (
+              <NavLink to="/discussion-forum" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+                <svg viewBox="0 0 24 24" className="nav-icon" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" /></svg>
+                <span>Discussion Forum</span>
+              </NavLink>
+            )}
 
             {!isSuperAdmin && (
               <NavLink to="/placement-calendar" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
@@ -500,6 +572,18 @@ const Sidebar = () => {
             <NavLink to="/academics" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
               <svg viewBox="0 0 24 24" className="nav-icon" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg>
               <span>Academics &amp; Marks Hub</span>
+            </NavLink>
+
+            <NavLink to="/faculty/attendance" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+              <svg viewBox="0 0 24 24" className="nav-icon" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="3" width="7" height="7"/>
+                <rect x="14" y="3" width="7" height="7"/>
+                <rect x="3" y="14" width="7" height="7"/>
+                <path d="M14 14h3v3h-3z"/>
+                <path d="M20 14v3"/>
+                <path d="M14 20h6"/>
+              </svg>
+              <span>Smart Attendance &amp; Live Classes</span>
             </NavLink>
 
             <NavLink to="/job-opportunities" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
@@ -537,6 +621,34 @@ const Sidebar = () => {
                 <polyline points="12 6 12 12 16 14" />
               </svg>
               <span>Student Audit Logs</span>
+            </NavLink>
+
+            <NavLink to="/front-office" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+              <svg viewBox="0 0 24 24" className="nav-icon" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+                <line x1="16" y1="2" x2="16" y2="6" />
+                <line x1="8" y1="2" x2="8" y2="6" />
+                <line x1="3" y1="10" x2="21" y2="10" />
+                <path d="M9 16l2 2 4-4" />
+              </svg>
+              <span>Front Office &amp; Security</span>
+            </NavLink>
+
+            <NavLink to="/support-desk" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+              <svg viewBox="0 0 24 24" className="nav-icon" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M18 18.72a9.094 9.094 0 0 0 3.741-.479 3 3 0 0 0-4.682-2.72m.94 3.198l.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0 1 12 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 0 1 6 18.719m12 0a5.971 5.971 0 0 0-.941-3.197m0 0A5.995 5.995 0 0 0 12 12.75a5.995 5.995 0 0 0-5.058 2.772m0 0a3 3 0 0 0-4.681 2.72 8.986 8.986 0 0 0 3.74.477m.999-3.199a5.971 5.971 0 0 0-.941 3.197M15 6.75a3 3 0 1 1-6 0 3 3 0 0 1 6 0zm6 3a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0zm-13.5 0a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0z" />
+              </svg>
+              <span>Support Desk &amp; Arrival</span>
+            </NavLink>
+
+            <NavLink to="/library" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+              <svg viewBox="0 0 24 24" className="nav-icon" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+                <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+                <line x1="9" y1="7" x2="16" y2="7" />
+                <line x1="9" y1="11" x2="14" y2="11" />
+              </svg>
+              <span>Physical Library</span>
             </NavLink>
 
             <NavLink to="/plagiarism-audit" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
@@ -654,9 +766,38 @@ const Sidebar = () => {
               <span>Department Attendance</span>
             </NavLink>
 
+            <NavLink to="/faculty/attendance" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+              <svg viewBox="0 0 24 24" className="nav-icon" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="3" width="7" height="7"/>
+                <rect x="14" y="3" width="7" height="7"/>
+                <rect x="3" y="14" width="7" height="7"/>
+                <path d="M14 14h3v3h-3z"/>
+                <path d="M20 14v3"/>
+                <path d="M14 20h6"/>
+              </svg>
+              <span>Live Classes &amp; Smart Attendance</span>
+            </NavLink>
+
             <NavLink to="/academics" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
               <svg viewBox="0 0 24 24" className="nav-icon" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg>
               <span>Academics &amp; CGPA</span>
+            </NavLink>
+
+            <NavLink to="/support-desk" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+              <svg viewBox="0 0 24 24" className="nav-icon" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M18 18.72a9.094 9.094 0 0 0 3.741-.479 3 3 0 0 0-4.682-2.72m.94 3.198l.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0 1 12 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 0 1 6 18.719m12 0a5.971 5.971 0 0 0-.941-3.197m0 0A5.995 5.995 0 0 0 12 12.75a5.995 5.995 0 0 0-5.058 2.772m0 0a3 3 0 0 0-4.681 2.72 8.986 8.986 0 0 0 3.74.477m.999-3.199a5.971 5.971 0 0 0-.941 3.197M15 6.75a3 3 0 1 1-6 0 3 3 0 0 1 6 0zm6 3a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0zm-13.5 0a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0z" />
+              </svg>
+              <span>Support Desk &amp; Arrival</span>
+            </NavLink>
+
+            <NavLink to="/library" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+              <svg viewBox="0 0 24 24" className="nav-icon" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+                <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+                <line x1="9" y1="7" x2="16" y2="7" />
+                <line x1="9" y1="11" x2="14" y2="11" />
+              </svg>
+              <span>Physical Library</span>
             </NavLink>
 
             <NavLink to="/placement-calendar" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
@@ -691,6 +832,46 @@ const Sidebar = () => {
               <span>Student Audit Logs</span>
             </NavLink>
 
+            <NavLink to="/faculty/attendance" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+              <svg viewBox="0 0 24 24" className="nav-icon" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="3" width="7" height="7"/>
+                <rect x="14" y="3" width="7" height="7"/>
+                <rect x="3" y="14" width="7" height="7"/>
+                <path d="M14 14h3v3h-3z"/>
+                <path d="M20 14v3"/>
+                <path d="M14 20h6"/>
+              </svg>
+              <span>Attendance &amp; Live Classes</span>
+            </NavLink>
+
+            <NavLink to="/front-office" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+              <svg viewBox="0 0 24 24" className="nav-icon" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+                <line x1="16" y1="2" x2="16" y2="6" />
+                <line x1="8" y1="2" x2="8" y2="6" />
+                <line x1="3" y1="10" x2="21" y2="10" />
+                <path d="M9 16l2 2 4-4" />
+              </svg>
+              <span>Front Office &amp; Security</span>
+            </NavLink>
+
+            <NavLink to="/support-desk" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+              <svg viewBox="0 0 24 24" className="nav-icon" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M18 18.72a9.094 9.094 0 0 0 3.741-.479 3 3 0 0 0-4.682-2.72m.94 3.198l.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0 1 12 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 0 1 6 18.719m12 0a5.971 5.971 0 0 0-.941-3.197m0 0A5.995 5.995 0 0 0 12 12.75a5.995 5.995 0 0 0-5.058 2.772m0 0a3 3 0 0 0-4.681 2.72 8.986 8.986 0 0 0 3.74.477m.999-3.199a5.971 5.971 0 0 0-.941 3.197M15 6.75a3 3 0 1 1-6 0 3 3 0 0 1 6 0zm6 3a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0zm-13.5 0a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0z" />
+              </svg>
+              <span>Support Desk &amp; Arrival</span>
+            </NavLink>
+
+            <NavLink to="/library" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+              <svg viewBox="0 0 24 24" className="nav-icon" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+                <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+                <line x1="9" y1="7" x2="16" y2="7" />
+                <line x1="9" y1="11" x2="14" y2="11" />
+              </svg>
+              <span>Physical Library</span>
+            </NavLink>
+
             <NavLink to="/plagiarism-audit" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
               <svg viewBox="0 0 24 24" className="nav-icon" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" /></svg>
               <span>Plagiarism Audit</span>
@@ -707,6 +888,88 @@ const Sidebar = () => {
             </NavLink>
           </>
         )}
+
+        {/* Dedicated Staff Role: Front Office & Security */}
+        {isFrontOffice && (
+          <>
+            <div className="sidebar-section-label">Gate &amp; Front Office</div>
+            <NavLink to="/front-office" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+              <svg viewBox="0 0 24 24" className="nav-icon" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+                <line x1="16" y1="2" x2="16" y2="6" />
+                <line x1="8" y1="2" x2="8" y2="6" />
+                <line x1="3" y1="10" x2="21" y2="10" />
+                <path d="M9 16l2 2 4-4" />
+              </svg>
+              <span>Visitor Passes &amp; Check-In</span>
+            </NavLink>
+            <NavLink to="/security-gate" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+              <svg viewBox="0 0 24 24" className="nav-icon" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+              </svg>
+              <span>Gate Checkpoint &amp; Scanner</span>
+            </NavLink>
+            <NavLink to="/support-desk" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+              <svg viewBox="0 0 24 24" className="nav-icon" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M18 18.72a9.094 9.094 0 0 0 3.741-.479 3 3 0 0 0-4.682-2.72m.94 3.198l.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0 1 12 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 0 1 6 18.719m12 0a5.971 5.971 0 0 0-.941-3.197m0 0A5.995 5.995 0 0 0 12 12.75a5.995 5.995 0 0 0-5.058 2.772m0 0a3 3 0 0 0-4.681 2.72 8.986 8.986 0 0 0 3.74.477m.999-3.199a5.971 5.971 0 0 0-.941 3.197M15 6.75a3 3 0 1 1-6 0 3 3 0 0 1 6 0zm6 3a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0zm-13.5 0a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0z" />
+              </svg>
+              <span>Arrival Assistance Requests</span>
+            </NavLink>
+          </>
+        )}
+
+        {/* Dedicated Staff Role: Support Desk */}
+        {isSupportDesk && (
+          <>
+            <div className="sidebar-section-label">Support Desk</div>
+            <NavLink to="/support-desk" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+              <svg viewBox="0 0 24 24" className="nav-icon" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M18 18.72a9.094 9.094 0 0 0 3.741-.479 3 3 0 0 0-4.682-2.72m.94 3.198l.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0 1 12 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 0 1 6 18.719m12 0a5.971 5.971 0 0 0-.941-3.197m0 0A5.995 5.995 0 0 0 12 12.75a5.995 5.995 0 0 0-5.058 2.772m0 0a3 3 0 0 0-4.681 2.72 8.986 8.986 0 0 0 3.74.477m.999-3.199a5.971 5.971 0 0 0-.941 3.197M15 6.75a3 3 0 1 1-6 0 3 3 0 0 1 6 0zm6 3a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0zm-13.5 0a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0z" />
+              </svg>
+              <span>Student Lookup &amp; Arrival Disputes</span>
+            </NavLink>
+          </>
+        )}
+
+        {/* Dedicated Staff Role: Support Desk Supervisor */}
+        {isSupportDeskSupervisor && (
+          <>
+            <div className="sidebar-section-label">Supervisor Operations</div>
+            <NavLink to="/support-desk" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+              <svg viewBox="0 0 24 24" className="nav-icon" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M18 18.72a9.094 9.094 0 0 0 3.741-.479 3 3 0 0 0-4.682-2.72m.94 3.198l.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0 1 12 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 0 1 6 18.719m12 0a5.971 5.971 0 0 0-.941-3.197m0 0A5.995 5.995 0 0 0 12 12.75a5.995 5.995 0 0 0-5.058 2.772m0 0a3 3 0 0 0-4.681 2.72 8.986 8.986 0 0 0 3.74.477m.999-3.199a5.971 5.971 0 0 0-.941 3.197M15 6.75a3 3 0 1 1-6 0 3 3 0 0 1 6 0zm6 3a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0zm-13.5 0a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0z" />
+              </svg>
+              <span>Dispute Review &amp; Adjudication</span>
+            </NavLink>
+            <NavLink to="/front-office" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+              <svg viewBox="0 0 24 24" className="nav-icon" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+                <line x1="16" y1="2" x2="16" y2="6" />
+                <line x1="8" y1="2" x2="8" y2="6" />
+                <line x1="3" y1="10" x2="21" y2="10" />
+                <path d="M9 16l2 2 4-4" />
+              </svg>
+              <span>Gate &amp; Arrival Oversight</span>
+            </NavLink>
+          </>
+        )}
+
+        {/* Dedicated Staff Role: Librarian */}
+        {isLibrarian && (
+          <>
+            <div className="sidebar-section-label">Library Desk</div>
+            <NavLink to="/library" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+              <svg viewBox="0 0 24 24" className="nav-icon" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+                <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+                <line x1="9" y1="7" x2="16" y2="7" />
+                <line x1="9" y1="11" x2="14" y2="11" />
+              </svg>
+              <span>Physical Library &amp; Circulation</span>
+            </NavLink>
+          </>
+        )}
       </nav>
 
       <div className="sidebar-footer">
@@ -718,9 +981,28 @@ const Sidebar = () => {
           >
             <div
               className="user-avatar"
-              style={getRoleAvatarStyle()}
+              style={user?.profilePicture ? { overflow: 'hidden', padding: 0 } : getRoleAvatarStyle()}
             >
-              {getRoleAvatarIcon()}
+              {user?.profilePicture ? (
+                <img
+                  src={user.profilePicture}
+                  alt={user.name}
+                  className="sidebar-user-avatar-img"
+                  onError={(e) => {
+                    e.currentTarget.style.display = 'none';
+                    const fallback = e.currentTarget.parentElement?.querySelector('.sidebar-avatar-fallback');
+                    if (fallback) fallback.style.display = 'flex';
+                  }}
+                />
+              ) : null}
+              <span
+                className="sidebar-avatar-fallback"
+                style={{
+                  display: user?.profilePicture ? 'none' : 'flex'
+                }}
+              >
+                {getRoleAvatarIcon()}
+              </span>
             </div>
             <div className="user-info">
               <span className="user-name">{user.name}</span>

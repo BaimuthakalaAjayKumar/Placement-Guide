@@ -130,7 +130,19 @@ export const PERMISSIONS = Object.freeze({
   // AI & System Configuration
   AI_USE: 'AI_USE',
   AI_CONFIGURE: 'AI_CONFIGURE',
-  SYSTEM_CONFIGURE: 'SYSTEM_CONFIGURE'
+  SYSTEM_CONFIGURE: 'SYSTEM_CONFIGURE',
+
+  // Dedicated Operational Desk Permissions
+  VISITOR_MANAGE: 'VISITOR_MANAGE',
+  VISITOR_PASS_ISSUE: 'VISITOR_PASS_ISSUE',
+  GATE_CHECKIN_EXECUTE: 'GATE_CHECKIN_EXECUTE',
+  GUARDIAN_VERIFY: 'GUARDIAN_VERIFY',
+  ARRIVAL_CORRECTION_SUBMIT: 'ARRIVAL_CORRECTION_SUBMIT',
+  ARRIVAL_CORRECTION_REVIEW: 'ARRIVAL_CORRECTION_REVIEW',
+  BOOK_MANAGE: 'BOOK_MANAGE',
+  BOOK_CIRCULATION: 'BOOK_CIRCULATION',
+  FINE_AUTHORIZE: 'FINE_AUTHORIZE',
+  FINE_SETTLEMENT_RECORD: 'FINE_SETTLEMENT_RECORD'
 });
 
 export const ALL_PERMISSIONS = Object.freeze(Object.values(PERMISSIONS));
@@ -147,6 +159,10 @@ export const ROLES = Object.freeze({
   AUDITOR: 'auditor',
   DIRECTOR: 'director',
   PRINCIPAL: 'principal',
+  FRONT_OFFICE: 'front_office',
+  LIBRARIAN: 'librarian',
+  SUPPORT_DESK: 'support_desk',
+  SUPPORT_DESK_SUPERVISOR: 'support_desk_supervisor',
 
   // Legacy role identifier
   ADMIN: 'admin'
@@ -433,6 +449,10 @@ export const ROLE_PERMISSIONS = Object.freeze({
     PERMISSIONS.CAMPUS_VIEW,
     PERMISSIONS.STUDENT_VIEW,
     PERMISSIONS.STUDENT_PROGRESS_VIEW,
+    PERMISSIONS.CODING_VIEW,
+    PERMISSIONS.CONTEST_MANAGE,
+    PERMISSIONS.QUESTION_MANAGE,
+    PERMISSIONS.TEST_VIEW,
     PERMISSIONS.COMPANY_VIEW,
     PERMISSIONS.COMPANY_CREATE,
     PERMISSIONS.COMPANY_UPDATE,
@@ -513,6 +533,44 @@ export const ROLE_PERMISSIONS = Object.freeze({
     PERMISSIONS.PLACEMENT_RESULT_VIEW,
     PERMISSIONS.REPORT_VIEW,
     PERMISSIONS.ANALYTICS_VIEW,
+    PERMISSIONS.AUDIT_LOG_VIEW
+  ]),
+
+  // FRONT OFFICE: Visitor Management, Pass Issuance & Gate Arrival Corrections
+  [ROLES.FRONT_OFFICE]: Object.freeze([
+    PERMISSIONS.CAMPUS_VIEW,
+    PERMISSIONS.VISITOR_MANAGE,
+    PERMISSIONS.VISITOR_PASS_ISSUE,
+    PERMISSIONS.GATE_CHECKIN_EXECUTE,
+    PERMISSIONS.GUARDIAN_VERIFY,
+    PERMISSIONS.ARRIVAL_CORRECTION_SUBMIT,
+    PERMISSIONS.ATTENDANCE_VIEW
+  ]),
+
+  // LIBRARIAN: Physical Catalog, Accessions, Circulation & Authorized Fine Recording
+  [ROLES.LIBRARIAN]: Object.freeze([
+    PERMISSIONS.CAMPUS_VIEW,
+    PERMISSIONS.STUDENT_VIEW,
+    PERMISSIONS.BOOK_MANAGE,
+    PERMISSIONS.BOOK_CIRCULATION,
+    PERMISSIONS.FINE_SETTLEMENT_RECORD
+  ]),
+
+  // SUPPORT DESK: Student Lookup, Discrepancy Tracking & Arrival Correction Submission
+  [ROLES.SUPPORT_DESK]: Object.freeze([
+    PERMISSIONS.CAMPUS_VIEW,
+    PERMISSIONS.STUDENT_VIEW,
+    PERMISSIONS.ARRIVAL_CORRECTION_SUBMIT,
+    PERMISSIONS.ATTENDANCE_VIEW
+  ]),
+
+  // SUPPORT DESK SUPERVISOR: Arrival Dispute Review, Adjudication & Oversight
+  [ROLES.SUPPORT_DESK_SUPERVISOR]: Object.freeze([
+    PERMISSIONS.CAMPUS_VIEW,
+    PERMISSIONS.STUDENT_VIEW,
+    PERMISSIONS.ARRIVAL_CORRECTION_SUBMIT,
+    PERMISSIONS.ARRIVAL_CORRECTION_REVIEW,
+    PERMISSIONS.ATTENDANCE_VIEW,
     PERMISSIONS.AUDIT_LOG_VIEW
   ])
 });
@@ -607,3 +665,7 @@ export const isAuditor = (user) => user && normalizeRole(user.role) === ROLES.AU
 export const isDirector = (user) => user && normalizeRole(user.role) === ROLES.DIRECTOR;
 export const isPrincipal = (user) => user && normalizeRole(user.role) === ROLES.PRINCIPAL;
 export const isExecutiveLeadership = (user) => user && [ROLES.DIRECTOR, ROLES.PRINCIPAL].includes(normalizeRole(user.role));
+export const isFrontOffice = (user) => user && normalizeRole(user.role) === ROLES.FRONT_OFFICE;
+export const isLibrarian = (user) => user && normalizeRole(user.role) === ROLES.LIBRARIAN;
+export const isSupportDesk = (user) => user && normalizeRole(user.role) === ROLES.SUPPORT_DESK;
+export const isSupportDeskSupervisor = (user) => user && normalizeRole(user.role) === ROLES.SUPPORT_DESK_SUPERVISOR;

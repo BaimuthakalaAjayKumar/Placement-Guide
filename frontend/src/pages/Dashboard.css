@@ -4,9 +4,154 @@
   align-items: center;
   justify-content: center;
   height: 100vh;
-  width: 100vw;
+  width: 100%;
+  box-sizing: border-box;
   gap: 16px;
   color: var(--text-secondary);
+}
+
+/* 0. Placement Suite Banner Launcher */
+.placement-suite-banner-launcher {
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.1) 0%, rgba(99, 102, 241, 0.04) 100%);
+  border: 1px solid rgba(99, 102, 241, 0.24);
+  border-radius: 14px;
+  padding: 1.25rem 1.6rem;
+  margin-bottom: 1.25rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+[data-theme="light"] .placement-suite-banner-launcher {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.05);
+}
+
+.placement-suite-banner-content {
+  flex: 1;
+  min-width: 260px;
+}
+
+.placement-suite-banner-title {
+  margin: 0 0 0.25rem 0;
+  color: var(--text-primary);
+  font-size: 1.15rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.placement-suite-banner-desc {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+
+.placement-suite-banner-btn {
+  background: var(--primary);
+  color: #ffffff;
+  border: none;
+  padding: 0.65rem 1.3rem;
+  border-radius: 9px;
+  font-weight: 600;
+  font-size: 0.88rem;
+  cursor: pointer;
+  transition: background-color 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease;
+  white-space: nowrap;
+}
+
+.placement-suite-banner-btn:hover {
+  background: var(--primary-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px var(--primary-glow);
+}
+
+/* 0b. Segmented Tab Switcher */
+.dashboard-tab-switcher {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 1.5rem;
+  background: var(--bg-card);
+  padding: 5px;
+  border-radius: 12px;
+  border: 1px solid var(--border-color);
+  width: fit-content;
+  max-width: 100%;
+  flex-wrap: wrap;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+[data-theme="light"] .dashboard-tab-switcher {
+  background: #f1f5f9;
+  border-color: #e2e8f0;
+}
+
+.dashboard-tab-btn {
+  background: transparent;
+  color: var(--text-secondary);
+  border: 1px solid transparent;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 0.86rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: background-color 0.16s ease, color 0.16s ease, border-color 0.16s ease;
+}
+
+.dashboard-tab-btn:hover {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+[data-theme="light"] .dashboard-tab-btn:hover {
+  background: #ffffff;
+  color: #0f172a;
+}
+
+.dashboard-tab-btn.active {
+  background: rgba(99, 102, 241, 0.15);
+  border-color: rgba(99, 102, 241, 0.32);
+  color: #f8fafc;
+}
+
+[data-theme="light"] .dashboard-tab-btn.active {
+  background: #ffffff;
+  border-color: #cbd5e1;
+  color: #4338ca;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+
+.dashboard-tab-badge {
+  padding: 2px 7px;
+  border-radius: 9999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.dashboard-tab-badge.academics {
+  background: rgba(16, 185, 129, 0.15);
+  color: #10b981;
+}
+
+.dashboard-tab-badge.achievements {
+  background: rgba(168, 85, 247, 0.15);
+  color: #a855f7;
+}
+
+.dashboard-tab-badge.pipeline {
+  background: rgba(37, 99, 235, 0.15);
+  color: #3b82f6;
 }
 
 .dashboard-content {
@@ -65,15 +210,17 @@
 }
 
 .pri-card h3 {
-  font-size: 18px;
-  margin-bottom: 8px;
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 6px;
 }
 
 .card-desc {
-  font-size: 12px;
+  font-size: 12.5px;
   color: var(--text-secondary);
-  margin-bottom: 24px;
-  line-height: 1.4;
+  margin-bottom: 22px;
+  line-height: 1.45;
 }
 
 .gauge-container {
@@ -91,8 +238,12 @@
 
 .gauge-background {
   fill: none;
-  stroke: rgba(255, 255, 255, 0.03);
+  stroke: rgba(255, 255, 255, 0.06);
   stroke-width: 7;
+}
+
+[data-theme="light"] .gauge-background {
+  stroke: #e2e8f0;
 }
 
 .gauge-fill {
@@ -114,10 +265,11 @@
 
 .gauge-percentage {
   font-family: var(--font-display);
-  font-size: 40px;
+  font-size: 38px;
   font-weight: 800;
-  color: white;
+  color: var(--text-primary);
   line-height: 1;
+  font-variant-numeric: tabular-nums;
 }
 
 .gauge-label {
@@ -217,18 +369,20 @@
 }
 
 .pillar-card h4 {
-  font-size: 13px;
+  font-size: 12px;
+  font-weight: 600;
   color: var(--text-secondary);
   text-transform: uppercase;
-  letter-spacing: 0.02em;
-  margin-bottom: 2px;
+  letter-spacing: 0.04em;
+  margin-bottom: 4px;
 }
 
 .pillar-value {
   font-family: var(--font-display);
   font-size: 20px;
   font-weight: 700;
-  color: white;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
 }
 
 .progress-bar-bg {
@@ -645,17 +799,19 @@
 /* Modals */
 .modal-overlay {
   position: fixed;
+  inset: 0;
   top: 0;
   left: 0;
-  width: 100vw;
-  height: 100vh;
-  background: rgba(0, 0, 0, 0.6);
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.65);
   backdrop-filter: blur(8px);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 1000;
   animation: fadeIn 0.2s ease-out;
+  box-sizing: border-box;
 }
 
 .modal-content {
@@ -2525,4 +2681,49 @@
   flex-direction: column;
   align-items: center;
   gap: 12px;
+}
+
+/* Light Theme Enhancements for Dashboard Cards and Lists */
+[data-theme="light"] .pillar-card {
+  background: #ffffff;
+  border-color: #e2e8f0;
+}
+
+[data-theme="light"] .pillar-icon-box {
+  border-color: #e2e8f0;
+}
+
+[data-theme="light"] .progress-bar-bg {
+  background: #e2e8f0;
+}
+
+[data-theme="light"] .cp-tracker-card,
+[data-theme="light"] .charts-card,
+[data-theme="light"] .activities-card,
+[data-theme="light"] .applied-jobs-dashboard-card,
+[data-theme="light"] .cp-leaderboard-card,
+[data-theme="light"] .consistency-card {
+  background: #ffffff !important;
+  border-color: #e2e8f0 !important;
+  color: #0f172a !important;
+}
+
+[data-theme="light"] .cp-tracker-header h3,
+[data-theme="light"] .charts-card h3,
+[data-theme="light"] .activities-card h3,
+[data-theme="light"] .applied-jobs-dashboard-card h3 {
+  color: #0f172a !important;
+}
+
+/* Respect reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .gauge-fill,
+  .progress-bar-fill,
+  .dashboard-tab-btn,
+  .pillar-card,
+  .placement-suite-banner-btn {
+    transition: none !important;
+    animation: none !important;
+    transform: none !important;
+  }
 }

@@ -8,6 +8,7 @@ const ContestAttempt = require('../models/ContestAttempt');
 const Project = require('../models/Project');
 const LabPracticeAttempt = require('../models/LabPracticeAttempt');
 const PracticeQuestion = require('../models/PracticeQuestion');
+const codingPlatformSyncService = require('../services/codingPlatformSyncService');
 const crypto = require('crypto');
 const sendEmail = require('../utils/sendEmail');
 const {
@@ -26,7 +27,18 @@ const sendStaffPasswordResetLink = async (user, req) => {
 
   const clientOrigin = req?.headers?.origin || process.env.CLIENT_URL || process.env.FRONTEND_URL || 'https://placement-guide-nu.vercel.app';
   const resetUrl = `${clientOrigin.replace(/\/+$/, '')}/reset-password/${resetToken}`;
-  const roleName = user.role === 'admin' ? 'Administrator' : 'Faculty';
+  const roleNameMap = {
+    admin: 'Administrator',
+    super_admin: 'Super Administrator',
+    campus_admin: 'Campus Administrator',
+    administrator: 'Administrator',
+    faculty: 'Faculty',
+    front_office: 'Front Office & Security Staff',
+    librarian: 'Campus Librarian',
+    support_desk: 'Support Desk Staff',
+    support_desk_supervisor: 'Support Desk Supervisor'
+  };
+  const roleName = roleNameMap[user.role] || 'Staff Member';
 
   await sendEmail({
     to: user.email,
@@ -51,254 +63,64 @@ const sendStaffPasswordResetLink = async (user, req) => {
   });
 };
 
-// Helper to fetch statistics & recent submissions directly from LeetCode GraphQL
+// Helper to fetch statistics directly from LeetCode GraphQL via codingPlatformSyncService
 const fetchLeetcodeData = async (username) => {
-  try {
-    const graphqlQuery = {
-      query: `
-        query userLeetcodeData($username: String!, $limit: Int!) {
-          matchedUser(username: $username) {
-            submitStatsGlobal {
-              acSubmissionNum {
-                difficulty
-                count
-              }
-            }
-          }
-          recentAcSubmissionList(username: $username, limit: $limit) {
-            titleSlug
-          }
-        }
-      `,
-      variables: { username, limit: 100 }
-    };
-
-    const response = await fetch("https://leetcode.com/graphql", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-      },
-      body: JSON.stringify(graphqlQuery)
-    });
-
-    if (!response.ok) {
-      throw new Error(`LeetCode server returned status code ${response.status}`);
-    }
-
-    const result = await response.json();
-    if (!result || !result.data || !result.data.matchedUser) {
-      throw new Error(`LeetCode user '${username}' not found.`);
-    }
-
-    const submissionStats = result.data.matchedUser.submitStatsGlobal.acSubmissionNum;
-    let easySolved = 0;
-    let mediumSolved = 0;
-    let hardSolved = 0;
-    let totalSolved = 0;
-
-    submissionStats.forEach(stat => {
-      if (stat.difficulty === 'Easy') easySolved = stat.count;
-      if (stat.difficulty === 'Medium') mediumSolved = stat.count;
-      if (stat.difficulty === 'Hard') hardSolved = stat.count;
-      if (stat.difficulty === 'All') totalSolved = stat.count;
-    });
-
-    const recentSubs = result.data.recentAcSubmissionList || [];
-    const solvedSlugs = Array.from(new Set(recentSubs.map(sub => sub.titleSlug)));
-
-    return {
-      easySolved,
-      mediumSolved,
-      hardSolved,
-      totalSolved,
-      solvedSlugs
-    };
-  } catch (err) {
-    console.warn(`LeetCode live fetch failed, generating deterministic fallback: ${err.message}`);
-    let hash = 0;
-    for (let i = 0; i < username.length; i++) {
-      hash = username.charCodeAt(i) + ((hash << 5) - hash);
-    }
-    const seedVal = Math.abs(hash);
-    const easy = 20 + (seedVal % 150);
-    const medium = 10 + (seedVal % 100);
-    const hard = 2 + (seedVal % 30);
-    return {
-      easySolved: easy,
-      mediumSolved: medium,
-      hardSolved: hard,
-      totalSolved: easy + medium + hard,
-      solvedSlugs: ['two-sum', 'add-two-numbers', 'longest-substring-without-repeating-characters']
-    };
-  }
+  const syncData = await codingPlatformSyncService.syncLeetcode(username);
+  return {
+    easySolved: syncData.easySolved || 0,
+    mediumSolved: syncData.mediumSolved || 0,
+    hardSolved: syncData.hardSolved || 0,
+    totalSolved: syncData.totalSolved || 0,
+    solvedSlugs: syncData.solvedSlugs || [],
+    lastSyncAt: syncData.lastSyncAt,
+    lastSyncStatus: syncData.lastSyncStatus,
+    lastSyncMessage: syncData.lastSyncMessage
+  };
 };
 
-// Helper to fetch Codeforces data
+// Helper to fetch Codeforces data via codingPlatformSyncService
 const fetchCodeforcesData = async (username) => {
-  try {
-    const infoRes = await fetch(`https://codeforces.com/api/user.info?handles=${username}`);
-    if (!infoRes.ok) throw new Error('Codeforces profile info request failed');
-    const infoJson = await infoRes.json();
-    if (infoJson.status !== 'OK' || !infoJson.result || infoJson.result.length === 0) {
-      throw new Error(`Codeforces user '${username}' not found.`);
-    }
-
-    const userInfo = infoJson.result[0];
-    const rating = userInfo.rating || 0;
-    const maxRating = userInfo.maxRating || 0;
-    const rank = userInfo.rank || 'Unrated';
-
-    let solvedCount = 0;
-    const solvedSlugs = [];
-    try {
-      const statusRes = await fetch(`https://codeforces.com/api/user.status?handle=${username}`);
-      if (statusRes.ok) {
-        const statusJson = await statusRes.json();
-        if (statusJson.status === 'OK' && statusJson.result) {
-          const solvedProblemsSet = new Set();
-          statusJson.result.forEach(sub => {
-            if (sub.verdict === 'OK' && sub.problem) {
-              const key = `${sub.problem.contestId}_${sub.problem.index}`;
-              const slug1 = `${sub.problem.contestId}${sub.problem.index}`.toLowerCase();
-              if (!solvedProblemsSet.has(key)) {
-                solvedProblemsSet.add(key);
-                solvedSlugs.push(key);
-                solvedSlugs.push(slug1);
-                if (sub.problem.name) {
-                  solvedSlugs.push(sub.problem.name.toLowerCase());
-                }
-              }
-            }
-          });
-          solvedCount = solvedProblemsSet.size;
-        }
-      }
-    } catch (err) {
-      console.warn(`Codeforces status fetch failed: ${err.message}`);
-    }
-
-    return {
-      rating,
-      maxRating,
-      rank,
-      solvedCount,
-      solvedSlugs
-    };
-  } catch (err) {
-    console.warn(`Codeforces live fetch failed, generating fallback: ${err.message}`);
-    let hash = 0;
-    for (let i = 0; i < username.length; i++) {
-      hash = username.charCodeAt(i) + ((hash << 5) - hash);
-    }
-    const seedVal = Math.abs(hash);
-    const rating = 1000 + (seedVal % 1500);
-    const maxRating = rating + 100;
-    const rank = rating >= 2400 ? 'Grandmaster' : rating >= 1900 ? 'Candidate Master' : rating >= 1600 ? 'Expert' : rating >= 1400 ? 'Specialist' : 'Pupil';
-    return {
-      rating,
-      maxRating,
-      rank,
-      solvedCount: 50 + (seedVal % 400),
-      solvedSlugs: []
-    };
-  }
+  const syncData = await codingPlatformSyncService.syncCodeforces(username);
+  return {
+    rating: syncData.rating || 0,
+    maxRating: syncData.maxRating || 0,
+    rank: syncData.rank || 'Unrated',
+    solvedCount: syncData.totalSolvedOnPlatform || 0,
+    solvedSlugs: syncData.solvedSlugs || [],
+    lastSyncAt: syncData.lastSyncAt,
+    lastSyncStatus: syncData.lastSyncStatus,
+    lastSyncMessage: syncData.lastSyncMessage
+  };
 };
 
-// Helper to fetch CodeChef data
+// Helper to fetch CodeChef data via codingPlatformSyncService
 const fetchCodechefData = async (username) => {
-  try {
-    const res = await fetch(`https://codechef-api.vercel.app/handle/${username}`);
-    if (!res.ok) throw new Error('CodeChef API request failed');
-    const json = await res.json();
-    if (!json || json.success === false) {
-      throw new Error(`CodeChef user '${username}' not found.`);
-    }
-    let solvedSlugs = [];
-    if (json.fullySolved && Array.isArray(json.fullySolved)) {
-      solvedSlugs = json.fullySolved.map(p => String(p).toLowerCase().trim());
-    } else if (json.problemsSolved && Array.isArray(json.problemsSolved)) {
-      solvedSlugs = json.problemsSolved.map(p => String(p).toLowerCase().trim());
-    }
-    return {
-      rating: json.currentRating || json.rating || 0,
-      stars: json.stars || '1★',
-      globalRank: json.globalRank || 0,
-      countryRank: json.countryRank || 0,
-      solvedCount: json.problemsSolvedCount || solvedSlugs.length || 0,
-      solvedSlugs
-    };
-  } catch (err) {
-    console.warn(`CodeChef live fetch failed, generating deterministic fallback: ${err.message}`);
-    let hash = 0;
-    for (let i = 0; i < username.length; i++) {
-      hash = username.charCodeAt(i) + ((hash << 5) - hash);
-    }
-    const seedVal = Math.abs(hash);
-    const rating = 1200 + (seedVal % 1300);
-    const stars = rating >= 2200 ? '5★' : rating >= 1800 ? '4★' : rating >= 1600 ? '3★' : rating >= 1400 ? '2★' : '1★';
-    return {
-      rating,
-      stars,
-      globalRank: 1000 + (seedVal % 20000),
-      countryRank: 500 + (seedVal % 10000),
-      solvedCount: 5 + (seedVal % 40),
-      solvedSlugs: []
-    };
-  }
+  const syncData = await codingPlatformSyncService.syncCodechef(username);
+  return {
+    rating: syncData.rating || 0,
+    stars: syncData.stars || '1★',
+    globalRank: syncData.globalRank || 0,
+    countryRank: syncData.countryRank || 0,
+    solvedCount: syncData.totalSolvedOnPlatform || 0,
+    solvedSlugs: syncData.solvedSlugs || [],
+    lastSyncAt: syncData.lastSyncAt,
+    lastSyncStatus: syncData.lastSyncStatus,
+    lastSyncMessage: syncData.lastSyncMessage
+  };
 };
 
-// Helper to fetch HackerRank data
+// Helper to fetch HackerRank data via codingPlatformSyncService
 const fetchHackerrankData = async (username) => {
-  try {
-    const response = await fetch(`https://www.hackerrank.com/rest/hackers/${username}/profile`, {
-      headers: {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-      }
-    });
-    if (!response.ok) throw new Error('HackerRank profile request failed');
-    const json = await response.json();
-    if (!json || !json.model) {
-      throw new Error(`HackerRank user '${username}' not found.`);
-    }
-
-    const model = json.model;
-    let solvedSlugs = [];
-    try {
-      const histRes = await fetch(`https://www.hackerrank.com/rest/hackers/${username}/recent_challenges`, {
-        headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" }
-      });
-      if (histRes.ok) {
-        const histJson = await histRes.json();
-        if (histJson && Array.isArray(histJson.models)) {
-          solvedSlugs = histJson.models.map(m => String(m.ch_slug || m.slug || m.name).toLowerCase().trim());
-        }
-      }
-    } catch (histErr) {
-      console.warn(`HackerRank recent challenges fetch failed: ${histErr.message}`);
-    }
-
-    return {
-      solvedCount: model.solved_challenges_count || model.challenges_solved || 0,
-      score: Math.round(model.score || 0),
-      badgesCount: model.badges_count || 0,
-      solvedSlugs
-    };
-  } catch (err) {
-    console.warn(`HackerRank live fetch failed, generating deterministic fallback: ${err.message}`);
-    let hash = 0;
-    for (let i = 0; i < username.length; i++) {
-      hash = username.charCodeAt(i) + ((hash << 5) - hash);
-    }
-    const seedVal = Math.abs(hash);
-    const solved = 30 + (seedVal % 200);
-    return {
-      solvedCount: solved,
-      score: solved * 25,
-      badgesCount: 2 + (seedVal % 8),
-      solvedSlugs: []
-    };
-  }
+  const syncData = await codingPlatformSyncService.syncHackerrank(username);
+  return {
+    solvedCount: syncData.totalSolvedOnPlatform || 0,
+    score: syncData.score || 0,
+    badgesCount: syncData.badgesCount || 0,
+    solvedSlugs: syncData.solvedSlugs || [],
+    lastSyncAt: syncData.lastSyncAt,
+    lastSyncStatus: syncData.lastSyncStatus,
+    lastSyncMessage: syncData.lastSyncMessage
+  };
 };
 
 // @desc    Get student placement readiness stats and activity
@@ -1060,10 +882,120 @@ exports.createFaculty = async (req, res, next) => {
   }
 };
 
+// @desc    Provision a new dedicated staff account (front_office, librarian, support_desk, etc.)
+// @route   POST /api/users/staff
+// @access  Private (Campus Admin, Administrator, Super Admin)
+exports.createStaffMember = async (req, res, next) => {
+  try {
+    const { name, email, role, managedScopes = [], departmentId, branch } = req.body;
+
+    if (!name || !email || !role) {
+      return res.status(400).json({
+        success: false,
+        error: 'Please fill in name, email, and staff role.'
+      });
+    }
+
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanRole = role.trim().toLowerCase();
+
+    // 1. Prohibit privilege escalation (cannot provision admin/super_admin/campus_admin via staff endpoint)
+    if (['admin', 'super_admin', 'campus_admin', 'administrator'].includes(cleanRole)) {
+      return res.status(403).json({
+        success: false,
+        error: 'Access Denied: Administrative accounts cannot be provisioned via staff endpoint. Use dedicated administrator provisioning.'
+      });
+    }
+
+    // 2. Role Assignment Restrictions: Must be an approved staff role
+    const ALLOWED_STAFF_ROLES = ['front_office', 'librarian', 'support_desk', 'support_desk_supervisor', 'faculty'];
+    if (!ALLOWED_STAFF_ROLES.includes(cleanRole)) {
+      return res.status(400).json({
+        success: false,
+        error: `Invalid staff role '${role}'. Permitted staff roles: ${ALLOWED_STAFF_ROLES.join(', ')}.`
+      });
+    }
+
+    // 2. Multi-Campus Scope Enforcement
+    const isPlatform = isSuperAdmin(req.user);
+    const userCampusId = req.user.campusId ? req.user.campusId.toString() : null;
+
+    if (!isPlatform && !userCampusId) {
+      return res.status(403).json({
+        success: false,
+        error: 'Multi-Campus Isolation: Your user account has no campus assignment.'
+      });
+    }
+
+    // Target campus determination
+    let targetCampusId = userCampusId;
+    if (isPlatform) {
+      targetCampusId = req.body.campusId || userCampusId || null;
+    } else if (req.body.campusId && req.body.campusId.toString() !== userCampusId) {
+      return res.status(403).json({
+        success: false,
+        error: 'Multi-Campus Isolation: You cannot provision staff for another campus.'
+      });
+    }
+
+    // 3. Duplicate check
+    const userExists = await User.findOne({ email: cleanEmail });
+    if (userExists) {
+      return res.status(400).json({
+        success: false,
+        error: 'Email already registered.'
+      });
+    }
+
+    // 4. Zero Password Exposure: Generate 32-byte cryptographically random initial password
+    const internalPassword = crypto.randomBytes(32).toString('hex');
+
+    // 5. Create Staff Account with mustChangePassword = true
+    const staffData = {
+      name: name.trim(),
+      email: cleanEmail,
+      password: internalPassword,
+      role: cleanRole,
+      mustChangePassword: true,
+      campusId: targetCampusId,
+      authorizedRoles: [cleanRole],
+      activeRole: cleanRole
+    };
+
+    if (departmentId) staffData.departmentId = departmentId;
+    if (branch) staffData.branch = branch;
+    if (Array.isArray(managedScopes) && managedScopes.length > 0) {
+      staffData.managedScopes = managedScopes;
+      staffData.managedAcademicYears = [...new Set(managedScopes.map(s => s.academicYear).filter(Boolean))];
+    }
+
+    const staff = await User.create(staffData);
+
+    // 6. Send Password Setup Link via Email (Never expose password in response)
+    try {
+      await sendStaffPasswordResetLink(staff, req);
+    } catch (emailError) {
+      await User.findByIdAndDelete(staff._id);
+      throw emailError;
+    }
+
+    const staffObj = staff.toObject();
+    delete staffObj.password;
+
+    res.status(201).json({
+      success: true,
+      message: `New ${cleanRole} account provisioned successfully. A password setup link was emailed to the account.`,
+      data: { ...staffObj, resetLinkSent: true }
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
 exports.getStaff = async (req, res, next) => {
   try {
     const campusFilter = getCampusFilter(req.user);
-    const query = { role: { $in: ['admin', 'faculty', 'hod', 'principal', 'director', 'campus_admin'] }, ...campusFilter };
+    const query = { role: { $in: ['admin', 'faculty', 'hod', 'principal', 'director', 'campus_admin', 'front_office', 'librarian'] }, ...campusFilter };
     const staff = await User.find(query)
       .select('name email role managedAcademicYears managedScopes mustChangePassword createdAt campusId')
       .sort({ role: 1, name: 1 });
@@ -1157,8 +1089,8 @@ exports.deleteStaffScope = async (req, res, next) => {
 
 exports.resetStaffPassword = async (req, res, next) => {
   try {
-    const staff = await User.findOne({ _id: req.params.id, role: { $in: ['admin', 'faculty'] } });
-    if (!staff) return res.status(404).json({ success: false, error: 'Administrator or faculty member not found.' });
+    const staff = await User.findOne({ _id: req.params.id, role: { $in: ['admin', 'faculty', 'front_office', 'librarian'] } });
+    if (!staff) return res.status(404).json({ success: false, error: 'Staff member not found.' });
 
     if (!canAccessCampus(req.user, staff.campusId)) {
       return res.status(403).json({ success: false, error: 'Not authorized to reset password for staff outside your assigned campus.' });
@@ -1178,8 +1110,8 @@ exports.deleteStaff = async (req, res, next) => {
     if (req.params.id === req.user.id) {
       return res.status(400).json({ success: false, error: 'You cannot remove your own administrator account.' });
     }
-    const staff = await User.findOne({ _id: req.params.id, role: { $in: ['admin', 'faculty'] } });
-    if (!staff) return res.status(404).json({ success: false, error: 'Administrator or faculty member not found.' });
+    const staff = await User.findOne({ _id: req.params.id, role: { $in: ['admin', 'faculty', 'front_office', 'librarian'] } });
+    if (!staff) return res.status(404).json({ success: false, error: 'Staff member not found.' });
 
     const isProtectedSuperAdmin =
       isSuperAdmin(staff) ||
@@ -1215,40 +1147,29 @@ exports.updateLeetcodeProfile = async (req, res, next) => {
       });
     }
 
-    let stats = null;
+    const cleanUsername = username.trim();
+    const syncData = await codingPlatformSyncService.syncLeetcode(cleanUsername);
+    const curatedProgress = await codingPlatformSyncService.matchCuratedProgress(req.user.id, 'leetcode', syncData);
 
-    try {
-      stats = await fetchLeetcodeData(username);
-    } catch (fetchErr) {
-      if (fetchErr.message.includes('not found')) {
-        return res.status(404).json({
-          success: false,
-          error: `LeetCode user '${username}' not found. Please verify the handle.`
-        });
-      }
-      // Network/Rate limit error fallback: deterministic stats
-      let hash = 0;
-      for (let i = 0; i < username.length; i++) {
-        hash = username.charCodeAt(i) + ((hash << 5) - hash);
-      }
-      const seedVal = Math.abs(hash);
-      const easy = 20 + (seedVal % 150);
-      const medium = 10 + (seedVal % 100);
-      const hard = 2 + (seedVal % 30);
-      stats = {
-        easySolved: easy,
-        mediumSolved: medium,
-        hardSolved: hard,
-        totalSolved: easy + medium + hard,
-        solvedSlugs: ['two-sum', 'add-two-numbers', 'longest-substring-without-repeating-characters']
-      };
-      console.warn(`LeetCode direct sync failed (using fallback stats): ${fetchErr.message}`);
-    }
+    const stats = {
+      easySolved: syncData.easySolved || 0,
+      mediumSolved: syncData.mediumSolved || 0,
+      hardSolved: syncData.hardSolved || 0,
+      totalSolved: syncData.totalSolved || 0,
+      solvedSlugs: syncData.solvedSlugs || [],
+      lastSyncAt: syncData.lastSyncAt,
+      lastSyncStatus: syncData.lastSyncStatus,
+      lastSyncMessage: syncData.lastSyncMessage,
+      verifiedSolvedCount: curatedProgress.solvedCount,
+      verifiedEasyCount: curatedProgress.easySolved,
+      verifiedMediumCount: curatedProgress.mediumSolved,
+      verifiedHardCount: curatedProgress.hardSolved
+    };
 
     const updatedUser = await User.findByIdAndUpdate(
       req.user.id,
       {
-        leetcodeUsername: username,
+        leetcodeUsername: cleanUsername,
         leetcodeStats: stats
       },
       { new: true }
@@ -1259,10 +1180,14 @@ exports.updateLeetcodeProfile = async (req, res, next) => {
       message: 'LeetCode profile synchronized successfully.',
       data: {
         leetcodeUsername: updatedUser.leetcodeUsername,
-        leetcodeStats: updatedUser.leetcodeStats
+        leetcodeStats: updatedUser.leetcodeStats,
+        curatedProgress
       }
     });
   } catch (err) {
+    if (err.message && err.message.includes('not found')) {
+      return res.status(404).json({ success: false, error: err.message });
+    }
     next(err);
   }
 };
@@ -1280,39 +1205,29 @@ exports.updateCodeforcesProfile = async (req, res, next) => {
       });
     }
 
-    let stats = null;
+    const cleanUsername = username.trim();
+    const syncData = await codingPlatformSyncService.syncCodeforces(cleanUsername);
+    const curatedProgress = await codingPlatformSyncService.matchCuratedProgress(req.user.id, 'codeforces', syncData);
 
-    try {
-      stats = await fetchCodeforcesData(username);
-    } catch (fetchErr) {
-      if (fetchErr.message.includes('not found')) {
-        return res.status(404).json({
-          success: false,
-          error: `Codeforces user '${username}' not found. Please verify the handle.`
-        });
-      }
-      // Fallback
-      let hash = 0;
-      for (let i = 0; i < username.length; i++) {
-        hash = username.charCodeAt(i) + ((hash << 5) - hash);
-      }
-      const seedVal = Math.abs(hash);
-      const rating = 1000 + (seedVal % 1500);
-      const maxRating = rating + 100;
-      const rank = rating >= 2400 ? 'Grandmaster' : rating >= 1900 ? 'Candidate Master' : rating >= 1600 ? 'Expert' : rating >= 1400 ? 'Specialist' : 'Pupil';
-      stats = {
-        rating,
-        maxRating,
-        rank,
-        solvedCount: 50 + (seedVal % 400)
-      };
-      console.warn(`Codeforces direct sync failed (using fallback stats): ${fetchErr.message}`);
-    }
+    const stats = {
+      rating: syncData.rating || 0,
+      maxRating: syncData.maxRating || 0,
+      rank: syncData.rank || 'Unrated',
+      solvedCount: syncData.totalSolvedOnPlatform || 0,
+      solvedSlugs: syncData.solvedSlugs || [],
+      lastSyncAt: syncData.lastSyncAt,
+      lastSyncStatus: syncData.lastSyncStatus,
+      lastSyncMessage: syncData.lastSyncMessage,
+      verifiedSolvedCount: curatedProgress.solvedCount,
+      verifiedEasyCount: curatedProgress.easySolved,
+      verifiedMediumCount: curatedProgress.mediumSolved,
+      verifiedHardCount: curatedProgress.hardSolved
+    };
 
     const updatedUser = await User.findByIdAndUpdate(
       req.user.id,
       {
-        codeforcesUsername: username,
+        codeforcesUsername: cleanUsername,
         codeforcesStats: stats
       },
       { new: true }
@@ -1323,10 +1238,14 @@ exports.updateCodeforcesProfile = async (req, res, next) => {
       message: 'Codeforces profile synchronized successfully.',
       data: {
         codeforcesUsername: updatedUser.codeforcesUsername,
-        codeforcesStats: updatedUser.codeforcesStats
+        codeforcesStats: updatedUser.codeforcesStats,
+        curatedProgress
       }
     });
   } catch (err) {
+    if (err.message && err.message.includes('not found')) {
+      return res.status(404).json({ success: false, error: err.message });
+    }
     next(err);
   }
 };
@@ -1344,38 +1263,30 @@ exports.updateCodechefProfile = async (req, res, next) => {
       });
     }
 
-    let stats = null;
+    const cleanUsername = username.trim();
+    const syncData = await codingPlatformSyncService.syncCodechef(cleanUsername);
+    const curatedProgress = await codingPlatformSyncService.matchCuratedProgress(req.user.id, 'codechef', syncData);
 
-    try {
-      stats = await fetchCodechefData(username);
-    } catch (fetchErr) {
-      if (fetchErr.message.includes('not found')) {
-        return res.status(404).json({
-          success: false,
-          error: `CodeChef user '${username}' not found. Please verify the handle.`
-        });
-      }
-      // Fallback
-      let hash = 0;
-      for (let i = 0; i < username.length; i++) {
-        hash = username.charCodeAt(i) + ((hash << 5) - hash);
-      }
-      const seedVal = Math.abs(hash);
-      const rating = 1200 + (seedVal % 1300);
-      const stars = rating >= 2200 ? '5★' : rating >= 1800 ? '4★' : rating >= 1600 ? '3★' : rating >= 1400 ? '2★' : '1★';
-      stats = {
-        rating,
-        stars,
-        globalRank: 1000 + (seedVal % 20000),
-        countryRank: 500 + (seedVal % 10000)
-      };
-      console.warn(`CodeChef direct sync failed (using fallback stats): ${fetchErr.message}`);
-    }
+    const stats = {
+      rating: syncData.rating || 0,
+      stars: syncData.stars || '1★',
+      globalRank: syncData.globalRank || 0,
+      countryRank: syncData.countryRank || 0,
+      solvedCount: syncData.totalSolvedOnPlatform || 0,
+      solvedSlugs: syncData.solvedSlugs || [],
+      lastSyncAt: syncData.lastSyncAt,
+      lastSyncStatus: syncData.lastSyncStatus,
+      lastSyncMessage: syncData.lastSyncMessage,
+      verifiedSolvedCount: curatedProgress.solvedCount,
+      verifiedEasyCount: curatedProgress.easySolved,
+      verifiedMediumCount: curatedProgress.mediumSolved,
+      verifiedHardCount: curatedProgress.hardSolved
+    };
 
     const updatedUser = await User.findByIdAndUpdate(
       req.user.id,
       {
-        codechefUsername: username,
+        codechefUsername: cleanUsername,
         codechefStats: stats
       },
       { new: true }
@@ -1386,10 +1297,14 @@ exports.updateCodechefProfile = async (req, res, next) => {
       message: 'CodeChef profile synchronized successfully.',
       data: {
         codechefUsername: updatedUser.codechefUsername,
-        codechefStats: updatedUser.codechefStats
+        codechefStats: updatedUser.codechefStats,
+        curatedProgress
       }
     });
   } catch (err) {
+    if (err.message && err.message.includes('not found')) {
+      return res.status(404).json({ success: false, error: err.message });
+    }
     next(err);
   }
 };
@@ -1407,36 +1322,28 @@ exports.updateHackerrankProfile = async (req, res, next) => {
       });
     }
 
-    let stats = null;
+    const cleanUsername = username.trim();
+    const syncData = await codingPlatformSyncService.syncHackerrank(cleanUsername);
+    const curatedProgress = await codingPlatformSyncService.matchCuratedProgress(req.user.id, 'hackerrank', syncData);
 
-    try {
-      stats = await fetchHackerrankData(username);
-    } catch (fetchErr) {
-      if (fetchErr.message.includes('not found')) {
-        return res.status(404).json({
-          success: false,
-          error: `HackerRank user '${username}' not found. Please verify the handle.`
-        });
-      }
-      // Fallback
-      let hash = 0;
-      for (let i = 0; i < username.length; i++) {
-        hash = username.charCodeAt(i) + ((hash << 5) - hash);
-      }
-      const seedVal = Math.abs(hash);
-      const solved = 30 + (seedVal % 200);
-      stats = {
-        solvedCount: solved,
-        score: solved * 25,
-        badgesCount: 2 + (seedVal % 8)
-      };
-      console.warn(`HackerRank direct sync failed (using fallback stats): ${fetchErr.message}`);
-    }
+    const stats = {
+      solvedCount: syncData.totalSolvedOnPlatform || 0,
+      score: syncData.score || 0,
+      badgesCount: syncData.badgesCount || 0,
+      solvedSlugs: syncData.solvedSlugs || [],
+      lastSyncAt: syncData.lastSyncAt,
+      lastSyncStatus: syncData.lastSyncStatus,
+      lastSyncMessage: syncData.lastSyncMessage,
+      verifiedSolvedCount: curatedProgress.solvedCount,
+      verifiedEasyCount: curatedProgress.easySolved,
+      verifiedMediumCount: curatedProgress.mediumSolved,
+      verifiedHardCount: curatedProgress.hardSolved
+    };
 
     const updatedUser = await User.findByIdAndUpdate(
       req.user.id,
       {
-        hackerrankUsername: username,
+        hackerrankUsername: cleanUsername,
         hackerrankStats: stats
       },
       { new: true }
@@ -1447,10 +1354,14 @@ exports.updateHackerrankProfile = async (req, res, next) => {
       message: 'HackerRank profile synchronized successfully.',
       data: {
         hackerrankUsername: updatedUser.hackerrankUsername,
-        hackerrankStats: updatedUser.hackerrankStats
+        hackerrankStats: updatedUser.hackerrankStats,
+        curatedProgress
       }
     });
   } catch (err) {
+    if (err.message && err.message.includes('not found')) {
+      return res.status(404).json({ success: false, error: err.message });
+    }
     next(err);
   }
 };
@@ -1546,109 +1457,50 @@ const fetchCodeforcesSubmissionCode = async (username, problemTitle) => {
   }
 };
 
-// @desc    Get custom solution code for a problem on a platform
+// @desc    Get custom or verified solution code for a problem on a platform
 // @route   GET /api/users/solutions/:platform/:problemId
 // @access  Private
 exports.getUserSolution = async (req, res, next) => {
   try {
     const { platform, problemId } = req.params;
-    const userId = req.user.id;
+    const userId = req.user.id || req.user._id;
 
-    let solution = await UserSolution.findOne({ user: userId, platform, problemId });
-    if (solution && solution.solutionCode && !solution.solutionCode.includes('// Write or paste your verified solution here')) {
-      return res.status(200).json({
-        success: true,
-        data: solution
-      });
-    }
-
-    const user = await User.findById(userId);
-
-    // 1. Auto-fetch from Codeforces if applicable
-    if (platform === 'codeforces' && user && user.codeforcesUsername) {
-      try {
-        const scraped = await fetchCodeforcesSubmissionCode(user.codeforcesUsername, problemId);
-        if (scraped && scraped.solutionCode) {
-          solution = await UserSolution.findOneAndUpdate(
-            { user: userId, platform, problemId },
-            { solutionCode: scraped.solutionCode, language: scraped.language || 'cpp', updatedAt: Date.now() },
-            { new: true, upsert: true }
-          );
-          return res.status(200).json({
-            success: true,
-            data: solution
-          });
-        }
-      } catch (scrapeErr) {
-        console.warn(`Auto Codeforces scraping failed: ${scrapeErr.message}`);
-      }
-    }
-
-    // 2. Auto-fetch from LeetCode if applicable
-    let detectedLang = 'javascript';
-    let isPlatformSolved = false;
-
-    if (platform === 'leetcode' && user && user.leetcodeUsername) {
-      try {
-        const graphqlQuery = {
-          query: `
-            query getRecentSubmissions($username: String!) {
-              recentSubmissionList(username: $username) {
-                title
-                titleSlug
-                statusDisplay
-                lang
-              }
-            }
-          `,
-          variables: { username: user.leetcodeUsername }
-        };
-
-        const lcRes = await fetch("https://leetcode.com/graphql", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-          },
-          body: JSON.stringify(graphqlQuery),
-          signal: AbortSignal.timeout(2500)
-        });
-
-        if (lcRes.ok) {
-          const lcJson = await lcRes.json();
-          const subs = lcJson?.data?.recentSubmissionList || [];
-          const cleanTarget = String(problemId).toLowerCase().replace(/[^a-z0-9]/g, '');
-
-          const matchedSub = subs.find(s => {
-            const cleanSlug = (s.titleSlug || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-            const cleanTitle = (s.title || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-            return cleanSlug === cleanTarget || cleanTitle === cleanTarget;
-          });
-
-          if (matchedSub) {
-            isPlatformSolved = true;
-            if (matchedSub.lang) {
-              const l = matchedSub.lang.toLowerCase();
-              if (l.includes('python')) detectedLang = 'python';
-              else if (l.includes('cpp') || l.includes('c++')) detectedLang = 'cpp';
-              else if (l.includes('java') && !l.includes('javascript')) detectedLang = 'java';
-              else detectedLang = 'javascript';
-            }
+    // 1. Check if the authenticated student has already saved/imported their own solution
+    const existingSolution = await UserSolution.findOne({ user: userId, platform, problemId });
+    if (existingSolution && existingSolution.solutionCode && existingSolution.solutionCode.trim()) {
+      // Validate that it's not a legacy placeholder
+      const isPlaceholder = existingSolution.solutionCode.includes('// Write or paste your verified solution here') &&
+                            existingSolution.solutionCode.split('\n').length <= 5;
+      if (!isPlaceholder) {
+        return res.status(200).json({
+          success: true,
+          data: {
+            user: userId,
+            platform,
+            problemId,
+            solution: existingSolution.solutionCode,
+            solutionCode: existingSolution.solutionCode,
+            language: existingSolution.language || 'cpp',
+            submittedAt: existingSolution.updatedAt,
+            verdict: 'Accepted',
+            isPlatformVerified: true,
+            sourceCodeAccessible: true,
+            source: 'student_saved',
+            message: 'Displaying your verified submitted solution code.'
           }
-        }
-      } catch (lcErr) {
-        console.warn(`Auto LeetCode sync check failed: ${lcErr.message}`);
+        });
       }
     }
 
-    // 3. Look up PracticeQuestion in database to get verified platform solution
+    // 2. Look up the exact curated question in PracticeQuestion
     const cleanId = String(problemId).toLowerCase().trim();
     let practiceQ = await PracticeQuestion.findOne({
       platform,
       $or: [
         { slug: cleanId },
         { title: problemId },
-        { id: Number(problemId) || -1 }
+        { id: Number(problemId) || -1 },
+        { officialProblemId: problemId }
       ]
     });
 
@@ -1659,31 +1511,193 @@ exports.getUserSolution = async (req, res, next) => {
       });
     }
 
-    const username = platform === 'leetcode' ? (user?.leetcodeUsername || 'Ajay__Kumar__')
-                   : platform === 'codeforces' ? (user?.codeforcesUsername || 'Student')
-                   : platform === 'codechef' ? (user?.codechefUsername || 'Student')
-                   : (user?.hackerrankUsername || 'Student');
+    const user = await User.findById(userId);
+    const platformTitle = platform.charAt(0).toUpperCase() + platform.slice(1);
 
-    const probTitle = practiceQ ? `${practiceQ.id}. ${practiceQ.title}` : problemId;
-    let baseCode = practiceQ?.solution;
+    // 3. Attempt to retrieve real latest submission metadata from platform
+    if (platform === 'codeforces' && user && user.codeforcesUsername) {
+      try {
+        const handle = user.codeforcesUsername.trim();
+        const statusRes = await fetch(`https://codeforces.com/api/user.status?handle=${encodeURIComponent(handle)}&from=1&count=1000`, {
+          signal: AbortSignal.timeout(6000)
+        });
 
-    if (!baseCode) {
-      baseCode = `function solve() {\n    // Solution code for ${probTitle}\n    return true;\n}`;
+        if (statusRes.ok) {
+          const statusJson = await statusRes.json();
+          if (statusJson.status === 'OK' && Array.isArray(statusJson.result)) {
+            // Find submissions matching the problem
+            const matchingSubs = statusJson.result.filter(sub => {
+              if (sub.verdict !== 'OK' || !sub.problem) return false;
+              const subKey = `${sub.problem.contestId}${sub.problem.index}`.toLowerCase();
+              const subName = (sub.problem.name || '').toLowerCase();
+              return subKey === cleanId ||
+                     (practiceQ && subKey === String(practiceQ.slug || '').toLowerCase()) ||
+                     (practiceQ && subName === String(practiceQ.title || '').toLowerCase());
+            });
+
+            if (matchingSubs.length > 0) {
+              // Order by creation time descending to pick latest submission
+              matchingSubs.sort((a, b) => b.creationTimeSeconds - a.creationTimeSeconds);
+              const latestSub = matchingSubs[0];
+
+              // Try to retrieve actual raw source code if unauthenticated access is permitted
+              let rawCode = null;
+              try {
+                const pageRes = await fetch(`https://codeforces.com/contest/${latestSub.problem.contestId}/submission/${latestSub.id}`, {
+                  headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) CampusBridge/1.0' },
+                  signal: AbortSignal.timeout(3000)
+                });
+                if (pageRes.ok) {
+                  const html = await pageRes.text();
+                  const match = html.match(/<pre[^>]*id="program-source-text"[^>]*>([\s\S]*?)<\/pre>/i);
+                  if (match && match[1]) {
+                    rawCode = match[1]
+                      .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&')
+                      .replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&apos;/g, "'");
+                  }
+                }
+              } catch (codeErr) {
+                // Raw code scraping blocked or protected
+              }
+
+              const submissionUrl = `https://codeforces.com/contest/${latestSub.problem.contestId}/submission/${latestSub.id}`;
+
+              if (rawCode) {
+                // Save verified source code in UserSolution
+                const saved = await UserSolution.findOneAndUpdate(
+                  { user: userId, platform, problemId },
+                  { solutionCode: rawCode, language: latestSub.programmingLanguage || 'cpp', updatedAt: new Date(latestSub.creationTimeSeconds * 1000) },
+                  { new: true, upsert: true }
+                );
+                return res.status(200).json({
+                  success: true,
+                  data: {
+                    user: userId,
+                    platform,
+                    problemId,
+                    solution: rawCode,
+                    solutionCode: rawCode,
+                    language: latestSub.programmingLanguage || 'cpp',
+                    submissionId: latestSub.id,
+                    verdict: latestSub.verdict,
+                    submittedAt: new Date(latestSub.creationTimeSeconds * 1000),
+                    officialSubmissionUrl: submissionUrl,
+                    isPlatformVerified: true,
+                    sourceCodeAccessible: true,
+                    message: 'Latest verified Codeforces submission retrieved.'
+                  }
+                });
+              }
+
+              return res.status(200).json({
+                success: true,
+                data: {
+                  user: userId,
+                  platform,
+                  problemId,
+                  solution: '',
+                  solutionCode: '',
+                  language: latestSub.programmingLanguage || 'cpp',
+                  submissionId: latestSub.id,
+                  verdict: 'Accepted (OK)',
+                  submittedAt: new Date(latestSub.creationTimeSeconds * 1000),
+                  officialSubmissionUrl: submissionUrl,
+                  isPlatformVerified: true,
+                  sourceCodeAccessible: false,
+                  message: `Codeforces verifies your submission #${latestSub.id} was Accepted. Codeforces requires account login to view raw source code. Open the official submission link or import your code below.`
+                }
+              });
+            }
+          }
+        }
+      } catch (cfErr) {
+        console.warn(`Codeforces submission check: ${cfErr.message}`);
+      }
     }
 
-    const commentHeader = `// Platform: ${platform.toUpperCase()}\n// Solved by: ${username}\n// Problem: ${probTitle}\n// Status: Last Submission Code\n\n`;
-    const finalCode = commentHeader + baseCode;
+    if (platform === 'leetcode' && user && user.leetcodeUsername) {
+      try {
+        const query = {
+          query: `
+            query getRecentSubmissions($username: String!) {
+              recentSubmissionList(username: $username) {
+                id
+                title
+                titleSlug
+                statusDisplay
+                lang
+                timestamp
+              }
+            }
+          `,
+          variables: { username: user.leetcodeUsername.trim() }
+        };
 
-    // Persist verified platform submission in UserSolution
-    solution = await UserSolution.findOneAndUpdate(
-      { user: userId, platform, problemId },
-      { solutionCode: finalCode, language: detectedLang, updatedAt: Date.now() },
-      { new: true, upsert: true }
-    );
+        const lcRes = await fetch("https://leetcode.com/graphql", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) CampusBridge/1.0" },
+          body: JSON.stringify(query),
+          signal: AbortSignal.timeout(4000)
+        });
+
+        if (lcRes.ok) {
+          const lcJson = await lcRes.json();
+          const subs = lcJson?.data?.recentSubmissionList || [];
+          const targetSlug = practiceQ ? practiceQ.slug.toLowerCase().trim() : cleanId;
+
+          const matchedSub = subs.find(s => {
+            const sSlug = (s.titleSlug || '').toLowerCase().trim();
+            return sSlug === targetSlug || (practiceQ && s.title?.toLowerCase() === practiceQ.title.toLowerCase());
+          });
+
+          if (matchedSub) {
+            const submissionUrl = `https://leetcode.com/problems/${matchedSub.titleSlug}/submissions/`;
+            return res.status(200).json({
+              success: true,
+              data: {
+                user: userId,
+                platform,
+                problemId,
+                solution: '',
+                solutionCode: '',
+                language: matchedSub.lang || 'javascript',
+                submissionId: matchedSub.id || null,
+                verdict: matchedSub.statusDisplay || 'Accepted',
+                submittedAt: matchedSub.timestamp ? new Date(Number(matchedSub.timestamp) * 1000) : null,
+                officialSubmissionUrl: submissionUrl,
+                isPlatformVerified: true,
+                sourceCodeAccessible: false,
+                message: 'LeetCode verified your solution as Accepted. LeetCode does not expose student source code through public APIs without session authentication. View your submission on LeetCode or save your code below.'
+              }
+            });
+          }
+        }
+      } catch (lcErr) {
+        console.warn(`LeetCode submission check: ${lcErr.message}`);
+      }
+    }
+
+    // Default response: honest empty/import state with official challenge link
+    const officialUrl = practiceQ?.officialUrl ||
+      (platform === 'leetcode' ? `https://leetcode.com/problems/${practiceQ?.slug || cleanId}/` :
+       platform === 'codeforces' ? (practiceQ ? `https://codeforces.com/problemset/problem/${practiceQ.slug}` : 'https://codeforces.com') :
+       platform === 'codechef' ? `https://www.codechef.com/problems/${practiceQ?.slug || cleanId}` :
+       `https://www.hackerrank.com/challenges/${practiceQ?.slug || cleanId}`);
 
     res.status(200).json({
       success: true,
-      data: solution
+      data: {
+        user: userId,
+        platform,
+        problemId,
+        solution: '',
+        solutionCode: '',
+        language: 'cpp',
+        isPlatformVerified: false,
+        sourceCodeAccessible: false,
+        officialSubmissionUrl: officialUrl,
+        message: `No saved submission found in portal for this problem. Solve this challenge on ${platformTitle} or paste your verified source code below to save it.`
+      }
     });
   } catch (err) {
     next(err);
@@ -1695,8 +1709,9 @@ exports.getUserSolution = async (req, res, next) => {
 // @access  Private
 exports.saveUserSolution = async (req, res, next) => {
   try {
-    const { platform, problemId, solutionCode, language } = req.body;
-    const userId = req.user.id;
+    const { platform, problemId, language } = req.body;
+    const solutionCode = req.body.solutionCode || req.body.code || req.body.solution;
+    const userId = req.user.id || req.user._id;
 
     if (!platform || !problemId || !solutionCode) {
       return res.status(400).json({
@@ -1707,14 +1722,18 @@ exports.saveUserSolution = async (req, res, next) => {
 
     const solution = await UserSolution.findOneAndUpdate(
       { user: userId, platform, problemId },
-      { solutionCode, language, updatedAt: Date.now() },
+      { solutionCode, language: language || 'javascript', updatedAt: Date.now() },
       { new: true, upsert: true }
     );
 
     res.status(200).json({
       success: true,
       message: 'Solution saved successfully',
-      data: solution
+      data: {
+        ...solution.toObject(),
+        solution: solution.solutionCode,
+        solutionCode: solution.solutionCode
+      }
     });
   } catch (err) {
     next(err);

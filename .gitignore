@@ -44,5 +44,6 @@ VERSION
 model_capabilities.yaml
 scratch/
 test_phase*.js
+skills-lock.json
 
 

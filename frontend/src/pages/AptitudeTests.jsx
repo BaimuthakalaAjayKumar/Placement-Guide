@@ -81,7 +81,7 @@ const isCoreCseTest = (test) => {
 
 const AptitudeTests = () => {
   const { token, user, loadUser } = useAuth();
-  
+
   const queryParams = new URLSearchParams(window.location.search);
   const companyFilter = queryParams.get('company') || '';
   const initialCategory = (queryParams.get('category') || '').toLowerCase();
@@ -125,12 +125,12 @@ const AptitudeTests = () => {
   const [hackerrankSyncLoading, setHackerrankSyncLoading] = useState(false);
   const [hackerrankSyncError, setHackerrankSyncError] = useState('');
   const [editingPlatformHandle, setEditingPlatformHandle] = useState(null);
-  
+
   // LeetCode filters & search
   const [searchQuery, setSearchQuery] = useState('');
   const [difficultyFilter, setDifficultyFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
-  
+
   // Practice Stats & Rankings from Backend
   const [practiceStats, setPracticeStats] = useState(null);
   const [loadingPracticeStats, setLoadingPracticeStats] = useState(false);
@@ -146,6 +146,7 @@ const AptitudeTests = () => {
   const [solutionModalError, setSolutionModalError] = useState('');
   const [solutionModalSuccess, setSolutionModalSuccess] = useState('');
   const [copiedCodeFeedback, setCopiedCodeFeedback] = useState(false);
+  const [solutionMetadata, setSolutionMetadata] = useState(null);
 
   // Exam taking states
   const [activeTest, setActiveTest] = useState(null);
@@ -232,6 +233,7 @@ const AptitudeTests = () => {
     setSolutionModalSuccess('');
     setIsEditingSolution(false);
     setCustomSolutionCode('');
+    setSolutionMetadata(null);
     setCopiedCodeFeedback(false);
 
     // Smooth scroll to the in-tab solution viewer right in the tab space
@@ -240,7 +242,7 @@ const AptitudeTests = () => {
       if (el) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }, 60);
 
-    const problemId = platform === 'codeforces' ? problem.title : problem.slug;
+    const problemId = platform === 'codeforces' ? (problem.title || problem.slug) : (problem.slug || problem.id);
 
     try {
       const res = await fetch(`${API_URL}/users/solutions/${platform}/${encodeURIComponent(problemId)}`, {
@@ -249,27 +251,36 @@ const AptitudeTests = () => {
         }
       });
       const data = await res.json();
-      if (data.success && data.data && data.data.solutionCode) {
-        setCustomSolutionCode(data.data.solutionCode);
-        setSolutionLanguage(data.data.language || (data.data.solutionCode.includes('#include') ? 'cpp' : 'javascript'));
+      if (data.success && data.data) {
+        setSolutionMetadata({
+          submissionId: data.data.submissionId,
+          verdict: data.data.verdict || (data.data.solutionCode ? 'Accepted' : 'Not Submitted'),
+          submittedAt: data.data.submittedAt,
+          officialSubmissionUrl: data.data.officialSubmissionUrl,
+          isPlatformVerified: !!data.data.isPlatformVerified,
+          sourceCodeAccessible: !!data.data.sourceCodeAccessible,
+          message: data.data.message || ''
+        });
+
+        if (data.data.solutionCode && data.data.solutionCode.trim()) {
+          setCustomSolutionCode(data.data.solutionCode);
+          setSolutionLanguage(data.data.language || 'cpp');
+        } else {
+          setCustomSolutionCode('');
+          setSolutionLanguage(data.data.language || 'cpp');
+        }
       } else {
-        const username = platform === 'leetcode' ? user?.leetcodeUsername
-                       : platform === 'codeforces' ? user?.codeforcesUsername
-                       : platform === 'codechef' ? user?.codechefUsername
-                       : user?.hackerrankUsername;
-
-        const defaultComment = `// Platform: ${platform.toUpperCase()}
-// Solved by: ${username || 'Ajay__Kumar__'}
-// Problem: ${problem.id}. ${problem.title}
-// Status: Last Submission Code
-\n`;
-
-        setCustomSolutionCode(defaultComment + (problem.solution || '// Write or paste your verified solution here\n'));
-        setSolutionLanguage(problem.solution?.includes('#include') ? 'cpp' : 'javascript');
+        setCustomSolutionCode('');
+        setSolutionMetadata({
+          verdict: 'Not Submitted',
+          isPlatformVerified: false,
+          sourceCodeAccessible: false,
+          message: 'No submissions found on platform or saved in CampusBridge.'
+        });
       }
     } catch (err) {
-      setCustomSolutionCode(problem.solution || '// Standard solution');
-      setSolutionModalError('Could not sync latest submission from server. Showing standard solution.');
+      setCustomSolutionCode('');
+      setSolutionModalError('Could not sync latest submission from server.');
     } finally {
       setSolutionModalLoading(false);
     }
@@ -277,140 +288,6 @@ const AptitudeTests = () => {
 
   const handleLanguageChange = (newLang) => {
     setSolutionLanguage(newLang);
-    const platform = activeTab;
-    const username = platform === 'leetcode' ? (user?.leetcodeUsername || 'Ajay__Kumar__')
-                   : platform === 'codeforces' ? (user?.codeforcesUsername || 'Student')
-                   : platform === 'codechef' ? (user?.codechefUsername || 'Student')
-                   : (user?.hackerrankUsername || 'Student');
-
-    const probId = selectedProblem?.id;
-    const probTitle = selectedProblem?.title || 'Solution';
-
-    let codeBody = '';
-
-    // If problem is 14 (Longest Common Prefix) - matching Image 1 exactly
-    if (probId === 14 || (selectedProblem?.title && selectedProblem.title.toLowerCase().includes('longest common prefix'))) {
-      if (newLang === 'javascript') {
-        codeBody = `function longestCommonPrefix(strs) {
-    if (!strs.length) return "";
-    let prefix = strs[0];
-    for (let i = 1; i < strs.length; i++) {
-        while (strs[i].indexOf(prefix) !== 0) {
-            prefix = prefix.substring(0, prefix.length - 1);
-            if (!prefix) return "";
-        }
-    }
-    return prefix;
-}`;
-      } else if (newLang === 'python') {
-        codeBody = `class Solution:
-    def longestCommonPrefix(self, strs: List[str]) -> str:
-        if not strs:
-            return ""
-        prefix = strs[0]
-        for s in strs[1:]:
-            while not s.startswith(prefix):
-                prefix = prefix[:-1]
-                if not prefix:
-                    return ""
-        return prefix`;
-      } else if (newLang === 'cpp') {
-        codeBody = `#include <vector>
-#include <string>
-using namespace std;
-
-class Solution {
-public:
-    string longestCommonPrefix(vector<string>& strs) {
-        if (strs.empty()) return "";
-        string prefix = strs[0];
-        for (int i = 1; i < strs.size(); i++) {
-            while (strs[i].find(prefix) != 0) {
-                prefix = prefix.substr(0, prefix.length() - 1);
-                if (prefix.empty()) return "";
-            }
-        }
-        return prefix;
-    }
-};`;
-      } else {
-        codeBody = `class Solution {
-    public String longestCommonPrefix(String[] strs) {
-        if (strs == null || strs.length == 0) return "";
-        String prefix = strs[0];
-        for (int i = 1; i < strs.length; i++) {
-            while (strs[i].indexOf(prefix) != 0) {
-                prefix = prefix.substring(0, prefix.length() - 1);
-                if (prefix.isEmpty()) return "";
-            }
-        }
-        return prefix;
-    }
-}`;
-      }
-    } else if (probId === 1 || (selectedProblem?.title && selectedProblem.title.toLowerCase().includes('two sum'))) {
-      if (newLang === 'javascript') {
-        codeBody = `function twoSum(nums, target) {
-    const map = new Map();
-    for (let i = 0; i < nums.length; i++) {
-        const complement = target - nums[i];
-        if (map.has(complement)) {
-            return [map.get(complement), i];
-        }
-        map.set(nums[i], i);
-    }
-    return [];
-}`;
-      } else if (newLang === 'python') {
-        codeBody = `class Solution:
-    def twoSum(self, nums: List[int], target: int) -> List[int]:
-        hashmap = {}
-        for i, num in enumerate(nums):
-            diff = target - num
-            if diff in hashmap:
-                return [hashmap[diff], i]
-            hashmap[num] = i
-        return []`;
-      } else if (newLang === 'cpp') {
-        codeBody = `#include <vector>
-#include <unordered_map>
-using namespace std;
-
-class Solution {
-public:
-    vector<int> twoSum(vector<int>& nums, int target) {
-        unordered_map<int, int> map;
-        for (int i = 0; i < nums.size(); i++) {
-            int comp = target - nums[i];
-            if (map.count(comp)) return {map[comp], i};
-            map[nums[i]] = i;
-        }
-        return {};
-    }
-};`;
-      } else {
-        codeBody = `import java.util.*;
-
-class Solution {
-    public int[] twoSum(int[] nums, int target) {
-        Map<Integer, Integer> map = new HashMap<>();
-        for (int i = 0; i < nums.length; i++) {
-            int comp = target - nums[i];
-            if (map.containsKey(comp)) return new int[]{map.get(comp), i};
-            map.put(nums[i], i);
-        }
-        return new int[]{};
-    }
-}`;
-      }
-    } else {
-      const rawSol = selectedProblem?.solution || customSolutionCode;
-      const strippedSol = rawSol.replace(/\/\/ Platform:[^\n]*\n|\/\/ Solved by:[^\n]*\n|\/\/ Problem:[^\n]*\n|\/\/ Status:[^\n]*\n|\/\/ Language:[^\n]*\n/g, '').trim();
-      codeBody = strippedSol || `// Solution code in ${newLang.toUpperCase()}`;
-    }
-
-    const commentHeader = `// Platform: ${platform.toUpperCase()}\n// Solved by: ${username}\n// Problem: ${selectedProblem?.id}. ${probTitle}\n// Status: Last Submission Code\n\n`;
-    setCustomSolutionCode(commentHeader + codeBody);
   };
 
   const handleSaveSolution = async () => {
@@ -418,7 +295,7 @@ class Solution {
     setSolutionModalSaveLoading(true);
     setSolutionModalError('');
     setSolutionModalSuccess('');
-    
+
     const platform = activeTab;
     const problemId = platform === 'codeforces' ? selectedProblem.title : selectedProblem.slug;
 
@@ -440,7 +317,7 @@ class Solution {
       if (data.success) {
         setIsEditingSolution(false);
         setSolutionModalSuccess(`Submission saved successfully in ${solutionLanguage.toUpperCase()}! Marked as solved.`);
-        
+
         // Refresh practice stats and user data immediately
         await fetchStudentPracticeStats();
         if (typeof loadUser === 'function') {
@@ -460,14 +337,14 @@ class Solution {
   const renderInTabSolutionViewer = (platform) => {
     if (!showSolutionModal || !selectedProblem || activeTab !== platform) return null;
 
-    const platformBorderColor = platform === 'leetcode' ? 'rgba(255, 161, 22, 0.4)' 
-                              : platform === 'codeforces' ? 'rgba(255, 75, 75, 0.4)' 
-                              : platform === 'codechef' ? 'rgba(211, 139, 39, 0.4)' 
+    const platformBorderColor = platform === 'leetcode' ? 'rgba(255, 161, 22, 0.4)'
+                              : platform === 'codeforces' ? 'rgba(255, 75, 75, 0.4)'
+                              : platform === 'codechef' ? 'rgba(211, 139, 39, 0.4)'
                               : 'rgba(46, 200, 102, 0.4)';
 
     return (
-      <div 
-        className="glass-card in-tab-solution-panel animate-fade mb-25" 
+      <div
+        className="glass-card in-tab-solution-panel animate-fade mb-25"
         id="in-tab-solution-viewer"
         style={{
           background: '#161b24',
@@ -484,8 +361,8 @@ class Solution {
           <h3 style={{ margin: 0, fontSize: '1.4rem', fontWeight: '800', color: '#fff' }}>
             {selectedProblem.id}. {selectedProblem.title} Solution
           </h3>
-          <button 
-            type="button" 
+          <button
+            type="button"
             className="close-btn"
             style={{ background: 'none', border: 'none', color: '#94a3b8', fontSize: '1.6rem', cursor: 'pointer', padding: '4px', lineHeight: 1 }}
             onClick={() => {
@@ -514,11 +391,11 @@ class Solution {
           </div>
         )}
 
-        {/* Meta info & controls matching Image 1 */}
+        {/* Meta info & controls */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', marginBottom: '18px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <span 
-              style={{ 
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+            <span
+              style={{
                 background: selectedProblem.difficulty?.toLowerCase() === 'easy' ? 'rgba(46, 200, 102, 0.18)' : selectedProblem.difficulty?.toLowerCase() === 'medium' ? 'rgba(255, 161, 22, 0.18)' : 'rgba(255, 75, 75, 0.18)',
                 color: selectedProblem.difficulty?.toLowerCase() === 'easy' ? '#2ec866' : selectedProblem.difficulty?.toLowerCase() === 'medium' ? '#FFA116' : '#FF4B4B',
                 padding: '4px 12px',
@@ -531,18 +408,64 @@ class Solution {
             >
               {selectedProblem.difficulty}
             </span>
-            <span 
-              style={{ 
-                background: 'rgba(255,255,255,0.06)', 
-                color: 'var(--text-secondary)', 
-                padding: '4px 12px', 
-                borderRadius: '12px', 
-                fontSize: '12px',
-                border: '1px solid rgba(255,255,255,0.08)'
-              }}
-            >
-              Acceptance: {selectedProblem.acceptance || '43.1%'}
-            </span>
+            {solutionMetadata && (
+              <span
+                style={{
+                  background: solutionMetadata.verdict?.toLowerCase().includes('accept') || solutionMetadata.verdict?.toLowerCase().includes('ok') ? 'rgba(46, 200, 102, 0.18)' : 'rgba(148, 163, 184, 0.18)',
+                  color: solutionMetadata.verdict?.toLowerCase().includes('accept') || solutionMetadata.verdict?.toLowerCase().includes('ok') ? '#2ec866' : '#94a3b8',
+                  padding: '4px 12px',
+                  borderRadius: '12px',
+                  fontWeight: '700',
+                  fontSize: '11px',
+                  textTransform: 'uppercase'
+                }}
+              >
+                Verdict: {solutionMetadata.verdict}
+              </span>
+            )}
+            {solutionMetadata?.submittedAt && (
+              <span
+                style={{
+                  background: 'rgba(255,255,255,0.06)',
+                  color: 'var(--text-secondary)',
+                  padding: '4px 12px',
+                  borderRadius: '12px',
+                  fontSize: '12px',
+                  border: '1px solid rgba(255,255,255,0.08)'
+                }}
+              >
+                Submitted: {new Date(solutionMetadata.submittedAt).toLocaleDateString()}
+              </span>
+            )}
+            {solutionMetadata?.submissionId && (
+              <span
+                style={{
+                  background: 'rgba(255,255,255,0.06)',
+                  color: 'var(--text-secondary)',
+                  padding: '4px 12px',
+                  borderRadius: '12px',
+                  fontSize: '12px',
+                  border: '1px solid rgba(255,255,255,0.08)'
+                }}
+              >
+                ID: #{solutionMetadata.submissionId}
+              </span>
+            )}
+            {solutionMetadata?.officialSubmissionUrl && (
+              <a
+                href={solutionMetadata.officialSubmissionUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  color: '#38bdf8',
+                  fontSize: '12px',
+                  textDecoration: 'underline',
+                  fontWeight: '600'
+                }}
+              >
+                Official Submission Link ↗
+              </a>
+            )}
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
@@ -550,13 +473,13 @@ class Solution {
               <label style={{ fontSize: '12px', color: 'var(--text-secondary)', margin: 0, fontWeight: '500' }}>Language:</label>
               <select
                 className="form-control"
-                style={{ 
-                  width: 'auto', 
-                  padding: '5px 12px', 
-                  fontSize: '12px', 
-                  borderRadius: '8px', 
-                  background: '#212631', 
-                  color: '#fff', 
+                style={{
+                  width: 'auto',
+                  padding: '5px 12px',
+                  fontSize: '12px',
+                  borderRadius: '8px',
+                  background: '#212631',
+                  color: '#fff',
                   border: '1px solid rgba(255,255,255,0.15)',
                   cursor: 'pointer'
                 }}
@@ -572,13 +495,13 @@ class Solution {
 
             <div>
               {!solutionModalLoading && (
-                <button 
+                <button
                   type="button"
                   className="btn btn-sm"
-                  style={{ 
-                    background: 'linear-gradient(135deg, #f59e0b, #d97706)', 
-                    border: 'none', 
-                    color: '#fff', 
+                  style={{
+                    background: 'linear-gradient(135deg, #f59e0b, #d97706)',
+                    border: 'none',
+                    color: '#fff',
                     fontWeight: '600',
                     padding: '6px 14px',
                     borderRadius: '8px',
@@ -587,11 +510,11 @@ class Solution {
                   }}
                   onClick={() => setIsEditingSolution(!isEditingSolution)}
                 >
-                  {isEditingSolution ? 'Cancel Edit' : '✏️ Edit Submission'}
+                  {isEditingSolution ? 'Cancel' : (customSolutionCode ? '✏️ Edit Submission' : '✏️ Import / Enter Code')}
                 </button>
               )}
               {isEditingSolution && (
-                <button 
+                <button
                   type="button"
                   className={`btn btn-success btn-sm ${solutionModalSaveLoading ? 'loading' : ''}`}
                   style={{ marginLeft: '8px', padding: '6px 14px', borderRadius: '8px' }}
@@ -605,24 +528,41 @@ class Solution {
           </div>
         </div>
 
-        {/* Code Block Container matching Image 1 */}
+        {solutionMetadata?.message && (
+          <div style={{
+            marginBottom: '16px',
+            backgroundColor: 'rgba(56, 189, 248, 0.1)',
+            border: '1px solid rgba(56, 189, 248, 0.25)',
+            padding: '10px 14px',
+            borderRadius: '8px',
+            color: '#7dd3fc',
+            fontSize: '0.85rem',
+            lineHeight: 1.5
+          }}>
+            ℹ️ {solutionMetadata.message}
+          </div>
+        )}
+
+        {/* Code Block Container */}
         <div style={{ background: '#0c1017', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px', padding: '16px', overflow: 'hidden' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', borderBottom: '1px solid rgba(255,255,255,0.06)', paddingBottom: '10px' }}>
             <span style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-              Last Submission Code ({solutionLanguage.toUpperCase()})
+              Submission Code ({solutionLanguage.toUpperCase()})
             </span>
-            <button 
-              type="button"
-              className="btn btn-secondary btn-sm"
-              style={{ fontSize: '11px', padding: '4px 10px', borderRadius: '6px', background: 'rgba(255,255,255,0.06)' }}
-              onClick={() => {
-                navigator.clipboard.writeText(customSolutionCode);
-                setCopiedCodeFeedback(true);
-                setTimeout(() => setCopiedCodeFeedback(false), 2000);
-              }}
-            >
-              {copiedCodeFeedback ? 'Copied! ✓' : '📋 Copy Code'}
-            </button>
+            {customSolutionCode && (
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                style={{ fontSize: '11px', padding: '4px 10px', borderRadius: '6px', background: 'rgba(255,255,255,0.06)' }}
+                onClick={() => {
+                  navigator.clipboard.writeText(customSolutionCode);
+                  setCopiedCodeFeedback(true);
+                  setTimeout(() => setCopiedCodeFeedback(false), 2000);
+                }}
+              >
+                {copiedCodeFeedback ? 'Copied! ✓' : '📋 Copy Code'}
+              </button>
+            )}
           </div>
 
           {solutionModalLoading ? (
@@ -636,7 +576,7 @@ class Solution {
             <textarea
               value={customSolutionCode}
               onChange={(e) => setCustomSolutionCode(e.target.value)}
-              placeholder="Paste or write your submission code here..."
+              placeholder="Paste or write your verified solution code here..."
               spellCheck="false"
               style={{
                 width: '100%',
@@ -653,14 +593,14 @@ class Solution {
                 lineHeight: '1.5'
               }}
             />
-          ) : (
-            <pre style={{ 
-              margin: 0, 
-              maxHeight: '350px', 
-              overflowY: 'auto', 
-              fontFamily: 'Consolas, Monaco, "Courier New", monospace', 
-              fontSize: '13px', 
-              lineHeight: '1.6', 
+          ) : customSolutionCode ? (
+            <pre style={{
+              margin: 0,
+              maxHeight: '350px',
+              overflowY: 'auto',
+              fontFamily: 'Consolas, Monaco, "Courier New", monospace',
+              fontSize: '13px',
+              lineHeight: '1.6',
               color: '#38bdf8',
               background: '#080b10',
               padding: '16px',
@@ -669,6 +609,35 @@ class Solution {
             }}>
               <code>{customSolutionCode}</code>
             </pre>
+          ) : (
+            <div style={{ padding: '36px 20px', textAlign: 'center', background: '#080b10', borderRadius: '8px' }}>
+              <div style={{ fontSize: '1.8rem', marginBottom: '8px' }}>💻</div>
+              <h4 style={{ color: '#fff', margin: '0 0 8px 0', fontSize: '1rem', fontWeight: '600' }}>
+                No Stored Source Code Found
+              </h4>
+              <p style={{ color: '#94a3b8', fontSize: '13px', maxWidth: '520px', margin: '0 auto 16px', lineHeight: 1.5 }}>
+                {solutionMetadata?.message || 'Neither a local saved solution nor public unauthenticated raw code was available for this problem. You can import or paste your verified solution below.'}
+              </p>
+              <div style={{ display: 'flex', justifyContent: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                {solutionMetadata?.officialSubmissionUrl && (
+                  <a
+                    href={solutionMetadata.officialSubmissionUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="btn btn-secondary btn-sm"
+                  >
+                    View on {platform.toUpperCase()} ↗
+                  </a>
+                )}
+                <button
+                  type="button"
+                  className="btn btn-primary btn-sm"
+                  onClick={() => setIsEditingSolution(true)}
+                >
+                  ✏️ Import / Enter Code
+                </button>
+              </div>
+            </div>
           )}
         </div>
 
@@ -783,12 +752,12 @@ class Solution {
       setLoading(true);
       let endpoint = `${API_URL}/tests`;
       const queryParamsList = [];
-      
+
       const categoryFilter = queryParams.get('category');
       if (categoryFilter) queryParamsList.push(`category=${categoryFilter}`);
       if (companyFilter) queryParamsList.push(`company=${companyFilter}`);
       if (subjectFilter) queryParamsList.push(`subject=${subjectFilter}`);
-      
+
       if (queryParamsList.length > 0) {
         endpoint += `?${queryParamsList.join('&')}`;
       }
@@ -891,7 +860,7 @@ class Solution {
     try {
       setError('');
       setLoading(true);
-      
+
       const res = await fetch(`${API_URL}/tests/${testId}`, {
         headers: {
           Authorization: `Bearer ${token}`
@@ -1021,37 +990,37 @@ class Solution {
         {/* Tab Buttons */}
         {!testStarted && !examResult && (
           <div className="test-tabs-container">
-            <button 
+            <button
               className={`test-tab-button ${activeTab === 'aptitude' ? 'active' : ''}`}
               onClick={() => setActiveTab('aptitude')}
             >
               Aptitude Modules
             </button>
-            <button 
+            <button
               className={`test-tab-button ${activeTab === 'core-cse' ? 'active' : ''}`}
               onClick={() => setActiveTab('core-cse')}
             >
               Core CSE Practice
             </button>
-            <button 
+            <button
               className={`test-tab-button ${activeTab === 'leetcode' ? 'active' : ''}`}
               onClick={() => setActiveTab('leetcode')}
             >
               LeetCode Practice
             </button>
-            <button 
+            <button
               className={`test-tab-button ${activeTab === 'codeforces' ? 'active' : ''}`}
               onClick={() => setActiveTab('codeforces')}
             >
               Codeforces Practice
             </button>
-            <button 
+            <button
               className={`test-tab-button ${activeTab === 'codechef' ? 'active' : ''}`}
               onClick={() => setActiveTab('codechef')}
             >
               CodeChef Practice
             </button>
-            <button 
+            <button
               className={`test-tab-button ${activeTab === 'hackerrank' ? 'active' : ''}`}
               onClick={() => setActiveTab('hackerrank')}
             >
@@ -1295,8 +1264,8 @@ class Solution {
                         ✏️ Edit Handle
                       </button>
                     )}
-                    <button 
-                      type="button" 
+                    <button
+                      type="button"
                       className={`btn btn-primary ${leetcodeSyncLoading ? 'loading' : ''}`}
                       onClick={() => handleSyncLeetcode()}
                       disabled={leetcodeSyncLoading}
@@ -1309,10 +1278,10 @@ class Solution {
                 <div className="leetcode-dashboard-stats-grid">
                   {/* Admin Solved Circle Progress */}
                   <div className="leetcode-stat-circle-box">
-                    <div 
-                      className="leetcode-circle-progress" 
-                      style={{ 
-                        '--leetcode-pct': Math.min(100, Math.round(((practiceStats?.leetcode?.solvedCount || 0) / (practiceStats?.leetcode?.totalCount || leetcodeProblems.length || 1)) * 100)) 
+                    <div
+                      className="leetcode-circle-progress"
+                      style={{
+                        '--leetcode-pct': Math.min(100, Math.round(((practiceStats?.leetcode?.solvedCount || 0) / (practiceStats?.leetcode?.totalCount || leetcodeProblems.length || 1)) * 100))
                       }}
                     >
                       <span className="count">
@@ -1381,20 +1350,20 @@ class Solution {
                       {practiceStats?.leetcode?.solvedCount || 0}/{practiceStats?.leetcode?.totalCount || leetcodeProblems.length} Solved
                     </span>
                   </div>
-                  
+
                   <div className="leetcode-controls-row">
                     <div className="search-box-wrapper">
-                      <input 
-                        type="text" 
+                      <input
+                        type="text"
                         placeholder="Search problems by name or id..."
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                         className="form-control"
                       />
                     </div>
-                    
+
                     <div className="dropdowns-group">
-                      <select 
+                      <select
                         className="form-control"
                         value={difficultyFilter}
                         onChange={(e) => setDifficultyFilter(e.target.value)}
@@ -1405,7 +1374,7 @@ class Solution {
                         <option value="hard">Hard</option>
                       </select>
 
-                      <select 
+                      <select
                         className="form-control"
                         value={statusFilter}
                         onChange={(e) => setStatusFilter(e.target.value)}
@@ -1433,7 +1402,7 @@ class Solution {
                     <tbody>
                       {(() => {
                         const solvedIdsSet = getPlatformSolvedIds('leetcode', user, practiceStats, leetcodeProblems);
-                        
+
                         // Order problems Easy first, Medium, then Hard
                         const sortedProblems = [...leetcodeProblems].sort((a, b) => {
                           const difficultyOrder = { 'Easy': 1, 'Medium': 2, 'Hard': 3 };
@@ -1445,20 +1414,20 @@ class Solution {
 
                         const filtered = sortedProblems.filter(problem => {
                           const isSolved = solvedIdsSet.has(problem.id);
-                          
+
                           // Search match
-                          const matchQuery = problem.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                          const matchQuery = problem.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
                                              problem.id.toString().includes(searchQuery);
-                          
+
                           // Difficulty match
-                          const matchDiff = difficultyFilter === 'all' || 
+                          const matchDiff = difficultyFilter === 'all' ||
                                             problem.difficulty.toLowerCase() === difficultyFilter.toLowerCase();
-                          
+
                           // Status match
-                          const matchStatus = statusFilter === 'all' || 
-                                              (statusFilter === 'solved' && isSolved) || 
+                          const matchStatus = statusFilter === 'all' ||
+                                              (statusFilter === 'solved' && isSolved) ||
                                               (statusFilter === 'unsolved' && !isSolved);
-                          
+
                           return matchQuery && matchDiff && matchStatus;
                         });
 
@@ -1491,7 +1460,7 @@ class Solution {
                               <td className="acceptance-cell">{problem.acceptance}</td>
                               <td style={{ textAlign: 'right' }}>
                                 <div className="action-buttons-cell">
-                                  <button 
+                                  <button
                                     className={`btn btn-sm ${isSolved ? 'btn-secondary' : 'btn-outline'}`}
                                     style={{ marginRight: '8px', fontSize: '12px' }}
                                     onClick={() => handleOpenSolutionModal(problem, 'leetcode')}
@@ -1499,10 +1468,10 @@ class Solution {
                                   >
                                     {isSolved ? 'View Solution' : 'Submit Solution'}
                                   </button>
-                                  <a 
-                                    href={`https://leetcode.com/problems/${problem.slug}/`} 
-                                    target="_blank" 
-                                    rel="noopener noreferrer" 
+                                  <a
+                                    href={`https://leetcode.com/problems/${problem.slug}/`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
                                     className="btn btn-primary btn-sm external-practice-btn"
                                   >
                                     Practice ↗
@@ -1581,8 +1550,8 @@ class Solution {
                         ✏️ Edit Handle
                       </button>
                     )}
-                    <button 
-                      type="button" 
+                    <button
+                      type="button"
                       className={`btn btn-primary ${codeforcesSyncLoading ? 'loading' : ''}`}
                       onClick={() => handleSyncCodeforces()}
                       disabled={codeforcesSyncLoading}
@@ -1595,11 +1564,11 @@ class Solution {
 
                 <div className="leetcode-dashboard-stats-grid">
                   <div className="leetcode-stat-circle-boxCF">
-                    <div 
-                      className="leetcode-circle-progress" 
-                      style={{ 
-                        '--leetcode-pct': Math.min(100, Math.round(((practiceStats?.codeforces?.solvedCount || 0) / (practiceStats?.codeforces?.totalCount || codeforcesProblems.length || 1)) * 100)), 
-                        borderColor: '#ff4b4b' 
+                    <div
+                      className="leetcode-circle-progress"
+                      style={{
+                        '--leetcode-pct': Math.min(100, Math.round(((practiceStats?.codeforces?.solvedCount || 0) / (practiceStats?.codeforces?.totalCount || codeforcesProblems.length || 1)) * 100)),
+                        borderColor: '#ff4b4b'
                       }}
                     >
                       <span className="count">
@@ -1665,20 +1634,20 @@ class Solution {
                       {practiceStats?.codeforces?.solvedCount || 0}/{practiceStats?.codeforces?.totalCount || codeforcesProblems.length} Solved
                     </span>
                   </div>
-                  
+
                   <div className="leetcode-controls-row">
                     <div className="search-box-wrapper">
-                      <input 
-                        type="text" 
+                      <input
+                        type="text"
                         placeholder="Search problems by name or id..."
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                         className="form-control"
                       />
                     </div>
-                    
+
                     <div className="dropdowns-group">
-                      <select 
+                      <select
                         className="form-control"
                         value={difficultyFilter}
                         onChange={(e) => setDifficultyFilter(e.target.value)}
@@ -1689,7 +1658,7 @@ class Solution {
                         <option value="hard">Hard</option>
                       </select>
 
-                      <select 
+                      <select
                         className="form-control"
                         value={statusFilter}
                         onChange={(e) => setStatusFilter(e.target.value)}
@@ -1717,7 +1686,7 @@ class Solution {
                     <tbody>
                       {(() => {
                         const solvedIdsSet = getPlatformSolvedIds('codeforces', user, practiceStats, codeforcesProblems);
-                        
+
                         // Order problems Easy first, Medium, then Hard
                         const sortedProblems = [...codeforcesProblems].sort((a, b) => {
                           const difficultyOrder = { 'Easy': 1, 'Medium': 2, 'Hard': 3 };
@@ -1729,20 +1698,20 @@ class Solution {
 
                         const filtered = sortedProblems.filter(problem => {
                           const isSolved = solvedIdsSet.has(problem.id);
-                          
+
                           // Search match
-                          const matchQuery = problem.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                          const matchQuery = problem.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
                                              problem.id.toString().includes(searchQuery);
-                          
+
                           // Difficulty match
-                          const matchDiff = difficultyFilter === 'all' || 
+                          const matchDiff = difficultyFilter === 'all' ||
                                             problem.difficulty.toLowerCase() === difficultyFilter.toLowerCase();
-                          
+
                           // Status match
-                          const matchStatus = statusFilter === 'all' || 
-                                              (statusFilter === 'solved' && isSolved) || 
+                          const matchStatus = statusFilter === 'all' ||
+                                              (statusFilter === 'solved' && isSolved) ||
                                               (statusFilter === 'unsolved' && !isSolved);
-                          
+
                           return matchQuery && matchDiff && matchStatus;
                         });
 
@@ -1779,7 +1748,7 @@ class Solution {
                               <td className="acceptance-cell">{problem.acceptance}</td>
                               <td style={{ textAlign: 'right' }}>
                                 <div className="action-buttons-cell">
-                                  <button 
+                                  <button
                                     className={`btn btn-sm ${isSolved ? 'btn-secondary' : 'btn-outline'}`}
                                     style={{ marginRight: '8px', fontSize: '12px' }}
                                     onClick={() => handleOpenSolutionModal(problem, 'codeforces')}
@@ -1787,10 +1756,10 @@ class Solution {
                                   >
                                     {isSolved ? 'View Solution' : 'Submit Solution'}
                                   </button>
-                                  <a 
-                                    href={codeforcesUrl} 
-                                    target="_blank" 
-                                    rel="noopener noreferrer" 
+                                  <a
+                                    href={codeforcesUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
                                     className="btn btn-primary btn-sm external-practice-btn"
                                     style={{ backgroundColor: '#ff4b4b', borderColor: '#ff4b4b' }}
                                   >
@@ -1869,8 +1838,8 @@ class Solution {
                         ✏️ Edit Handle
                       </button>
                     )}
-                    <button 
-                      type="button" 
+                    <button
+                      type="button"
                       className={`btn btn-primary ${codechefSyncLoading ? 'loading' : ''}`}
                       onClick={() => handleSyncCodechef()}
                       disabled={codechefSyncLoading}
@@ -1883,11 +1852,11 @@ class Solution {
 
                 <div className="leetcode-dashboard-stats-grid">
                   <div className="leetcode-stat-circle-boxCC">
-                    <div 
-                      className="leetcode-circle-progress" 
-                      style={{ 
-                        '--leetcode-pct': Math.min(100, Math.round(((practiceStats?.codechef?.solvedCount || 0) / (practiceStats?.codechef?.totalCount || codechefProblems.length || 1)) * 100)), 
-                        borderColor: '#d38b27' 
+                    <div
+                      className="leetcode-circle-progress"
+                      style={{
+                        '--leetcode-pct': Math.min(100, Math.round(((practiceStats?.codechef?.solvedCount || 0) / (practiceStats?.codechef?.totalCount || codechefProblems.length || 1)) * 100)),
+                        borderColor: '#d38b27'
                       }}
                     >
                       <span className="count">
@@ -1947,20 +1916,20 @@ class Solution {
                       {practiceStats?.codechef?.solvedCount || 0}/{practiceStats?.codechef?.totalCount || codechefProblems.length} Solved
                     </span>
                   </div>
-                  
+
                   <div className="leetcode-controls-row">
                     <div className="search-box-wrapper">
-                      <input 
-                        type="text" 
+                      <input
+                        type="text"
                         placeholder="Search problems by name or id..."
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                         className="form-control"
                       />
                     </div>
-                    
+
                     <div className="dropdowns-group">
-                      <select 
+                      <select
                         className="form-control"
                         value={difficultyFilter}
                         onChange={(e) => setDifficultyFilter(e.target.value)}
@@ -1971,7 +1940,7 @@ class Solution {
                         <option value="hard">Hard</option>
                       </select>
 
-                      <select 
+                      <select
                         className="form-control"
                         value={statusFilter}
                         onChange={(e) => setStatusFilter(e.target.value)}
@@ -1999,7 +1968,7 @@ class Solution {
                     <tbody>
                       {(() => {
                         const solvedIdsSet = getPlatformSolvedIds('codechef', user, practiceStats, codechefProblems);
-                        
+
                         // Order problems Easy first, Medium, then Hard
                         const sortedProblems = [...codechefProblems].sort((a, b) => {
                           const difficultyOrder = { 'Easy': 1, 'Medium': 2, 'Hard': 3 };
@@ -2011,20 +1980,20 @@ class Solution {
 
                         const filtered = sortedProblems.filter(problem => {
                           const isSolved = solvedIdsSet.has(problem.id);
-                          
+
                           // Search match
-                          const matchQuery = problem.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                          const matchQuery = problem.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
                                              problem.id.toString().includes(searchQuery);
-                          
+
                           // Difficulty match
-                          const matchDiff = difficultyFilter === 'all' || 
+                          const matchDiff = difficultyFilter === 'all' ||
                                             problem.difficulty.toLowerCase() === difficultyFilter.toLowerCase();
-                          
+
                           // Status match
-                          const matchStatus = statusFilter === 'all' || 
-                                              (statusFilter === 'solved' && isSolved) || 
+                          const matchStatus = statusFilter === 'all' ||
+                                              (statusFilter === 'solved' && isSolved) ||
                                               (statusFilter === 'unsolved' && !isSolved);
-                          
+
                           return matchQuery && matchDiff && matchStatus;
                         });
 
@@ -2057,7 +2026,7 @@ class Solution {
                               <td className="acceptance-cell">{problem.acceptance}</td>
                               <td style={{ textAlign: 'right' }}>
                                 <div className="action-buttons-cell">
-                                  <button 
+                                  <button
                                     className={`btn btn-sm ${isSolved ? 'btn-secondary' : 'btn-outline'}`}
                                     style={{ marginRight: '8px', fontSize: '12px' }}
                                     onClick={() => handleOpenSolutionModal(problem, 'codechef')}
@@ -2065,10 +2034,10 @@ class Solution {
                                   >
                                     {isSolved ? 'View Solution' : 'Submit Solution'}
                                   </button>
-                                  <a 
-                                    href={`https://www.codechef.com/problems/${problem.slug?.toUpperCase()}`} 
-                                    target="_blank" 
-                                    rel="noopener noreferrer" 
+                                  <a
+                                    href={`https://www.codechef.com/problems/${problem.slug?.toUpperCase()}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
                                     className="btn btn-primary btn-sm external-practice-btn"
                                     style={{ backgroundColor: '#d38b27', borderColor: '#d38b27' }}
                                   >
@@ -2147,8 +2116,8 @@ class Solution {
                         ✏️ Edit Handle
                       </button>
                     )}
-                    <button 
-                      type="button" 
+                    <button
+                      type="button"
                       className={`btn btn-primary ${hackerrankSyncLoading ? 'loading' : ''}`}
                       onClick={() => handleSyncHackerrank()}
                       disabled={hackerrankSyncLoading}
@@ -2161,11 +2130,11 @@ class Solution {
 
                 <div className="leetcode-dashboard-stats-grid">
                   <div className="leetcode-stat-circle-boxHR">
-                    <div 
-                      className="leetcode-circle-progress" 
-                      style={{ 
-                        '--leetcode-pct': Math.min(100, Math.round(((practiceStats?.hackerrank?.solvedCount || 0) / (practiceStats?.hackerrank?.totalCount || hackerrankProblems.length || 1)) * 100)), 
-                        borderColor: '#2ec866' 
+                    <div
+                      className="leetcode-circle-progress"
+                      style={{
+                        '--leetcode-pct': Math.min(100, Math.round(((practiceStats?.hackerrank?.solvedCount || 0) / (practiceStats?.hackerrank?.totalCount || hackerrankProblems.length || 1)) * 100)),
+                        borderColor: '#2ec866'
                       }}
                     >
                       <span className="count">
@@ -2217,20 +2186,20 @@ class Solution {
                       {practiceStats?.hackerrank?.solvedCount || 0}/{practiceStats?.hackerrank?.totalCount || hackerrankProblems.length} Solved
                     </span>
                   </div>
-                  
+
                   <div className="leetcode-controls-row">
                     <div className="search-box-wrapper">
-                      <input 
-                        type="text" 
+                      <input
+                        type="text"
                         placeholder="Search problems by name or id..."
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                         className="form-control"
                       />
                     </div>
-                    
+
                     <div className="dropdowns-group">
-                      <select 
+                      <select
                         className="form-control"
                         value={difficultyFilter}
                         onChange={(e) => setDifficultyFilter(e.target.value)}
@@ -2241,7 +2210,7 @@ class Solution {
                         <option value="hard">Hard</option>
                       </select>
 
-                      <select 
+                      <select
                         className="form-control"
                         value={statusFilter}
                         onChange={(e) => setStatusFilter(e.target.value)}
@@ -2269,7 +2238,7 @@ class Solution {
                     <tbody>
                       {(() => {
                         const solvedIdsSet = getPlatformSolvedIds('hackerrank', user, practiceStats, hackerrankProblems);
-                        
+
                         // Order problems Easy first, Medium, then Hard
                         const sortedProblems = [...hackerrankProblems].sort((a, b) => {
                           const difficultyOrder = { 'Easy': 1, 'Medium': 2, 'Hard': 3 };
@@ -2281,20 +2250,20 @@ class Solution {
 
                         const filtered = sortedProblems.filter(problem => {
                           const isSolved = solvedIdsSet.has(problem.id);
-                          
+
                           // Search match
-                          const matchQuery = problem.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                          const matchQuery = problem.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
                                              problem.id.toString().includes(searchQuery);
-                          
+
                           // Difficulty match
-                          const matchDiff = difficultyFilter === 'all' || 
+                          const matchDiff = difficultyFilter === 'all' ||
                                             problem.difficulty.toLowerCase() === difficultyFilter.toLowerCase();
-                          
+
                           // Status match
-                          const matchStatus = statusFilter === 'all' || 
-                                              (statusFilter === 'solved' && isSolved) || 
+                          const matchStatus = statusFilter === 'all' ||
+                                              (statusFilter === 'solved' && isSolved) ||
                                               (statusFilter === 'unsolved' && !isSolved);
-                          
+
                           return matchQuery && matchDiff && matchStatus;
                         });
 
@@ -2327,7 +2296,7 @@ class Solution {
                               <td className="acceptance-cell">{problem.acceptance}</td>
                               <td style={{ textAlign: 'right' }}>
                                 <div className="action-buttons-cell">
-                                  <button 
+                                  <button
                                     className={`btn btn-sm ${isSolved ? 'btn-secondary' : 'btn-outline'}`}
                                     style={{ marginRight: '8px', fontSize: '12px' }}
                                     onClick={() => handleOpenSolutionModal(problem, 'hackerrank')}
@@ -2335,10 +2304,10 @@ class Solution {
                                   >
                                     {isSolved ? 'View Solution' : 'Submit Solution'}
                                   </button>
-                                  <a 
-                                    href={`https://www.hackerrank.com/challenges/${problem.slug}/problem`} 
-                                    target="_blank" 
-                                    rel="noopener noreferrer" 
+                                  <a
+                                    href={`https://www.hackerrank.com/challenges/${problem.slug}/problem`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
                                     className="btn btn-primary btn-sm external-practice-btn"
                                     style={{ backgroundColor: '#2ec866', borderColor: '#2ec866' }}
                                   >
@@ -2425,10 +2394,10 @@ class Solution {
 
                 {activeTest.questions[currentQuestionIndex].questionImage && (
                   <div className="question-image-wrapper" style={{ margin: '15px 0', textAlign: 'center' }}>
-                    <img 
-                      src={getImageUrl(activeTest.questions[currentQuestionIndex].questionImage)} 
-                      alt="Question Visual" 
-                      style={{ maxWidth: '100%', maxHeight: '300px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)' }} 
+                    <img
+                      src={getImageUrl(activeTest.questions[currentQuestionIndex].questionImage)}
+                      alt="Question Visual"
+                      style={{ maxWidth: '100%', maxHeight: '300px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)' }}
                     />
                   </div>
                 )}
@@ -2505,7 +2474,7 @@ class Solution {
                 <div className="score-analytics-summary">
                   <h2>{examResult.percentage}% Correct</h2>
                   <p>You answered <strong>{examResult.score}</strong> questions correctly out of a total <strong>{examResult.totalQuestions}</strong>.</p>
-                  
+
                   <div className="results-feedback-level" data-passed={examResult.percentage >= 60 ? 'pass' : 'fail'}>
                     {examResult.percentage >= 80 ? 'Excellent Score! High aptitude mastery.' : examResult.percentage >= 60 ? 'Passed. Good general competency.' : 'Score below target. Retake to improve score.'}
                   </div>
@@ -2517,7 +2486,7 @@ class Solution {
             </div>
 
             <h3 className="breakdown-headline">Detailed Question Breakdown</h3>
-            
+
             <div className="questions-breakdown-list">
               {examResult.breakdown.map((q, idx) => (
                 <div className={`glass-card result-question-item ${q.isCorrect ? 'correct' : 'incorrect'}`} key={idx}>
@@ -2532,10 +2501,10 @@ class Solution {
 
                   {q.questionImage && (
                     <div className="question-image-wrapper" style={{ margin: '12px 0' }}>
-                      <img 
-                        src={getImageUrl(q.questionImage)} 
-                        alt="Question Visual" 
-                        style={{ maxWidth: '100%', maxHeight: '250px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.08)' }} 
+                      <img
+                        src={getImageUrl(q.questionImage)}
+                        alt="Question Visual"
+                        style={{ maxWidth: '100%', maxHeight: '250px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.08)' }}
                       />
                     </div>
                   )}
@@ -2545,7 +2514,7 @@ class Solution {
                       const isCorrectAnswer = oIdx === q.correctAnswer;
                       const isChosenAnswer = oIdx === q.userAnswer;
                       const optImg = q.optionImages?.[oIdx];
-                      
+
                       let optionState = '';
                       if (isCorrectAnswer) optionState = 'correct-option';
                       else if (isChosenAnswer && !q.isCorrect) optionState = 'chosen-wrong-option';
@@ -2576,10 +2545,10 @@ class Solution {
                       {q.explanation && <p>{q.explanation}</p>}
                       {q.explanationImage && (
                         <div className="explanation-image-wrapper" style={{ marginTop: '10px' }}>
-                          <img 
-                            src={getImageUrl(q.explanationImage)} 
-                            alt="Explanation Visual" 
-                            style={{ maxWidth: '100%', maxHeight: '220px', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.08)' }} 
+                          <img
+                            src={getImageUrl(q.explanationImage)}
+                            alt="Explanation Visual"
+                            style={{ maxWidth: '100%', maxHeight: '220px', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.08)' }}
                           />
                         </div>
                       )}

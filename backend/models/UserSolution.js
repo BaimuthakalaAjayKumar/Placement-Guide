@@ -16,8 +16,13 @@ const UserSolutionSchema = new mongoose.Schema({
     required: true
   },
   solutionCode: {
-    type: String,
-    required: true
+    type: String
+  },
+  code: {
+    type: String
+  },
+  solution: {
+    type: String
   },
   language: {
     type: String,
@@ -28,6 +33,21 @@ const UserSolutionSchema = new mongoose.Schema({
     default: Date.now
   }
 });
+
+UserSolutionSchema.pre('validate', function(next) {
+  const codeVal = this.solutionCode || this.code || this.solution;
+  if (codeVal) {
+    this.solutionCode = codeVal;
+  }
+  if (!this.solutionCode) {
+    this.invalidate('solutionCode', 'Path `solutionCode` is required.');
+  }
+  next();
+});
+
+UserSolutionSchema.virtual('solutionText')
+  .get(function() { return this.solutionCode; })
+  .set(function(val) { this.solutionCode = val; });
 
 // Enforce single solution per user/platform/problem
 UserSolutionSchema.index({ user: 1, platform: 1, problemId: 1 }, { unique: true });

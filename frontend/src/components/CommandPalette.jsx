@@ -82,14 +82,18 @@ const CommandPalette = () => {
               window.dispatchEvent(new CustomEvent('open_naac_modal'));
             }
           },
-          {
-            id: 'placement-drives-mgr',
-            title: 'Placement Drives & Job Postings',
-            desc: 'Manage campus recruitments, slots, and eligibility criteria',
-            category: '🏛️ Institutional Leadership',
-            icon: '💼',
-            action: () => navigate('/job-opportunities')
-          },
+          ...(!isSuperAdmin
+            ? [
+                {
+                  id: 'placement-drives-mgr',
+                  title: 'Placement Drives & Job Postings',
+                  desc: 'Manage campus recruitments, slots, and eligibility criteria',
+                  category: '🏛️ Institutional Leadership',
+                  icon: '💼',
+                  action: () => navigate('/job-opportunities')
+                }
+              ]
+            : []),
           {
             id: 'faculty-staff',
             title: 'Faculty & Coordinator Directory',
@@ -153,14 +157,18 @@ const CommandPalette = () => {
             icon: '📝',
             action: () => navigate('/faculty')
           },
-          {
-            id: 'question-bank',
-            title: 'Question Bank & Company Blueprints',
-            desc: 'Curate coding challenges, MCQ tests, and company interview sets',
-            category: '👨‍🏫 Faculty Workbench',
-            icon: '📚',
-            action: () => navigate('/question-bank')
-          },
+          ...(!isSuperAdmin
+            ? [
+                {
+                  id: 'question-bank',
+                  title: 'Question Bank & Company Blueprints',
+                  desc: 'Curate coding challenges, MCQ tests, and company interview sets',
+                  category: '👨‍🏫 Faculty Workbench',
+                  icon: '📚',
+                  action: () => navigate('/question-bank')
+                }
+              ]
+            : []),
           {
             id: 'project-studio',
             title: 'ProjectStudio & Capstone Viva Panel',
@@ -177,14 +185,18 @@ const CommandPalette = () => {
             icon: '⚖️',
             action: () => navigate('/plagiarism-audit')
           },
-          {
-            id: 'smart-attendance',
-            title: 'Live Session QR Attendance Generator',
-            desc: 'Launch real-time dynamic QR for classroom & lab check-in',
-            category: '👨‍🏫 Faculty Workbench',
-            icon: '📱',
-            action: () => navigate('/faculty/attendance')
-          }
+          ...(!isSuperAdmin
+            ? [
+                {
+                  id: 'smart-attendance',
+                  title: 'Live Session QR Attendance Generator',
+                  desc: 'Launch real-time dynamic QR for classroom & lab check-in',
+                  category: '👨‍🏫 Faculty Workbench',
+                  icon: '📱',
+                  action: () => navigate('/faculty/attendance')
+                }
+              ]
+            : [])
         ]
       : []),
 
@@ -199,14 +211,18 @@ const CommandPalette = () => {
             icon: '🎯',
             action: () => navigate('/dashboard')
           },
-          {
-            id: 'job-board',
-            title: 'Placement Drives & Company Pipeline',
-            desc: 'Explore visiting companies, eligibility check, and application status',
-            category: '🚀 Student Hub',
-            icon: '🏢',
-            action: () => navigate('/job-opportunities')
-          },
+          ...(!isSuperAdmin
+            ? [
+                {
+                  id: 'job-board',
+                  title: 'Placement Drives & Company Pipeline',
+                  desc: 'Explore visiting companies, eligibility check, and application status',
+                  category: '🚀 Student Hub',
+                  icon: '🏢',
+                  action: () => navigate('/job-opportunities')
+                }
+              ]
+            : []),
           {
             id: 'student-kanban-pipeline',
             title: 'My Drive Application Pipeline (Kanban)',
@@ -276,14 +292,18 @@ const CommandPalette = () => {
           }
         ]
       : []),
-    {
-      id: 'discussion-forum',
-      title: 'Placement Discussion Forum & Senior Debriefs',
-      desc: 'Peer problem solving and interview question experiences',
-      category: '📅 University Schedule',
-      icon: '💬',
-      action: () => navigate('/discussion-forum')
-    },
+    ...(!isSuperAdmin
+      ? [
+          {
+            id: 'discussion-forum',
+            title: 'Placement Discussion Forum & Senior Debriefs',
+            desc: 'Peer problem solving and interview question experiences',
+            category: '📅 University Schedule',
+            icon: '💬',
+            action: () => navigate('/discussion-forum')
+          }
+        ]
+      : []),
     {
       id: 'user-profile',
       title: 'User Profile & Academic Credentials',

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import { API_URL } from '../config/api';
+import Header from '../components/Header';
 import './FacultyAttendanceHistory.css';
 
 const FacultyAttendanceHistory = () => {
@@ -162,7 +163,10 @@ const FacultyAttendanceHistory = () => {
   };
 
   return (
-    <div className="faculty-history-container">
+    <>
+      <Header title="Attendance Session History — Faculty Audit" />
+      <div className="content-wrapper faculty-history-content-wrapper animate-fade">
+        <div className="faculty-history-container">
       {/* Header */}
       <header className="history-header">
         <div>
@@ -199,6 +203,7 @@ const FacultyAttendanceHistory = () => {
           <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
             <option value="">All Statuses</option>
             <option value="ACTIVE">ACTIVE</option>
+            <option value="SUBMITTED">SUBMITTED (RECTIFYING)</option>
             <option value="FINALIZED">FINALIZED</option>
             <option value="LOCKED">LOCKED</option>
             <option value="CANCELLED">CANCELLED</option>
@@ -602,7 +607,9 @@ const FacultyAttendanceHistory = () => {
           </div>
         </div>
       )}
-    </div>
+        </div>
+      </div>
+    </>
   );
 };
 

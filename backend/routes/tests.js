@@ -15,13 +15,18 @@ const {
   uploadQuestionImage,
   uploadImage,
   getPracticeQuestions,
+  getPlatformQuotaStatus,
+  getAllPlatformsQuotaStatus,
   addPracticeQuestion,
   deletePracticeQuestion,
+  editPracticeQuestion,
+  archivePracticeQuestion,
+  unarchivePracticeQuestion,
+  bulkCreatePracticeQuestions,
+  syncPlatformPractice,
   getPracticeReport,
   getStudentPracticeStats,
-  getIndividualPracticeReport,
-  editPracticeQuestion,
-  bulkCreatePracticeQuestions
+  getIndividualPracticeReport
 } = require('../controllers/tests');
 
 const router = express.Router();
@@ -35,9 +40,12 @@ router.get('/attempts/history', getAttemptsHistory);
 router.get('/:id', getTestById);
 router.post('/:id/submit', submitTestAttempt);
 
-// Practice questions & student stats route for students & admins
+// Practice questions & student stats route for students & placement officers
 router.get('/practice-stats/me', getStudentPracticeStats);
+router.get('/practice-questions/summary/quota', getAllPlatformsQuotaStatus);
 router.get('/practice-questions/:platform', getPracticeQuestions);
+router.get('/practice-questions/:platform/quota-status', getPlatformQuotaStatus);
+router.post('/practice-sync/:platform', syncPlatformPractice);
 
 // Subject Test Reports (Admin, Faculty, HOD, Director & Principal)
 router.get('/subject/:subjectId/reports', authorize('admin', 'faculty', 'hod', 'director', 'principal'), getSubjectTestReports);
@@ -54,12 +62,16 @@ router.delete('/:id/questions/:qId', authorize('admin', 'faculty', 'hod'), delet
 // Image Upload
 router.post('/upload-image', authorize('admin', 'faculty', 'hod'), uploadQuestionImage, uploadImage);
 
-// Practice Platform Coordinator & Reports (Admin, Faculty & HOD)
-router.post('/practice-questions/:platform', authorize('admin', 'hod'), addPracticeQuestion);
-router.delete('/practice-questions/:platform/:id', authorize('admin', 'hod'), deletePracticeQuestion);
-router.put('/practice-questions/:platform/:id', authorize('admin', 'hod'), editPracticeQuestion);
-router.post('/practice-questions/:platform/bulk', authorize('admin', 'hod'), bulkCreatePracticeQuestions);
-router.get('/practice-reports/student/:studentId', authorize('admin', 'faculty', 'hod', 'director', 'principal', 'auditor'), getIndividualPracticeReport);
-router.get('/practice-reports/:platform', authorize('admin', 'faculty', 'hod', 'director', 'principal', 'auditor'), getPracticeReport);
+// Practice Platform Question Bank Management (Strictly Placement Officer & Admin)
+router.post('/practice-questions/:platform', authorize('placement_officer', 'admin'), addPracticeQuestion);
+router.delete('/practice-questions/:platform/:id', authorize('placement_officer', 'admin'), deletePracticeQuestion);
+router.put('/practice-questions/:platform/:id', authorize('placement_officer', 'admin'), editPracticeQuestion);
+router.put('/practice-questions/:platform/:id/archive', authorize('placement_officer', 'admin'), archivePracticeQuestion);
+router.put('/practice-questions/:platform/:id/unarchive', authorize('placement_officer', 'admin'), unarchivePracticeQuestion);
+router.post('/practice-questions/:platform/bulk', authorize('placement_officer', 'admin'), bulkCreatePracticeQuestions);
+
+// Aggregate Progress Reports (Placement Officer, Admin, Faculty, Leadership & Auditors)
+router.get('/practice-reports/student/:studentId', authorize('placement_officer', 'admin', 'faculty', 'hod', 'director', 'principal', 'auditor'), getIndividualPracticeReport);
+router.get('/practice-reports/:platform', authorize('placement_officer', 'admin', 'faculty', 'hod', 'director', 'principal', 'auditor'), getPracticeReport);
 
 module.exports = router;

@@ -1,0 +1,299 @@
+.library-container {
+  padding: 1.5rem;
+  background: var(--bg-card, #111827);
+  border-radius: 12px;
+  color: var(--text-main, #f3f4f6);
+}
+
+.library-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 1.5rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--border-color, #1f2937);
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.library-header h2 {
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: #fff;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.library-sub {
+  color: #9ca3af;
+  font-size: 0.9rem;
+  margin-top: 0.3rem;
+}
+
+.lib-header-actions {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.btn-lib-primary {
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  color: #fff;
+  border: none;
+  padding: 0.65rem 1.25rem;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  transition: transform 0.15s, opacity 0.15s;
+}
+
+.btn-lib-primary:hover {
+  transform: translateY(-1px);
+  opacity: 0.95;
+}
+
+.btn-lib-secondary {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #cbd5e1;
+  padding: 0.65rem 1.2rem;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-lib-secondary:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+
+/* KPI Grid */
+.lib-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.lib-kpi-card {
+  display: flex;
+  align-items: center;
+  background: #1f2937;
+  border: 1px solid #374151;
+  border-radius: 10px;
+  padding: 1.2rem;
+  gap: 0.9rem;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2);
+}
+
+.lib-kpi-icon {
+  font-size: 1.8rem;
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  background: rgba(99, 102, 241, 0.15);
+}
+
+.lib-kpi-card.purple .lib-kpi-icon { background: rgba(168, 85, 247, 0.15); }
+.lib-kpi-card.blue .lib-kpi-icon { background: rgba(59, 130, 246, 0.15); }
+.lib-kpi-card.amber .lib-kpi-icon { background: rgba(245, 158, 11, 0.15); }
+.lib-kpi-card.red .lib-kpi-icon { background: rgba(239, 68, 68, 0.15); }
+.lib-kpi-card.green .lib-kpi-icon { background: rgba(16, 185, 129, 0.15); }
+
+.lib-kpi-info h3 {
+  font-size: 1.5rem;
+  font-weight: 800;
+  margin: 0;
+  color: #fff;
+}
+
+.lib-kpi-info p {
+  margin: 0.2rem 0 0 0;
+  font-size: 0.8rem;
+  color: #9ca3af;
+}
+
+/* Nav Tabs */
+.lib-tabs-bar {
+  display: flex;
+  gap: 0.5rem;
+  border-bottom: 1px solid #374151;
+  margin-bottom: 1.5rem;
+  overflow-x: auto;
+}
+
+.lib-tab-btn {
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: #9ca3af;
+  padding: 0.75rem 1.25rem;
+  font-weight: 600;
+  font-size: 0.95rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.lib-tab-btn:hover {
+  color: #e5e7eb;
+}
+
+.lib-tab-btn.active {
+  color: #818cf8;
+  border-bottom-color: #818cf8;
+}
+
+/* Book Catalog Grid */
+.lib-books-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1.25rem;
+}
+
+.lib-book-card {
+  background: #1f2937;
+  border: 1px solid #374151;
+  border-radius: 12px;
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.lib-book-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
+  border-color: #4b5563;
+}
+
+.book-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 0.5rem;
+}
+
+.book-category-tag {
+  background: rgba(99, 102, 241, 0.15);
+  color: #a5b4fc;
+  border: 1px solid rgba(99, 102, 241, 0.3);
+  padding: 0.2rem 0.5rem;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.book-title {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: #fff;
+  margin: 0.3rem 0;
+  line-height: 1.35;
+}
+
+.book-author {
+  color: #9ca3af;
+  font-size: 0.85rem;
+  margin-bottom: 0.75rem;
+}
+
+.book-meta-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.8rem;
+  color: #cbd5e1;
+  margin-bottom: 0.4rem;
+}
+
+.book-copies-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #111827;
+  padding: 0.6rem 0.8rem;
+  border-radius: 8px;
+  margin-top: 0.75rem;
+  font-size: 0.82rem;
+}
+
+/* Circulation Desk Panels */
+.circulation-panels-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.circulation-action-card {
+  background: #1f2937;
+  border: 1px solid #374151;
+  border-radius: 12px;
+  padding: 1.5rem;
+}
+
+.circulation-action-card h3 {
+  margin: 0 0 1rem 0;
+  color: #fff;
+  font-size: 1.25rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* Copies Drawer / Table */
+.copies-list-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 1rem;
+}
+
+.copies-list-table th {
+  background: #111827;
+  padding: 0.6rem 0.8rem;
+  font-size: 0.78rem;
+  color: #9ca3af;
+  text-align: left;
+}
+
+.copies-list-table td {
+  padding: 0.65rem 0.8rem;
+  border-bottom: 1px solid #374151;
+  font-size: 0.85rem;
+}
+
+/* Light Theme */
+[data-theme="light"] .library-container {
+  background: #ffffff;
+  color: #0f172a;
+}
+[data-theme="light"] .library-header h2 {
+  color: #0f172a;
+}
+[data-theme="light"] .lib-kpi-card,
+[data-theme="light"] .lib-book-card,
+[data-theme="light"] .circulation-action-card {
+  background: #f8fafc;
+  border-color: #e2e8f0;
+}
+[data-theme="light"] .lib-kpi-info h3,
+[data-theme="light"] .book-title,
+[data-theme="light"] .circulation-action-card h3 {
+  color: #0f172a;
+}
+[data-theme="light"] .book-copies-indicator {
+  background: #f1f5f9;
+}

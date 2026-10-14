@@ -7,11 +7,11 @@ const User = require('../models/User');
  */
 const extractClientIp = (req) => {
   if (!req) return '127.0.0.1';
-  let ip = req.headers['x-forwarded-for'] || 
-           req.headers['x-real-ip'] || 
-           req.headers['cf-connecting-ip'] ||
-           req.connection?.remoteAddress || 
-           req.socket?.remoteAddress || 
+  let ip = req.headers?.['x-forwarded-for'] ||
+           req.headers?.['x-real-ip'] ||
+           req.headers?.['cf-connecting-ip'] ||
+           req.connection?.remoteAddress ||
+           req.socket?.remoteAddress ||
            req.ip || '';
   if (typeof ip === 'string' && ip.includes(',')) {
     ip = ip.split(',')[0].trim();
@@ -27,7 +27,7 @@ const extractClientIp = (req) => {
 
 const extractUserAgent = (req) => {
   if (!req) return '';
-  return req.headers['user-agent'] || '';
+  return req.headers?.['user-agent'] || '';
 };
 
 /**
@@ -97,5 +97,65 @@ const logActivity = async ({
   }
 };
 
-module.exports = { logActivity, extractClientIp, extractUserAgent };
+/**
+ * Dedicated Security & Checkpoint Audit Event Logger
+ * Supports both raw User Objects and ID-based payloads with campus attribution.
+ */
+const logAuditEvent = async ({
+  user,
+  userId,
+  userName,
+  userEmail,
+  userRole,
+  campusId = null,
+  departmentId = null,
+  action,
+  category = 'Security',
+  description = '',
+  details = {},
+  durationSeconds = 0,
+  req
+}) => {
+  try {
+    const targetUserId = userId || (user && user._id ? user._id : user);
+    let resolvedName = userName || (user && user.name ? user.name : null);
+    let resolvedEmail = userEmail || (user && user.email ? user.email : null);
+    let resolvedRole = userRole || (user && user.role ? user.role : null);
+
+    if ((!resolvedName || !resolvedEmail) && targetUserId) {
+      const fetched = await User.findById(targetUserId).select('name email role');
+      if (fetched) {
+        resolvedName = resolvedName || fetched.name;
+        resolvedEmail = resolvedEmail || fetched.email;
+        resolvedRole = resolvedRole || fetched.role;
+      }
+    }
+
+    const ipAddress = extractClientIp(req);
+    const userAgent = extractUserAgent(req);
+
+    const logEntry = await AuditLog.create({
+      user: targetUserId,
+      userName: resolvedName || 'Security Operator',
+      userEmail: resolvedEmail || 'security@campusbridge.local',
+      userRole: resolvedRole || 'administrator',
+      campusId,
+      departmentId,
+      action: action || 'SECURITY_AUDIT_EVENT',
+      category: category || 'Security',
+      description: description || '',
+      details: details || {},
+      durationSeconds,
+      ipAddress,
+      userAgent
+    });
+
+    return logEntry;
+  } catch (err) {
+    console.error('AuditLogger logAuditEvent error (non-fatal):', err.message);
+    return null;
+  }
+};
+
+module.exports = { logActivity, logAuditEvent, extractClientIp, extractUserAgent };
 

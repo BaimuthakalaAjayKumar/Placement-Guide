@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const fs = require('fs');
 const path = require('path');
 const multer = require('multer');
@@ -8,6 +9,7 @@ const User = require('../models/User');
 const UserSolution = require('../models/UserSolution');
 const Notification = require('../models/Notification');
 const { logActivity } = require('../utils/auditLogger');
+const codingPlatformSyncService = require('../services/codingPlatformSyncService');
 
 // Seed practice questions from frontend data files if database has none
 const seedPracticeQuestions = async () => {
@@ -891,82 +893,550 @@ const parsePracticeQuestionUrl = (platform, rawUrl = '') => {
 
 // --- PRACTICE PLATFORMS COORDINATION ---
 
+// @desc    Get quota and difficulty statistics for a platform question bank
+// @route   GET /api/tests/practice-questions/:platform/quota-status
+// @access  Private
+exports.getPlatformQuotaStatus = async (req, res, next) => {
+  try {
+    const { platform } = req.params;
+    const validPlatforms = ['leetcode', 'codeforces', 'codechef', 'hackerrank'];
+    if (!validPlatforms.includes(platform)) {
+      return res.status(400).json({ success: false, error: 'Invalid platform specified' });
+    }
+
+    const counts = await PracticeQuestion.aggregate([
+      { $match: { platform, isArchived: { $ne: true }, isActive: true } },
+      { $group: { _id: '$difficulty', count: { $sum: 1 } } }
+    ]);
+
+    const currentCounts = { Easy: 0, Medium: 0, Hard: 0 };
+    counts.forEach(c => {
+      if (currentCounts[c._id] !== undefined) currentCounts[c._id] = c.count;
+    });
+
+    let totalActive = currentCounts.Easy + currentCounts.Medium + currentCounts.Hard;
+    if (totalActive === 0) {
+      const staticList = await codingPlatformSyncService.getCuratedQuestions(platform);
+      staticList.forEach(q => {
+        if (currentCounts[q.difficulty] !== undefined) currentCounts[q.difficulty]++;
+      });
+      totalActive = currentCounts.Easy + currentCounts.Medium + currentCounts.Hard;
+    }
+
+    const targetQuota = { Easy: 50, Medium: 50, Hard: 50, total: 150 };
+    const missingCounts = {
+      Easy: Math.max(0, 50 - currentCounts.Easy),
+      Medium: Math.max(0, 50 - currentCounts.Medium),
+      Hard: Math.max(0, 50 - currentCounts.Hard),
+      total: Math.max(0, 150 - totalActive)
+    };
+
+    const archivedCount = await PracticeQuestion.countDocuments({
+      platform,
+      $or: [{ isArchived: true }, { isActive: false }]
+    });
+
+    const isQuotaMet = missingCounts.total === 0 && missingCounts.Easy === 0 && missingCounts.Medium === 0 && missingCounts.Hard === 0;
+    const missing = [];
+    if (missingCounts.Easy > 0) missing.push(`${missingCounts.Easy} Easy`);
+    if (missingCounts.Medium > 0) missing.push(`${missingCounts.Medium} Medium`);
+    if (missingCounts.Hard > 0) missing.push(`${missingCounts.Hard} Hard`);
+
+    const quotaPayload = {
+      platform,
+      targetQuota,
+      currentCounts,
+      totalActive,
+      easyCount: currentCounts.Easy,
+      mediumCount: currentCounts.Medium,
+      hardCount: currentCounts.Hard,
+      missingCounts,
+      missing,
+      archivedCount,
+      isQuotaMet,
+      isComplete: isQuotaMet
+    };
+
+    res.status(200).json({
+      success: true,
+      ...quotaPayload,
+      data: quotaPayload
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// @desc    Get quota and difficulty statistics across all 4 platforms
+// @route   GET /api/tests/practice-questions-summary/quota
+// @access  Private
+exports.getAllPlatformsQuotaStatus = async (req, res, next) => {
+  try {
+    const validPlatforms = ['leetcode', 'codeforces', 'codechef', 'hackerrank'];
+    const summary = {};
+
+    for (const platform of validPlatforms) {
+      const counts = await PracticeQuestion.aggregate([
+        { $match: { platform, isArchived: { $ne: true }, isActive: true } },
+        { $group: { _id: '$difficulty', count: { $sum: 1 } } }
+      ]);
+
+      const currentCounts = { Easy: 0, Medium: 0, Hard: 0 };
+      counts.forEach(c => {
+        if (currentCounts[c._id] !== undefined) currentCounts[c._id] = c.count;
+      });
+
+      let totalActive = currentCounts.Easy + currentCounts.Medium + currentCounts.Hard;
+      if (totalActive === 0) {
+        const staticList = await codingPlatformSyncService.getCuratedQuestions(platform);
+        staticList.forEach(q => {
+          if (currentCounts[q.difficulty] !== undefined) currentCounts[q.difficulty]++;
+        });
+        totalActive = currentCounts.Easy + currentCounts.Medium + currentCounts.Hard;
+      }
+
+      summary[platform] = {
+        targetQuota: { Easy: 50, Medium: 50, Hard: 50, total: 150 },
+        currentCounts,
+        totalActive,
+        missingCounts: {
+          Easy: Math.max(0, 50 - currentCounts.Easy),
+          Medium: Math.max(0, 50 - currentCounts.Medium),
+          Hard: Math.max(0, 50 - currentCounts.Hard),
+          total: Math.max(0, 150 - totalActive)
+        },
+        isQuotaMet: totalActive === 150 && currentCounts.Easy === 50 && currentCounts.Medium === 50 && currentCounts.Hard === 50
+      };
+    }
+
+    res.status(200).json({
+      success: true,
+      summary
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
 // @desc    Get practice questions for a platform
 // @route   GET /api/tests/practice-questions/:platform
 // @access  Private
 exports.getPracticeQuestions = async (req, res, next) => {
   try {
-    const { platform } = req.params;
-    const query = { platform, isActive: true };
+    const platform = (req.params.platform || req.query.platform || '').toLowerCase().trim();
+    const validPlatforms = ['leetcode', 'codeforces', 'codechef', 'hackerrank'];
+    if (!validPlatforms.includes(platform)) {
+      return res.status(400).json({ success: false, error: 'Invalid platform.' });
+    }
+
+    const includeArchived = req.query.includeArchived === 'true' &&
+      ['placement_officer', 'admin', 'super_admin'].includes(req.user?.role);
+
+    const query = { platform };
+    if (!includeArchived) {
+      query.isActive = true;
+      query.isArchived = { $ne: true };
+    }
     if (req.query.company) {
       query.company = req.query.company;
     }
-    const questions = await PracticeQuestion.find(query).sort({ id: 1 });
-    res.status(200).json({ success: true, data: questions });
+    if (req.query.difficulty) {
+      query.difficulty = req.query.difficulty;
+    }
+
+    let questions = await PracticeQuestion.find(query)
+      .populate('createdBy', 'name email role')
+      .populate('updatedBy', 'name email role')
+      .sort({ id: 1 });
+
+    if (questions.length === 0 && !includeArchived && !req.query.company) {
+      const staticList = await codingPlatformSyncService.getCuratedQuestions(platform);
+      if (req.query.difficulty) {
+        questions = staticList.filter(q => q.difficulty.toLowerCase() === req.query.difficulty.toLowerCase());
+      } else {
+        questions = staticList;
+      }
+    }
+
+    const easyCount = questions.filter(q => q.difficulty === 'Easy' && !q.isArchived).length;
+    const mediumCount = questions.filter(q => q.difficulty === 'Medium' && !q.isArchived).length;
+    const hardCount = questions.filter(q => q.difficulty === 'Hard' && !q.isArchived).length;
+    const totalActive = easyCount + mediumCount + hardCount;
+
+    res.status(200).json({
+      success: true,
+      platform,
+      count: questions.length,
+      quota: {
+        targetTotal: 150,
+        targetPerDifficulty: 50,
+        easy: easyCount,
+        medium: mediumCount,
+        hard: hardCount,
+        total: totalActive,
+        missing: Math.max(0, 150 - totalActive),
+        easyMissing: Math.max(0, 50 - easyCount),
+        mediumMissing: Math.max(0, 50 - mediumCount),
+        hardMissing: Math.max(0, 50 - hardCount)
+      },
+      data: questions
+    });
   } catch (err) {
     next(err);
   }
 };
 
-// @desc    Add a practice question to a platform (Admin only)
+// @desc    Add an official curated practice question to a platform (Placement Officer & Admin only)
 // @route   POST /api/tests/practice-questions/:platform
-// @access  Private/Admin
+// @access  Private/Placement Officer & Admin
 exports.addPracticeQuestion = async (req, res, next) => {
   try {
-    const { platform } = req.params;
-    const { officialUrl, url, questionUrl, solution, tags } = req.body;
-    const parsed = parsePracticeQuestionUrl(platform, officialUrl || url || questionUrl || '');
+    if (!['placement_officer', 'admin', 'super_admin'].includes(req.user.role)) {
+      return res.status(403).json({
+        success: false,
+        error: 'Only Placement Officers and Administrators can add official practice questions.'
+      });
+    }
 
-    const maxQuestion = await PracticeQuestion.findOne({ platform }).sort({ id: -1 }).select('id');
-    const nextId = (maxQuestion?.id || 0) + 1;
-    const finalId = Number(req.body.id || parsed.id || nextId);
+    const platform = (req.params.platform || req.body.platform || '').toLowerCase().trim();
+    const validPlatforms = ['leetcode', 'codeforces', 'codechef', 'hackerrank'];
+    if (!validPlatforms.includes(platform)) {
+      return res.status(400).json({ success: false, error: 'Invalid platform.' });
+    }
+
+    const { officialUrl, url, questionUrl, solution, tags, officialProblemId } = req.body;
+    const finalUrl = (officialUrl || url || questionUrl || '').trim();
+    const parsed = parsePracticeQuestionUrl(platform, finalUrl);
+
     const finalSlug = String(req.body.slug || parsed.slug || '').trim();
     const finalTitle = String(req.body.title || parsed.title || titleFromSlug(finalSlug)).trim();
     const finalDifficulty = req.body.difficulty || 'Medium';
 
-    if (!finalSlug) {
-      return res.status(400).json({ success: false, error: 'Please provide a valid question URL.' });
+    if (!['Easy', 'Medium', 'Hard'].includes(finalDifficulty)) {
+      return res.status(400).json({ success: false, error: 'Difficulty must be Easy, Medium, or Hard.' });
     }
 
-    const existing = await PracticeQuestion.findOne({
-      platform,
-      company: req.body.company || '',
-      $or: [{ id: finalId }, { slug: finalSlug }]
-    });
-    if (existing) {
-      return res.status(400).json({ success: false, error: 'This practice question already exists on this platform for this company.' });
+    if (!finalSlug && !finalUrl && !officialProblemId) {
+      return res.status(400).json({ success: false, error: 'Please provide a valid problem URL, ID, or slug.' });
     }
+
+    // 1. Prevent duplicate platform problem IDs, titles, and URLs first
+    const duplicateChecks = [];
+    if (finalSlug) duplicateChecks.push({ slug: finalSlug });
+    if (finalUrl) duplicateChecks.push({ officialUrl: finalUrl });
+    if (officialProblemId) duplicateChecks.push({ officialProblemId: String(officialProblemId) });
+    if (req.body.problemId) duplicateChecks.push({ officialProblemId: String(req.body.problemId) });
+    if (parsed.id) duplicateChecks.push({ id: parsed.id });
+
+    if (duplicateChecks.length > 0) {
+      const existing = await PracticeQuestion.findOne({
+        platform,
+        isArchived: { $ne: true },
+        $or: duplicateChecks
+      });
+      if (existing) {
+        return res.status(400).json({
+          success: false,
+          error: `This practice question already exists in the active bank for ${platform} ("${existing.title}"). Duplicate entries are prohibited.`
+        });
+      }
+    }
+
+    // Also check static curated bank for duplicates if DB doesn't have it
+    const staticCurated = await codingPlatformSyncService.getCuratedQuestions(platform);
+    const existingInCurated = staticCurated.find(q =>
+      (finalSlug && (String(q.slug).toLowerCase() === finalSlug.toLowerCase() || String(q.id).toLowerCase() === finalSlug.toLowerCase())) ||
+      (finalUrl && (String(q.url).toLowerCase() === finalUrl.toLowerCase() || String(q.officialUrl || '').toLowerCase() === finalUrl.toLowerCase())) ||
+      (officialProblemId && (String(q.problemId) === String(officialProblemId) || String(q.officialProblemId || '') === String(officialProblemId) || String(q.id) === String(officialProblemId))) ||
+      (req.body.problemId && (String(q.problemId) === String(req.body.problemId) || String(q.id) === String(req.body.problemId))) ||
+      (finalTitle && String(q.title).toLowerCase() === finalTitle.toLowerCase())
+    );
+    if (existingInCurated) {
+      return res.status(400).json({
+        success: false,
+        error: `This practice question already exists in the active bank for ${platform} ("${existingInCurated.title || existingInCurated.slug}"). Duplicate entries are prohibited.`
+      });
+    }
+
+    // 2. Enforce platform-specific quota (maximum 50 active questions per difficulty)
+    let currentDifficultyCount = await PracticeQuestion.countDocuments({
+      platform,
+      difficulty: finalDifficulty,
+      isArchived: { $ne: true },
+      isActive: true
+    });
+
+    // Fallback to static curated file if DB collection is unseeded
+    if (currentDifficultyCount === 0) {
+      currentDifficultyCount = staticCurated.filter(q => q.difficulty === finalDifficulty).length;
+    }
+
+    if (currentDifficultyCount >= 50) {
+      return res.status(400).json({
+        success: false,
+        error: `Difficulty quota reached: exactly 50 ${finalDifficulty} questions are already active (50/50 for ${finalDifficulty} on ${platform}). Archive an existing ${finalDifficulty} question before adding a new one.`
+      });
+    }
+
+    const maxQuestion = await PracticeQuestion.findOne({ platform }).sort({ id: -1 }).select('id');
+    const nextId = (maxQuestion?.id || 0) + 1;
+    const finalId = Number(req.body.id || parsed.id || nextId);
 
     const question = await PracticeQuestion.create({
       platform,
       id: finalId,
+      officialProblemId: officialProblemId ? String(officialProblemId) : String(parsed.id || finalId),
+      officialUrl: finalUrl,
       title: finalTitle,
       difficulty: finalDifficulty,
       acceptance: req.body.acceptance || '50%',
-      slug: finalSlug,
+      slug: finalSlug || `problem-${finalId}`,
       solution: solution || '',
-      tags: tags || [],
+      tags: Array.isArray(tags) ? tags : [],
       company: req.body.company || '',
-      year: req.body.year || new Date().getFullYear()
+      year: req.body.year || new Date().getFullYear(),
+      isActive: true,
+      isArchived: false,
+      createdBy: req.user.id || req.user._id,
+      updatedBy: req.user.id || req.user._id
     });
 
     res.status(201).json({ success: true, data: question });
+  } catch (err) {
+    if (typeof next === 'function') next(err);
+    else res.status(500).json({ success: false, error: err.message });
+  }
+};
+
+// @desc    Archive a practice question from the active bank (Placement Officer & Admin only)
+// @route   DELETE /api/tests/practice-questions/:platform/:id
+// @access  Private/Placement Officer & Admin
+exports.deletePracticeQuestion = async (req, res, next) => {
+  try {
+    if (!['placement_officer', 'admin', 'super_admin'].includes(req.user.role)) {
+      return res.status(403).json({
+        success: false,
+        error: 'Only Placement Officers and Administrators can archive questions.'
+      });
+    }
+
+    const { platform, id } = req.params;
+    const filter = mongoose.Types.ObjectId.isValid(id)
+      ? { _id: id }
+      : (platform ? { platform, id: Number(id) } : { _id: id });
+
+    // Soft-archive to preserve historical submissions and progress
+    const question = await PracticeQuestion.findOneAndUpdate(
+      filter,
+      {
+        isActive: false,
+        isArchived: true,
+        updatedBy: req.user.id || req.user._id,
+        updatedAt: new Date()
+      },
+      { new: true }
+    );
+
+    if (!question) {
+      return res.status(404).json({ success: false, error: 'Question not found' });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: `Practice question #${id} successfully archived. Historical submissions and student progress are preserved.`,
+      data: question
+    });
+  } catch (err) {
+    if (typeof next === 'function') next(err);
+    else res.status(500).json({ success: false, error: err.message });
+  }
+};
+
+// @desc    Explicitly archive a practice question from the active bank
+// @route   PUT /api/tests/practice-questions/:platform/:id/archive
+// @access  Private/Placement Officer & Admin
+exports.archivePracticeQuestion = async (req, res, next) => {
+  return exports.deletePracticeQuestion(req, res, next);
+};
+
+// @desc    Unarchive / Restore a practice question back to the active bank
+// @route   PUT /api/tests/practice-questions/:platform/:id/unarchive
+// @access  Private/Placement Officer & Admin
+exports.unarchivePracticeQuestion = async (req, res, next) => {
+  try {
+    if (!['placement_officer', 'admin', 'super_admin'].includes(req.user.role)) {
+      return res.status(403).json({
+        success: false,
+        error: 'Only Placement Officers and Administrators can restore questions.'
+      });
+    }
+
+    const { platform, id } = req.params;
+    const filter = mongoose.Types.ObjectId.isValid(id)
+      ? { _id: id }
+      : (platform ? { platform, id: Number(id) } : { _id: id });
+
+    const question = await PracticeQuestion.findOne(filter);
+    if (!question) {
+      return res.status(404).json({ success: false, error: 'Question not found' });
+    }
+
+    // Check quota before restoring
+    const activeDifficultyCount = await PracticeQuestion.countDocuments({
+      platform: question.platform,
+      difficulty: question.difficulty,
+      isArchived: { $ne: true },
+      isActive: true
+    });
+
+    if (activeDifficultyCount >= 50) {
+      return res.status(400).json({
+        success: false,
+        error: `Cannot unarchive: difficulty quota of 50 ${question.difficulty} questions on ${question.platform} is already reached.`
+      });
+    }
+
+    question.isActive = true;
+    question.isArchived = false;
+    question.updatedBy = req.user.id;
+    question.updatedAt = new Date();
+    await question.save();
+
+    res.status(200).json({
+      success: true,
+      message: `Question #${id} successfully restored to the active set.`,
+      data: question
+    });
   } catch (err) {
     next(err);
   }
 };
 
-// @desc    Delete a practice question from a platform (Admin only)
-// @route   DELETE /api/tests/practice-questions/:platform/:id
-// @access  Private/Admin
-exports.deletePracticeQuestion = async (req, res, next) => {
+
+// @desc    Synchronize authenticated student's platform progress with official APIs
+// @route   POST /api/tests/practice-sync/:platform
+// @access  Private
+exports.syncPlatformPractice = async (req, res, next) => {
   try {
-    const { platform, id } = req.params;
-    const question = await PracticeQuestion.findOneAndDelete({ platform, id: Number(id) });
-    if (!question) {
-      return res.status(404).json({ success: false, error: 'Question not found' });
+    const { platform } = req.params;
+    const validPlatforms = ['leetcode', 'codeforces', 'codechef', 'hackerrank'];
+    if (!validPlatforms.includes(platform)) {
+      return res.status(400).json({ success: false, error: 'Invalid platform' });
     }
-    res.status(200).json({ success: true, data: {} });
+
+    const student = await User.findById(req.user.id);
+    if (!student) {
+      return res.status(404).json({ success: false, error: 'User not found' });
+    }
+
+    const username = (req.body.username ||
+      (platform === 'leetcode' ? student.leetcodeUsername :
+       platform === 'codeforces' ? student.codeforcesUsername :
+       platform === 'codechef' ? student.codechefUsername :
+       student.hackerrankUsername) || '').trim();
+
+    if (!username) {
+      return res.status(400).json({ success: false, error: `Please provide a ${platform} username to synchronize.` });
+    }
+
+    let syncData;
+    if (platform === 'codeforces') {
+      syncData = await codingPlatformSyncService.syncCodeforces(username);
+    } else if (platform === 'leetcode') {
+      syncData = await codingPlatformSyncService.syncLeetcode(username);
+    } else if (platform === 'codechef') {
+      syncData = await codingPlatformSyncService.syncCodechef(username);
+    } else if (platform === 'hackerrank') {
+      syncData = await codingPlatformSyncService.syncHackerrank(username);
+    }
+
+    // Match against curated 150 question bank
+    const curatedProgress = await codingPlatformSyncService.matchCuratedProgress(student._id, platform, syncData);
+
+    // Update student's profile and stats in DB
+    const updatePayload = {};
+    if (platform === 'leetcode') {
+      updatePayload.leetcodeUsername = username;
+      updatePayload.leetcodeStats = {
+        easySolved: syncData.easySolved || 0,
+        mediumSolved: syncData.mediumSolved || 0,
+        hardSolved: syncData.hardSolved || 0,
+        totalSolved: syncData.totalSolved || 0,
+        solvedSlugs: syncData.solvedSlugs || [],
+        lastSyncAt: syncData.lastSyncAt,
+        lastSyncStatus: syncData.lastSyncStatus,
+        lastSyncMessage: syncData.lastSyncMessage,
+        verifiedSolvedCount: curatedProgress.solvedCount,
+        verifiedEasyCount: curatedProgress.easySolved,
+        verifiedMediumCount: curatedProgress.mediumSolved,
+        verifiedHardCount: curatedProgress.hardSolved
+      };
+    } else if (platform === 'codeforces') {
+      updatePayload.codeforcesUsername = username;
+      updatePayload.codeforcesStats = {
+        rating: syncData.rating || 0,
+        maxRating: syncData.maxRating || 0,
+        rank: syncData.rank || 'Unrated',
+        solvedCount: syncData.totalSolvedOnPlatform || 0,
+        solvedSlugs: syncData.solvedSlugs || [],
+        lastSyncAt: syncData.lastSyncAt,
+        lastSyncStatus: syncData.lastSyncStatus,
+        lastSyncMessage: syncData.lastSyncMessage,
+        verifiedSolvedCount: curatedProgress.solvedCount,
+        verifiedEasyCount: curatedProgress.easySolved,
+        verifiedMediumCount: curatedProgress.mediumSolved,
+        verifiedHardCount: curatedProgress.hardSolved
+      };
+    } else if (platform === 'codechef') {
+      updatePayload.codechefUsername = username;
+      updatePayload.codechefStats = {
+        rating: syncData.rating || 0,
+        stars: syncData.stars || '1★',
+        globalRank: syncData.globalRank || 0,
+        countryRank: syncData.countryRank || 0,
+        solvedCount: syncData.totalSolvedOnPlatform || 0,
+        solvedSlugs: syncData.solvedSlugs || [],
+        lastSyncAt: syncData.lastSyncAt,
+        lastSyncStatus: syncData.lastSyncStatus,
+        lastSyncMessage: syncData.lastSyncMessage,
+        verifiedSolvedCount: curatedProgress.solvedCount,
+        verifiedEasyCount: curatedProgress.easySolved,
+        verifiedMediumCount: curatedProgress.mediumSolved,
+        verifiedHardCount: curatedProgress.hardSolved
+      };
+    } else if (platform === 'hackerrank') {
+      updatePayload.hackerrankUsername = username;
+      updatePayload.hackerrankStats = {
+        solvedCount: syncData.totalSolvedOnPlatform || 0,
+        score: syncData.score || 0,
+        badgesCount: syncData.badgesCount || 0,
+        solvedSlugs: syncData.solvedSlugs || [],
+        lastSyncAt: syncData.lastSyncAt,
+        lastSyncStatus: syncData.lastSyncStatus,
+        lastSyncMessage: syncData.lastSyncMessage,
+        verifiedSolvedCount: curatedProgress.solvedCount,
+        verifiedEasyCount: curatedProgress.easySolved,
+        verifiedMediumCount: curatedProgress.mediumSolved,
+        verifiedHardCount: curatedProgress.hardSolved
+      };
+    }
+
+    const updatedUser = await User.findByIdAndUpdate(student._id, updatePayload, { new: true });
+
+    res.status(200).json({
+      success: true,
+      message: `${platform.toUpperCase()} profile synchronized successfully.`,
+      data: {
+        platform,
+        username,
+        syncData,
+        curatedProgress,
+        userStats: platform === 'leetcode' ? updatedUser.leetcodeStats :
+                   platform === 'codeforces' ? updatedUser.codeforcesStats :
+                   platform === 'codechef' ? updatedUser.codechefStats :
+                   updatedUser.hackerrankStats
+      }
+    });
   } catch (err) {
     next(err);
   }
@@ -1013,6 +1483,7 @@ const calculateStudentPlatformSolved = (student, platform, questions, studentSol
   }
 
   const solvedIds = [];
+  const solvedIdsSet = new Set();
   const solvedProblems = [];
   const unsolvedProblems = [];
 
@@ -1020,16 +1491,30 @@ const calculateStudentPlatformSolved = (student, platform, questions, studentSol
     const slugKey = String(q.slug || '').toLowerCase().trim();
     const titleKey = String(q.title || '').toLowerCase().trim();
     const idKey = String(q.id);
+    const officialIdKey = String(q.officialProblemId || '').toLowerCase().trim();
 
-    const portalSol = portalSolutionsMap.get(slugKey) || 
-                      portalSolutionsMap.get(titleKey) || 
-                      portalSolutionsMap.get(idKey);
+    const portalSol = portalSolutionsMap.get(slugKey) ||
+                      portalSolutionsMap.get(titleKey) ||
+                      portalSolutionsMap.get(idKey) ||
+                      (officialIdKey && portalSolutionsMap.get(officialIdKey));
 
-    const isPlatformSolved = (slugKey && verifiedSlugs.has(slugKey)) || 
-                             (titleKey && verifiedSlugs.has(titleKey));
+    let isPlatformSolved = (slugKey && verifiedSlugs.has(slugKey)) ||
+                           (titleKey && verifiedSlugs.has(titleKey)) ||
+                           (officialIdKey && verifiedSlugs.has(officialIdKey));
 
-    if (portalSol || isPlatformSolved) {
-      solvedIds.push(q.id);
+    if (platform === 'codeforces') {
+      const match = (q.title || '').match(/(\d+)\s*([A-Za-z]\d*)/i);
+      if (match) {
+        const cfKey1 = `${match[1]}${match[2]}`.toLowerCase();
+        const cfKey2 = `${match[1]}_${match[2]}`.toLowerCase();
+        if (verifiedSlugs.has(cfKey1) || verifiedSlugs.has(cfKey2)) {
+          isPlatformSolved = true;
+        }
+      }
+    }
+
+    if ((portalSol || isPlatformSolved) && !solvedIdsSet.has(q.id)) {
+      solvedIdsSet.add(q.id);
       solvedProblems.push({
         id: q.id,
         title: q.title,
@@ -1041,7 +1526,7 @@ const calculateStudentPlatformSolved = (student, platform, questions, studentSol
         hasCustomCode: !!portalSol?.solutionCode,
         solutionCode: portalSol?.solutionCode || ''
       });
-    } else {
+    } else if (!solvedIdsSet.has(q.id)) {
       unsolvedProblems.push({
         id: q.id,
         title: q.title,
@@ -1060,7 +1545,7 @@ const calculateStudentPlatformSolved = (student, platform, questions, studentSol
   const percentage = totalCount > 0 ? Math.round((solvedCount / totalCount) * 100) : 0;
 
   return {
-    solvedIds,
+    solvedIds: Array.from(solvedIdsSet),
     solvedProblems,
     unsolvedProblems,
     solvedCount,
@@ -1088,7 +1573,14 @@ exports.getStudentPracticeStats = async (req, res, next) => {
     }
 
     const platforms = ['leetcode', 'codeforces', 'codechef', 'hackerrank'];
-    const allQuestions = await PracticeQuestion.find({ isActive: true }).sort({ id: 1 });
+    let allQuestions = await PracticeQuestion.find({ isActive: true, isArchived: { $ne: true } }).sort({ id: 1 });
+    if (!allQuestions || allQuestions.length === 0) {
+      allQuestions = [];
+      for (const plat of platforms) {
+        const platQs = await codingPlatformSyncService.getCuratedQuestions(plat);
+        allQuestions.push(...platQs);
+      }
+    }
     const allStudentSolutions = await UserSolution.find({ user: student._id });
     const allStudents = await User.find({ role: { $ne: 'admin' } }).select('name leetcodeUsername leetcodeStats codeforcesUsername codeforcesStats codechefUsername codechefStats hackerrankUsername hackerrankStats');
     const allCohortSolutions = await UserSolution.find();
@@ -1122,14 +1614,43 @@ exports.getStudentPracticeStats = async (req, res, next) => {
       const rankIndex = studentScores.findIndex(s => s.id === String(student._id));
       const rank = rankIndex !== -1 ? rankIndex + 1 : 1;
 
+      const platformStatsObj = plat === 'leetcode' ? student.leetcodeStats :
+                               plat === 'codeforces' ? student.codeforcesStats :
+                               plat === 'codechef' ? student.codechefStats :
+                               student.hackerrankStats;
+
       stats[plat] = {
         ...studentResult,
+        targetQuota: 150,
         rank,
-        totalStudents: allStudents.length
+        totalStudents: allStudents.length,
+        lastSyncAt: platformStatsObj?.lastSyncAt || null,
+        lastSyncStatus: platformStatsObj?.lastSyncStatus || 'idle',
+        lastSyncMessage: platformStatsObj?.lastSyncMessage || ''
       };
     });
 
-    res.status(200).json({ success: true, data: stats });
+    let grandTotalSolved = 0;
+    let grandTotalCurated = 0;
+    platforms.forEach(p => {
+      grandTotalSolved += stats[p].solvedCount;
+      grandTotalCurated += stats[p].totalCount;
+    });
+
+    const overallPercentage = grandTotalCurated > 0 ? Math.round((grandTotalSolved / grandTotalCurated) * 100) : 0;
+
+    res.status(200).json({
+      success: true,
+      data: {
+        ...stats,
+        overall: {
+          totalSolved: grandTotalSolved,
+          totalCurated: grandTotalCurated,
+          targetQuota: 600,
+          percentage: overallPercentage
+        }
+      }
+    });
   } catch (err) {
     next(err);
   }
@@ -1396,23 +1917,79 @@ exports.getIndividualPracticeReport = async (req, res, next) => {
   }
 };
 
-// @desc    Edit a practice question (Admin only)
+// @desc    Edit a practice question (Placement Officer & Admin only)
 // @route   PUT /api/tests/practice-questions/:platform/:id
-// @access  Private/Admin
+// @access  Private/Placement Officer & Admin
 exports.editPracticeQuestion = async (req, res, next) => {
   try {
+    if (!['placement_officer', 'admin', 'super_admin'].includes(req.user.role)) {
+      return res.status(403).json({
+        success: false,
+        error: 'Only Placement Officers and Administrators can edit question metadata.'
+      });
+    }
+
     const { platform, id } = req.params;
-    const { title, difficulty, acceptance, slug, solution, tags, company, year } = req.body;
+    const {
+      title,
+      difficulty,
+      acceptance,
+      slug,
+      officialProblemId,
+      officialUrl,
+      solution,
+      tags,
+      company,
+      year
+    } = req.body;
 
-    const question = await PracticeQuestion.findOneAndUpdate(
-      { platform, id: Number(id) },
-      { title, difficulty, acceptance, slug, solution, tags, company, year },
-      { new: true, runValidators: true }
-    );
-
-    if (!question) {
+    const existingQ = await PracticeQuestion.findOne({ platform, id: Number(id) });
+    if (!existingQ) {
       return res.status(404).json({ success: false, error: 'Practice question not found.' });
     }
+
+    // If changing difficulty, verify that target difficulty does not exceed 50 active questions
+    if (difficulty && difficulty !== existingQ.difficulty) {
+      if (!['Easy', 'Medium', 'Hard'].includes(difficulty)) {
+        return res.status(400).json({ success: false, error: 'Difficulty must be Easy, Medium, or Hard.' });
+      }
+
+      const countInNewDifficulty = await PracticeQuestion.countDocuments({
+        platform,
+        difficulty,
+        isArchived: { $ne: true },
+        isActive: true,
+        _id: { $ne: existingQ._id }
+      });
+
+      if (countInNewDifficulty >= 50) {
+        return res.status(400).json({
+          success: false,
+          error: `Cannot change difficulty to ${difficulty}: quota already reached (50/50 for ${difficulty} on ${platform}).`
+        });
+      }
+    }
+
+    const updateFields = {
+      updatedBy: req.user.id,
+      updatedAt: new Date()
+    };
+    if (title) updateFields.title = title.trim();
+    if (difficulty) updateFields.difficulty = difficulty;
+    if (acceptance) updateFields.acceptance = acceptance;
+    if (slug) updateFields.slug = slug.trim();
+    if (officialProblemId !== undefined) updateFields.officialProblemId = String(officialProblemId);
+    if (officialUrl !== undefined) updateFields.officialUrl = officialUrl.trim();
+    if (solution !== undefined) updateFields.solution = solution;
+    if (tags) updateFields.tags = Array.isArray(tags) ? tags : [];
+    if (company !== undefined) updateFields.company = company;
+    if (year !== undefined) updateFields.year = year;
+
+    const question = await PracticeQuestion.findByIdAndUpdate(
+      existingQ._id,
+      updateFields,
+      { new: true, runValidators: true }
+    );
 
     res.status(200).json({ success: true, data: question });
   } catch (err) {
@@ -1429,11 +2006,18 @@ const cleanTitleFromSlug = (slug) => {
     .join(' ');
 };
 
-// @desc    Bulk create practice questions (Admin only)
+// @desc    Bulk create practice questions (Placement Officer & Admin only)
 // @route   POST /api/tests/practice-questions/:platform/bulk
-// @access  Private/Admin
+// @access  Private/Placement Officer & Admin
 exports.bulkCreatePracticeQuestions = async (req, res, next) => {
   try {
+    if (!['placement_officer', 'admin', 'super_admin'].includes(req.user.role)) {
+      return res.status(403).json({
+        success: false,
+        error: 'Only Placement Officers and Administrators can bulk create practice questions.'
+      });
+    }
+
     const { platform } = req.params;
     const { questions } = req.body;
 
@@ -1444,8 +2028,27 @@ exports.bulkCreatePracticeQuestions = async (req, res, next) => {
     const createdQuestions = [];
     const duplicateErrors = [];
 
+    // Pre-calculate current active counts per difficulty
+    const counts = {
+      Easy: await PracticeQuestion.countDocuments({ platform, difficulty: 'Easy', isArchived: { $ne: true }, isActive: true }),
+      Medium: await PracticeQuestion.countDocuments({ platform, difficulty: 'Medium', isArchived: { $ne: true }, isActive: true }),
+      Hard: await PracticeQuestion.countDocuments({ platform, difficulty: 'Hard', isArchived: { $ne: true }, isActive: true })
+    };
+
     for (const q of questions) {
-      const urlStr = q.officialUrl || q.url || q.questionUrl || '';
+      const urlStr = (q.officialUrl || q.url || q.questionUrl || '').trim();
+      const finalDifficulty = q.difficulty || 'Medium';
+
+      if (!['Easy', 'Medium', 'Hard'].includes(finalDifficulty)) {
+        duplicateErrors.push(`Skipped "${q.title || 'Unknown'}": Invalid difficulty "${finalDifficulty}"`);
+        continue;
+      }
+
+      // Check quota limit for difficulty
+      if (counts[finalDifficulty] >= 50) {
+        duplicateErrors.push(`Skipped "${q.title || urlStr}": Quota reached for ${finalDifficulty} (50/50 on ${platform})`);
+        continue;
+      }
 
       // Parse details
       let parsedId = null;
@@ -1497,16 +2100,20 @@ exports.bulkCreatePracticeQuestions = async (req, res, next) => {
       const finalId = Number(idCount);
       const finalSlug = String(q.slug || parsedSlug || '').trim();
       const finalTitle = String(q.title || parsedTitle || cleanTitleFromSlug(finalSlug) || `Question ${finalId}`).trim();
-      const finalDifficulty = q.difficulty || 'Medium';
 
-      if (!finalSlug) {
+      if (!finalSlug && !urlStr) {
         duplicateErrors.push(`Skipped: Missing URL or slug payload details`);
         continue;
       }
 
+      const duplicateConditions = [{ id: finalId }];
+      if (finalSlug) duplicateConditions.push({ slug: finalSlug });
+      if (urlStr) duplicateConditions.push({ officialUrl: urlStr });
+
       const existing = await PracticeQuestion.findOne({
         platform,
-        $or: [{ id: finalId }, { slug: finalSlug }]
+        isArchived: { $ne: true },
+        $or: duplicateConditions
       });
 
       if (existing) {
@@ -1517,14 +2124,23 @@ exports.bulkCreatePracticeQuestions = async (req, res, next) => {
       const newQ = await PracticeQuestion.create({
         platform,
         id: finalId,
+        officialProblemId: q.officialProblemId ? String(q.officialProblemId) : String(parsedId || finalId),
+        officialUrl: urlStr,
         title: finalTitle,
         difficulty: finalDifficulty,
         acceptance: q.acceptance || '50%',
-        slug: finalSlug,
+        slug: finalSlug || `problem-${finalId}`,
         solution: q.solution || '',
-        tags: q.tags || []
+        tags: Array.isArray(q.tags) ? q.tags : [],
+        company: q.company || '',
+        year: q.year || new Date().getFullYear(),
+        isActive: true,
+        isArchived: false,
+        createdBy: req.user.id,
+        updatedBy: req.user.id
       });
 
+      counts[finalDifficulty]++;
       createdQuestions.push(newQ);
     }
 

@@ -214,6 +214,67 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  // Upload or update Profile Photo (File or base64 camera capture)
+  const uploadProfilePhoto = async (photoData, isFile = false) => {
+    try {
+      let options;
+      if (isFile) {
+        const formData = new FormData();
+        formData.append('photo', photoData);
+        options = {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`
+          },
+          body: formData
+        };
+      } else {
+        options = {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`
+          },
+          body: JSON.stringify({ photo: photoData })
+        };
+      }
+
+      const res = await fetch(`${API_URL}/auth/profile-photo`, options);
+      const data = await res.json();
+
+      if (data.success) {
+        setUser(data.user);
+        return { success: true, profilePicture: data.profilePicture };
+      } else {
+        return { success: false, error: data.error || 'Failed to upload profile photo.' };
+      }
+    } catch (err) {
+      return { success: false, error: 'Network error. Could not upload profile photo.' };
+    }
+  };
+
+  // Remove Profile Photo
+  const removeProfilePhoto = async () => {
+    try {
+      const res = await fetch(`${API_URL}/auth/profile-photo`, {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      const data = await res.json();
+
+      if (data.success) {
+        setUser(data.user);
+        return { success: true };
+      } else {
+        return { success: false, error: data.error || 'Failed to remove profile photo.' };
+      }
+    } catch (err) {
+      return { success: false, error: 'Network error. Could not remove profile photo.' };
+    }
+  };
+
   // Reset Password & Log In automatically
   const resetPassword = async (resetToken, password) => {
     setLoading(true);
@@ -255,6 +316,8 @@ export const AuthProvider = ({ children }) => {
         login,
         logout,
         updateProfile,
+        uploadProfilePhoto,
+        removeProfilePhoto,
         resetPassword,
         loadUser: () => loadUser(token)
       }}

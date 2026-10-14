@@ -39,19 +39,20 @@ const Login = () => {
     e.preventDefault();
     setError('');
 
-    if (!email || !password) {
+    const cleanEmail = (email || '').trim();
+    if (!cleanEmail || !password) {
       setError('Please fill in all fields.');
       return;
     }
 
     setLocalLoading(true);
-    const result = await login(email, password);
+    const result = await login(cleanEmail, password);
     setLocalLoading(false);
 
     if (result.success) {
       // Preserve last login credentials so user never has to retype
       if (rememberMe) {
-        localStorage.setItem('last_login_email', email);
+        localStorage.setItem('last_login_email', cleanEmail);
         localStorage.setItem('last_login_password', password);
         localStorage.setItem('remember_credentials', 'true');
       } else {
@@ -60,14 +61,25 @@ const Login = () => {
         localStorage.setItem('remember_credentials', 'false');
       }
 
-      if (result.user && result.user.role === 'admin') {
+      const userRole = result.user?.role;
+      if (['admin', 'super_admin', 'campus_admin', 'administrator', 'director', 'principal'].includes(userRole)) {
         navigate('/admin');
-      } else if (result.user && result.user.role === 'faculty') {
+      } else if (userRole === 'placement_officer') {
+        navigate('/job-opportunities');
+      } else if (userRole === 'faculty') {
         navigate('/faculty');
-      } else if (result.user && result.user.role === 'recruiter') {
+      } else if (userRole === 'recruiter') {
         navigate('/recruiter');
-      } else if (result.user && result.user.role === 'hod') {
+      } else if (userRole === 'hod') {
         navigate('/hod');
+      } else if (userRole === 'auditor') {
+        navigate('/audit-logs');
+      } else if (userRole === 'front_office') {
+        navigate('/front-office');
+      } else if (userRole === 'support_desk' || userRole === 'support_desk_supervisor') {
+        navigate('/support-desk');
+      } else if (userRole === 'librarian') {
+        navigate('/library');
       } else {
         navigate('/dashboard');
       }
@@ -187,9 +199,14 @@ const Login = () => {
           </button>
         </form>
 
-        <div className="auth-footer">
-          <span>New to Campus Bridge? </span>
-          <Link to="/register" className="auth-link">Create an Account</Link>
+        <div className="auth-footer" style={{ display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'center' }}>
+          <div>
+            <span>New to Campus Bridge? </span>
+            <Link to="/register" className="auth-link">Create an Account</Link>
+          </div>
+          <div style={{ fontSize: '11px', color: 'var(--text-secondary, #94a3b8)', opacity: 0.8 }}>
+            Platform Super Admin: <code style={{ color: '#818cf8', background: 'rgba(99, 102, 241, 0.1)', padding: '1px 4px', borderRadius: '4px' }}>vaddeajaykumar2004@gmail.com</code>
+          </div>
         </div>
       </div>
     </div>

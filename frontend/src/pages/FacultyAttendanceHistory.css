@@ -1,14 +1,21 @@
+.faculty-history-content-wrapper {
+  box-sizing: border-box;
+}
+
 .faculty-history-container {
-  padding: 24px;
-  max-width: 1300px;
+  width: 100%;
+  max-width: 1400px;
   margin: 0 auto;
+  padding: 0;
+  box-sizing: border-box;
   color: var(--text-primary, #f8fafc);
 }
 
 .history-header {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
+  align-items: center;
+  flex-wrap: wrap;
   margin-bottom: 24px;
   gap: 16px;
 }
@@ -503,4 +510,25 @@
 
 .btn-submit-correction:hover {
   background: #4f46e5;
+}
+
+@media (max-width: 768px) {
+  .history-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .history-header h1 {
+    font-size: 1.4rem;
+  }
+
+  .filter-card {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .sessions-table th,
+  .sessions-table td {
+    padding: 10px 12px;
+  }
 }

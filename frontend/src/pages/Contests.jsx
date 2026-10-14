@@ -42,7 +42,10 @@ const Contests = () => {
   const [internalContests, setInternalContests] = useState([]);
   const [loadingInternal, setLoadingInternal] = useState(true);
 
-  // Admin Contest Creator Modal state
+  // Contest Manager Role Check
+  const isContestManager = ['placement_officer', 'admin', 'super_admin'].includes(user?.role);
+
+  // Contest Creator Modal state
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [questionsList, setQuestionsList] = useState([]);
   const [loadingQuestions, setLoadingQuestions] = useState(false);
@@ -50,12 +53,17 @@ const Contests = () => {
   // Form Fields
   const [formTitle, setFormTitle] = useState('');
   const [formDesc, setFormDesc] = useState('');
+  const [formPlatform, setFormPlatform] = useState('internal');
+  const [formOfficialUrl, setFormOfficialUrl] = useState('');
+  const [formContestCode, setFormContestCode] = useState('');
+  const [formIsPublished, setFormIsPublished] = useState(true);
   const [formStartTime, setFormStartTime] = useState('');
   const [formEndTime, setFormEndTime] = useState('');
   const [formDuration, setFormDuration] = useState('60');
   const [selectedQuestions, setSelectedQuestions] = useState([]);
   const [formError, setFormError] = useState('');
   const [formSuccess, setFormSuccess] = useState('');
+  const [actionLoadingId, setActionLoadingId] = useState(null);
 
   // Question Creator/Editor Sub-Modal states
   const [showQuestionModal, setShowQuestionModal] = useState(false);
@@ -474,6 +482,10 @@ const Contests = () => {
   const handleOpenCreateModal = () => {
     setFormTitle('');
     setFormDesc('');
+    setFormPlatform('internal');
+    setFormOfficialUrl('');
+    setFormContestCode('');
+    setFormIsPublished(true);
     setFormStartTime('');
     setFormEndTime('');
     setFormDuration('60');
@@ -482,6 +494,47 @@ const Contests = () => {
     setFormSuccess('');
     setShowCreateModal(true);
     fetchQuestionsForCreator();
+  };
+
+  const handlePublishContest = async (contestId) => {
+    try {
+      setActionLoadingId(contestId);
+      const res = await fetch(`${API_URL}/contests/internal/${contestId}/publish`, {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (data.success) {
+        await fetchInternalContests();
+      } else {
+        alert(data.error || 'Failed to publish contest');
+      }
+    } catch (err) {
+      alert('Error publishing contest');
+    } finally {
+      setActionLoadingId(null);
+    }
+  };
+
+  const handleCancelContest = async (contestId) => {
+    if (!window.confirm('Are you sure you want to cancel this contest?')) return;
+    try {
+      setActionLoadingId(contestId);
+      const res = await fetch(`${API_URL}/contests/internal/${contestId}/cancel`, {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (data.success) {
+        await fetchInternalContests();
+      } else {
+        alert(data.error || 'Failed to cancel contest');
+      }
+    } catch (err) {
+      alert('Error cancelling contest');
+    } finally {
+      setActionLoadingId(null);
+    }
   };
 
   const handleToggleQuestionSelection = (qId) => {
@@ -499,6 +552,11 @@ const Contests = () => {
       return;
     }
 
+    if (new Date(formEndTime) <= new Date(formStartTime)) {
+      setFormError('End time must be after start time.');
+      return;
+    }
+
     try {
       const res = await fetch(`${API_URL}/contests/internal`, {
         method: 'POST',
@@ -509,6 +567,10 @@ const Contests = () => {
         body: JSON.stringify({
           title: formTitle,
           description: formDesc,
+          platform: formPlatform || 'internal',
+          officialContestUrl: formOfficialUrl || '',
+          contestCode: formContestCode || '',
+          isPublished: formIsPublished,
           startTime: formStartTime,
           endTime: formEndTime,
           duration: parseInt(formDuration),
@@ -602,7 +664,7 @@ const Contests = () => {
                   Mock programming tests conducted under secure AI Web-Proctoring.
                 </p>
               </div>
-              {user.role === 'admin' && (
+              {isContestManager && (
                 <button className="btn btn-primary" onClick={handleOpenCreateModal}>
                   ➕ Conduct Contest
                 </button>
@@ -623,7 +685,10 @@ const Contests = () => {
 
                   let statusText = 'Not Started';
                   let statusClass = 'not-started';
-                  if (now >= start && now <= end) {
+                  if (c.status === 'cancelled') {
+                    statusText = 'CANCELLED';
+                    statusClass = 'cancelled';
+                  } else if (now >= start && now <= end) {
                     statusText = 'LIVE NOW';
                     statusClass = 'live';
                   } else if (now > end) {
@@ -635,7 +700,17 @@ const Contests = () => {
                     <div key={index} className="glass-card contest-card animate-fade">
                       <div className="card-top">
                         <span className={`status-badge ${statusClass}`}>{statusText}</span>
-                        <span className="contest-duration-tag">{c.duration} mins</span>
+                        <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                          <span style={{ fontSize: '11px', textTransform: 'uppercase', padding: '2px 8px', borderRadius: '4px', background: 'rgba(255,255,255,0.08)', color: '#94a3b8' }}>
+                            {c.platform || 'internal'}
+                          </span>
+                          {isContestManager && (
+                            <span style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '4px', background: c.isPublished ? 'rgba(46, 200, 102, 0.15)' : 'rgba(234, 179, 8, 0.15)', color: c.isPublished ? '#2ec866' : '#eab308', fontWeight: '600' }}>
+                              {c.isPublished ? 'Published' : 'Draft'}
+                            </span>
+                          )}
+                          <span className="contest-duration-tag">{c.duration} mins</span>
+                        </div>
                       </div>
 
                       <h3 className="contest-title">{c.title}</h3>
@@ -652,27 +727,59 @@ const Contests = () => {
                         </div>
                         <div className="meta-row">
                           <span className="meta-icon">📝</span>
-                          <span>{c.questions?.length || 0} Questions Selected</span>
+                          <span>{(c.questions?.length || 0) + (c.curatedQuestions?.length || 0)} Questions</span>
                         </div>
+                        {c.officialContestUrl && (
+                          <div className="meta-row">
+                            <span className="meta-icon">🔗</span>
+                            <a href={c.officialContestUrl} target="_blank" rel="noopener noreferrer" style={{ color: '#38bdf8', fontSize: '12px' }}>
+                              Official Contest Page ↗
+                            </a>
+                          </div>
+                        )}
                       </div>
 
                       <div className="card-bottom flex-column-gap mt-15">
-                        {user.role === 'admin' ? (
-                          <div style={{ display: 'flex', gap: '10px', width: '100%' }}>
-                            <button
-                              onClick={() => navigate(`/contests/${c._id}/report`)}
-                              className="btn btn-secondary btn-sm"
-                              style={{ flex: 1 }}
-                            >
-                              📊 Proctoring Report
-                            </button>
-                            <button
-                              onClick={() => navigate(`/contests/${c._id}/leaderboard`)}
-                              className="btn btn-primary btn-sm"
-                              style={{ flex: 1 }}
-                            >
-                              🏆 Leaderboard
-                            </button>
+                        {isContestManager ? (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%' }}>
+                            <div style={{ display: 'flex', gap: '8px', width: '100%' }}>
+                              {!c.isPublished && c.status !== 'cancelled' && (
+                                <button
+                                  onClick={() => handlePublishContest(c._id)}
+                                  disabled={actionLoadingId === c._id}
+                                  className="btn btn-success btn-sm"
+                                  style={{ flex: 1 }}
+                                >
+                                  {actionLoadingId === c._id ? 'Publishing...' : '📢 Publish'}
+                                </button>
+                              )}
+                              {c.status !== 'cancelled' && (
+                                <button
+                                  onClick={() => handleCancelContest(c._id)}
+                                  disabled={actionLoadingId === c._id}
+                                  className="btn btn-outline-danger btn-sm"
+                                  style={{ flex: 1, borderColor: '#ef4444', color: '#ef4444' }}
+                                >
+                                  {actionLoadingId === c._id ? 'Cancelling...' : '🛑 Cancel'}
+                                </button>
+                              )}
+                            </div>
+                            <div style={{ display: 'flex', gap: '8px', width: '100%' }}>
+                              <button
+                                onClick={() => navigate(`/contests/${c._id}/report`)}
+                                className="btn btn-secondary btn-sm"
+                                style={{ flex: 1 }}
+                              >
+                                📊 Proctoring Report
+                              </button>
+                              <button
+                                onClick={() => navigate(`/contests/${c._id}/leaderboard`)}
+                                className="btn btn-primary btn-sm"
+                                style={{ flex: 1 }}
+                              >
+                                🏆 Leaderboard
+                              </button>
+                            </div>
                           </div>
                         ) : (
                           <div style={{ display: 'flex', gap: '10px', width: '100%' }}>
@@ -1501,6 +1608,44 @@ const Contests = () => {
               </div>
 
               <div className="form-row">
+                <div className="form-group" style={{ flex: 1 }}>
+                  <label className="form-label">Platform</label>
+                  <select
+                    className="form-control"
+                    value={formPlatform}
+                    onChange={(e) => setFormPlatform(e.target.value)}
+                  >
+                    <option value="internal">Internal (CampusBridge)</option>
+                    <option value="leetcode">LeetCode</option>
+                    <option value="codeforces">Codeforces</option>
+                    <option value="codechef">CodeChef</option>
+                    <option value="hackerrank">HackerRank</option>
+                  </select>
+                </div>
+                <div className="form-group" style={{ flex: 1 }}>
+                  <label className="form-label">Contest Code (Optional)</label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    value={formContestCode}
+                    onChange={(e) => setFormContestCode(e.target.value)}
+                    placeholder="e.g. CF-932 or LC-392"
+                  />
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Official Contest URL (Optional)</label>
+                <input
+                  type="url"
+                  className="form-control"
+                  value={formOfficialUrl}
+                  onChange={(e) => setFormOfficialUrl(e.target.value)}
+                  placeholder="https://codeforces.com/contest/..."
+                />
+              </div>
+
+              <div className="form-row">
                 <div className="form-group">
                   <label className="form-label">Start Date & Time</label>
                   <input
@@ -1534,6 +1679,19 @@ const Contests = () => {
                   max="1440"
                   required
                 />
+              </div>
+
+              <div className="form-group" style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '5px', marginBottom: '15px' }}>
+                <input
+                  type="checkbox"
+                  id="formIsPublished"
+                  checked={formIsPublished}
+                  onChange={(e) => setFormIsPublished(e.target.checked)}
+                  style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                />
+                <label htmlFor="formIsPublished" style={{ color: '#fff', fontSize: '13px', margin: 0, cursor: 'pointer', fontWeight: '500' }}>
+                  Publish Immediately (Make visible to enrolled students)
+                </label>
               </div>
 
               <div className="form-group">

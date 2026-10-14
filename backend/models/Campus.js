@@ -48,6 +48,41 @@ const CampusSchema = new mongoose.Schema({
     type: Boolean,
     default: true,
     index: true
+  },
+  // Optional campus-level geofence coordinates (nullable until explicitly configured)
+  latitude: {
+    type: Number,
+    default: null,
+    min: [-90, 'Latitude must be between -90 and 90 degrees'],
+    max: [90, 'Latitude must be between -90 and 90 degrees']
+  },
+  longitude: {
+    type: Number,
+    default: null,
+    min: [-180, 'Longitude must be between -180 and 180 degrees'],
+    max: [180, 'Longitude must be between -180 and 180 degrees']
+  },
+  arrivalPerimeterRadiusMeters: {
+    type: Number,
+    default: null,
+    min: [5, 'Perimeter radius must be at least 5 meters'],
+    max: [5000, 'Perimeter radius cannot exceed 5000 meters']
+  },
+  // Campus Arrival Attendance Configuration (Standard Cutoff: 10:00 AM IST)
+  arrivalCutoffTime: {
+    type: String,
+    default: '10:00',
+    trim: true
+  },
+  absenceEvaluationTime: {
+    type: String,
+    default: '10:30',
+    trim: true
+  },
+  timezone: {
+    type: String,
+    default: 'Asia/Kolkata',
+    trim: true
   }
 }, {
   timestamps: true

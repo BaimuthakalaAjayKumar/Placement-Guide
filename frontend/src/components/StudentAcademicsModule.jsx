@@ -14,6 +14,27 @@ const GRADE_SCALE = [
   { range: '< 40', grade: 'F', point: 0, label: 'Fail / Arrear', color: '#EF4444' }
 ];
 
+const toOrdinalYear = (val) => {
+  if (!val) return 'N/A';
+  const s = String(val).trim();
+  if (/^1(st)?(\s*year)?$/i.test(s) || s === 'I') return '1st Year';
+  if (/^2(nd)?(\s*year)?$/i.test(s) || s === 'II') return '2nd Year';
+  if (/^3(rd)?(\s*year)?$/i.test(s) || s === 'III') return '3rd Year';
+  if (/^4(th)?(\s*year)?$/i.test(s) || s === 'IV' || /final/i.test(s)) return '4th Year';
+  if (s === '2026') return '4th Year';
+  if (s === '2027') return '3rd Year';
+  if (s === '2028') return '2nd Year';
+  if (s === '2029') return '1st Year';
+  return s.toLowerCase().includes('year') ? s : `${s} Year`;
+};
+
+const getAcademicSession = (u) => {
+  if (u?.academicSession) return u.academicSession;
+  const s = String(u?.academicYear || u?.year || '').trim();
+  if (/20\d\d[-–]20\d\d/.test(s)) return s;
+  return '2026–2027';
+};
+
 const StudentAcademicsModule = ({ targetStudentId, isEmbedded = false }) => {
   const { user, token } = useAuth();
   const [loading, setLoading] = useState(true);
@@ -232,7 +253,7 @@ const StudentAcademicsModule = ({ targetStudentId, isEmbedded = false }) => {
               {record?.studentRollNumber && <span className="roll-chip">{record.studentRollNumber}</span>}
             </h2>
             <p className="hero-subtext">
-              Department of {record?.branch || user?.branch || 'Engineering'} • {honors.title}
+              Department of {record?.branch || user?.branch || 'Engineering'} • {toOrdinalYear(record?.academicYear || user?.academicYear || user?.year)} (Session {getAcademicSession(record || user)}) • {honors.title}
             </p>
           </div>
         </div>
@@ -257,6 +278,48 @@ const StudentAcademicsModule = ({ targetStudentId, isEmbedded = false }) => {
             </strong>
             <small className="metric-hint">Evaluated</small>
           </div>
+        </div>
+      </div>
+
+      {/* ── Official University Results API Integration Boundary ── */}
+      <div className="results-api-boundary-banner" style={{
+        background: 'rgba(15, 23, 42, 0.65)',
+        border: '1px solid rgba(99, 102, 241, 0.25)',
+        borderRadius: '12px',
+        padding: '12px 18px',
+        marginBottom: '1.25rem',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        flexWrap: 'wrap',
+        gap: '10px'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <span style={{ fontSize: '20px' }}>🏛️</span>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+              <strong style={{ fontSize: '13px', color: '#f8fafc' }}>
+                University Examination Results API Boundary
+              </strong>
+              <span style={{
+                background: 'rgba(245, 158, 11, 0.15)',
+                color: '#fcd34d',
+                border: '1px solid rgba(245, 158, 11, 0.3)',
+                padding: '2px 8px',
+                borderRadius: '6px',
+                fontSize: '11px',
+                fontWeight: 600
+              }}>
+                Awaiting Institutional Credentials &amp; Specification
+              </span>
+            </div>
+            <p style={{ margin: '3px 0 0 0', fontSize: '12px', color: '#94a3b8', lineHeight: '1.4' }}>
+              Integration boundary prepared for automated synchronization. Currently evaluating authoritative grades and SGPA/CGPA calculations from verified internal CampusBridge academic records.
+            </p>
+          </div>
+        </div>
+        <div style={{ fontSize: '12px', color: '#38bdf8', fontWeight: 600 }}>
+          <span>Source: Authoritative Campus Database</span>
         </div>
       </div>
 

@@ -55,6 +55,22 @@ exports.protect = async (req, res, next) => {
       }
     }
 
+    // Enforce forced-password-change for any account with mustChangePassword = true
+    if (req.user.mustChangePassword) {
+      const url = req.originalUrl || req.url || '';
+      const isAuthExemptRoute =
+        url.includes('/api/auth/me') ||
+        url.includes('/api/auth/logout') ||
+        url.includes('/api/auth/change-password');
+      if (!isAuthExemptRoute) {
+        return res.status(403).json({
+          success: false,
+          mustChangePassword: true,
+          error: 'Password change required before accessing operational services.'
+        });
+      }
+    }
+
     next();
   } catch (err) {
     return res.status(401).json({

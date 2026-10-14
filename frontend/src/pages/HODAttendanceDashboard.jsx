@@ -21,6 +21,52 @@ const HODAttendanceDashboard = () => {
   const [endDate, setEndDate] = useState('');
   const [sectionFilter, setSectionFilter] = useState('');
 
+  // Live Department Classes in Session State
+  const [liveSessions, setLiveSessions] = useState([]);
+  const [loadingLive, setLoadingLive] = useState(false);
+  const [nowClock, setNowClock] = useState(Date.now());
+
+  // Second-by-second live ticking timer
+  useEffect(() => {
+    const timer = setInterval(() => setNowClock(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const fetchLiveSessions = async () => {
+    if (!token) return;
+    try {
+      setLoadingLive(true);
+      const res = await axios.get(`${API_URL}/attendance/sessions/active`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.data?.success) {
+        setLiveSessions(res.data.sessions || []);
+      }
+    } catch (err) {
+      console.error('Error fetching live sessions for HOD:', err);
+    } finally {
+      setLoadingLive(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchLiveSessions();
+    const interval = setInterval(fetchLiveSessions, 10000);
+    return () => clearInterval(interval);
+  }, [token]);
+
+  const calcLiveTimer = (startTime) => {
+    if (!startTime) return '00:00';
+    const elapsed = Math.max(0, Math.floor((nowClock - new Date(startTime).getTime()) / 1000));
+    const hrs = Math.floor(elapsed / 3600);
+    const mins = Math.floor((elapsed % 3600) / 60);
+    const secs = elapsed % 60;
+    if (hrs > 0) {
+      return `${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    }
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
+
   const deptName = user?.department || user?.branch || 'Department';
 
   const handleDispatchDepartmentAtRisk = async () => {
@@ -148,6 +194,79 @@ const HODAttendanceDashboard = () => {
       </div>
 
       {error && <div className="hod-att-error">{error}</div>}
+
+      {/* Real-Time Live Department Classes In Session */}
+      <div className="hod-live-classes-panel">
+        <div className="hod-live-panel-header">
+          <div className="hod-live-title-row">
+            <span className="hod-live-pulsing-badge">
+              <span className="hod-radar-dot"></span> LIVE DEPARTMENT TELEMETRY
+            </span>
+            <span className="hod-live-count-chip">
+              {liveSessions.length} {liveSessions.length === 1 ? 'Class' : 'Classes'} In Session
+            </span>
+          </div>
+          <a href="/faculty/attendance" className="hod-btn-smart-monitor">
+            📡 Open Live Classes Console ➔
+          </a>
+        </div>
+
+        {liveSessions.length === 0 ? (
+          <div className="hod-live-empty-strip">
+            <span>🟢 No department lectures currently in session. Classes on recess or waiting for next scheduled timetable slot.</span>
+            <button type="button" className="btn-refresh-live" onClick={fetchLiveSessions} disabled={loadingLive}>
+              🔄 Refresh
+            </button>
+          </div>
+        ) : (
+          <div className="hod-live-cards-grid">
+            {liveSessions.map((sess) => {
+              const present = sess.totalPresent || 0;
+              const enrolled = sess.totalEnrolled || 0;
+              const pct = enrolled > 0 ? Math.round((present / enrolled) * 100) : 0;
+
+              return (
+                <div key={sess._id} className="hod-live-card animate-fade">
+                  <div className="hod-live-card-top">
+                    <div>
+                      <div className="hod-card-badge-row">
+                        <span className="hod-live-tag">🔴 LIVE</span>
+                        <span className="hod-period-tag">Period {sess.period || '1'}</span>
+                      </div>
+                      <h4 className="hod-card-subj">{sess.subjectId?.name || sess.subject?.name || 'Class'}</h4>
+                      <span className="hod-card-code">{sess.subjectId?.code || sess.subject?.code || ''}</span>
+                    </div>
+                    <div className="hod-live-timer-box">
+                      <span className="hod-timer-val">⏱️ {calcLiveTimer(sess.actualStartTime)}</span>
+                      <span className="hod-timer-lbl">Elapsed</span>
+                    </div>
+                  </div>
+
+                  <div className="hod-live-details">
+                    <div><strong>Faculty:</strong> {sess.facultyId?.name || 'Instructor'} {sess.facultyId?.designation ? `(${sess.facultyId.designation})` : ''}</div>
+                    <div><strong>Room:</strong> {sess.roomId?.buildingName} {sess.roomId?.roomNumber || 'Room'} &bull; <span className="text-success">30m Geofence</span></div>
+                    <div><strong>Cohort:</strong> {sess.academicYear} &bull; {sess.branch} &bull; Section {sess.section}</div>
+                  </div>
+
+                  <div className="hod-live-progress-box">
+                    <div className="hod-progress-lbls">
+                      <span>Turnout: <strong>{present} / {enrolled}</strong></span>
+                      <span className="text-success font-bold">{pct}%</span>
+                    </div>
+                    <div className="hod-progress-track">
+                      <div className="hod-progress-fill" style={{ width: `${Math.min(100, pct)}%` }}></div>
+                    </div>
+                  </div>
+
+                  <a href="/faculty/attendance" className="hod-btn-inspect">
+                    👁️ Inspect Live Roster &amp; QR
+                  </a>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
 
       {/* Metrics Ribbon */}
       <div className="hod-metrics-ribbon">

@@ -4,73 +4,93 @@
 
 .cb-ai-fab-container {
   position: fixed;
-  bottom: 24px;
-  right: 28px;
-  z-index: 9999;
+  bottom: 20px;
+  right: 24px;
+  z-index: 1050;
   display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 8px;
+  align-items: center;
+  justify-content: center;
   font-family: inherit;
 }
 
 .cb-ai-fab-button {
+  width: 40px;
+  height: 40px;
+  min-width: 40px;
+  min-height: 40px;
+  border-radius: 50%;
+  padding: 0;
+  margin: 0;
   display: flex;
   align-items: center;
-  gap: 10px;
+  justify-content: center;
   background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 50%, #d946ef 100%);
   color: #ffffff;
   border: 1px solid rgba(255, 255, 255, 0.25);
-  border-radius: 9999px;
-  padding: 12px 22px;
-  font-size: 0.95rem;
-  font-weight: 700;
   cursor: pointer;
-  box-shadow: 0 8px 30px rgba(124, 58, 237, 0.45), 0 2px 10px rgba(0, 0, 0, 0.2);
-  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 4px 14px rgba(124, 58, 237, 0.4), 0 2px 6px rgba(0, 0, 0, 0.2);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   position: relative;
-  overflow: hidden;
 }
 
 .cb-ai-fab-button:hover {
-  transform: translateY(-3px) scale(1.02);
-  box-shadow: 0 12px 35px rgba(124, 58, 237, 0.6), 0 4px 15px rgba(0, 0, 0, 0.25);
+  transform: translateY(-2px) scale(1.06);
+  box-shadow: 0 6px 18px rgba(124, 58, 237, 0.55), 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.cb-ai-fab-button:focus-visible {
+  outline: 2px solid #a855f7;
+  outline-offset: 2px;
 }
 
 .cb-ai-fab-button:active {
-  transform: translateY(0) scale(0.98);
+  transform: translateY(0) scale(0.96);
 }
 
 .cb-ai-fab-avatar {
-  font-size: 1.3rem;
+  font-size: 1.15rem;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   animation: cb-ai-pulse 2.5s infinite;
 }
 
-.cb-ai-fab-text {
-  letter-spacing: -0.01em;
-}
-
-.cb-ai-fab-context-pill {
-  background: rgba(0, 0, 0, 0.25);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  color: #f1f5f9;
-  font-size: 0.75rem;
-  padding: 2px 8px;
-  border-radius: 9999px;
-  max-width: 140px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
 .cb-ai-fab-error-badge {
+  position: absolute;
+  top: -3px;
+  right: -3px;
   background: #ef4444;
   color: white;
-  font-size: 0.7rem;
+  font-size: 0.65rem;
   font-weight: 800;
-  padding: 2px 6px;
+  min-width: 16px;
+  height: 16px;
   border-radius: 9999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 3px;
+  border: 1.5px solid #0f172a;
   animation: cb-ai-bounce 1.5s infinite;
+}
+
+@media (max-width: 768px) {
+  .cb-ai-fab-container {
+    bottom: 16px;
+    right: 16px;
+  }
+
+  .cb-ai-fab-button {
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .cb-ai-fab-avatar {
+    font-size: 1.25rem;
+  }
 }
 
 /* Modal Window */

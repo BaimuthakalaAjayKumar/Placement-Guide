@@ -20,6 +20,20 @@ const LAB_LANGUAGES = [
     { key: 'sql', label: 'SQL', icon: '🗄️', ext: '.sql', placeholder: '-- SQL Reference Schema & Queries\nCREATE DATABASE IF NOT EXISTS StudentManagement;\nUSE StudentManagement;\n\nCREATE TABLE Students (\n    student_id INT PRIMARY KEY,\n    name VARCHAR(100) NOT NULL\n);' },
 ];
 
+const toOrdinalAcademicYear = (val) => {
+    if (!val) return 'N/A';
+    const str = String(val).trim();
+    if (/^1(st)?(\s*year)?$/i.test(str) || str === 'I') return '1st Year';
+    if (/^2(nd)?(\s*year)?$/i.test(str) || str === 'II') return '2nd Year';
+    if (/^3(rd)?(\s*year)?$/i.test(str) || str === 'III') return '3rd Year';
+    if (/^4(th)?(\s*year)?$/i.test(str) || str === 'IV' || /final/i.test(str)) return '4th Year';
+    if (str === '2026') return '4th Year';
+    if (str === '2027') return '3rd Year';
+    if (str === '2028') return '2nd Year';
+    if (str === '2029') return '1st Year';
+    return str.toLowerCase().includes('year') ? str : `${str} Year`;
+};
+
 const FacultyDashboard = () => {
     const { user } = useAuth();
     const location = useLocation();
@@ -1517,7 +1531,7 @@ const FacultyDashboard = () => {
                                     {selectedStudent.name}
                                 </h3>
                                 <span className="student-year-pill" style={{ background: 'rgba(99, 102, 241, 0.15)', color: '#a5b4fc', border: '1px solid rgba(99, 102, 241, 0.35)', padding: '3px 10px', borderRadius: '6px', fontSize: '12px', fontWeight: 600 }}>
-                                    📅 Year: {selectedStudent.academicYear || selectedStudent.year || 'N/A'}
+                                    📅 Year: {toOrdinalAcademicYear(selectedStudent.academicYear || selectedStudent.year)}
                                 </span>
                                 <span className="student-scope-pill" style={{ background: 'rgba(16, 185, 129, 0.15)', color: '#34d399', border: '1px solid rgba(16, 185, 129, 0.35)', padding: '3px 10px', borderRadius: '6px', fontSize: '12px', fontWeight: 600 }}>
                                     🏢 Branch: {selectedStudent.branch || 'N/A'}
@@ -2292,13 +2306,6 @@ const FacultyDashboard = () => {
                         >
                             🎓 Marks &amp; CGPA Evaluator
                         </button>
-
-                        <button
-                            className={`faculty-tab-btn ${activeTab === 'placement-export' ? 'active' : ''}`}
-                            onClick={() => { setActiveTab('placement-export'); setError(null); setSuccessMsg(''); }}
-                        >
-                            📑 Stats &amp; Report Export
-                        </button>
                         <button
                             className={`faculty-tab-btn ${activeTab === 'subjects' ? 'active' : ''}`}
                             onClick={() => { setActiveTab('subjects'); setError(null); setSuccessMsg(''); }}
@@ -2478,7 +2485,7 @@ const FacultyDashboard = () => {
                                                             <td>{student.email}</td>
                                                             <td>
                                                                 <span className="code-pill" style={{ fontSize: '12px', background: 'rgba(99, 102, 241, 0.12)', color: '#c7d2fe', border: '1px solid rgba(99, 102, 241, 0.25)' }}>
-                                                                    {student.academicYear || student.year || 'N/A'}
+                                                                    {toOrdinalAcademicYear(student.academicYear || student.year)}
                                                                 </span>
                                                             </td>
                                                             <td>

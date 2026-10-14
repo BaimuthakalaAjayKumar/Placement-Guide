@@ -36,3 +36,8 @@ export async function logoutUser(): Promise<{ success: boolean; message?: string
     return { success: true };
   }
 }
+
+export async function updateUserProfile(data: Partial<User>): Promise<{ success: boolean; data: User; error?: string }> {
+  const response = await apiClient.put<{ success: boolean; data: User; error?: string }>('/api/auth/profile', data);
+  return response.data;
+}

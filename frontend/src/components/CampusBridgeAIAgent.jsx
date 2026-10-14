@@ -340,15 +340,12 @@ const CampusBridgeAIAgent = () => {
             type="button"
             className="cb-ai-fab-button"
             onClick={() => setIsAIAgentOpen(true)}
-            title="Open CampusBridge AI Agent"
+            title="Ask CampusBridge AI"
+            aria-label="Ask CampusBridge AI"
           >
-            <span className="cb-ai-fab-avatar">🤖</span>
-            <span className="cb-ai-fab-text">Ask CampusBridge AI</span>
-            <span className="cb-ai-fab-context-pill">
-              📍 {currentPage.split(' ')[0]}
-            </span>
+            <span className="cb-ai-fab-avatar" aria-hidden="true">🤖</span>
             {visibleErrors.length > 0 && (
-              <span className="cb-ai-fab-error-badge" title="Errors detected on screen">
+              <span className="cb-ai-fab-error-badge" title="Errors detected on screen" aria-label={`${visibleErrors.length} errors detected`}>
                 {visibleErrors.length}
               </span>
             )}

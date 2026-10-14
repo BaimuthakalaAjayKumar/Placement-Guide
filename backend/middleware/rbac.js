@@ -12,7 +12,7 @@ const {
   getRolePermissions,
   hasRolePermission
 } = require('../config/permissions');
-const { isSuperAdmin } = require('../utils/scopeFilter');
+const { isSuperAdmin, isCampusScopedAdmin } = require('../utils/scopeFilter');
 
 /**
  * Middleware: Enforce that the authenticated user possesses one or more required permissions.
@@ -237,6 +237,8 @@ module.exports = {
   requireScope,
   checkOwnership,
   userHasPermission,
+  isSuperAdmin,
+  isCampusScopedAdmin,
   PERMISSIONS,
   ROLES
 };

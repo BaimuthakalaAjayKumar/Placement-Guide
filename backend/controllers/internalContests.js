@@ -13,86 +13,144 @@ const {
 } = require('../services/plagiarismService');
 const sendEmail = require('../utils/sendEmail');
 
-// @desc    Create an internal contest
+const isContestManager = (role) => ['placement_officer', 'admin', 'super_admin'].includes(role);
+
+// @desc    Create a contest (Placement Officer & Admin)
 // @route   POST /api/contests/internal
-// @access  Private/Admin
+// @access  Private/Placement Officer & Admin
 exports.createContest = async (req, res, next) => {
   try {
-    if (req.user.role !== 'admin') {
-      return res.status(403).json({ success: false, error: 'Only admins can perform this action' });
+    if (!isContestManager(req.user.role)) {
+      return res.status(403).json({ success: false, error: 'Only Placement Officers and Administrators can manage coding contests.' });
     }
 
-    const { title, description, startTime, endTime, duration, questions } = req.body;
-    if (!title || !startTime || !endTime || !duration || !questions || questions.length === 0) {
-      return res.status(400).json({ success: false, error: 'Please provide all required fields' });
-    }
-
-    const contest = await Contest.create({
+    const {
       title,
       description,
       startTime,
       endTime,
       duration,
       questions,
-      createdBy: req.user.id
+      curatedQuestions,
+      platform,
+      officialContestUrl,
+      contestCode,
+      isPublished,
+      status
+    } = req.body;
+
+    if (!title || !startTime || !endTime || !duration) {
+      return res.status(400).json({ success: false, error: 'Please provide title, start time, end time, and duration.' });
+    }
+
+    const start = new Date(startTime);
+    const end = new Date(endTime);
+    if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+      return res.status(400).json({ success: false, error: 'Please provide valid start and end timestamps.' });
+    }
+    if (end <= start) {
+      return res.status(400).json({ success: false, error: 'Contest end time must be strictly after start time.' });
+    }
+
+    const durationNum = parseInt(duration, 10);
+    if (isNaN(durationNum) || durationNum <= 0) {
+      return res.status(400).json({ success: false, error: 'Duration must be a positive integer in minutes.' });
+    }
+
+    const contest = await Contest.create({
+      title: title.trim(),
+      description: description || '',
+      platform: platform || 'internal',
+      officialContestUrl: officialContestUrl || '',
+      contestCode: contestCode || '',
+      startTime: start,
+      endTime: end,
+      duration: durationNum,
+      questions: Array.isArray(questions) ? questions : [],
+      curatedQuestions: Array.isArray(curatedQuestions) ? curatedQuestions : [],
+      isPublished: isPublished === true || status === 'published',
+      status: status || (isPublished ? 'published' : 'draft'),
+      createdBy: req.user.id || req.user._id,
+      updatedBy: req.user.id || req.user._id
     });
 
-    // Notify all students via email (asynchronous background operation)
-    User.find({ role: 'student' })
-      .select('email name')
-      .then(students => {
-        console.log("==================================");
-        console.log("Contest Students Found:", students.length);
-        console.log(students);
-        console.log("==================================");
-        students.forEach(student => {
-          sendEmail({
-            to: student.email,
-            subject: `New Internal Contest Scheduled: ${title}`,
-            text: `Hello ${student.name},\n\nA new internal coding contest has been scheduled: "${title}".\n\nStart Time: ${new Date(startTime).toLocaleString()}\nDuration: ${duration} minutes\n\nLog in to PrepPortal to view details.\n\nPrepPortal Team`,
-            html: `
-              <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 5px;">
-                <h2 style="color: #6366f1; border-bottom: 2px solid #6366f1; padding-bottom: 10px;">New Internal Contest Scheduled</h2>
-                <p>Hello <strong>${student.name}</strong>,</p>
-                <p>A new internal coding contest has been added to PrepPortal. Here are the details:</p>
-                <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
-                  <tr style="background-color: #f8fafc;">
-                    <td style="padding: 10px; border: 1px solid #e2e8f0; font-weight: bold; width: 30%;">Contest Title</td>
-                    <td style="padding: 10px; border: 1px solid #e2e8f0;">${title}</td>
-                  </tr>
-                  <tr>
-                    <td style="padding: 10px; border: 1px solid #e2e8f0; font-weight: bold;">Description</td>
-                    <td style="padding: 10px; border: 1px solid #e2e8f0;">${description || 'No description provided.'}</td>
-                  </tr>
-                  <tr style="background-color: #f8fafc;">
-                    <td style="padding: 10px; border: 1px solid #e2e8f0; font-weight: bold;">Start Time</td>
-                    <td style="padding: 10px; border: 1px solid #e2e8f0;">${new Date(startTime).toLocaleString()}</td>
-                  </tr>
-                  <tr>
-                    <td style="padding: 10px; border: 1px solid #e2e8f0; font-weight: bold;">End Time</td>
-                    <td style="padding: 10px; border: 1px solid #e2e8f0;">${new Date(endTime).toLocaleString()}</td>
-                  </tr>
-                  <tr style="background-color: #f8fafc;">
-                    <td style="padding: 10px; border: 1px solid #e2e8f0; font-weight: bold;">Duration</td>
-                    <td style="padding: 10px; border: 1px solid #e2e8f0;">${duration} minutes</td>
-                  </tr>
-                </table>
-                <p style="margin-top: 20px;">Please log in to your account and navigate to the Coding Contests section to take the contest when it starts.</p>
-                <div style="margin-top: 30px; border-top: 1px solid #e2e8f0; padding-top: 15px; font-size: 12px; color: #64748b;">
-                  This is an automated notification from PrepPortal. Please do not reply directly to this email.
-                </div>
-              </div>
-            `
-          }).catch(err => {
-            console.error(`Failed to send email to ${student.email}:`, err);
-          });
-        });
-      })
-      .catch(err => {
-        console.error('Failed to fetch students for contest email notification:', err);
-      });
-
     res.status(201).json({
+      success: true,
+      data: contest
+    });
+  } catch (err) {
+    if (typeof next === 'function') next(err);
+    else res.status(500).json({ success: false, error: err.message });
+  }
+};
+
+// @desc    Update a contest (Placement Officer & Admin)
+// @route   PUT /api/contests/internal/:id
+// @access  Private/Placement Officer & Admin
+exports.updateContest = async (req, res, next) => {
+  try {
+    if (!isContestManager(req.user.role)) {
+      return res.status(403).json({ success: false, error: 'Only Placement Officers and Administrators can manage coding contests.' });
+    }
+
+    const contest = await Contest.findById(req.params.id);
+    if (!contest) {
+      return res.status(404).json({ success: false, error: 'Contest not found' });
+    }
+
+    const {
+      title,
+      description,
+      startTime,
+      endTime,
+      duration,
+      questions,
+      curatedQuestions,
+      platform,
+      officialContestUrl,
+      contestCode,
+      isPublished,
+      status
+    } = req.body;
+
+    if (startTime && endTime) {
+      const start = new Date(startTime);
+      const end = new Date(endTime);
+      if (end <= start) {
+        return res.status(400).json({ success: false, error: 'Contest end time must be strictly after start time.' });
+      }
+      contest.startTime = start;
+      contest.endTime = end;
+    } else if (startTime) {
+      const start = new Date(startTime);
+      if (contest.endTime <= start) {
+        return res.status(400).json({ success: false, error: 'Contest end time must be after start time.' });
+      }
+      contest.startTime = start;
+    } else if (endTime) {
+      const end = new Date(endTime);
+      if (end <= contest.startTime) {
+        return res.status(400).json({ success: false, error: 'Contest end time must be after start time.' });
+      }
+      contest.endTime = end;
+    }
+
+    if (title) contest.title = title.trim();
+    if (description !== undefined) contest.description = description;
+    if (platform) contest.platform = platform;
+    if (officialContestUrl !== undefined) contest.officialContestUrl = officialContestUrl;
+    if (contestCode !== undefined) contest.contestCode = contestCode;
+    if (duration) contest.duration = parseInt(duration, 10);
+    if (questions) contest.questions = questions;
+    if (curatedQuestions) contest.curatedQuestions = curatedQuestions;
+    if (isPublished !== undefined) contest.isPublished = isPublished;
+    if (status) contest.status = status;
+    contest.updatedBy = req.user.id;
+    contest.updatedAt = new Date();
+
+    await contest.save();
+
+    res.status(200).json({
       success: true,
       data: contest
     });
@@ -101,14 +159,83 @@ exports.createContest = async (req, res, next) => {
   }
 };
 
-// @desc    Get all internal contests
+// @desc    Publish a contest (Placement Officer & Admin)
+// @route   PUT /api/contests/internal/:id/publish
+// @access  Private/Placement Officer & Admin
+exports.publishContest = async (req, res, next) => {
+  try {
+    if (!isContestManager(req.user.role)) {
+      return res.status(403).json({ success: false, error: 'Only Placement Officers and Administrators can publish contests.' });
+    }
+
+    const contest = await Contest.findById(req.params.id);
+    if (!contest) {
+      return res.status(404).json({ success: false, error: 'Contest not found' });
+    }
+
+    contest.isPublished = true;
+    contest.status = 'published';
+    contest.updatedBy = req.user.id;
+    contest.updatedAt = new Date();
+    await contest.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Contest published successfully.',
+      data: contest
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// @desc    Cancel a contest (Placement Officer & Admin)
+// @route   PUT /api/contests/internal/:id/cancel
+// @access  Private/Placement Officer & Admin
+exports.cancelContest = async (req, res, next) => {
+  try {
+    if (!isContestManager(req.user.role)) {
+      return res.status(403).json({ success: false, error: 'Only Placement Officers and Administrators can cancel contests.' });
+    }
+
+    const contest = await Contest.findById(req.params.id);
+    if (!contest) {
+      return res.status(404).json({ success: false, error: 'Contest not found' });
+    }
+
+    contest.isPublished = false;
+    contest.status = 'cancelled';
+    contest.updatedBy = req.user.id;
+    contest.updatedAt = new Date();
+    await contest.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Contest cancelled successfully.',
+      data: contest
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// @desc    Get all contests (Students see published; Managers see all)
 // @route   GET /api/contests/internal
 // @access  Private
 exports.getContests = async (req, res, next) => {
   try {
-    const contests = await Contest.find()
-      .populate('createdBy', 'name')
+    const isManager = isContestManager(req.user?.role);
+    const filter = {};
+    if (!isManager) {
+      // Students only view published, non-cancelled contests
+      filter.isPublished = true;
+      filter.status = { $ne: 'cancelled' };
+    }
+
+    const contests = await Contest.find(filter)
+      .populate('createdBy', 'name email role')
       .populate('questions', 'title difficulty')
+      .populate('curatedQuestions', 'title difficulty platform officialUrl')
       .sort({ startTime: -1 });
 
     res.status(200).json({

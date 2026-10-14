@@ -5,6 +5,7 @@ const {
   getStudentProgress,
   createAdmin,
   createFaculty,
+  createStaffMember,
   getStaff,
   updateStaffScopes,
   deleteStaffScope,
@@ -47,10 +48,11 @@ router.put('/students/:id/academics', protect, authorize('admin'), updateStudent
 router.delete('/students/:id', protect, authorize('admin'), deleteStudent);
 router.post('/admins', protect, authorize('admin'), createAdmin);
 router.post('/faculty', protect, authorize('admin'), createFaculty);
-router.get('/staff', protect, authorize('admin', 'director', 'principal'), getStaff);
-router.put('/staff/:id/scopes', protect, authorize('admin'), updateStaffScopes);
-router.delete('/staff/:id/scopes/:scopeId', protect, authorize('admin'), deleteStaffScope);
-router.put('/staff/:id/reset-password', protect, authorize('admin'), resetStaffPassword);
-router.delete('/staff/:id', protect, authorize('admin'), deleteStaff);
+router.post('/staff', protect, authorize('admin', 'super_admin', 'campus_admin', 'administrator'), createStaffMember);
+router.get('/staff', protect, authorize('admin', 'super_admin', 'campus_admin', 'administrator', 'director', 'principal'), getStaff);
+router.put('/staff/:id/scopes', protect, authorize('admin', 'super_admin', 'campus_admin', 'administrator'), updateStaffScopes);
+router.delete('/staff/:id/scopes/:scopeId', protect, authorize('admin', 'super_admin', 'campus_admin', 'administrator'), deleteStaffScope);
+router.put('/staff/:id/reset-password', protect, authorize('admin', 'super_admin', 'campus_admin', 'administrator'), resetStaffPassword);
+router.delete('/staff/:id', protect, authorize('admin', 'super_admin', 'campus_admin', 'administrator'), deleteStaff);
 
 module.exports = router;

@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import Header from '../components/Header';
 import FacultyTestBuilder from '../components/FacultyTestBuilder';
 import PlacementStatsExport from '../components/PlacementStatsExport';
+import AcademicScopeReviewManager from '../components/AcademicScopeReviewManager';
 import { API_URL } from '../config/api';
 import './HODDashboard.css';
 
@@ -1408,6 +1409,9 @@ const HODDashboard = () => {
                 </button>
               </div>
             </div>
+
+            {/* Pending Academic Scope Requests Roster */}
+            <AcademicScopeReviewManager userRole="hod" onDecisionSuccess={fetchStudents} />
 
             {/* Students Table */}
             <div className="glass-card hod-card">

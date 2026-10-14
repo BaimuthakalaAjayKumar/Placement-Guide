@@ -828,8 +828,8 @@ h1, h2, h3, h4, h5 {
   left: 0 !important;
   right: 0 !important;
   bottom: 0 !important;
-  width: 100vw !important;
-  height: 100vh !important;
+  width: 100% !important;
+  height: 100% !important;
   background: rgba(2, 6, 23, 0.82) !important;
   backdrop-filter: blur(8px) !important;
   -webkit-backdrop-filter: blur(8px) !important;
@@ -1204,6 +1204,24 @@ h1, h2, h3, h4, h5 {
 [data-theme="light"] .human-card:hover {
   border-color: #cbd5e1;
   box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08);
+}
+
+/* Accessibility: Accessible focus rings */
+:focus-visible {
+  outline: 2px solid #6366f1;
+  outline-offset: 2px;
+}
+
+/* Accessibility: Respect reduced motion settings */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 

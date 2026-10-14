@@ -55,6 +55,9 @@ const StudentAttendanceScanner = React.lazy(() => import('./pages/StudentAttenda
 const FacultyAttendanceHistory = React.lazy(() => import('./pages/FacultyAttendanceHistory'));
 const StudentAttendance = React.lazy(() => import('./pages/StudentAttendance'));
 const HODAttendanceDashboard = React.lazy(() => import('./pages/HODAttendanceDashboard'));
+const SupportDeskPage = React.lazy(() => import('./pages/SupportDeskPage'));
+const LibraryPage = React.lazy(() => import('./pages/LibraryPage'));
+const FrontOfficePage = React.lazy(() => import('./pages/FrontOfficePage'));
 
 // Helper for home route by role
 const getRoleHome = (role) => {
@@ -64,6 +67,9 @@ const getRoleHome = (role) => {
   if (role === 'recruiter') return '/recruiter';
   if (role === 'hod') return '/hod';
   if (role === 'auditor') return '/audit-logs';
+  if (role === 'front_office') return '/front-office';
+  if (role === 'support_desk' || role === 'support_desk_supervisor') return '/support-desk';
+  if (role === 'librarian') return '/library';
   return '/dashboard';
 };
 
@@ -313,7 +319,7 @@ const AppRoutes = () => {
       <Route
         path="/change-password"
         element={
-          <PrivateRoute allowedRoles={['student', 'faculty', 'hod', 'admin', 'super_admin', 'campus_admin', 'administrator', 'recruiter', 'placement_officer', 'auditor']}>
+          <PrivateRoute allowedRoles={['student', 'faculty', 'hod', 'admin', 'super_admin', 'campus_admin', 'administrator', 'director', 'principal', 'recruiter', 'placement_officer', 'auditor', 'front_office', 'librarian', 'support_desk', 'support_desk_supervisor']}>
             <ChangePassword />
           </PrivateRoute>
         }
@@ -437,7 +443,7 @@ const AppRoutes = () => {
       <Route
         path="/profile"
         element={
-          <PrivateRoute allowedRoles={['student', 'faculty', 'hod', 'recruiter', 'admin', 'placement_officer', 'auditor']}>
+          <PrivateRoute allowedRoles={['student', 'faculty', 'hod', 'recruiter', 'admin', 'super_admin', 'campus_admin', 'administrator', 'director', 'principal', 'placement_officer', 'auditor', 'front_office', 'librarian', 'support_desk', 'support_desk_supervisor']}>
             <Profile />
           </PrivateRoute>
         }
@@ -506,6 +512,38 @@ const AppRoutes = () => {
         }
       />
       <Route
+        path="/front-office"
+        element={
+          <PrivateRoute allowedRoles={['admin', 'super_admin', 'campus_admin', 'administrator', 'auditor', 'director', 'principal', 'front_office']}>
+            <FrontOfficePage defaultTab="overview" />
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/security-gate"
+        element={
+          <PrivateRoute allowedRoles={['admin', 'super_admin', 'campus_admin', 'administrator', 'auditor', 'director', 'principal', 'front_office']}>
+            <FrontOfficePage defaultTab="security-scanner" />
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/support-desk"
+        element={
+          <PrivateRoute allowedRoles={['admin', 'super_admin', 'campus_admin', 'administrator', 'auditor', 'director', 'principal', 'hod', 'support_desk', 'support_desk_supervisor']}>
+            <SupportDeskPage />
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/library"
+        element={
+          <PrivateRoute allowedRoles={['admin', 'super_admin', 'campus_admin', 'administrator', 'auditor', 'director', 'principal', 'faculty', 'student', 'hod', 'librarian']}>
+            <LibraryPage />
+          </PrivateRoute>
+        }
+      />
+      <Route
         path="/admin/discussions"
         element={
           <PrivateRoute allowedRoles={['admin']}>
@@ -524,7 +562,7 @@ const AppRoutes = () => {
       <Route
         path="/faculty/attendance"
         element={
-          <PrivateRoute allowedRoles={['faculty', 'admin', 'campus_admin', 'super_admin']}>
+          <PrivateRoute allowedRoles={['faculty', 'admin', 'campus_admin', 'super_admin', 'director', 'principal', 'administrator', 'hod', 'auditor']}>
             <FacultyAttendanceSession />
           </PrivateRoute>
         }
@@ -532,7 +570,7 @@ const AppRoutes = () => {
       <Route
         path="/faculty/attendance/history"
         element={
-          <PrivateRoute allowedRoles={['faculty', 'admin', 'campus_admin', 'super_admin']}>
+          <PrivateRoute allowedRoles={['faculty', 'admin', 'campus_admin', 'super_admin', 'director', 'principal', 'administrator', 'hod', 'auditor']}>
             <FacultyAttendanceHistory />
           </PrivateRoute>
         }
@@ -556,7 +594,7 @@ const AppRoutes = () => {
       <Route
         path="/hod/attendance"
         element={
-          <PrivateRoute allowedRoles={['hod', 'admin', 'campus_admin', 'super_admin']}>
+          <PrivateRoute allowedRoles={['hod', 'admin', 'campus_admin', 'super_admin', 'director', 'principal', 'administrator', 'auditor']}>
             <HODAttendanceDashboard />
           </PrivateRoute>
         }
@@ -564,7 +602,7 @@ const AppRoutes = () => {
       <Route
         path="/attendance"
         element={
-          <PrivateRoute allowedRoles={['student', 'faculty', 'admin', 'campus_admin', 'super_admin', 'hod']}>
+          <PrivateRoute allowedRoles={['student', 'faculty', 'admin', 'campus_admin', 'super_admin', 'hod', 'director', 'principal', 'administrator', 'auditor']}>
             {user?.role === 'student' ? (
               <Navigate to="/attendance/scan" replace />
             ) : user?.role === 'hod' ? (

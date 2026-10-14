@@ -5,8 +5,12 @@ import Header from '../components/Header';
 import CompanyPlacementManager from '../components/CompanyPlacementManager';
 import RecruiterCredentialsManager from '../components/RecruiterCredentialsManager';
 import AtRiskDetectionModule from '../components/AtRiskDetectionModule';
-
+import AcademicScopeReviewManager from '../components/AcademicScopeReviewManager';
 import PlacementStatsExport from '../components/PlacementStatsExport';
+import FrontOfficeSecurityManager from '../components/FrontOfficeSecurityManager';
+import SupportDeskManager from '../components/SupportDeskManager';
+import PhysicalLibraryManager from '../components/PhysicalLibraryManager';
+import SuperAdminControlCenter from '../components/SuperAdminControlCenter';
 import { API_URL } from '../config/api';
 import { isSuperAdmin, isCampusAdmin } from '../utils/permissions';
 import './AdminPanel.css';
@@ -31,6 +35,49 @@ const isCoreCseTest = (test) => {
 
 const isAptitudeTest = (test) => !isCoreCseTest(test);
 
+export const isTestOrDemoClassSession = (cls) => {
+  if (!cls) return false;
+  const facultyName = (cls.facultyId?.name || '').toLowerCase();
+  const facultyEmail = (cls.facultyId?.email || '').toLowerCase();
+  const subjectName = (cls.subjectId?.name || cls.subject?.name || '').toLowerCase();
+  const subjectCode = (cls.subjectId?.code || cls.subject?.code || '').toLowerCase();
+  const roomNumber = (cls.roomId?.roomNumber || '').toLowerCase();
+  const buildingName = (cls.roomId?.buildingName || '').toLowerCase();
+  const topic = (cls.topic || '').toLowerCase();
+
+  // Explicit test / demo keywords
+  const hasTestKeyword =
+    facultyName.includes('test') ||
+    facultyName.includes('demo') ||
+    facultyEmail.includes('test') ||
+    facultyEmail.includes('demo') ||
+    subjectName.includes('test') ||
+    subjectName.includes('demo') ||
+    subjectCode.includes('test') ||
+    subjectCode.includes('demo') ||
+    roomNumber.includes('test') ||
+    roomNumber.includes('demo') ||
+    buildingName.includes('test') ||
+    buildingName.includes('demo') ||
+    topic.includes('test') ||
+    topic.includes('demo');
+
+  if (hasTestKeyword) return true;
+
+  // Placeholder / mock attributes matching reported test class cards:
+  // Dr. Test Faculty / Assigned Staff / Academic Class / Room with Turnout: 0 / 0
+  const isPlaceholderFaculty = !facultyName || facultyName === 'faculty' || facultyName.includes('assigned staff');
+  const isPlaceholderSubject = !cls.subjectId && !cls.subject?.name;
+  const isPlaceholderRoom = !cls.roomId?.roomNumber && !cls.roomId?.buildingName;
+  const isZeroTurnout = (cls.totalPresent || 0) === 0 && (cls.totalEnrolled || 0) === 0;
+
+  if (isZeroTurnout && (isPlaceholderFaculty || isPlaceholderSubject || isPlaceholderRoom)) {
+    return true;
+  }
+
+  return false;
+};
+
 const getImageUrl = (path) => {
   if (!path) return '';
   if (path.startsWith('http://') || path.startsWith('https://')) return path;
@@ -49,14 +96,39 @@ const PLACEMENT_ALLOWED_TABS = [
   'placement-export',
   'interviews',
   'interview-settings',
-  'subject-discussions'
+  'subject-discussions',
+  'practice',
+  'practice-reports'
 ];
 
 const AUDITOR_ALLOWED_TABS = [
   'audit-logs',
   'student-audit-logs',
   'practice-reports',
-  'analytics'
+  'analytics',
+  'front-office',
+  'security-gate',
+  'support-desk',
+  'library'
+];
+
+export const SUPER_ADMIN_EXCLUDED_TABS = [
+  'lab-reports',          // Plagiarism Audit: Lab Practice Reports
+  'question-bank',        // Plagiarism Audit: Question Bank Reports
+  'subject-discussions',  // Discussion Forums
+  'discussions',          // Discussion Forums alias
+  'practice',             // Coding Playground / Practice Platforms
+  'job-opportunities',    // Placement Drives & Jobs
+  'jobs',                 // Placement Drives alias
+  'job-postings',         // Placement Drives alias
+  'company-drives',       // Placement Drives alias
+  'applied-jobs',         // Applied Jobs Report
+  'job-applications',     // Applied Jobs alias
+  'academics',            // Academics
+  'academic-content',     // Academic Hub & Projects
+  'core-subjects',        // Core CSE Subjects
+  'aptitude',             // Aptitude Tests Manager
+  'marks'                 // Marks Hub alias
 ];
 
 // Enterprise 5-Domain Navigation Matrix
@@ -160,6 +232,13 @@ const TAB_GROUPS = [
         icon: '💬',
         desc: 'Moderated academic Q&A discussions grouped by subject and branch.',
         aliases: ['discussions']
+      },
+      {
+        id: 'library',
+        label: 'Physical Library',
+        icon: '📖',
+        desc: 'Physical book catalog, copy accession tracking, issue/return circulation desk, and reservations.',
+        aliases: ['physical-library', 'books']
       }
     ]
   },
@@ -204,6 +283,13 @@ const TAB_GROUPS = [
         desc: 'Staff directory, managed academic scopes, and temporary recruiter credentialing.'
       },
       {
+        id: 'support-desk',
+        label: 'Support Desk & Campus Arrival',
+        icon: '🎫',
+        desc: 'Student lookup, campus-arrival correction tickets, dual-control approval, and audit logs.',
+        aliases: ['helpdesk', 'arrival-corrections', 'support']
+      },
+      {
         id: 'audit-logs',
         label: 'Student Audit Logs',
         icon: '📜',
@@ -215,6 +301,22 @@ const TAB_GROUPS = [
         label: 'System Registry & Settings',
         icon: '⚙️',
         desc: 'Academic directory exports and irreversible batch decommissioning.'
+      }
+    ]
+  },
+  {
+    id: 'security-frontoffice',
+    label: 'Front Office & Security',
+    icon: '🛂',
+    shortDesc: 'Visitors, Gate & Guardians',
+    desc: 'Campus visitor roster, time-limited digital passes, security gate check-in/out, and verified digital guardian cards.',
+    tabs: [
+      {
+        id: 'front-office',
+        label: 'Front Office & Security Hub',
+        icon: '🛂',
+        desc: 'Visitor registrations, gate checkpoint scanning, pass revocations, and digital guardian cards.',
+        aliases: ['visitors', 'security-gate', 'guardian-cards']
       }
     ]
   }
@@ -241,18 +343,14 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
       if (defaultTab && AUDITOR_ALLOWED_TABS.includes(defaultTab)) return defaultTab;
       return 'audit-logs';
     }
-    return tabParam || defaultTab;
+    const candidateTab = tabParam || defaultTab;
+    if (isSuperAdmin(user) && SUPER_ADMIN_EXCLUDED_TABS.includes(candidateTab)) {
+      return 'analytics';
+    }
+    return candidateTab;
   };
 
   const initialTab = getInitialTab();
-
-  const SUPER_ADMIN_EXCLUDED_TABS = [
-    'lab-reports',          // Plagiarism Audit: Lab Practice Reports
-    'question-bank',        // Plagiarism Audit: Question Bank Reports
-    'subject-discussions',  // Discussion Forums
-    'discussions',          // Discussion Forums alias
-    'practice'              // Coding Playground / Practice Platforms
-  ];
 
   const isTabAllowedForRole = (tabId) => {
     if (isFaculty) return tabId === 'applied-jobs' || tabId === 'job-applications';
@@ -330,7 +428,7 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
 
   // Lists
   const [students, setStudents] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
@@ -392,6 +490,57 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
   const [refreshingOverview, setRefreshingOverview] = useState(false);
   const [lastRefreshedAt, setLastRefreshedAt] = useState(new Date());
 
+  // Live Campus Classes Telemetry (Phase 4 & Live Classes)
+  const [liveCampusClasses, setLiveCampusClasses] = useState([]);
+  const [loadingLiveCampusClasses, setLoadingLiveCampusClasses] = useState(false);
+  const [liveClockNow, setLiveClockNow] = useState(Date.now());
+
+  const displayedLiveCampusClasses = isSuperAdmin(user)
+    ? liveCampusClasses.filter((cls) => !isTestOrDemoClassSession(cls))
+    : liveCampusClasses;
+
+  // Second-by-second live ticking clock
+  useEffect(() => {
+    const clockTimer = setInterval(() => setLiveClockNow(Date.now()), 1000);
+    return () => clearInterval(clockTimer);
+  }, []);
+
+  const fetchLiveCampusClasses = async () => {
+    if (!token) return;
+    try {
+      setLoadingLiveCampusClasses(true);
+      const res = await fetch(`${API_URL}/attendance/sessions/active`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (data?.success) {
+        setLiveCampusClasses(Array.isArray(data.sessions) ? data.sessions : []);
+      }
+    } catch (err) {
+      // non-fatal
+    } finally {
+      setLoadingLiveCampusClasses(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchLiveCampusClasses();
+    const interval = setInterval(fetchLiveCampusClasses, 10000);
+    return () => clearInterval(interval);
+  }, [token]);
+
+  const calcCampusLiveTimer = (startTime) => {
+    if (!startTime) return '00:00';
+    const elapsed = Math.max(0, Math.floor((liveClockNow - new Date(startTime).getTime()) / 1000));
+    const hrs = Math.floor(elapsed / 3600);
+    const mins = Math.floor((elapsed % 3600) / 60);
+    const secs = elapsed % 60;
+    if (hrs > 0) {
+      return `${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    }
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
+
   // Phase 6 Operational System Health State
   const [systemHealth, setSystemHealth] = useState({
     status: 'checking', // 'checking' | 'healthy' | 'degraded' | 'offline'
@@ -409,6 +558,7 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
 
   // Aptitude Tests Manager States
   const [aptitudeTests, setAptitudeTests] = useState([]);
+  const [loadingTests, setLoadingTests] = useState(false);
   const [selectedTest, setSelectedTest] = useState(null);
   const [examForm, setExamForm] = useState({ title: '', description: '', category: 'subject', duration: 30, academicYear: '', branch: '', section: '', subject: '', questionLimit: 20 });
   const [creatingExam, setCreatingExam] = useState(false);
@@ -749,7 +899,8 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
         fetchAuditStats(),
         fetchPlacementDrives(),
         fetchAtRiskSummary(),
-        fetchSystemHealth()
+        fetchSystemHealth(),
+        fetchLiveCampusClasses()
       ]);
       setLastRefreshedAt(new Date());
     } finally {
@@ -1044,6 +1195,7 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
   const fetchAptitudeTests = async () => {
     try {
       setLoading(true);
+      setLoadingTests(true);
       const res = await fetch(`${API_URL}/tests`, {
         headers: {
           Authorization: `Bearer ${token}`
@@ -1051,7 +1203,7 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
       });
       const data = await res.json();
       if (data.success) {
-        setAptitudeTests(data.data);
+        setAptitudeTests(Array.isArray(data.data) ? data.data : []);
       } else {
         setError(data.error || 'Failed to retrieve aptitude tests.');
       }
@@ -1059,6 +1211,7 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
       setError('Could not connect to aptitude test server.');
     } finally {
       setLoading(false);
+      setLoadingTests(false);
     }
   };
 
@@ -1849,8 +2002,9 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
 
       if (activeTab === 'analytics') {
         refreshOverviewMetrics();
-      } else if (activeTab === 'job-opportunities' || activeTab === 'jobs' || activeTab === 'job-postings') {
+      } else if (activeTab === 'job-opportunities' || activeTab === 'jobs' || activeTab === 'job-postings' || activeTab === 'company-drives') {
         fetchJobs();
+        fetchPlacementDrives();
       } else if (activeTab === 'applied-jobs' || activeTab === 'job-applications') {
         fetchJobs();
         fetchApplicationsReport();
@@ -3337,15 +3491,6 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
     document.body.removeChild(link);
   };
 
-  if (loading && !showQuestionsModal && !showAttemptsModal) {
-    return (
-      <div className="dashboard-loading-container">
-        <div className="spinner-loader"></div>
-        <p>Loading Admin Console metrics...</p>
-      </div>
-    );
-  }
-
 
 
   const fetchInterviewMetadata = async () => {
@@ -3807,6 +3952,7 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
   };
 
   const handleSelectTab = (tabId) => {
+    if (!isTabAllowedForRole(tabId)) return;
     safeSetActiveTab(tabId);
     triggerTabLoaders(tabId);
   };
@@ -3837,9 +3983,10 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
   const allFlattenedTabs = TAB_GROUPS.flatMap((g) => g.tabs);
   const currentTabObj = allFlattenedTabs.find((t) => t.id === activeTab || (t.aliases && t.aliases.includes(activeTab))) || allFlattenedTabs[0];
 
-  const visibleGroups = TAB_GROUPS.filter((group) =>
-    group.tabs.some((tab) => isTabAllowedForRole(tab.id))
-  );
+  const visibleGroups = TAB_GROUPS.filter((group) => {
+    if (isSuperAdmin(user) && group.id === 'academics') return false;
+    return group.tabs.some((tab) => isTabAllowedForRole(tab.id));
+  });
 
   const visibleSubTabs = (currentGroupObj?.tabs || []).filter((tab) =>
     isTabAllowedForRole(tab.id)
@@ -3849,7 +3996,9 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
     <>
       <Header
         title={
-          currentTabObj
+          isSuperAdmin(user) && activeTab === 'analytics'
+            ? 'SaaS Platform Control Center • CampusBridge'
+            : currentTabObj
             ? `${currentTabObj.label} • CampusBridge Console`
             : 'Admin Command Console'
         }
@@ -4162,11 +4311,11 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
           <div className="admin-hero-top-row">
             <div className="admin-hero-breadcrumb-wrap">
               <div className="admin-hero-breadcrumb-bar">
-                <span className="breadcrumb-root">⚡ Command Center</span>
+                <span className="breadcrumb-root">⚡ {isSuperAdmin(user) ? 'SaaS Control Center' : 'Command Center'}</span>
                 <span className="breadcrumb-sep">›</span>
-                <span className="breadcrumb-domain">{currentGroupObj.icon} {currentGroupObj.label}</span>
+                <span className="breadcrumb-domain">{currentGroupObj.icon} {isSuperAdmin(user) && activeGroup === 'overview' ? 'Platform Governance' : currentGroupObj.label}</span>
                 <span className="breadcrumb-sep">›</span>
-                <span className="breadcrumb-active-view">{currentTabObj?.label}</span>
+                <span className="breadcrumb-active-view">{isSuperAdmin(user) && activeTab === 'analytics' ? 'Platform Control Center' : currentTabObj?.label}</span>
               </div>
               <span className="admin-hero-badge">
                 <span className="admin-hero-status-pulse" />
@@ -4175,27 +4324,31 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
             </div>
 
             <div className="admin-hero-actions">
-              <button
-                type="button"
-                className="admin-hero-action-btn admin-hero-btn-naac"
-                onClick={() => window.dispatchEvent(new CustomEvent('open_naac_modal'))}
-                title="Generate NAAC Criteria 5.2.1 Audit Dossier"
-                id="hero-naac-btn"
-              >
-                <span className="btn-icon">📜</span>
-                <span>NAAC 5.2 Dossier</span>
-              </button>
+              {!isSuperAdmin(user) && (
+                <>
+                  <button
+                    type="button"
+                    className="admin-hero-action-btn admin-hero-btn-naac"
+                    onClick={() => window.dispatchEvent(new CustomEvent('open_naac_modal'))}
+                    title="Generate NAAC Criteria 5.2.1 Audit Dossier"
+                    id="hero-naac-btn"
+                  >
+                    <span className="btn-icon">📜</span>
+                    <span>NAAC 5.2 Dossier</span>
+                  </button>
 
-              <button
-                type="button"
-                className="admin-hero-action-btn admin-hero-btn-heatmap"
-                onClick={() => window.dispatchEvent(new CustomEvent('open_skillgap_modal'))}
-                title="Open Department Skill-Gap Heatmap"
-                id="hero-skillgap-btn"
-              >
-                <span className="btn-icon">📊</span>
-                <span>Skill-Gap Heatmap</span>
-              </button>
+                  <button
+                    type="button"
+                    className="admin-hero-action-btn admin-hero-btn-heatmap"
+                    onClick={() => window.dispatchEvent(new CustomEvent('open_skillgap_modal'))}
+                    title="Open Department Skill-Gap Heatmap"
+                    id="hero-skillgap-btn"
+                  >
+                    <span className="btn-icon">📊</span>
+                    <span>Skill-Gap Heatmap</span>
+                  </button>
+                </>
+              )}
 
               <button
                 type="button"
@@ -4214,10 +4367,14 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
           <div className="admin-hero-main-row">
             <div className="admin-hero-titles">
               <h1 className="admin-hero-title">
-                {currentTabObj ? `${currentTabObj.icon} ${currentTabObj.label}` : 'Administration Portal'}
+                {isSuperAdmin(user) && activeTab === 'analytics'
+                  ? '🌐 SaaS Platform Control Center'
+                  : currentTabObj ? `${currentTabObj.icon} ${currentTabObj.label}` : 'Administration Portal'}
               </h1>
               <p className="admin-hero-subtitle">
-                {currentTabObj?.desc || currentGroupObj?.desc}
+                {isSuperAdmin(user) && activeTab === 'analytics'
+                  ? 'Software service provider management, institutional tenant oversight, system diagnostics, and audit governance.'
+                  : (currentTabObj?.desc || currentGroupObj?.desc)}
               </p>
             </div>
 
@@ -4350,6 +4507,10 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
                       <span className="chip-label">Job-Ready:</span>
                       <strong className={`chip-val ${studentsError ? 'text-rose' : 'text-emerald'}`}>{studentsError ? 'Offline' : loading ? '...' : jobReadyStudents.length}</strong>
                     </div>
+                    <div className="domain-telemetry-chip">
+                      <span className="chip-label">Live Classes:</span>
+                      <strong className="chip-val text-rose">{loadingLiveCampusClasses ? '...' : `${displayedLiveCampusClasses.length} In Session`}</strong>
+                    </div>
                   </>
                 )}
                 {activeGroup === 'placements' && (
@@ -4372,15 +4533,15 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
                   <>
                     <div className="domain-telemetry-chip">
                       <span className="chip-label">Assessments:</span>
-                      <strong className="chip-val">{loadingTests ? '...' : aptitudeTests.length}</strong>
+                      <strong className="chip-val">{loadingTests ? '...' : (Array.isArray(aptitudeTests) ? aptitudeTests.length : 0)}</strong>
                     </div>
                     <div className="domain-telemetry-chip">
                       <span className="chip-label">Subjects:</span>
-                      <strong className="chip-val">{loadingAcademicContent ? '...' : academicSubjects.length}</strong>
+                      <strong className="chip-val">{loadingAcademicContent ? '...' : (Array.isArray(academicSubjects) ? academicSubjects.length : 0)}</strong>
                     </div>
                     <div className="domain-telemetry-chip">
                       <span className="chip-label">Projects:</span>
-                      <strong className="chip-val">{loadingAcademicContent ? '...' : academicProjects.length}</strong>
+                      <strong className="chip-val">{loadingAcademicContent ? '...' : (Array.isArray(academicProjects) ? academicProjects.length : 0)}</strong>
                     </div>
                   </>
                 )}
@@ -4436,6 +4597,9 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
 
         {
           activeTab === 'analytics' && (
+            isSuperAdmin(user) ? (
+              <SuperAdminControlCenter onNavigateTab={handleSelectTab} />
+            ) : (
             <>
               {/* Phase 2.1 & 4 & 5: Enterprise Telemetry Header Bar & Command Strip */}
               <div className={`admin-analytics-header-bar glass-card ${refreshingOverview ? 'is-syncing' : ''}`}>
@@ -4655,68 +4819,72 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
                 </div>
 
                 {/* 4. Active Placement Drives */}
-                <div className="glass-card admin-kpi-card">
-                  <div className="kpi-accent-stripe stripe-cyan"></div>
-                  <div className="admin-kpi-header">
-                    <span className="admin-kpi-icon-badge kpi-cyan">🏢</span>
-                    <span className="admin-kpi-tag tag-cyan">PMS Hub</span>
+                {!isSuperAdmin(user) && (
+                  <div className="glass-card admin-kpi-card">
+                    <div className="kpi-accent-stripe stripe-cyan"></div>
+                    <div className="admin-kpi-header">
+                      <span className="admin-kpi-icon-badge kpi-cyan">🏢</span>
+                      <span className="admin-kpi-tag tag-cyan">PMS Hub</span>
+                    </div>
+                    <div className="admin-kpi-body">
+                      <span className="admin-kpi-number">
+                        {placementDrivesLoading ? '...' : placementDrivesError ? <span className="text-warning" style={{ fontSize: '1.2rem' }}>Unavailable</span> : activeDrivesCount}
+                      </span>
+                      <h4 className="admin-kpi-title">Active Placement Drives</h4>
+                      <p className="admin-kpi-desc">
+                        {placementDrivesError ? 'Drive telemetry unavailable' : placementDrives.length === 0 ? '0 scheduled on-campus' : `${placementDrives.length} total scheduled on-campus`}
+                      </p>
+                    </div>
+                    <div className="admin-kpi-footer">
+                      <button
+                        type="button"
+                        className="admin-kpi-link-btn"
+                        onClick={() => {
+                          handleSelectGroup('placements');
+                          handleSelectTab('job-opportunities');
+                          setPlacementHubSubTab('drives');
+                        }}
+                        title="Manage placement recruitment drives"
+                      >
+                        {activeDrivesCount > 0 ? 'View Active Drives ➔' : 'Schedule Drive ➔'}
+                      </button>
+                    </div>
                   </div>
-                  <div className="admin-kpi-body">
-                    <span className="admin-kpi-number">
-                      {placementDrivesLoading ? '...' : placementDrivesError ? <span className="text-warning" style={{ fontSize: '1.2rem' }}>Unavailable</span> : activeDrivesCount}
-                    </span>
-                    <h4 className="admin-kpi-title">Active Placement Drives</h4>
-                    <p className="admin-kpi-desc">
-                      {placementDrivesError ? 'Drive telemetry unavailable' : placementDrives.length === 0 ? '0 scheduled on-campus' : `${placementDrives.length} total scheduled on-campus`}
-                    </p>
-                  </div>
-                  <div className="admin-kpi-footer">
-                    <button
-                      type="button"
-                      className="admin-kpi-link-btn"
-                      onClick={() => {
-                        handleSelectGroup('placements');
-                        handleSelectTab('job-opportunities');
-                        setPlacementHubSubTab('drives');
-                      }}
-                      title="Manage placement recruitment drives"
-                    >
-                      {activeDrivesCount > 0 ? 'View Active Drives ➔' : 'Schedule Drive ➔'}
-                    </button>
-                  </div>
-                </div>
+                )}
 
                 {/* 5. Corporate Job Opportunities */}
-                <div className="glass-card admin-kpi-card">
-                  <div className="kpi-accent-stripe stripe-blue"></div>
-                  <div className="admin-kpi-header">
-                    <span className="admin-kpi-icon-badge kpi-blue">💼</span>
-                    <span className="admin-kpi-tag tag-blue">Industry</span>
+                {!isSuperAdmin(user) && (
+                  <div className="glass-card admin-kpi-card">
+                    <div className="kpi-accent-stripe stripe-blue"></div>
+                    <div className="admin-kpi-header">
+                      <span className="admin-kpi-icon-badge kpi-blue">💼</span>
+                      <span className="admin-kpi-tag tag-blue">Industry</span>
+                    </div>
+                    <div className="admin-kpi-body">
+                      <span className="admin-kpi-number">
+                        {fetchJobsLoading ? '...' : jobsError ? <span className="text-warning" style={{ fontSize: '1.2rem' }}>Unavailable</span> : totalJobsCount}
+                      </span>
+                      <h4 className="admin-kpi-title">Job Opportunities</h4>
+                      <p className="admin-kpi-desc">
+                        {jobsError ? 'Job service unavailable' : `${totalJobsCount} verified corporate postings open`}
+                      </p>
+                    </div>
+                    <div className="admin-kpi-footer">
+                      <button
+                        type="button"
+                        className="admin-kpi-link-btn"
+                        onClick={() => {
+                          handleSelectGroup('placements');
+                          handleSelectTab('job-opportunities');
+                          setPlacementHubSubTab('jobs');
+                        }}
+                        title="Manage corporate job listings"
+                      >
+                        Manage Job Postings ➔
+                      </button>
+                    </div>
                   </div>
-                  <div className="admin-kpi-body">
-                    <span className="admin-kpi-number">
-                      {fetchJobsLoading ? '...' : jobsError ? <span className="text-warning" style={{ fontSize: '1.2rem' }}>Unavailable</span> : totalJobsCount}
-                    </span>
-                    <h4 className="admin-kpi-title">Job Opportunities</h4>
-                    <p className="admin-kpi-desc">
-                      {jobsError ? 'Job service unavailable' : `${totalJobsCount} verified corporate postings open`}
-                    </p>
-                  </div>
-                  <div className="admin-kpi-footer">
-                    <button
-                      type="button"
-                      className="admin-kpi-link-btn"
-                      onClick={() => {
-                        handleSelectGroup('placements');
-                        handleSelectTab('job-opportunities');
-                        setPlacementHubSubTab('jobs');
-                      }}
-                      title="Manage corporate job listings"
-                    >
-                      Manage Job Postings ➔
-                    </button>
-                  </div>
-                </div>
+                )}
 
                 {/* 6. Institutional Staff */}
                 <div className="glass-card admin-kpi-card">
@@ -4810,7 +4978,115 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
                     </button>
                   </div>
                 </div>
+
+                {/* 9. Campus Live Classes in Session */}
+                <div className="glass-card admin-kpi-card">
+                  <div className="kpi-accent-stripe stripe-rose" style={{ background: '#ef4444' }}></div>
+                  <div className="admin-kpi-header">
+                    <span className="admin-kpi-icon-badge" style={{ background: 'rgba(239, 68, 68, 0.15)', color: '#ef4444' }}>📡</span>
+                    <span className="admin-kpi-tag" style={{ background: 'rgba(239, 68, 68, 0.12)', color: '#fca5a5' }}>
+                      <span className="pulse-dot" style={{ background: '#ef4444', marginRight: '4px' }}></span>
+                      Live Stream
+                    </span>
+                  </div>
+                  <div className="admin-kpi-body">
+                    <span className="admin-kpi-number" style={{ color: '#f87171' }}>
+                      {loadingLiveCampusClasses ? '...' : displayedLiveCampusClasses.length}
+                    </span>
+                    <h4 className="admin-kpi-title">Live Classes in Session</h4>
+                    <p className="admin-kpi-desc">
+                      {displayedLiveCampusClasses.length === 0
+                        ? 'No active lectures running across campus'
+                        : `${displayedLiveCampusClasses.length} classes active with real-time timers & geofencing`}
+                    </p>
+                  </div>
+                  <div className="admin-kpi-footer">
+                    {!isSuperAdmin(user) ? (
+                      <a
+                        href="/faculty/attendance"
+                        className="admin-kpi-link-btn text-rose"
+                        title="Open Smart Attendance & Live Classes Console"
+                      >
+                        Monitor Live Classes ➔
+                      </a>
+                    ) : (
+                      <span className="text-secondary" style={{ fontSize: '0.82rem' }}>Institutional Live Feed</span>
+                    )}
+                  </div>
+                </div>
               </div>
+
+              {/* Campus Live Classes Telemetry Stream */}
+              {displayedLiveCampusClasses.length > 0 && (
+                <div className="glass-card mb-20 animate-fade" style={{ padding: '1.25rem 1.5rem', borderLeft: '4px solid #ef4444' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                      <span className="live-pulsing-badge" style={{ background: 'rgba(239, 68, 68, 0.16)', color: '#fca5a5', padding: '0.3rem 0.7rem', borderRadius: '9999px', fontSize: '0.78rem', fontWeight: 800 }}>
+                        <span className="live-radar-dot" style={{ width: '8px', height: '8px', background: '#ef4444', borderRadius: '50%', display: 'inline-block', marginRight: '4px' }}></span>
+                        LIVE CAMPUS CLASSES ({displayedLiveCampusClasses.length} ACTIVE)
+                      </span>
+                      <span style={{ color: '#94a3b8', fontSize: '0.85rem' }}>Director, Principal, Administrator &amp; Auditor Real-Time Surveillance</span>
+                    </div>
+                    {!isSuperAdmin(user) && (
+                      <a href="/faculty/attendance" className="admin-kpi-link-btn" style={{ fontWeight: 700 }}>
+                        Open Full Live Monitor ➔
+                      </a>
+                    )}
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '1rem' }}>
+                    {displayedLiveCampusClasses.map((cls) => {
+                      const present = cls.totalPresent || 0;
+                      const enrolled = cls.totalEnrolled || 0;
+                      const pct = enrolled > 0 ? Math.round((present / enrolled) * 100) : 0;
+                      return (
+                        <div key={cls._id} style={{ background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '12px', padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                            <div>
+                              <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', marginBottom: '0.2rem' }}>
+                                <span style={{ color: '#ef4444', fontWeight: 800, fontSize: '0.72rem' }}>🔴 LIVE</span>
+                                <span style={{ background: 'rgba(99, 102, 241, 0.2)', color: '#c7d2fe', fontSize: '0.72rem', fontWeight: 700, padding: '0.1rem 0.45rem', borderRadius: '4px' }}>
+                                  Period {cls.period || '1'}
+                                </span>
+                              </div>
+                              <strong style={{ color: '#ffffff', fontSize: '1.05rem', display: 'block' }}>{cls.subjectId?.name || cls.subject?.name || 'Class'}</strong>
+                              <span style={{ color: '#94a3b8', fontSize: '0.78rem', fontFamily: 'monospace' }}>{cls.subjectId?.code || cls.subject?.code || ''}</span>
+                            </div>
+                            <div style={{ background: 'rgba(15, 23, 42, 0.9)', border: '1px solid rgba(56, 189, 248, 0.35)', borderRadius: '8px', padding: '0.3rem 0.6rem', textAlign: 'right' }}>
+                              <span style={{ fontFamily: 'monospace', color: '#38bdf8', fontWeight: 800, fontSize: '1rem', display: 'block' }}>
+                                ⏱️ {calcCampusLiveTimer(cls.actualStartTime)}
+                              </span>
+                              <span style={{ fontSize: '0.65rem', color: '#94a3b8', textTransform: 'uppercase' }}>Elapsed</span>
+                            </div>
+                          </div>
+
+                          <div style={{ fontSize: '0.82rem', color: '#cbd5e1', background: 'rgba(15, 23, 42, 0.35)', padding: '0.5rem 0.75rem', borderRadius: '8px', display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+                            <div><strong>Faculty:</strong> {cls.facultyId?.name || 'Faculty'} {cls.facultyId?.designation ? `(${cls.facultyId.designation})` : ''}</div>
+                            <div><strong>Room:</strong> {cls.roomId?.buildingName} {cls.roomId?.roomNumber || 'Room'} &bull; <span style={{ color: '#4ade80' }}>30m Geofence</span></div>
+                            <div><strong>Cohort:</strong> {cls.academicYear} &bull; {cls.branch} &bull; Sec {cls.section}</div>
+                          </div>
+
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: '#94a3b8' }}>
+                              <span>Turnout: <strong>{present} / {enrolled}</strong></span>
+                              <span style={{ color: '#4ade80', fontWeight: 700 }}>{pct}%</span>
+                            </div>
+                            <div style={{ height: '6px', background: 'rgba(255, 255, 255, 0.08)', borderRadius: '9999px', overflow: 'hidden' }}>
+                              <div style={{ height: '100%', background: 'linear-gradient(90deg, #10b981, #059669)', width: `${Math.min(100, pct)}%` }}></div>
+                            </div>
+                          </div>
+
+                          {!isSuperAdmin(user) && (
+                            <a href="/faculty/attendance" style={{ background: 'rgba(99, 102, 241, 0.15)', border: '1px solid rgba(99, 102, 241, 0.35)', color: '#c7d2fe', padding: '0.5rem', borderRadius: '8px', fontWeight: 700, fontSize: '0.8rem', textAlign: 'center', textDecoration: 'none', transition: 'all 0.2s ease', marginTop: '0.2rem' }}>
+                              👁️ Inspect Live Session &amp; Roster
+                            </a>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
 
               {/* Phase 2.1: Enterprise Visual Charts & Insights Grid */}
               <div className="admin-analytics-insights-grid" role="region" aria-label="Visual Analytics and Trend Insights">
@@ -5273,7 +5549,16 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
                       ) : (
                         <tr>
                           <td colSpan="7" className="table-empty-msg">
-                            {students.length === 0 ? 'No students registered in current scope.' : 'No students match current filter criteria.'}
+                            {loading ? (
+                              <div className="dashboard-loading-container" style={{ padding: '24px' }}>
+                                <div className="spinner-loader"></div>
+                                <p>Loading student roster...</p>
+                              </div>
+                            ) : students.length === 0 ? (
+                              'No students registered in current scope.'
+                            ) : (
+                              'No students match current filter criteria.'
+                            )}
                           </td>
                         </tr>
                       )}
@@ -5332,6 +5617,7 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
                 )}
               </div>
             </>
+            )
           )
         }
 
@@ -8284,6 +8570,9 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
 
         {activeTab === 'faculty-staff' && (
           <div className="faculty-staff-management-wrapper animate-fade">
+            {/* Academic Scope Change Requests Review Roster */}
+            <AcademicScopeReviewManager userRole="admin" onDecisionSuccess={fetchStaff} />
+
             {/* Header / Intro Card */}
             <div className="glass-card" style={{ marginBottom: '20px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
@@ -8632,6 +8921,33 @@ const AdminPanel = ({ defaultTab = 'analytics' }) => {
                 )}
               </div>
             </div>
+          </div>
+        )}
+
+        {/* ========================================================================= */}
+        {/* TAB: FRONT OFFICE, SECURITY & VISITOR PASS MANAGEMENT                     */}
+        {/* ========================================================================= */}
+        {(activeTab === 'front-office' || activeTab === 'visitors' || activeTab === 'security-gate' || activeTab === 'guardian-cards') && (
+          <div className="admin-front-office-wrapper animate-fade">
+            <FrontOfficeSecurityManager />
+          </div>
+        )}
+
+        {/* ========================================================================= */}
+        {/* TAB: SUPPORT DESK & CAMPUS-ARRIVAL CORRECTIONS                            */}
+        {/* ========================================================================= */}
+        {(activeTab === 'support-desk' || activeTab === 'helpdesk' || activeTab === 'arrival-corrections' || activeTab === 'support') && (
+          <div className="admin-support-desk-wrapper animate-fade">
+            <SupportDeskManager />
+          </div>
+        )}
+
+        {/* ========================================================================= */}
+        {/* TAB: PHYSICAL LIBRARY CATALOG & CIRCULATION DESK                         */}
+        {/* ========================================================================= */}
+        {(activeTab === 'library' || activeTab === 'physical-library' || activeTab === 'books') && (
+          <div className="admin-physical-library-wrapper animate-fade">
+            <PhysicalLibraryManager />
           </div>
         )}
 

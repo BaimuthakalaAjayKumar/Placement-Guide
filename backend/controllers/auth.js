@@ -1,4 +1,10 @@
+const path = require('path');
+const fs = require('fs');
+const multer = require('multer');
 const User = require('../models/User');
+require('../models/Campus');
+require('../models/Department');
+require('../models/Subject');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const sendEmail = require('../utils/sendEmail');
@@ -160,8 +166,23 @@ exports.login = async (req, res, next) => {
       }
     }
 
-    // Check for user
-    const user = await User.findOne({ email }).select('+password');
+    // Check for user (case-insensitive & trimmed with Super Admin aliases support)
+    const cleanEmail = (email || '').trim();
+    const isSuperAdminAlias = ['superadmin@campusbridge.com', 'superadmin@grietcollege.com', 'admin@campusbridge.com', 'superadmin'].includes(cleanEmail.toLowerCase());
+    const emailFilter = isSuperAdminAlias
+      ? { $or: [{ email: cleanEmail }, { email: 'vaddeajaykumar2004@gmail.com' }] }
+      : {
+          $or: [
+            { email: cleanEmail },
+            { email: { $regex: new RegExp(`^${cleanEmail.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')}$`, 'i') } }
+          ]
+        };
+
+    const user = await User.findOne(emailFilter)
+      .select('+password')
+      .populate('campusId')
+      .populate('departmentId')
+      .populate('managedScopes.subject');
     if (!user) {
       return res.status(401).json({
         success: false,
@@ -226,7 +247,10 @@ exports.login = async (req, res, next) => {
 // @access  Private
 exports.getMe = async (req, res, next) => {
   try {
-    let user = await User.findById(req.user.id);
+    let user = await User.findById(req.user.id)
+      .populate('campusId')
+      .populate('departmentId')
+      .populate('managedScopes.subject');
 
     // Auto-replicate LeetCode status on load
     if (user && user.leetcodeUsername) {
@@ -313,7 +337,10 @@ exports.getMe = async (req, res, next) => {
         updates.lastLoginIp = clientIp;
       }
       if (Object.keys(updates).length > 0) {
-        user = await User.findByIdAndUpdate(user._id, { $set: updates }, { new: true });
+        user = await User.findByIdAndUpdate(user._id, { $set: updates }, { new: true })
+          .populate('campusId')
+          .populate('departmentId')
+          .populate('managedScopes.subject');
       }
     }
 
@@ -343,6 +370,13 @@ exports.updateProfile = async (req, res, next) => {
       section: req.body.section,
       year: req.body.year,
       academicYear: req.body.academicYear,
+      // Role-specific profile enhancement fields
+      qualifications: req.body.qualifications !== undefined ? String(req.body.qualifications).trim() : undefined,
+      specialization: req.body.specialization !== undefined ? String(req.body.specialization).trim() : undefined,
+      experience: req.body.experience !== undefined ? String(req.body.experience).trim() : undefined,
+      experienceYears: req.body.experienceYears !== undefined && req.body.experienceYears !== null && req.body.experienceYears !== '' ? Number(req.body.experienceYears) : undefined,
+      officeLocation: req.body.officeLocation !== undefined ? String(req.body.officeLocation).trim() : undefined,
+      profilePicture: req.body.profilePicture !== undefined ? String(req.body.profilePicture).trim() : undefined,
       leetcodeUsername: req.body.leetcodeUsername,
       codeforcesUsername: req.body.codeforcesUsername,
       codechefUsername: req.body.codechefUsername,
@@ -362,7 +396,7 @@ exports.updateProfile = async (req, res, next) => {
       key => fieldsToUpdate[key] === undefined && delete fieldsToUpdate[key]
     );
 
-    // Phase 8H: Security restriction - prevent students from self-updating official academic metrics
+    // Security restriction - prevent students from self-updating official academic metrics
     if (req.user.role === 'student') {
       delete fieldsToUpdate.sgpaSem1;
       delete fieldsToUpdate.sgpaSem2;
@@ -374,6 +408,12 @@ exports.updateProfile = async (req, res, next) => {
       delete fieldsToUpdate.sgpaSem8;
       delete fieldsToUpdate.branch;
       delete fieldsToUpdate.academicYear;
+      delete fieldsToUpdate.rollNumber;
+    }
+
+    // Role eligibility restriction - exclude institutional service desk accounts (librarian, front_office) from modifying profile photo
+    if (['librarian', 'front_office'].includes(req.user.role)) {
+      delete fieldsToUpdate.profilePicture;
     }
 
     // If leetcodeUsername is changing, verify and sync stats!
@@ -455,7 +495,10 @@ exports.updateProfile = async (req, res, next) => {
     const user = await User.findByIdAndUpdate(req.user.id, fieldsToUpdate, {
       new: true,
       runValidators: true
-    });
+    })
+      .populate('campusId')
+      .populate('departmentId')
+      .populate('managedScopes.subject');
 
     res.status(200).json({
       success: true,
@@ -655,6 +698,258 @@ exports.logout = async (req, res, next) => {
     res.status(200).json({
       success: true,
       message: 'Logged out successfully'
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// @desc    Switch active operating role for authorized multi-role users
+// @route   POST /api/auth/switch-role
+// @access  Private
+exports.switchRole = async (req, res, next) => {
+  try {
+    const { targetRole } = req.body;
+    if (!targetRole) {
+      return res.status(400).json({ success: false, error: 'targetRole is required.' });
+    }
+
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      return res.status(404).json({ success: false, error: 'User not found' });
+    }
+
+    const normalizedTarget = targetRole.trim().toLowerCase();
+    const allowedRoles = Array.isArray(user.authorizedRoles) && user.authorizedRoles.length > 0
+      ? user.authorizedRoles
+      : [user.role];
+
+    if (!allowedRoles.includes(normalizedTarget)) {
+      return res.status(403).json({
+        success: false,
+        code: 'ROLE_NOT_AUTHORIZED_FOR_USER',
+        error: `Access Denied: You are not authorized to assume role '${normalizedTarget}'.`
+      });
+    }
+
+    const previousRole = user.role;
+    user.role = normalizedTarget;
+    user.activeRole = normalizedTarget;
+    await user.save();
+
+    await logActivity({
+      user,
+      action: 'ROLE_SWITCHED',
+      category: 'Authentication & RBAC',
+      description: `${user.name} switched active role from ${previousRole} to ${normalizedTarget}`,
+      details: { previousRole, activeRole: normalizedTarget },
+      req
+    });
+
+    sendTokenResponse(user, 200, res);
+  } catch (err) {
+    next(err);
+  }
+};
+
+// ============================================================
+// PROFILE PHOTO MANAGEMENT (ALL ROLES EXCEPT librarian & front_office)
+// ============================================================
+
+// Multer storage for profile photos
+const profilePhotoStorage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    const uploadDir = path.join(__dirname, '../uploads/profiles');
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    }
+    cb(null, uploadDir);
+  },
+  filename: function (req, file, cb) {
+    const ext = path.extname(file.originalname).toLowerCase();
+    cb(null, `profile-${req.user.id}-${Date.now()}${ext}`);
+  }
+});
+
+// Strict file filter for image formats (JPEG, PNG, WebP only)
+const profilePhotoFileFilter = (req, file, cb) => {
+  const allowedExts = /jpeg|jpg|png|webp/;
+  const extValid = allowedExts.test(path.extname(file.originalname).toLowerCase());
+  const mimeValid = /^image\/(jpeg|jpg|png|webp)$/i.test(file.mimetype);
+  if (extValid && mimeValid) {
+    cb(null, true);
+  } else {
+    cb(new Error('Invalid image format. Only JPEG, PNG, and WebP files are supported.'), false);
+  }
+};
+
+const profilePhotoUploadMiddleware = multer({
+  storage: profilePhotoStorage,
+  fileFilter: profilePhotoFileFilter,
+  limits: { fileSize: 5 * 1024 * 1024 } // 5MB maximum
+}).single('photo');
+
+// @desc    Upload or update user profile photo (device camera or file upload)
+// @route   POST /api/auth/profile-photo
+// @access  Private (All roles except librarian and front_office)
+exports.uploadProfilePhoto = async (req, res, next) => {
+  try {
+    // 1. Strict Role Eligibility: Exclude librarian and front_office
+    const excludedRoles = ['librarian', 'front_office'];
+    if (excludedRoles.includes(req.user.role)) {
+      return res.status(403).json({
+        success: false,
+        error: 'Profile photo customization is disabled for institutional service desk roles (librarian, front_office).'
+      });
+    }
+
+    // 2. Process file or data-URL payload
+    profilePhotoUploadMiddleware(req, res, async (err) => {
+      if (err instanceof multer.MulterError) {
+        if (err.code === 'LIMIT_FILE_SIZE') {
+          return res.status(400).json({ success: false, error: 'Photo exceeds the 5MB file size limit.' });
+        }
+        return res.status(400).json({ success: false, error: err.message });
+      } else if (err) {
+        return res.status(400).json({ success: false, error: err.message });
+      }
+
+      let photoUrl = '';
+
+      if (req.file) {
+        photoUrl = `/uploads/profiles/${req.file.filename}`;
+      } else if (req.body && req.body.photo) {
+        // Base64 camera capture payload
+        const rawPhoto = String(req.body.photo).trim();
+        const matches = rawPhoto.match(/^data:image\/(jpeg|jpg|png|webp);base64,(.+)$/i);
+        if (!matches) {
+          return res.status(400).json({
+            success: false,
+            error: 'Invalid photo payload. Image must be formatted as JPEG, PNG, or WebP base64 data.'
+          });
+        }
+
+        const format = matches[1].toLowerCase() === 'jpeg' ? 'jpg' : matches[1].toLowerCase();
+        const buffer = Buffer.from(matches[2], 'base64');
+
+        if (buffer.length > 5 * 1024 * 1024) {
+          return res.status(400).json({
+            success: false,
+            error: 'Photo exceeds the 5MB file size limit.'
+          });
+        }
+
+        const uploadDir = path.join(__dirname, '../uploads/profiles');
+        if (!fs.existsSync(uploadDir)) {
+          fs.mkdirSync(uploadDir, { recursive: true });
+        }
+
+        const filename = `profile-${req.user.id}-${Date.now()}.${format}`;
+        const filePath = path.join(uploadDir, filename);
+        fs.writeFileSync(filePath, buffer);
+        photoUrl = `/uploads/profiles/${filename}`;
+      } else {
+        return res.status(400).json({
+          success: false,
+          error: 'Please provide a photo via camera capture or file upload.'
+        });
+      }
+
+      // 3. Update database record for authenticated user (Ownership verification)
+      const user = await User.findById(req.user.id)
+        .populate('campusId')
+        .populate('departmentId')
+        .populate('managedScopes.subject');
+
+      if (!user) {
+        return res.status(404).json({ success: false, error: 'User account not found.' });
+      }
+
+      // Clean up previous uploaded image if exists
+      if (user.profilePicture && user.profilePicture.startsWith('/uploads/profiles/')) {
+        const oldFile = path.join(__dirname, '..', user.profilePicture);
+        if (fs.existsSync(oldFile)) {
+          try { fs.unlinkSync(oldFile); } catch (e) { /* ignore cleanup error */ }
+        }
+      }
+
+      user.profilePicture = photoUrl;
+      await user.save({ validateBeforeSave: false });
+
+      // Record Activity Audit
+      await logActivity({
+        user,
+        action: 'PROFILE_PHOTO_UPDATED',
+        category: 'Profile Governance',
+        description: `${user.name} (${user.role.toUpperCase()}) updated profile photograph.`,
+        details: { role: user.role, email: user.email, photoUrl },
+        req
+      });
+
+      const userObj = user.toObject();
+      delete userObj.password;
+
+      return res.status(200).json({
+        success: true,
+        message: 'Profile photo updated successfully.',
+        profilePicture: photoUrl,
+        user: userObj
+      });
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// @desc    Remove authenticated user profile photo
+// @route   DELETE /api/auth/profile-photo
+// @access  Private (All roles except librarian and front_office)
+exports.removeProfilePhoto = async (req, res, next) => {
+  try {
+    const excludedRoles = ['librarian', 'front_office'];
+    if (excludedRoles.includes(req.user.role)) {
+      return res.status(403).json({
+        success: false,
+        error: 'Profile photo customization is disabled for institutional service desk roles (librarian, front_office).'
+      });
+    }
+
+    const user = await User.findById(req.user.id)
+      .populate('campusId')
+      .populate('departmentId')
+      .populate('managedScopes.subject');
+
+    if (!user) {
+      return res.status(404).json({ success: false, error: 'User account not found.' });
+    }
+
+    if (user.profilePicture && user.profilePicture.startsWith('/uploads/profiles/')) {
+      const oldFile = path.join(__dirname, '..', user.profilePicture);
+      if (fs.existsSync(oldFile)) {
+        try { fs.unlinkSync(oldFile); } catch (e) { /* ignore cleanup error */ }
+      }
+    }
+
+    user.profilePicture = '';
+    await user.save({ validateBeforeSave: false });
+
+    await logActivity({
+      user,
+      action: 'PROFILE_PHOTO_REMOVED',
+      category: 'Profile Governance',
+      description: `${user.name} (${user.role.toUpperCase()}) removed profile photograph.`,
+      details: { role: user.role, email: user.email },
+      req
+    });
+
+    const userObj = user.toObject();
+    delete userObj.password;
+
+    return res.status(200).json({
+      success: true,
+      message: 'Profile photo removed successfully.',
+      profilePicture: '',
+      user: userObj
     });
   } catch (err) {
     next(err);

@@ -91,7 +91,7 @@ export const RootNavigator: React.FC = () => {
               <Stack.Screen name="HODApp" component={HODNavigator} />
             ) : normalizedRole === 'principal' ? (
               <Stack.Screen name="PrincipalApp" component={PrincipalNavigator} />
-            ) : normalizedRole === 'director' ? (
+            ) : (normalizedRole === 'director' || normalizedRole === 'campus_admin') ? (
               <Stack.Screen name="DirectorApp" component={DirectorNavigator} />
             ) : (
               <Stack.Screen name="UnsupportedRole" component={UnsupportedRoleScreen} />

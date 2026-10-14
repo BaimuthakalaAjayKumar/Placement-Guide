@@ -39,6 +39,18 @@ const PracticeQuestionSchema = new mongoose.Schema({
     type: Boolean,
     default: true
   },
+  isArchived: {
+    type: Boolean,
+    default: false
+  },
+  officialProblemId: {
+    type: String,
+    default: ''
+  },
+  officialUrl: {
+    type: String,
+    default: ''
+  },
   company: {
     type: String,
     default: ''
@@ -47,7 +59,21 @@ const PracticeQuestionSchema = new mongoose.Schema({
     type: Number,
     default: () => new Date().getFullYear()
   },
+  createdBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    default: null
+  },
+  updatedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    default: null
+  },
   createdAt: {
+    type: Date,
+    default: Date.now
+  },
+  updatedAt: {
     type: Date,
     default: Date.now
   }
@@ -55,5 +81,8 @@ const PracticeQuestionSchema = new mongoose.Schema({
 
 // Compound index to guarantee uniqueness of ID per platform & company
 PracticeQuestionSchema.index({ platform: 1, id: 1, company: 1 }, { unique: true });
+PracticeQuestionSchema.index({ platform: 1, isArchived: 1, difficulty: 1 });
+PracticeQuestionSchema.index({ platform: 1, slug: 1 });
+PracticeQuestionSchema.index({ platform: 1, officialProblemId: 1 });
 
 module.exports = mongoose.model('PracticeQuestion', PracticeQuestionSchema);
