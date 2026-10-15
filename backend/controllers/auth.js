@@ -10,12 +10,26 @@ const crypto = require('crypto');
 const sendEmail = require('../utils/sendEmail');
 const { logActivity, extractClientIp, extractUserAgent } = require('../utils/auditLogger');
 const { verifyTurnstileToken } = require('../utils/turnstileService');
+const {
+  EMBEDDING_DIM,
+  getMatchThreshold,
+  getAmbiguousThreshold,
+  validateEmbeddingQuality,
+  generatePreAuthFaceToken,
+  verifyPreAuthFaceToken,
+  generateLivenessChallenge,
+  validateLivenessChallenge,
+  consumeChallengeNonce,
+  encryptEmbedding,
+  decryptEmbedding,
+  compareEmbeddings
+} = require('../services/biometricService');
 
 // Helper to generate and send token
 const sendTokenResponse = (user, statusCode, res) => {
   // Create token
   const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
-    expiresIn: process.env.JWT_EXPIRE
+    expiresIn: process.env.JWT_EXPIRE || '30d'
   });
 
   // Remove password from output if present
@@ -207,9 +221,102 @@ exports.login = async (req, res, next) => {
       });
     }
 
-    // If student account is locked by policy, update session and send token so App.jsx renders the locked recovery screen
-    if (user.role === 'student' && user.isLocked) {
-      console.log(`[AUTH] Student ${user.email} logged in with LOCKED status. Presenting locked recovery interface.`);
+    // ============================================================
+    // MANDATORY STUDENT FACE AUTHENTICATION GATE
+    // ============================================================
+    if (user.role === 'student') {
+      // 1. Check temporary lockout from failed biometric attempts
+      if (user.biometricProfile?.lockoutUntil && new Date() < new Date(user.biometricProfile.lockoutUntil)) {
+        const remainingMin = Math.ceil((new Date(user.biometricProfile.lockoutUntil) - Date.now()) / (60 * 1000));
+        return res.status(429).json({
+          success: false,
+          isLockedOut: true,
+          lockoutUntil: user.biometricProfile.lockoutUntil,
+          error: `Account temporarily locked due to multiple failed face verification attempts. Please retry in ${remainingMin} minute(s) or request institutional accommodation.`
+        });
+      }
+
+      // 2. Check active authorized non-biometric accommodation exemption
+      const isExempted = Boolean(
+        user.biometricProfile?.exemption?.isExempt &&
+        (!user.biometricProfile.exemption.validUntil || new Date() < new Date(user.biometricProfile.exemption.validUntil))
+      );
+
+      if (!isExempted) {
+        // 3. First login: face enrollment incomplete -> Issue pre-auth enrollment challenge
+        if (!user.biometricProfile || !user.biometricProfile.isEnrolled) {
+          const preAuthToken = generatePreAuthFaceToken(user._id, 'AWAITING_FACE_ENROLLMENT', {
+            role: user.role,
+            email: user.email
+          });
+
+          await logActivity({
+            user,
+            action: 'FACE_ENROLLMENT_REQUIRED',
+            category: 'Biometric Access',
+            description: `Student ${user.name} credentials verified. Mandatory face enrollment required before full session grant.`,
+            details: { role: user.role, email: user.email },
+            req
+          });
+
+          return res.status(200).json({
+            success: true,
+            requireFaceEnrollment: true,
+            preAuthToken,
+            user: {
+              _id: user._id,
+              name: user.name,
+              email: user.email,
+              role: user.role,
+              rollNumber: user.rollNumber || ''
+            }
+          });
+        }
+
+        // 4. Subsequent login: face enrolled -> Issue single-use liveness challenge & challenge token
+        const challenge = generateLivenessChallenge(user._id);
+        const challengeToken = generatePreAuthFaceToken(user._id, 'AWAITING_FACE_VERIFICATION', {
+          role: user.role,
+          email: user.email,
+          challengeNonce: challenge.challengeNonce
+        });
+
+        await logActivity({
+          user,
+          action: 'FACE_VERIFICATION_REQUIRED',
+          category: 'Biometric Access',
+          description: `Student ${user.name} credentials verified. Dynamic face verification challenged (${challenge.promptAction}).`,
+          details: { role: user.role, email: user.email, promptAction: challenge.promptAction },
+          req
+        });
+
+        return res.status(200).json({
+          success: true,
+          requireFaceVerification: true,
+          challengeToken,
+          challengeNonce: challenge.challengeNonce,
+          promptAction: challenge.promptAction,
+          instructions: challenge.instructions,
+          expiresAt: challenge.expiresAt,
+          user: {
+            _id: user._id,
+            name: user.name,
+            email: user.email,
+            role: user.role,
+            rollNumber: user.rollNumber || ''
+          }
+        });
+      }
+
+      // If exempted, log accommodation access
+      await logActivity({
+        user,
+        action: 'LOGIN_ACCOMMODATION_BYPASS',
+        category: 'Biometric Access',
+        description: `Student ${user.name} logged in via authorized non-biometric accommodation exemption`,
+        details: { exemptionReason: user.biometricProfile?.exemption?.reason || 'Administrative accommodation' },
+        req
+      });
     }
 
     // Extract client network IP and browser agent
@@ -951,6 +1058,438 @@ exports.removeProfilePhoto = async (req, res, next) => {
       profilePicture: '',
       user: userObj
     });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// ============================================================
+// STUDENT MANDATORY FACE AUTHENTICATION CONTROLLER ENDPOINTS
+// ============================================================
+
+const emergencyOtpStore = new Map();
+
+/**
+ * @desc    Request dynamic liveness challenge nonce & prompt action for student face verification
+ * @route   POST /api/auth/face/challenge
+ * @access  Pre-authenticated Student
+ */
+exports.requestStudentFaceChallenge = async (req, res, next) => {
+  try {
+    const authHeader = req.headers.authorization;
+    const token = (authHeader && authHeader.startsWith('Bearer')) ? authHeader.split(' ')[1] : req.body.token;
+    if (!token) {
+      return res.status(401).json({ success: false, error: 'Challenge token is required.' });
+    }
+
+    const check = verifyPreAuthFaceToken(token);
+    if (!check.valid) {
+      return res.status(401).json({ success: false, error: check.error });
+    }
+
+    const challenge = generateLivenessChallenge(check.payload.userId);
+    return res.status(200).json({
+      success: true,
+      challengeNonce: challenge.challengeNonce,
+      promptAction: challenge.promptAction,
+      instructions: challenge.instructions,
+      expiresAt: challenge.expiresAt
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * @desc    Enroll facial biometric template on student's first login
+ * @route   POST /api/auth/face/enroll
+ * @access  Pre-authenticated Student (Stage: AWAITING_FACE_ENROLLMENT)
+ */
+exports.enrollStudentFace = async (req, res, next) => {
+  try {
+    const { preAuthToken, consentGiven, probeEmbedding, opticalEvidence, challengeNonce, livenessEvidence } = req.body;
+    const rawVector = probeEmbedding || opticalEvidence;
+
+    if (!preAuthToken) {
+      return res.status(401).json({ success: false, error: 'Pre-authentication enrollment token is required.' });
+    }
+
+    const tokenCheck = verifyPreAuthFaceToken(preAuthToken, 'AWAITING_FACE_ENROLLMENT');
+    if (!tokenCheck.valid) {
+      return res.status(401).json({ success: false, error: tokenCheck.error });
+    }
+
+    if (!consentGiven) {
+      return res.status(400).json({
+        success: false,
+        error: 'Biometric enrollment requires explicit informed consent and institutional policy acknowledgment.'
+      });
+    }
+
+    if (!rawVector) {
+      return res.status(400).json({
+        success: false,
+        error: 'Facial embedding vector is required for enrollment.'
+      });
+    }
+
+    // Validate embedding quality (dimension, finiteness, non-zero entropy)
+    const qualityCheck = validateEmbeddingQuality(rawVector);
+    if (!qualityCheck.valid) {
+      return res.status(400).json({ success: false, error: qualityCheck.error });
+    }
+
+    const user = await User.findById(tokenCheck.payload.userId)
+      .select('+biometricProfile.encryptedEmbedding +biometricProfile.authTag +biometricProfile.iv');
+    if (!user) {
+      return res.status(404).json({ success: false, error: 'User account not found.' });
+    }
+
+    // Prevent enrollment replacement if already enrolled (defense against account takeover)
+    if (user.biometricProfile && user.biometricProfile.isEnrolled) {
+      return res.status(403).json({
+        success: false,
+        error: 'This student account already has an active biometric enrollment. To replace an existing enrollment, submit a formal administrative reset request.'
+      });
+    }
+
+    // Validate challenge nonce if provided
+    if (challengeNonce) {
+      const nonceResult = consumeChallengeNonce(challengeNonce, user._id);
+      if (!nonceResult.valid) {
+        return res.status(400).json({ success: false, error: nonceResult.error });
+      }
+    }
+
+    // Encrypt 128-d embedding at rest using AES-256-GCM
+    const encrypted = encryptEmbedding(rawVector);
+    const now = new Date();
+    const clientIp = extractClientIp(req);
+
+    user.biometricProfile = {
+      isEnrolled: true,
+      enrolledAt: now,
+      consentGiven: true,
+      consentDate: now,
+      encryptedEmbedding: encrypted.encryptedEmbedding,
+      authTag: encrypted.authTag,
+      iv: encrypted.iv,
+      modelVersion: 'cb-facenet-128d-v1',
+      enrolledByIp: clientIp,
+      lastVerifiedAt: now,
+      revokedAt: null,
+      revokedReason: '',
+      failedVerificationAttempts: 0,
+      lockoutUntil: null,
+      exemption: user.biometricProfile?.exemption || { isExempt: false, reason: '', validUntil: null }
+    };
+
+    // Update login metrics
+    user.loginCount = (user.loginCount || 0) + 1;
+    user.lastLoginAt = now;
+    user.lastActiveAt = now;
+    user.currentSessionStartedAt = now;
+    user.lastIpAddress = clientIp;
+    user.lastLoginIp = clientIp;
+    user.userAgent = extractUserAgent(req);
+    await user.save({ validateBeforeSave: false });
+
+    await logActivity({
+      user,
+      action: 'BIOMETRIC_ENROLLED_FIRST_LOGIN',
+      category: 'Biometric Access',
+      description: `Student ${user.name} successfully completed initial biometric facial enrollment.`,
+      details: { studentId: user._id, modelVersion: 'cb-facenet-128d-v1' },
+      req
+    });
+
+    // Issue full session JWT now that mandatory enrollment is completed!
+    sendTokenResponse(user, 200, res);
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * @desc    Verify student face identity on subsequent logins before issuing session
+ * @route   POST /api/auth/face/verify-login
+ * @access  Pre-authenticated Student (Stage: AWAITING_FACE_VERIFICATION)
+ */
+exports.verifyStudentFaceLogin = async (req, res, next) => {
+  try {
+    const { challengeToken, challengeNonce, probeEmbedding, opticalEvidence, livenessEvidence } = req.body;
+    const rawVector = probeEmbedding || opticalEvidence;
+
+    if (!challengeToken) {
+      return res.status(401).json({ success: false, error: 'Challenge verification token is required.' });
+    }
+
+    const tokenCheck = verifyPreAuthFaceToken(challengeToken, 'AWAITING_FACE_VERIFICATION');
+    if (!tokenCheck.valid) {
+      return res.status(401).json({ success: false, error: tokenCheck.error });
+    }
+
+    const user = await User.findById(tokenCheck.payload.userId)
+      .select('+biometricProfile.encryptedEmbedding +biometricProfile.authTag +biometricProfile.iv');
+    if (!user) {
+      return res.status(404).json({ success: false, error: 'User account not found.' });
+    }
+
+    // Check temporary lockout
+    if (user.biometricProfile?.lockoutUntil && new Date() < new Date(user.biometricProfile.lockoutUntil)) {
+      const remainingMin = Math.ceil((new Date(user.biometricProfile.lockoutUntil) - Date.now()) / (60 * 1000));
+      return res.status(429).json({
+        success: false,
+        isLockedOut: true,
+        lockoutUntil: user.biometricProfile.lockoutUntil,
+        error: `Account is temporarily locked due to multiple failed verification attempts. Please retry in ${remainingMin} minute(s).`
+      });
+    }
+
+    if (!user.biometricProfile || !user.biometricProfile.isEnrolled) {
+      return res.status(400).json({
+        success: false,
+        error: 'No biometric facial profile enrolled for this account. Please complete enrollment first.'
+      });
+    }
+
+    if (!rawVector) {
+      return res.status(400).json({ success: false, error: 'Facial probe embedding is required.' });
+    }
+
+    // Validate probe vector quality (dimension, finiteness, non-zero entropy)
+    const qualityCheck = validateEmbeddingQuality(rawVector);
+    if (!qualityCheck.valid) {
+      return res.status(400).json({ success: false, error: qualityCheck.error });
+    }
+
+    // Validate & consume challenge nonce (single-use anti-replay)
+    if (!challengeNonce) {
+      return res.status(400).json({ success: false, error: 'Verification challenge nonce is required.' });
+    }
+    const nonceResult = consumeChallengeNonce(challengeNonce, user._id);
+    if (!nonceResult.valid) {
+      return res.status(400).json({ success: false, error: nonceResult.error });
+    }
+
+    // Validate optical liveness telemetry
+    if (livenessEvidence) {
+      const { opticalVariance = 0, motionDelta = 0, framesSampled = 1 } = livenessEvidence;
+      const variance = Math.max(Number(opticalVariance) || 0, Number(motionDelta) || 0);
+      if (variance < 0.12 && framesSampled > 1) {
+        await logActivity({
+          user,
+          action: 'LOGIN_LIVENESS_FAILED',
+          category: 'Biometric Access',
+          description: `Liveness failed: Static photo or screen presentation attack detected for ${user.name}`,
+          req
+        });
+        return res.status(400).json({
+          success: false,
+          status: 'LIVENESS_FAILED',
+          error: 'Liveness check failed: Static photo or presentation attack detected. Please maintain natural motion in front of the camera.'
+        });
+      }
+    }
+
+    // Decrypt enrolled template
+    const enrolledEmbedding = decryptEmbedding(
+      user.biometricProfile.encryptedEmbedding,
+      user.biometricProfile.authTag,
+      user.biometricProfile.iv
+    );
+
+    // Compare embeddings against calibrated threshold
+    const matchResult = compareEmbeddings(enrolledEmbedding, rawVector);
+
+    if (!matchResult.isMatch) {
+      user.biometricProfile.failedVerificationAttempts = (user.biometricProfile.failedVerificationAttempts || 0) + 1;
+      let lockoutTriggered = false;
+
+      if (user.biometricProfile.failedVerificationAttempts >= 5) {
+        user.biometricProfile.lockoutUntil = new Date(Date.now() + 15 * 60 * 1000);
+        lockoutTriggered = true;
+      }
+      await user.save({ validateBeforeSave: false });
+
+      await logActivity({
+        user,
+        action: 'LOGIN_FACE_REJECTED',
+        category: 'Biometric Access',
+        description: `Biometric login rejected for ${user.name} (Similarity: ${matchResult.similarity}, Failure count: ${user.biometricProfile.failedVerificationAttempts})`,
+        details: { similarity: matchResult.similarity, lockoutTriggered },
+        req
+      });
+
+      if (matchResult.isAmbiguous) {
+        return res.status(400).json({
+          success: false,
+          status: 'AMBIGUOUS_MATCH',
+          similarity: matchResult.similarity,
+          failedAttempts: user.biometricProfile.failedVerificationAttempts,
+          error: 'Inconclusive facial match. Please ensure direct lighting, remove masks or glare, and look directly into the camera.'
+        });
+      }
+
+      return res.status(401).json({
+        success: false,
+        status: 'VERIFICATION_FAILED',
+        similarity: matchResult.similarity,
+        failedAttempts: user.biometricProfile.failedVerificationAttempts,
+        isLockedOut: lockoutTriggered,
+        lockoutUntil: user.biometricProfile.lockoutUntil,
+        error: lockoutTriggered
+          ? 'Account temporarily locked for 15 minutes due to 5 consecutive failed facial verifications.'
+          : 'Identity verification failed: Face does not match the enrolled profile for this account.'
+      });
+    }
+
+    // Verification Succeeded!
+    const clientIp = extractClientIp(req);
+    user.biometricProfile.failedVerificationAttempts = 0;
+    user.biometricProfile.lockoutUntil = null;
+    user.biometricProfile.lastVerifiedAt = new Date();
+
+    user.loginCount = (user.loginCount || 0) + 1;
+    user.lastLoginAt = new Date();
+    user.lastActiveAt = new Date();
+    user.currentSessionStartedAt = new Date();
+    user.lastIpAddress = clientIp;
+    user.lastLoginIp = clientIp;
+    user.userAgent = extractUserAgent(req);
+    await user.save({ validateBeforeSave: false });
+
+    await logActivity({
+      user,
+      action: 'LOGIN_FACE_VERIFIED',
+      category: 'Biometric Access',
+      description: `Student ${user.name} successfully authenticated via facial biometric verification (Similarity: ${matchResult.similarity})`,
+      details: { similarity: matchResult.similarity },
+      req
+    });
+
+    sendTokenResponse(user, 200, res);
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * @desc    Request emergency OTP accommodation for camera/accessibility failure
+ * @route   POST /api/auth/face/emergency-otp
+ * @access  Pre-authenticated Student
+ */
+exports.requestEmergencyOtp = async (req, res, next) => {
+  try {
+    const { preAuthToken, reason } = req.body;
+    if (!preAuthToken) {
+      return res.status(401).json({ success: false, error: 'Challenge token is required.' });
+    }
+    const tokenCheck = verifyPreAuthFaceToken(preAuthToken);
+    if (!tokenCheck.valid) {
+      return res.status(401).json({ success: false, error: tokenCheck.error });
+    }
+
+    const user = await User.findById(tokenCheck.payload.userId);
+    if (!user) {
+      return res.status(404).json({ success: false, error: 'User account not found.' });
+    }
+
+    // Generate 6-digit OTP
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiresAt = Date.now() + 10 * 60 * 1000;
+    emergencyOtpStore.set(user._id.toString(), {
+      otpHash: crypto.createHash('sha256').update(otp).digest('hex'),
+      expiresAt,
+      attempts: 0
+    });
+
+    try {
+      await sendEmail({
+        to: user.email,
+        subject: 'CAMPUSBRIDGE — Emergency Login Verification OTP',
+        text: `Your one-time login accommodation code is: ${otp}. It expires in 10 minutes.`,
+        html: `<h3>CAMPUSBRIDGE Emergency Login Accommodation</h3><p>Your one-time code is: <strong>${otp}</strong></p><p>This code expires in 10 minutes. Reason requested: ${reason || 'Camera malfunction / Accessibility accommodation'}</p>`
+      });
+    } catch (mailErr) {
+      console.warn('[AUTH] SMTP dispatch failed for emergency OTP:', mailErr.message);
+    }
+
+    await logActivity({
+      user,
+      action: 'EMERGENCY_OTP_REQUESTED',
+      category: 'Biometric Access',
+      description: `Student ${user.name} requested emergency OTP accommodation.`,
+      details: { reason: reason || 'Camera / accessibility failure' },
+      req
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: 'Emergency verification code dispatched to your institutional email address.',
+      expiresInSeconds: 600
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * @desc    Verify emergency OTP accommodation and issue student session
+ * @route   POST /api/auth/face/verify-emergency-otp
+ * @access  Pre-authenticated Student
+ */
+exports.verifyEmergencyOtp = async (req, res, next) => {
+  try {
+    const { preAuthToken, otp } = req.body;
+    if (!preAuthToken || !otp) {
+      return res.status(400).json({ success: false, error: 'Token and OTP are required.' });
+    }
+    const tokenCheck = verifyPreAuthFaceToken(preAuthToken);
+    if (!tokenCheck.valid) {
+      return res.status(401).json({ success: false, error: tokenCheck.error });
+    }
+
+    const record = emergencyOtpStore.get(tokenCheck.payload.userId);
+    if (!record || Date.now() > record.expiresAt) {
+      emergencyOtpStore.delete(tokenCheck.payload.userId);
+      return res.status(400).json({ success: false, error: 'OTP has expired or was not requested. Please request a new code.' });
+    }
+
+    record.attempts += 1;
+    if (record.attempts > 4) {
+      emergencyOtpStore.delete(tokenCheck.payload.userId);
+      return res.status(429).json({ success: false, error: 'Too many incorrect OTP attempts. Please request a new code.' });
+    }
+
+    const hashedInput = crypto.createHash('sha256').update(String(otp).trim()).digest('hex');
+    if (hashedInput !== record.otpHash) {
+      return res.status(400).json({ success: false, error: 'Invalid verification code.' });
+    }
+
+    // OTP verified! Consume OTP immediately
+    emergencyOtpStore.delete(tokenCheck.payload.userId);
+
+    const user = await User.findById(tokenCheck.payload.userId);
+    const clientIp = extractClientIp(req);
+    user.loginCount = (user.loginCount || 0) + 1;
+    user.lastLoginAt = new Date();
+    user.lastActiveAt = new Date();
+    user.currentSessionStartedAt = new Date();
+    user.lastIpAddress = clientIp;
+    user.lastLoginIp = clientIp;
+    user.userAgent = extractUserAgent(req);
+    await user.save({ validateBeforeSave: false });
+
+    await logActivity({
+      user,
+      action: 'LOGIN_EMERGENCY_OTP_VERIFIED',
+      category: 'Biometric Access',
+      description: `Student ${user.name} logged in via verified emergency OTP accommodation.`,
+      req
+    });
+
+    sendTokenResponse(user, 200, res);
   } catch (err) {
     next(err);
   }

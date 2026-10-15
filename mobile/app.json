@@ -23,7 +23,6 @@
         "USE_BIOMETRIC",
         "USE_FINGERPRINT",
         "android.permission.CAMERA",
-        "android.permission.RECORD_AUDIO",
         "android.permission.ACCESS_COARSE_LOCATION",
         "android.permission.ACCESS_FINE_LOCATION",
         "android.permission.USE_BIOMETRIC",
@@ -41,7 +40,8 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "CampusBridge requires camera access for biometric facial verification and scanning dynamic attendance QR codes."
+          "cameraPermission": "CampusBridge requires camera access for biometric facial verification and scanning dynamic attendance QR codes.",
+          "recordAudioAndroid": false
         }
       ],
       [

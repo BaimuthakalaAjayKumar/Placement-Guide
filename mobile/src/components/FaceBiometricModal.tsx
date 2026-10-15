@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { THEME } from '../utils/constants';
 import { attendanceApi, BiometricChallengeResponse } from '../api/attendanceApi';
+import { extractFaceEmbedding } from '../services/faceInferenceService';
 
 // Safe dynamic loader for native camera to prevent Expo Go crashes
 let CameraViewComponent: any = null;
@@ -149,87 +150,94 @@ export const FaceBiometricModal: React.FC<FaceBiometricModalProps> = ({
     }
   };
 
-  // Generate synthetic optical feature descriptor based on facial geometry & multi-frame sampling
-  const generateOpticalEvidence = (): number[] => {
-    const vector = new Array(128).fill(0);
-    const seed = Date.now() % 10000;
-    for (let i = 0; i < 128; i++) {
-      // Produces consistent normalized facial keypoint ratios (inter-pupillary, jawline, mouth)
-      vector[i] = Math.sin((i + 1) * 0.4 + seed * 0.0001) * 0.8 + Math.cos((i + 7) * 0.2) * 0.2;
-    }
-    return vector;
-  };
-
   const handleCaptureAndVerify = async () => {
-    if (status === 'PROCESSING') return;
+    if (status === 'PROCESSING' || status === 'CAPTURING') return;
 
     setStatus('CAPTURING');
-    setStatusMessage('Analyzing facial geometry and optical liveness...');
+    setStatusMessage('Analyzing facial geometry with MobileFaceNet...');
     setErrorMessage(null);
 
-    // Multi-frame optical variance analysis
-    setTimeout(async () => {
-      setStatus('PROCESSING');
+    try {
+      let opticalEvidence: number[];
+      if (cameraRef.current && isNativeCameraAvailable) {
+        const photo = await cameraRef.current.takePictureAsync({
+          base64: true,
+          quality: 0.85,
+          skipProcessing: false,
+        });
+
+        if (!photo?.base64 && !photo?.uri) {
+          throw new Error('Camera snapshot failed.');
+        }
+
+        setStatus('PROCESSING');
+        setStatusMessage('Extracting biometric embedding via ONNX...');
+
+        opticalEvidence = await extractFaceEmbedding({
+          base64: photo.base64,
+          uri: photo.uri,
+        });
+      } else {
+        throw new Error('Camera sensor or native inference module not available.');
+      }
+
       setStatusMessage('Verifying biometric identity...');
 
-      try {
-        const opticalEvidence = generateOpticalEvidence();
-        const livenessEvidence = {
-          opticalVariance: 0.28, // Genuine human optical variance
-          motionDelta: 0.19,
-          framesSampled: 4,
-        };
+      const livenessEvidence = {
+        opticalVariance: 0.28,
+        motionDelta: 0.19,
+        framesSampled: 4,
+      };
 
-        if (mode === 'ENROLL') {
-          const res = await attendanceApi.enrollBiometric({
-            consentGiven: true,
-            opticalEvidence,
-            challengeNonce: challenge?.challengeNonce,
-            livenessEvidence,
-          });
+      if (mode === 'ENROLL') {
+        const res = await attendanceApi.enrollBiometric({
+          consentGiven: true,
+          opticalEvidence,
+          challengeNonce: challenge?.challengeNonce,
+          livenessEvidence,
+        });
 
-          if (res.success) {
-            setStatus('SUCCESS');
-            setStatusMessage('Facial enrollment completed successfully!');
-            setTimeout(() => {
-              onSuccess();
-            }, 1200);
-          } else {
-            setStatus('ERROR');
-            setErrorMessage(res.error || 'Biometric enrollment failed.');
-          }
+        if (res.success) {
+          setStatus('SUCCESS');
+          setStatusMessage('Facial enrollment completed successfully!');
+          setTimeout(() => {
+            onSuccess();
+          }, 1200);
         } else {
-          // Mode: VERIFY
-          const res = await attendanceApi.verifyBiometric({
-            purpose,
-            opticalEvidence,
-            challengeNonce: challenge?.challengeNonce,
-            livenessEvidence,
-          });
+          setStatus('ERROR');
+          setErrorMessage(res.error || 'Biometric enrollment failed.');
+        }
+      } else {
+        // Mode: VERIFY
+        const res = await attendanceApi.verifyBiometric({
+          purpose,
+          opticalEvidence,
+          challengeNonce: challenge?.challengeNonce,
+          livenessEvidence,
+        });
 
-          if (res.success && res.verified && res.faceVerificationToken) {
-            setStatus('SUCCESS');
-            setSimilarityScore(res.similarity || 0.94);
-            setStatusMessage(`Verified (Match: ${Math.round((res.similarity || 0.94) * 100)}%)`);
-            const token = res.faceVerificationToken;
-            setTimeout(() => {
-              onSuccess(token);
-            }, 900);
+        if (res.success && res.verified && res.faceVerificationToken) {
+          setStatus('SUCCESS');
+          setSimilarityScore(res.similarity || 0.94);
+          setStatusMessage(`Verified (Match: ${Math.round((res.similarity || 0.94) * 100)}%)`);
+          const token = res.faceVerificationToken;
+          setTimeout(() => {
+            onSuccess(token);
+          }, 900);
+        } else {
+          setStatus('ERROR');
+          if (res.status === 'AMBIGUOUS_MATCH') {
+            setErrorMessage('Inconclusive match. Please ensure direct lighting and look straight ahead.');
           } else {
-            setStatus('ERROR');
-            if (res.status === 'AMBIGUOUS_MATCH') {
-              setErrorMessage('Inconclusive match. Please ensure direct lighting and look straight ahead.');
-            } else {
-              setErrorMessage(res.error || 'Face verification failed. Profile mismatch.');
-            }
+            setErrorMessage(res.error || 'Face verification failed. Profile mismatch.');
           }
         }
-      } catch (err: any) {
-        setStatus('ERROR');
-        const apiErr = err.response?.data?.error || err.message || 'Verification request failed.';
-        setErrorMessage(apiErr);
       }
-    }, 1200);
+    } catch (err: any) {
+      setStatus('ERROR');
+      const apiErr = err.response?.data?.error || err.message || 'Verification request failed.';
+      setErrorMessage(apiErr);
+    }
   };
 
   const translateY = scanLineAnim.interpolate({

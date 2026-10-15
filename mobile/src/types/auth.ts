@@ -61,9 +61,19 @@ export interface User {
 
 export interface AuthResponse {
   success: boolean;
-  token: string;
-  user: User;
+  token?: string;
+  user?: User;
   error?: string;
+  requireFaceEnrollment?: boolean;
+  preAuthToken?: string;
+  requireFaceVerification?: boolean;
+  challengeToken?: string;
+  challengeNonce?: string;
+  promptAction?: string;
+  instructions?: string;
+  expiresAt?: string;
+  isLockedOut?: boolean;
+  lockoutUntil?: string;
 }
 
 export interface CaptchaVerification {
@@ -89,8 +99,9 @@ export interface AuthContextType {
   isBiometricSupported?: boolean;
   biometricLabel?: string;
   role: UserRole | null;
-  login: (credentials: LoginCredentials) => Promise<{ success: boolean; error?: string }>;
+  login: (credentials: LoginCredentials) => Promise<AuthResponse>;
   logout: () => Promise<void>;
   refreshProfile: () => Promise<void>;
   unlockWithBiometrics?: () => Promise<{ success: boolean; error?: string }>;
+  setSessionFromToken: (token: string, user: User) => Promise<void>;
 }

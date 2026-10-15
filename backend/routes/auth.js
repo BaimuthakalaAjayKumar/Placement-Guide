@@ -10,7 +10,12 @@ const {
   logout,
   switchRole,
   uploadProfilePhoto,
-  removeProfilePhoto
+  removeProfilePhoto,
+  requestStudentFaceChallenge,
+  enrollStudentFace,
+  verifyStudentFaceLogin,
+  requestEmergencyOtp,
+  verifyEmergencyOtp
 } = require('../controllers/auth');
 
 const router = express.Router();
@@ -28,5 +33,12 @@ router.delete('/profile-photo', protect, removeProfilePhoto);
 router.put('/change-password', protect, changePassword);
 router.post('/forgotpassword', forgotPassword);
 router.put('/resetpassword/:token', resetPassword);
+
+// Student Mandatory Face Authentication & Verification Routes
+router.post('/face/challenge', requestStudentFaceChallenge);
+router.post('/face/enroll', enrollStudentFace);
+router.post('/face/verify-login', verifyStudentFaceLogin);
+router.post('/face/emergency-otp', requestEmergencyOtp);
+router.post('/face/verify-emergency-otp', verifyEmergencyOtp);
 
 module.exports = router;

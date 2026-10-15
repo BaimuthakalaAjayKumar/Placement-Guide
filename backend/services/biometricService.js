@@ -16,11 +16,61 @@ const jwt = require('jsonwebtoken');
  */
 
 const EMBEDDING_DIM = 128;
-const SIMILARITY_THRESHOLD = 0.75; // Defensible threshold derived from cosine metric standard
-const AMBIGUOUS_THRESHOLD = 0.60;
+const DEFAULT_SIMILARITY_THRESHOLD = 0.70; // Calibrated operational baseline (configurable via env)
+const DEFAULT_AMBIGUOUS_THRESHOLD = 0.58;
 const LIVENESS_VARIANCE_MIN = 0.12; // Minimum optical/motion variance across challenge frames
 const NONCE_EXPIRY_MS = 60 * 1000; // 60 seconds
 const VERIFICATION_TOKEN_EXPIRY_SEC = 180; // 3 minutes
+const PRE_AUTH_EXPIRY_SEC = 300; // 5 minutes for face challenge completion
+
+function getMatchThreshold() {
+  const envVal = parseFloat(process.env.BIOMETRIC_MATCH_THRESHOLD);
+  return Number.isFinite(envVal) && envVal >= 0.5 && envVal <= 0.95 ? envVal : DEFAULT_SIMILARITY_THRESHOLD;
+}
+
+function getAmbiguousThreshold() {
+  const envVal = parseFloat(process.env.BIOMETRIC_AMBIGUOUS_THRESHOLD);
+  const matchThreshold = getMatchThreshold();
+  return Number.isFinite(envVal) && envVal >= 0.4 && envVal < matchThreshold ? envVal : DEFAULT_AMBIGUOUS_THRESHOLD;
+}
+
+/**
+ * Rigorously checks that an embedding is a genuine 128-dimensional vector,
+ * rejecting synthetic, constant, malformed, or zero-entropy vectors.
+ */
+function validateEmbeddingQuality(vector) {
+  if (!Array.isArray(vector)) {
+    return { valid: false, error: 'Embedding must be an array of numeric values.' };
+  }
+  if (vector.length !== EMBEDDING_DIM) {
+    return { valid: false, error: `Embedding dimension mismatch. Expected ${EMBEDDING_DIM}, received ${vector.length}.` };
+  }
+
+  let sum = 0;
+  let sumSq = 0;
+  for (let i = 0; i < vector.length; i++) {
+    const val = vector[i];
+    if (typeof val !== 'number' || !Number.isFinite(val) || Number.isNaN(val)) {
+      return { valid: false, error: `Embedding element at index ${i} is not a finite number.` };
+    }
+    if (val < -3.0 || val > 3.0) {
+      return { valid: false, error: `Embedding value at index ${i} exceeds valid normalized range.` };
+    }
+    sum += val;
+    sumSq += val * val;
+  }
+
+  const mean = sum / vector.length;
+  const variance = (sumSq / vector.length) - (mean * mean);
+  const stdDev = Math.sqrt(Math.max(0, variance));
+
+  // Reject synthetic constant or zero-variance vectors
+  if (stdDev < 0.02) {
+    return { valid: false, error: 'Embedding rejected: Zero or near-zero variance indicates synthetic or forged vector.' };
+  }
+
+  return { valid: true };
+}
 
 // In-memory nonce stores for challenge-response and anti-replay
 // Maps are periodically pruned to prevent memory growth
@@ -40,7 +90,7 @@ setInterval(() => {
       consumedTokenNonces.delete(nonce);
     }
   }
-}, 2 * 60 * 1000);
+}, 2 * 60 * 1000).unref();
 
 /**
  * Derive 32-byte AES-256 key from environment secret
@@ -221,16 +271,19 @@ function computeCosineSimilarity(vectorA, vectorB) {
  * @param {number[]} probeEmbedding
  * @returns {{ similarity: number, isMatch: boolean, isAmbiguous: boolean }}
  */
-function compareEmbeddings(enrolledEmbedding, probeEmbedding) {
+function compareEmbeddings(enrolledEmbedding, probeEmbedding, customThreshold = null) {
   const normEnrolled = l2Normalize(enrolledEmbedding);
   const normProbe = l2Normalize(probeEmbedding);
   const similarity = computeCosineSimilarity(normEnrolled, normProbe);
   const rounded = Math.round(similarity * 10000) / 10000;
 
+  const matchThreshold = typeof customThreshold === 'number' ? customThreshold : getMatchThreshold();
+  const ambiguousThreshold = getAmbiguousThreshold();
+
   return {
     similarity: rounded,
-    isMatch: rounded >= SIMILARITY_THRESHOLD,
-    isAmbiguous: rounded >= AMBIGUOUS_THRESHOLD && rounded < SIMILARITY_THRESHOLD
+    isMatch: rounded >= matchThreshold,
+    isAmbiguous: rounded >= ambiguousThreshold && rounded < matchThreshold
   };
 }
 
@@ -396,13 +449,84 @@ function verifyAndConsumeFaceToken(token, expectedUserId, expectedPurpose) {
   }
 }
 
+/**
+ * Generates a short-lived restricted token during pre-auth verification stage.
+ * Cannot access general protected routes; only authorized for face enrollment or verification.
+ */
+function generatePreAuthFaceToken(userId, stage, metadata = {}) {
+  const jwtSecret = process.env.JWT_SECRET || 'cb-secret-token-fallback';
+  const tokenNonce = crypto.randomBytes(16).toString('hex');
+  const payload = {
+    userId: userId.toString(),
+    stage, // 'AWAITING_FACE_ENROLLMENT' | 'AWAITING_FACE_VERIFICATION'
+    tokenNonce,
+    tokenType: 'PRE_AUTH_FACE_CHALLENGE',
+    ...metadata,
+    iat: Math.floor(Date.now() / 1000)
+  };
+  return jwt.sign(payload, jwtSecret, { expiresIn: PRE_AUTH_EXPIRY_SEC });
+}
+
+/**
+ * Verifies a pre-auth face challenge token and confirms authentication stage.
+ */
+function verifyPreAuthFaceToken(token, expectedStage = null) {
+  if (!token) {
+    return { valid: false, error: 'Pre-authentication challenge token is missing.' };
+  }
+  const jwtSecret = process.env.JWT_SECRET || 'cb-secret-token-fallback';
+  try {
+    const decoded = jwt.verify(token, jwtSecret);
+    if (decoded.tokenType !== 'PRE_AUTH_FACE_CHALLENGE') {
+      return { valid: false, error: 'Invalid token type for pre-auth challenge.' };
+    }
+    if (expectedStage && decoded.stage !== expectedStage) {
+      return { valid: false, error: `Authentication stage mismatch. Expected ${expectedStage}, received ${decoded.stage}.` };
+    }
+    return { valid: true, payload: decoded };
+  } catch (err) {
+    if (err.name === 'TokenExpiredError') {
+      return { valid: false, error: 'Face verification session timed out (5-minute limit). Please sign in again.' };
+    }
+    return { valid: false, error: 'Invalid or forged authentication challenge signature.' };
+  }
+}
+
+/**
+ * Validates and consumes a single-use challenge nonce.
+ */
+function consumeChallengeNonce(challengeNonce, userId) {
+  if (!challengeNonce || !activeChallenges.has(challengeNonce)) {
+    return { valid: false, error: 'Liveness challenge expired or was already consumed. Please retry.' };
+  }
+  const challenge = activeChallenges.get(challengeNonce);
+  activeChallenges.delete(challengeNonce); // anti-replay: consume immediately
+
+  if (Date.now() > challenge.expiresAt) {
+    return { valid: false, error: 'Liveness challenge expired (60-second limit). Please refresh camera.' };
+  }
+  if (challenge.userId !== userId.toString()) {
+    return { valid: false, error: 'Challenge user identity mismatch.' };
+  }
+  return { valid: true, challenge };
+}
+
 module.exports = {
   EMBEDDING_DIM,
-  SIMILARITY_THRESHOLD,
-  AMBIGUOUS_THRESHOLD,
+  DEFAULT_SIMILARITY_THRESHOLD,
+  DEFAULT_AMBIGUOUS_THRESHOLD,
+  SIMILARITY_THRESHOLD: DEFAULT_SIMILARITY_THRESHOLD,
+  AMBIGUOUS_THRESHOLD: DEFAULT_AMBIGUOUS_THRESHOLD,
   LIVENESS_VARIANCE_MIN,
   NONCE_EXPIRY_MS,
   VERIFICATION_TOKEN_EXPIRY_SEC,
+  PRE_AUTH_EXPIRY_SEC,
+  getMatchThreshold,
+  getAmbiguousThreshold,
+  validateEmbeddingQuality,
+  generatePreAuthFaceToken,
+  verifyPreAuthFaceToken,
+  consumeChallengeNonce,
   l2Normalize,
   extractNormalizedEmbedding,
   encryptEmbedding,

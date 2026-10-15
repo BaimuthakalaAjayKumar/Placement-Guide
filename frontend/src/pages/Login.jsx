@@ -199,14 +199,9 @@ const Login = () => {
           </button>
         </form>
 
-        <div className="auth-footer" style={{ display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'center' }}>
-          <div>
-            <span>New to Campus Bridge? </span>
-            <Link to="/register" className="auth-link">Create an Account</Link>
-          </div>
-          <div style={{ fontSize: '11px', color: 'var(--text-secondary, #94a3b8)', opacity: 0.8 }}>
-            Platform Super Admin: <code style={{ color: '#818cf8', background: 'rgba(99, 102, 241, 0.1)', padding: '1px 4px', borderRadius: '4px' }}>vaddeajaykumar2004@gmail.com</code>
-          </div>
+        <div className="auth-footer">
+          <span>New to Campus Bridge? </span>
+          <Link to="/register" className="auth-link">Create an Account</Link>
         </div>
       </div>
     </div>

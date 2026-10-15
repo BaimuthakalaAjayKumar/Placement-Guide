@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
-import { AuthContextType, LoginCredentials, User, UserRole } from '../types/auth';
+import { AuthContextType, AuthResponse, LoginCredentials, User, UserRole } from '../types/auth';
 import { getToken, saveToken, getUserData, saveUserData, clearAuthStorage } from '../utils/storage';
 import { loginUser, logoutUser, getMe } from '../api/authApi';
 import { registerUnauthorizedHandler } from '../api/client';
@@ -110,7 +110,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
-  const login = async (credentials: LoginCredentials): Promise<{ success: boolean; error?: string }> => {
+  const setSessionFromToken = async (newToken: string, newUser: User): Promise<void> => {
+    await saveToken(newToken);
+    await saveUserData(newUser);
+    setToken(newToken);
+    setUser(newUser);
+    setIsCachedSession(false);
+    setIsBiometricLocked(false);
+  };
+
+  const login = async (credentials: LoginCredentials): Promise<AuthResponse> => {
     setIsLoading(true);
     try {
       const response = await loginUser(credentials);
@@ -121,12 +130,23 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         setUser(response.user);
         setIsCachedSession(false);
         setIsBiometricLocked(false);
-        return { success: true };
+        return response;
+      }
+      // If student requires face enrollment or verification, return response without storing session
+      if (response.requireFaceEnrollment || response.requireFaceVerification) {
+        return response;
       }
       return { success: false, error: response.error || 'Login failed.' };
     } catch (err: any) {
       const errorMessage = formatApiErrorMessage(err);
-      return { success: false, error: errorMessage };
+      const isLockedOut = err?.response?.data?.isLockedOut;
+      const lockoutUntil = err?.response?.data?.lockoutUntil;
+      return {
+        success: false,
+        error: errorMessage,
+        isLockedOut,
+        lockoutUntil,
+      };
     } finally {
       setIsLoading(false);
     }
@@ -180,6 +200,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         logout,
         refreshProfile,
         unlockWithBiometrics,
+        setSessionFromToken,
       }}
     >
       {children}

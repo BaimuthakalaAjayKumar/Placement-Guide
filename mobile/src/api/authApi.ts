@@ -41,3 +41,61 @@ export async function updateUserProfile(data: Partial<User>): Promise<{ success:
   const response = await apiClient.put<{ success: boolean; data: User; error?: string }>('/api/auth/profile', data);
   return response.data;
 }
+
+export interface FaceChallengeResponse {
+  success: boolean;
+  challengeNonce: string;
+  promptAction: string;
+  instructions: string;
+  expiresAt: string;
+  error?: string;
+}
+
+export async function requestFaceChallenge(preAuthToken: string): Promise<FaceChallengeResponse> {
+  const response = await apiClient.post<FaceChallengeResponse>(
+    '/api/auth/face/challenge',
+    { token: preAuthToken },
+    { headers: { Authorization: `Bearer ${preAuthToken}` } }
+  );
+  return response.data;
+}
+
+export async function enrollStudentFace(data: {
+  preAuthToken: string;
+  consentGiven: boolean;
+  probeEmbedding: number[];
+  challengeNonce?: string;
+  livenessEvidence?: any;
+}): Promise<AuthResponse> {
+  const response = await apiClient.post<AuthResponse>('/api/auth/face/enroll', data);
+  return response.data;
+}
+
+export async function verifyStudentFaceLogin(data: {
+  challengeToken: string;
+  challengeNonce: string;
+  probeEmbedding: number[];
+  livenessEvidence?: any;
+}): Promise<AuthResponse & { similarity?: number; isLockedOut?: boolean; lockoutUntil?: string; verified?: boolean; status?: string }> {
+  const response = await apiClient.post<AuthResponse & { similarity?: number; isLockedOut?: boolean; lockoutUntil?: string; verified?: boolean; status?: string }>(
+    '/api/auth/face/verify-login',
+    data
+  );
+  return response.data;
+}
+
+export async function requestEmergencyOtp(preAuthToken: string, reason?: string): Promise<{ success: boolean; message?: string; error?: string }> {
+  const response = await apiClient.post<{ success: boolean; message?: string; error?: string }>(
+    '/api/auth/face/emergency-otp',
+    { preAuthToken, reason }
+  );
+  return response.data;
+}
+
+export async function verifyEmergencyOtp(preAuthToken: string, otp: string): Promise<AuthResponse> {
+  const response = await apiClient.post<AuthResponse>(
+    '/api/auth/face/verify-emergency-otp',
+    { preAuthToken, otp }
+  );
+  return response.data;
+}

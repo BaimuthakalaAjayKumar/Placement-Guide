@@ -501,6 +501,33 @@ const UserSchema = new mongoose.Schema({
     revokedReason: {
       type: String,
       default: ''
+    },
+    failedVerificationAttempts: {
+      type: Number,
+      default: 0
+    },
+    lockoutUntil: {
+      type: Date,
+      default: null
+    },
+    exemption: {
+      isExempt: {
+        type: Boolean,
+        default: false
+      },
+      reason: {
+        type: String,
+        default: ''
+      },
+      exemptedBy: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+        default: null
+      },
+      validUntil: {
+        type: Date,
+        default: null
+      }
     }
   },
   createdAt: {

@@ -20,6 +20,7 @@ interface InputProps {
   autoCapitalize?: 'none' | 'sentences' | 'words' | 'characters';
   error?: string;
   editable?: boolean;
+  maxLength?: number;
   style?: ViewStyle;
 }
 
@@ -33,6 +34,7 @@ export const Input: React.FC<InputProps> = ({
   autoCapitalize = 'none',
   error,
   editable = true,
+  maxLength,
   style,
 }) => {
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
@@ -61,6 +63,7 @@ export const Input: React.FC<InputProps> = ({
           keyboardType={keyboardType}
           autoCapitalize={autoCapitalize}
           editable={editable}
+          maxLength={maxLength}
           onFocus={() => setIsFocused(true)}
           onBlur={() => setIsFocused(false)}
         />

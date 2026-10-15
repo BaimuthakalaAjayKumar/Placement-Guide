@@ -5,10 +5,14 @@ import { Input } from '../../components/Input';
 import { Button } from '../../components/Button';
 import { ErrorBanner } from '../../components/ErrorBanner';
 import { CaptchaChallenge } from '../../components/CaptchaChallenge';
+import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { AuthStackParamList } from '../../navigation/AuthNavigator';
 import { useAuth } from '../../context/AuthContext';
 import { THEME, APP_NAME } from '../../utils/constants';
 
 export const LoginScreen: React.FC = () => {
+  const navigation = useNavigation<NativeStackNavigationProp<AuthStackParamList>>();
   const {
     login,
     isLoading,
@@ -77,8 +81,40 @@ export const LoginScreen: React.FC = () => {
         captchaToken,
       });
 
+      // 1. Mandatory Student Face Enrollment on first login
+      if (result.requireFaceEnrollment && result.preAuthToken) {
+        resetCaptcha();
+        navigation.navigate('StudentFaceEnrollment', {
+          preAuthToken: result.preAuthToken,
+          studentName: result.user?.name || 'Student',
+          email: result.user?.email || email.trim(),
+        });
+        return;
+      }
+
+      // 2. Mandatory Student Face Verification on subsequent logins
+      if (result.requireFaceVerification && result.challengeToken && result.challengeNonce) {
+        resetCaptcha();
+        navigation.navigate('StudentFaceLogin', {
+          challengeToken: result.challengeToken,
+          challengeNonce: result.challengeNonce,
+          promptAction: result.promptAction,
+          instructions: result.instructions,
+          studentName: result.user?.name || 'Student',
+          email: result.user?.email || email.trim(),
+        });
+        return;
+      }
+
       if (!result.success) {
-        setErrorMessage(result.error || 'Authentication failed. Please check your credentials.');
+        if (result.isLockedOut) {
+          setErrorMessage(
+            result.error ||
+              'Biometric verification attempts exceeded. Account is temporarily locked out. Please try again later or use emergency access.'
+          );
+        } else {
+          setErrorMessage(result.error || 'Authentication failed. Please check your credentials.');
+        }
         resetCaptcha();
       } else {
         resetCaptcha();

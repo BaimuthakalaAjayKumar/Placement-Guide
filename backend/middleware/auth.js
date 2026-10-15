@@ -25,6 +25,14 @@ exports.protect = async (req, res, next) => {
     // Verify token
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
+    // Block pre-authentication and intermediate verification tokens from accessing protected application resources
+    if (decoded.tokenType === 'PRE_AUTH_FACE_CHALLENGE' || decoded.tokenType === 'BIOMETRIC_FACE_VERIFICATION') {
+      return res.status(401).json({
+        success: false,
+        error: 'Pre-authentication challenge token cannot be used to access protected application resources. Complete facial verification first.'
+      });
+    }
+
     req.user = await User.findById(decoded.id);
 
     if (!req.user) {
